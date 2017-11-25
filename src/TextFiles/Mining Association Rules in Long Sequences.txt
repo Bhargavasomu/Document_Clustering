@@ -1,0 +1,1063 @@
+Mining Association Rules in Long Sequences
+
+Boris Cule and Bart Goethals
+
+University of Antwerp,
+
+Middelheimlaan 1, 2020 Antwerpen, Belgium
+{boris.cule,bart.goethals}@ua.ac.be
+
+Abstract. Discovering interesting patterns in long sequences, and ﬁnd-
+ing conﬁdent association rules within them, is a popular area in data
+mining. Most existing methods deﬁne patterns as interesting if they oc-
+cur frequently enough in a suﬃciently cohesive form. Based on these
+frequent patterns, association rules are mined in the traditional man-
+ner. Recently, a new interestingness measure, combining cohesion and
+frequency of a pattern, has been proposed, and patterns are deemed in-
+teresting if encountering one event from the pattern implies with a high
+probability that the rest of the pattern can be found nearby. It is quite
+clear that this probability is not necessarily equally high for all the events
+making up such a pattern, which is why we propose to introduce the con-
+cept of association rules into this problem setting. The conﬁdence of such
+an association rule tells us how far on average from a particular event, or
+a set of events, one has to look, in order to ﬁnd the rest of the pattern.
+In this paper, we present an eﬃcient algorithm to mine such association
+rules. After applying our method to both synthetic and real-life data, we
+conclude that it indeed gives intuitive results in a number of applications.
+
+Keywords: association rules, sequences, interesting itemsets.
+
+1 Introduction
+
+Pattern discovery in sequences is a popular data mining task. Typically, the
+dataset consists of a single event sequence, and the task consists of analysing
+the order in which events occur, trying to identify correlation among events. In
+this paper, events are items, and we look for association rules between itemsets.
+Usually, an itemset is evaluated based on how close to each other its items occur
+(cohesion), and how often the itemset itself occurs (frequency).
+
+Recently, we proposed to combine cohesion and frequency into a single mea-
+sure [2], thereby guaranteeing that if we encounter an item from an itemset
+identiﬁed as interesting, there is a high probability that the rest of the itemset
+can be found nearby. The proposed algorithm suﬀered from long runtimes, de-
+spite the eﬃcient pruning of candidates. We now propose relaxing the pruning
+function, but making it much easier to compute. As a result, we prune less, but
+the algorithm runs much faster.
+
+We further propose to introduce the concept of association rules into this
+setting. We wish to ﬁnd itemsets that imply the occurrence of other itemsets
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part I, LNAI 6118, pp. 300–309, 2010.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2010
+
+Mining Association Rules in Long Sequences
+
+301
+
+nearby. We present an eﬃcient algorithm to mine such rules, taking advantage
+of two factors that lead to its eﬃciency — we can mine itemsets and rules in
+parallel, and we only need to compute the conﬁdence of a simple class of rules,
+and use them to evaluate all other rules.
+
+2 Related Work
+
+The concept of ﬁnding patterns in sequences was ﬁrst described by Mannila et
+al. [7]. Patterns are described as episodes, and can be parallel, where the order in
+which events occur is irrelevant, serial, where events occur in a particular order,
+or a combination of the two. We limit ourselves to parallel episodes containing no
+more than one occurrence of any single event type — in other words, itemsets.
+In this setting, Mannila et al. propose the Winepi method to detect frequent
+itemsets. The method slides a window of ﬁxed length over the sequence, and
+each window containing the itemset counts towards its total frequency, which
+is deﬁned as the proportion of all windows that contain it. The conﬁdence of
+an association rule X ⇒ Y , denoted c(X ⇒ Y ), is deﬁned as the ratio of the
+frequency of X ∪ Y and the frequency of X. Once the frequent itemsets have
+been found, rules between them are generated in the traditional manner [1].
+
+Mannila et al. propose another method, Minepi, to search for frequent item-
+sets based on their minimal occurrences [7]. Here, however, association rules are
+of the form X[win1] ⇒ Y [win2], meaning that if itemset X has a minimal oc-
+currence in a window W1 of size win1, then X ∪ Y has a minimal occurrence in a
+window W2 of size win2 that fully contains W1. As we plan to develop rules that
+tell us how likely we are to ﬁnd some items nearby, we do not wish to use any
+ﬁxed window lengths, so these are precisely the sort of rules we wish to avoid.
+Generating association rules based on a maximum gap constraint, as deﬁned
+by Garriga [4], was done by M´eger and Rigotti [8], but only for serial episodes
+X and Y , where X is a preﬁx of Y . Most other related work has been based
+on the Winepi deﬁnitions, and only attempted to ﬁnd the same rules (or a
+representative subset) more eﬃciently [3, 5].
+
+Consider sequence s = cghef ababcidjcgdlcmd, that will be used as a running
+example throughout the paper. Assume that the time stamps associated with
+the items are integers from 1 to 20. This short sequence is enough to demonstrate
+the unintuitiveness of the Winepi method for evaluating association rules. We
+see that for each occurrence of an a, there is a b right next to it. Similarly, for
+each g, there is a c right next to it. Logically, association rules a ⇒ b and g ⇒ c
+should be equally conﬁdent (to be precise, their conﬁdence should be equal to
+1). Winepi, with a window size of 2 (the number of possible windows is thus
+21, as the ﬁrst window starts one time stamp before the sequence, and the last
+21 , f r(ab) =
+one ends one time stamp after the sequence), results in f r(a) = 4
+21 . and therefore c(a ⇒ b) = 0.75, c(g ⇒ c) = 0.5. A
+21 , f r(g) = 4
+3
+larger window always gives similar results, namely c(g ⇒ c) < c(a ⇒ b) < 1.
+Due to space restrictions, we only present related work on association rules.
+A more extensive discussion of related work on discovering patterns in sequences
+can be found in [2] and [6].
+
+21 , f r(cg) = 2
+
+302
+
+B. Cule and B. Goethals
+
+3 Problem Setting
+
+As our work is based on an earlier work [2], we now reproduce some of the
+necessary deﬁnitions and notations that we will use here. An event is a pair
+(i, t), consisting of an item and a time stamp, where i ∈ I, the set of all possible
+items, and t ∈ N. Two items can never occur at the same time. We denote a
+sequence of events by S. For an itemset X, the set of all occurrences of its items
+is denoted by N(X) = {t | (i, t) ∈ S and i ∈ X}. The coverage of X is deﬁned
+as the probability of encountering an item from X in the sequence, and denoted
+
+P (X) =
+
+|N (X)|
+
+|S|
+
+.
+
+The length of the shortest interval containing itemset X for each time stamp in
+N(X) is computed as
+W (X, t) = min{t2 − t1 + 1 | t1 ≤ t ≤ t2 and ∀i ∈ X,∃(i, t
+The average length of such shortest intervals is expressed as
+
+(cid:3)) ∈ S, t1 ≤ t
+
+(cid:3) ≤ t2}.
+
+W (X) =
+
+(cid:2)
+
+t∈N (X) W (X, t)
+
+|N (X)|
+
+.
+
+The cohesion of X is deﬁned as the ratio of the itemset size and the average
+length of the shortest intervals that contain it, and denoted
+
+C(X) =
+
+|X|
+W (X)
+
+.
+
+Finally, the interestingness of an itemset X is deﬁned as I(X) = C(X)P (X).
+Given a user deﬁned threshold min int, X is considered interesting if I(X)
+exceeds min int. An optional parameter, max size, can be used to limit the
+output only to itemsets with a size smaller or equal to max size.
+
+We are now ready to deﬁne the concept of association rules in this setting.
+The aim is to generate rules of the form if X occurs, Y occurs nearby, where
+X ∩ Y = ∅ and X ∪ Y is an interesting itemset. We denote such a rule by
+X ⇒ Y , and we call X the body of the rule and Y the head of the rule. Clearly,
+the closer Y occurs to X on average, the higher the value of the rule. In other
+words, to compute the conﬁdence of the rule, we must now use the average length
+of minimal windows containing X ∪ Y , but only from the point of view of items
+making up itemset X. We therefore deﬁne this new average as
+
+(cid:2)
+
+t∈N (X) W (X∪Y, t)
+
+.
+
+|N (X)|
+The conﬁdence of a rule can now be deﬁned as
+
+W (X, Y ) =
+
+c(X ⇒ Y ) =
+
+|X∪Y |
+W (X,Y )
+
+.
+
+A rule X ⇒ Y is considered conﬁdent if its conﬁdence exceeds a given threshold,
+min conf.
+We now return to our running example. Looking at itemset cd, we see that
+the occurrence of a c at time stamp 1 will reduce the value of rule c ⇒ d, but
+
+Mining Association Rules in Long Sequences
+
+303
+
+not of rule d ⇒ c. Indeed, we see that W (cd, 1) = 12, and the minimal window
+containing cd for the other three occurrences of c is always of size 3. Therefore,
+W (c, d) = 21
+5.25 = 0.38. Meanwhile, the minimal
+window containing cd for all occurrences of d is always of size 3. It follows that
+W (d, c) = 9
+3 = 0.67. We can conclude that while an
+occurrence of a c does not highly imply ﬁnding a d nearby, when we encounter a
+d we can be reasonably certain that a c will be found nearby. We also note that,
+according to our deﬁnitions, c(a ⇒ b) = 1 and c(g ⇒ c) = 1, as desired.
+
+4 = 5.25, and c(c ⇒ d) = 2
+3 = 3 and c(d ⇒ c) = 2
+
+4 Improved Interesting Itemsets Algorithm
+
+The algorithm proposed in [2] and given in Algorithm 1, ﬁnds interesting itemsets
+as deﬁned in Section 3 by going through the search space (a tree) in a depth-ﬁrst
+manner, pruning whenever possible. The ﬁrst call to the algorithm is made with
+X empty, and Y equal to the set of all items.
+
+Algorithm 1. INIT((cid:10)X, Y (cid:11)) ﬁnds interesting itemsets
+if U BI((cid:2)X, Y (cid:3)) ≥ min int and size(X) ≤ max size then
+
+if Y = ∅ then
+output X
+
+else
+
+Choose a in Y
+INIT((cid:2)X ∪ {a}, Y \ {a}(cid:3))
+INIT((cid:2)X, Y \ {a}(cid:3))
+
+end if
+
+end if
+
+The algorithm uses the U BI pruning function, that returns an upper bound
+of the interestingness of all itemsets Z such that X ⊆ Z ⊆ X ∪ Y . If this upper
+bound is lower than the chosen min int, the subtree rooted at (cid:10)X, Y (cid:11) can be
+pruned. The U BI function is deﬁned as
+
+U BI((cid:2)X, Y (cid:3)) =
+
+|N(X∪Y )|2×|X∪Y |
+(cid:2)
+t∈N (X) W (X, t)×|S| .
+
+This pruning function prunes a large number of candidates, but the algorithm
+still suﬀers from long runtimes, due to the fact that each time a new itemset X is
+considered for pruning, W (X, t) needs to be computed for almost each t ∈ N(X).
+For large itemsets, this can imply multiple dataset scans just to decide if a single
+candidate node can be pruned.
+
+We propose a new pruning function in an attempt to balance pruning a large
+number of candidates with the eﬀort needed for pruning. As the main problem
+with the original function was computing the exact minimal windows for each
+candidate, we aim to estimate the length of these windows using a much simpler
+computation. To do this, we ﬁrst compute the exact sum of the window lengths
+for each pair of items, and we then use these sums to come up with a lower
+bound of the sum of the window lengths for all other candidate nodes.
+
+304
+
+B. Cule and B. Goethals
+
+We ﬁrst note that
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+t∈N (X) W (X, t) =
+
+x∈X
+
+t∈N ({x}) W (X, t).
+
+We then note that each window around an item x ∈ X must be at least as
+large as the largest such window containing the same item x and any other item
+y ∈ X. It follows that
+
+(cid:2)
+
+t∈N ({x}) W (X, t) ≥ (cid:2)
+
+t∈N ({x}) maxy∈X\{x}(W (xy, t)).
+
+Naturally, it also holds that
+
+(cid:2)
+
+t∈N ({x}) W (X, t) ≥ maxy∈X\{x}(
+
+(cid:2)
+
+t∈N ({x}) W (xy, t)).
+
+(cid:2)
+
+To simplify our notation, from now on we will denote
+s(x, y). Finally, we see that
+
+t∈N ({x}) W (xy, t) by
+
+(cid:2)
+
+t∈N (X) W (X, t) ≥ (cid:2)
+
+x∈X maxy∈X\{x}(s(x, y)),
+
+giving us a lower bound for the sum of windows containing X around all occur-
+rences of items of X. This gives us a new pruning function:
+
+N U BI((cid:2)X, Y (cid:3)) =
+
+(cid:2)
+
+|N(X∪Y )|2×|X∪Y |
+
+x∈X maxy∈X\{x}(s(x,y))×|S| .
+
+This new pruning function is easily evaluated, as all it requires is that we store
+s(x, y), the sum of minimal windows containing x and y over all occurrences of
+x, for each pair of items (x, y), so we can look them up when necessary.
+
+The exact windows will still have to be computed for the leaves of the search
+tree that have not been pruned, but this is unavoidable. Even for the leaves, it
+pays oﬀ to ﬁrst check the upper bound, and then, only if the upper bound exceeds
+the threshold, compute the exact interestingness. The new algorithm uses N U BI
+instead of U BI, and is the same as the one given in Algorithm 1, with
+
+if I(X) ≥ min int then output X
+
+replacing line 3.
+Let us now return to our running example, and examine what happens if we
+encounter node (cid:10){a, b, c},{d, e}(cid:11) in the search tree. We denote X = {a, b, c} and
+Y = {d, e}. With the original pruning technique, we would need to compute the
+exact minimal windows containing X for each occurrence of a, b or c. After a fair
+amount of work scanning the dataset many times, in all necessary directions, we
+t∈N (X) W (X, t) = 7 + 5 + 4 + 3 + 3 + 3 +
+would come up with the following:
+7 + 11 = 43. The value of the U BI pruning function is therefore:
+
+(cid:2)
+
+|N (X∪Y )|2×|X∪Y |
+t∈N (X) W (X, t)×|S| = 144×5
+(cid:2)
+
+43×20 = 0.84.
+
+Using the new technique, we would ﬁrst compute s(x, y) for all pairs (x, y). The
+relevant pairs are s(a, b) = 4, s(a, c) = 8, s(b, a) = 4, s(b, c) = 6,
+s(c, a) = 27, s(c, b) = 25. We can now compute the minimal possible sum of
+windows for each item, giving us
+
+Mining Association Rules in Long Sequences
+
+305
+
+maxy∈X\{a}(s(a, y)) = 8, maxy∈X\{b}(s(b, y)) = 6, maxy∈X\{c}(s(c, y)) = 27
+
+resulting in a sum of
+pruning function is therefore
+
+(cid:2)
+
+x∈X maxy∈X\{x}(s(x, y)) = 41. The value of the NUBI
+
+(cid:2)
+
+|N (X∪Y )|2×|X∪Y |
+
+x∈X maxy∈X\{x}(s(x,y))×|S| = 0.88
+
+We see that by simply looking up a few precomputed values instead of scanning
+the dataset a number of times, we get a very good estimate of the sum of the
+window lengths.
+
+5 Association Rules Algorithm
+
+Unlike the traditional approaches, which need all the frequent itemsets to be
+generated before the generation of association rules can begin, we are able to
+generate rules in parallel with the interesting itemsets. When ﬁnding an inter-
+esting itemset X, we compute the sum of all minimal windows W (X, t) for each
+x ∈ X apart, before adding them up into the overall sum needed to compute
+I(X). With these sums still in memory, we can easily compute the conﬁdence of
+all association rules of the form x ⇒ X \{x}, with x ∈ X, that can be generated
+from itemset X. In practice, it is suﬃcient to limit our computations to rules
+of precisely this form (i.e., rules where the body consists of a single item). To
+compute the conﬁdence of all other rules, we ﬁrst note that
+
+(cid:2)
+
+t∈N (X) W (X ∪ Y, t) =
+
+(cid:2)
+
+x∈X
+
+(cid:2)
+
+t∈N ({x}) W (X ∪ Y, t).
+
+A trivial mathematical property tells us that
+
+(cid:2)
+
+t∈N ({x}) W (X ∪ Y, t) = W (x, Y ∪ X \ {x})|N(x)|.
+
+As a result, we can conclude that
+
+W (X, Y ) =
+
+(cid:2)
+
+x∈X W (x,Y ∪X\{x})|N (x)|
+
+|N (X)|
+
+,
+
+which in turn implies that
+
+c(X ⇒ Y ) =
+
+(cid:2)
+
+|X∪Y ||N (X)|
+
+x∈X W (x,Y ∪X\{x})|N (x)|.
+
+Meanwhile, we can derive that
+
+and it follows that
+
+c(x ⇒ Y ∪ X \ {x}) =
+
+|X∪Y |
+
+W (x,Y ∪X\{x})
+
+,
+
+c(X ⇒ Y ) =
+
+(cid:2)
+
+|N(X)|
+c(x⇒Y ∪X\{x})
+
+|N (x)|
+
+.
+
+x∈X
+
+(1)
+
+As a result, once we have evaluated all the rules of the form x ⇒ X \ {x}, with
+x ∈ X, we can then evaluate all other rules Y ⇒ X \ Y , with Y ⊂ X, without
+
+306
+
+B. Cule and B. Goethals
+
+Algorithm 2. AR((cid:10)X, Y (cid:11)) ﬁnds interesting itemsets and conﬁdent association
+rules within them
+if N U BI((cid:2)X, Y (cid:3)) ≥ min int and size(X) ≤ max size then
+if Y = ∅ then
+
+if I(X) ≥ min int then
+
+output X
+for all x ∈ X do
+
+compute and store c(x ⇒ X \ {x})
+if c(x ⇒ X \ {x}) ≥ min conf then output x ⇒ X \ {x}
+
+end for
+for all Y ⊂ X with |Y | ≥ 2 do
+
+if c(Y ⇒ X \ Y ) ≥ min conf then output Y ⇒ X \ Y
+
+end for
+
+end if
+
+else
+
+Choose a in Y
+AR((cid:2)X ∪ {a}, Y \ {a}(cid:3))
+AR((cid:2)X, Y \ {a}(cid:3))
+
+end if
+
+end if
+
+further dataset scans. The algorithm for ﬁnding both interesting itemsets and
+conﬁdent association rules is given in Algorithm 2.
+ab ⇒ c. First we compute c(a ⇒ bc) = 3
+From Eq. 1, it follows that c(ab ⇒ c) =
+that this corresponds to the value as deﬁned in Section 3.
+
+Looking back at our running example, let us compute the conﬁdence of rule
+3.5 = 0.86.
+5 = 0.8. It is easy to check
+
+4 = 0.75 and c(b ⇒ ac) = 3
+
+4
+0.75 +
+
+2
+
+= 4
+
+2
+
+0.86
+
+6 Experiments
+
+In our experiments, we aim to show three things:
+
+1. our algorithm for ﬁnding interesting itemsets works faster than the one given
+
+in [2] and can handle much longer sequences.
+
+2. our algorithm for ﬁnding association rules gives meaningful results, without
+
+3. our algorithm for ﬁnding association rules runs very eﬃciently, even with a
+
+generating spurious output.
+
+conﬁdence threshold set to 0.
+
+To do this, we designed a dataset that allowed us to demonstrate all three claims.
+To generate a sequence in which some association rules would certainly stand
+out, we used the Markov chain model given in Table 1. Our dataset consisted of
+items a, b, c, and 22 other items, randomly distributed whenever the transition
+table led us to item x. We ﬁne tuned the probabilities in such a way that all
+items apart from c had approximately the same frequency, while c appeared
+approximately twice as often. The high probability of transitions from a to b
+
+Mining Association Rules in Long Sequences
+
+307
+
+Table 1. A transition matrix deﬁning a Markov model
+
+b
+
+c
+
+a
+0
+
+x
+a
+0.45 0.45 0.1
+b 0.45
+0.45 0.1
+c
+0.1 0.9
+x 0.025 0.025 0.05 0.9
+
+0
+0
+
+0
+
+and c, and from b to a and c should result in rules such as a ⇒ c and b ⇒ c
+having a high conﬁdence. However, given that c appears more often, sometimes
+without an a or a b nearby, we would expect rules such as c ⇒ a and c ⇒ b to
+be ranked lower. Later on we show that our algorithm gave the expected results
+for all these cases.
+
+First, though, let us examine our ﬁrst claim. We used our Markov model
+to generate ten sequences of 10 000 items and ran the two algorithms on each
+sequence, varying min int, at ﬁrst choosing max size of 4. Figures 1(a) and 1(c)
+show the average runtimes and number of evaluated candidate nodes for each
+algorithm, as well as the actual number of identiﬁed interesting itemsets. While
+our algorithm pruned less (Figure 1(c)), it ran much faster, most importantly
+at the thresholds where the most interesting itemsets are found (see Figure 1(b)
+for a zoomed-in version). Naturally, if min int = 0, the algorithms take equally
+long, as all itemsets are identiﬁed as interesting, and their exact interestingness
+must be computed. In short, we see that the runtime of the original algorithm is
+proportional to the number of candidates, while the runtime of our new algorithm
+is proportional to the number of interesting itemsets.
+
+To support the second claim, we ran our association rules algorithm with both
+min int and min conf equal to 0. We set max size to 4. We now simply had
+to check which rules had the highest conﬁdence. In repeated experiments, with
+various 500 000 items long datasets, the results were very consistent. The most
+interesting rules were a ⇒ c and b ⇒ c, with a conﬁdence of 0.52. Then followed
+rules a ⇒ bc, b ⇒ ac and ab ⇒ c, with a conﬁdence of 0.34. Rules a ⇒ b and
+b ⇒ a had a conﬁdence of 0.29, while rules ac ⇒ b and bc ⇒ a had a conﬁdence
+of 0.2. Rule c ⇒ ab had a conﬁdence of around 0.17, while rules not involving a,
+b or c had a conﬁdence between 0.13 and 0.17. We can safely conclude that our
+algorithm gave the expected results.
+
+To conﬁrm this claim, we ran our algorithm on three text datasets: English1,
+Italian2 and Dutch3. In each text, we considered the letters of the alphabet and
+the space between words (denoted (cid:2)) as items, ignoring all other symbols. In all
+three languages, rule q ⇒ u had a conﬁdence of 1, as q is almost always followed
+by u in all these languages. In all three languages, there followed a number of
+rules with (cid:2) in the head, but the body varied. In Italian, a space is often found
+near f, as f is mostly found at the beginning of Italian words, while the same is
+true for j in English. Rules involving two letters revealed some patterns inherent
+
+1 http://www.gutenberg.org/ﬁles/1999/1999.txt
+2 http://www.gutenberg.org/dirs/etext04/7clel10.txt
+3 http://www.gutenberg.org/ﬁles/18066/18066-8.txt
+
+308
+
+B. Cule and B. Goethals
+
+Table 2. Some interesting rules found in three diﬀerent languages
+
+English
+
+Italian
+
+Dutch
+
+c(q ⇒ u) = 1
+c(q ⇒ u) = 1
+c(q ⇒ u) = 1
+two
+letters c(z ⇒ i) = 0.61 c(h ⇒ c) = 0.75
+c(j ⇒ i) = 0.75
+c(v ⇒ e) = 0.58 c(h ⇒ e) = 0.51 c(d ⇒ e) = 0.61
+c(g ⇒ e) = 0.57
+c(z ⇒ a) = 0.5
+c(x ⇒ e) = 0.53
+three c(q ⇒ eu) = 0.63 c(q ⇒ eu) = 0.6
+c(q ⇒ iu) = 1
+letters c(z ⇒ ai) = 0.52 c(h ⇒ ce) = 0.57 c(j ⇒ ei) = 0.46
+c(q ⇒ nu) = 0.4 c(q ⇒ au) = 0.52 c(g ⇒ en) = 0.44
+with c(y ⇒ (cid:2)) = 0.85 c(q ⇒ (cid:2)) = 0.84 c(z ⇒ (cid:2)) = 0.78
+c(w ⇒ (cid:2)) = 0.84
+c(w ⇒ (cid:2)) = 0.74
+c(j ⇒ (cid:2)) = 0.83
+c(v ⇒ (cid:2)) = 0.73
+c((cid:2) ⇒ e) = 0.35 c((cid:2) ⇒ a) = 0.39 c((cid:2) ⇒ n) = 0.35
+
+c(f ⇒ (cid:2)) = 0.7
+c(a ⇒ (cid:2)) = 0.7
+
+...
+
+...
+
+...
+
+(cid:2)
+
+4
+
+1000
+
+100
+
+10
+
+l
+
+)
+e
+a
+c
+s
+ 
+g
+o
+l
+(
+ 
+s
+d
+n
+o
+c
+e
+s
+
+new runtime
+old runtime
+
+1000
+
+100
+
+10
+
+l
+
+)
+e
+a
+c
+s
+ 
+g
+o
+l
+(
+ 
+s
+d
+n
+o
+c
+e
+s
+
+new runtime
+old runtime
+interesting itemsets
+
+10000
+
+l
+
+)
+e
+a
+c
+s
+ 
+
+100
+
+1
+
+g
+o
+l
+(
+ 
+s
+t
+e
+s
+m
+e
+
+t
+i
+ 
+
+g
+n
+
+i
+t
+s
+e
+r
+e
+n
+
+t
+
+i
+
+l
+
+)
+e
+a
+c
+s
+ 
+
+g
+o
+l
+(
+ 
+s
+e
+u
+r
+ 
+
+l
+
+n
+o
+
+i
+t
+
+i
+
+a
+c
+o
+s
+s
+a
+
+ 
+t
+
+n
+e
+d
+
+i
+f
+
+n
+o
+c
+
+ 0
+
+ 0.2
+
+ 0.4
+
+ 0.6
+
+ 0.8
+
+ 1
+
+ 0
+
+ 0.02
+
+ 0.04
+
+ 0.06
+
+ 0.08
+
+ 0.1
+
+interestingness threshold
+
+interestingness threshold
+
+(a)
+
+new candidates
+old candidates
+interesting itemsets
+
+(b)
+
+AR runtime
+confident rules
+
+10000
+
+100
+
+1
+
+l
+
+)
+e
+a
+c
+s
+ 
+g
+o
+l
+(
+ 
+s
+d
+n
+o
+c
+e
+s
+
+400
+
+200
+
+100
+
+1e+05
+
+10000
+
+1000
+
+100
+
+10
+
+1
+
+l
+
+)
+e
+a
+c
+s
+ 
+g
+o
+l
+(
+ 
+s
+t
+e
+s
+m
+e
+
+t
+i
+ 
+.
+t
+
+n
+
+i
+ 
+/
+ 
+s
+e
+
+t
+
+i
+
+a
+d
+d
+n
+a
+c
+
+ 0
+
+ 0.2
+
+ 0.4
+
+ 0.6
+
+ 0.8
+
+ 1
+
+ 0
+
+ 0.2
+
+ 0.4
+
+ 0.6
+
+ 0.8
+
+ 1
+
+interestingness threshold
+
+(c)
+
+confidence threshold
+
+(d)
+
+Fig. 1. (a) Runtime comparison of the two itemset algorithms with max size set to 4.
+(b) Zoomed-in version of Figure 1(a). (c) Pruning comparison with max size set to 4.
+(d) Runtime of the AR algorithm with a varying conﬁdence threshold.
+
+in these languages. For example, rule h ⇒ c was ranked high in Italian (where h
+appears very rarely without a c in front of it), while rule j ⇒ i scored very high
+in Dutch (where j is often preceded by an i). A summary of the results is given
+in Table 2.
+
+To prove our third claim, we ran the AR algorithm on ten Markov chain
+datasets (each 10 000 items long), using min int of 0.025 and max size of 4, each
+time varying min conf. The average runtimes and number of found association
+
+4 This is due to a short dataset, rather than an actual rule in the Dutch language.
+
+Mining Association Rules in Long Sequences
+
+309
+
+rules are shown in Figure 1(d). We can see that the exponential growth in the
+number of generated rules had virtually no eﬀect on the runtime of the algorithm.
+
+7 Conclusion
+
+In this paper we presented a new way of identifying association rules in sequences.
+We base ourselves on interesting itemsets and look for association rules within
+them. When we encounter a part of an itemset in the sequence, our measure of the
+rule’s conﬁdence tells us how likely we are to ﬁnd the rest of the itemset nearby.
+On our way to discovering association rules, we found a way to improve the
+runtime of the algorithm that ﬁnds the interesting itemsets, too. By relaxing the
+upper bound of an itemset’s interestingness, we actually prune fewer candidates,
+but our new algorithm runs much faster than the old one. To be precise, the
+runtime of the new algorithm is proportional to the number of identiﬁed item-
+sets, while the runtime of the old algorithm was proportional to the number of
+evaluated nodes in the search tree. Due to being able to generate association
+rules while mining interesting itemsets, the cost of ﬁnding conﬁdent association
+rules is negligible.
+
+Experiments demonstrated the validity of our central claims — that our al-
+gorithm for ﬁnding interesting itemsets runs much faster than the original one,
+particularly on long datasets, and that our algorithm for ﬁnding association rules
+gives meaningful results very eﬃciently.
+
+References
+
+1. Agrawal, R., Imielinski, T., Swami, A.: Mining Association Rules between Sets of
+Items in Large Databases. In: Proc. ACM SIGMOD Int. Conf. on Management of
+Data, pp. 207–216 (1993)
+
+2. Cule, B., Goethals, B., Robardet, C.: A new constraint for mining sets in sequences.
+
+In: Proc. SIAM Int. Conf. on Data Mining (SDM), pp. 317–328 (2009)
+
+3. Das, G., Lin, K.-I., Mannila, H., Renganathan, G., Smyth, P.: Rule discovery from
+time series. In: Proc. Int. Conf. on Knowledge Discovery and Data Mining (KDD),
+pp. 16–22 (1998)
+
+4. Garriga, G.C.: Discovering Unbounded Episodes in Sequential Data. In: Lavraˇc,
+N., Gamberger, D., Todorovski, L., Blockeel, H. (eds.) PKDD 2003. LNCS (LNAI),
+vol. 2838, pp. 83–94. Springer, Heidelberg (2003)
+
+5. Harms, S.K., Saquer, J., Tadesse, T.: Discovering Representative Episodal Associ-
+ation Rules from Event Sequences Using Frequent Closed Episode Sets and Event
+Constraints. In: Proc. IEEE Int. Conf. on Data Mining (ICDM), pp. 603–606 (2001)
+6. Laxman, S., Sastry, P.S.: A survey of temporal data mining. In: SADHANA,
+
+Academy Proceedings in Engineering Sciences, vol. 31, pp. 173–198 (2006)
+
+7. Mannila, H., Toivonen, H., Verkamo, A.I.: Discovery of Frequent Episodes in Event
+
+Sequences. Data Mining and Knowledge Discovery 1(3), 259–289 (1997)
+
+8. M´eger, N., Rigotti, C.: Constraint-Based Mining of Episode Rules and Optimal
+Window Sizes. In: Boulicaut, J.-F., Esposito, F., Giannotti, F., Pedreschi, D. (eds.)
+PKDD 2004. LNCS (LNAI), vol. 3202, pp. 313–324. Springer, Heidelberg (2004)
+
+

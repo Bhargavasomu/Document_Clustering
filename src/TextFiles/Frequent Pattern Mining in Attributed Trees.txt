@@ -1,0 +1,1034 @@
+Frequent Pattern Mining in Attributed Trees
+
+Claude Pasquier1,2, J´er´emy Sanhes1, Fr´ed´eric Flouvat1,
+
+and Nazha Selmaoui-Folcher1
+
+1 University of New Caledonia, PPME, BP R4, F-98851 Noum´ea, New Caledonia
+
+{jeremy.sanhes,frederic.flouvat,nazha.selmaoui}@univ-nc.nc
+
+2 Institute of Biology Valrose (IBV)
+
+UNS - CNRS UMR7277 - INSERM U1091, F-06108 Nice cedex 2
+
+claude.pasquier@unice.fr
+
+Abstract. Frequent pattern mining is an important data mining task
+with a broad range of applications. Initially focused on the discovery
+of frequent itemsets, studies were extended to mine structural forms like
+sequences, trees or graphs. In this paper, we introduce a new data mining
+method that consists in mining new kind of patterns in a collection of
+attributed trees (atrees). Attributed trees are trees in which vertices are
+associated with itemsets. Mining this type of patterns (called asubtrees),
+which combines tree mining and itemset mining, requires the exploration
+of a huge search space. We present several new algorithms for attributed
+trees mining and show that their implementations can eﬃciently list
+frequent patterns in a database of several thousand of attributed trees.
+
+Keywords: tree mining, frequent pattern mining, attributed tree.
+
+1
+
+Introduction
+
+Frequent pattern mining is an important problem in data mining research. Ini-
+tially focused on the discovery of frequent itemsets [1], studies were extended to
+mine structural forms like sequences [2], trees [7] or graphs [22]. While itemset
+mining seeks frequent combinations of items in a set of transactions, structural
+mining seeks frequent substructures. Most existing studies focus only on one kind
+of problem (itemset mining or structural mining). However, in order to represent
+richer information, it seems natural to consider itemsets that are organized in
+complex structures. In this paper, we introduce the problem of mining attributed
+trees that are tree structures in which each vertex is associated with an itemset.
+In web log analysis, for example, it is common to represent user browsing in
+tree-like data where each page is identiﬁed with an unique id. However, one can
+more pertinently characterize browsed pages with lists of keywords associated
+with their content. This approach allows to capture the browsing habits of users
+even when the web site is reshuﬄed. Other applications can be imagined in vari-
+ous area such as retweet trees mining, spatio-temporal data mining, phylogenetic
+tree mining and XML document mining.
+
+The key contributions of our work are the following: 1) We present the problem
+of mining ordered and unordered substructures in a collection of attributed trees.
+
+J. Pei et al. (Eds.): PAKDD 2013, Part I, LNAI 7818, pp. 26–37, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+Frequent Pattern Mining in Attributed Trees
+
+27
+
+2) We deﬁne canonical forms for attributed trees. 3) We propose a method for
+attributed trees enumeration that is based on two operations: itemset extension
+and tree extension. 4) We present an eﬃcient algorithm IMIT for extracting
+frequent substructures in a set of attributed trees. 5) We perform extensive
+experiments on several synthetic datasets and a real weblogs dataset.
+
+The rest of this paper is organised as follows. Section 2 presents basic concepts
+and deﬁnes the problem. Section 3 proposes a brief overview of related works,
+particularly few studies that mix itemset mining and structure mining. Section 4
+describes the method including the search space exploration, the frequency com-
+putation and the candidates pruning method. Section 5 reports several applica-
+tions of the algorithms to mine both synthetic and real datasets. Finally, section
+6 concludes the paper and presents possible extensions of the current work.
+
+2 Basic Concepts and Problem Statement
+
+In this section, we give basic deﬁnitions and concepts and then introduce the
+problem of attributed tree mining.
+
+2.1 Preliminaries
+
+Let I = {i1, i2, .., in} be a set of items. An itemset is a set P ⊆ I. The size of an
+itemset is the number of items. The set D of itemsets presents in a database is
+denoted by {P1,P2, ...,Pm} where ∀P ∈ D,P ⊆ I. D is a transaction database.
+A tree S = (V, E) is a directed, acyclic and connected graph where V is a set
+of vertices (nodes) and E = {(u, v)|u, v ∈ V } is a set of edges. A distinguished
+node r ∈ V is considered as the root, and for any other node x ∈ V , there is a
+unique path from r to x. If there is a path from a vertex u to v in S = (V, E),
+then u is an ancestor of v (v is a descendant of u). If (u, v) ∈ E (i.e. u is
+an immediate ancestor of v), then u is the parent of v (v is a child of u). An
+ordered tree has a left-to-right ordering among the siblings. In this paper, unless
+otherwise speciﬁed, all trees we consider are unordered.
+An attributed tree, or (atree) is a triple T = (V, E, λ) where (V, E) is
+the underlying tree and λ : V → D is a function which associates an itemset
+λ(u) ∈ I to each vertex u ∈ V . The size of an attributed tree is the number of
+items associated with its vertices.
+
+In this paper, we use a string representation for an atree based on that deﬁned
+for labeled trees by Zaki [24]. This representation is only intended to provide a
+readable form for atrees. The string representation for an atree T is generated
+by adding a representation of the nodes found in T in a depth-ﬁrst preorder
+traversal of T and adding a special symbol $ when a backtracking from a child
+to its direct parent occurs. In the paper, for simplicity, we omit the trailing $s.
+A string representation of a node is generated by listing all the items present
+in the associated itemset in a lexicographical order. For example, the string
+representation of atree T 2 from Fig. 1 is ”a c $ cde ab $ a”.
+
+Attributed trees can be understood as itemsets organized in a tree structure.
+As such, attributed tree inclusion can be deﬁned with respect to itemsets
+
+28
+
+C. Pasquier et al.
+
+inclusion or structural inclusion. For itemset inclusion, we say that atree T1
+is contained in another atree T2 if both atrees have the same structure and
+for each vertex of T1, the associated itemset is contained in the itemset of the
+coresponding vertex in T2. More formally, T1 = (V1, E1, λ1) is contained in
+T2 = (V2, E2, λ2), and is denoted by T1 <I T2, if V1 = V2 and E1 = E2
+and ∀x ∈ V1, λ1(x) ⊆ λ2(x). Structural inclusion is represented by the classical
+
+concept of subtree [5,7,12,17,19,23,24].
+
+From the previous deﬁnition, we generalize the notion of asubtree in the fol-
+lowing way. T1 = (V1, E1, λ1) is a asubtree of a atree T2 = (V2, E2, λ2) and
+is denoted T1 < T2 if T1 is an isomorphic asubtree of T2, i.e. there exists a
+mapping ϕ : V1 → V2 such that T1 (cid:6)= T2 and (u, v) ∈ E1 if (ϕ(u), ϕ(v)) ∈ E2
+and ∀x ∈ V1, λ1(x) ⊆ λ2(ϕ(x)). If T1 is an asubtree of T2, we say that T2 is an
+asupertree of T1. T1 is called an induced asubtree of T2 iﬀ T1 is an isomorphic
+asubtree of T2 and ϕ preserves the parent-child relationships. T1 is called an em-
+bedded asubtree of T2 iﬀ T1 is an isomorphic asubtree of T2 and ϕ preserves
+the ancestor-descendant relationships. T1 = (V1, E1, λ1) is called a gap-i asub-
+tree of T2 = (V2, E2, λ2) iﬀ T1 is an isomorphic asubtree of T2 and ϕ preserves
+the ancestor-descendant relationships with the following constraint: ∀u∀v ∈ E1
+such that u is an ancestor of v and d(ϕ(u), ϕ(v)) = 1, d(u, v) ≤ i where d(x, y)
+represents the number of edges between x and y in the atree.
+
+Fig. 1 shows an example of an atree database composed of three diﬀerent
+atrees with two (incomplete) sets of common asubtrees using a maximum gap
+of 0 and 1.
+
+Input database
+
+a
+
+a
+
+ab
+
+cde
+
+c
+
+cde
+
+a
+
+cde
+
+ab
+
+a
+
+abc
+
+c
+
+Common asubtrees
+
+a
+
+cde
+
+a
+
+e
+
+a
+
+c
+
+a
+
+ab
+
+c
+
+a
+
+a
+
+(cid:2)
+(cid:2)
+
+(cid:3)(cid:4)
+(cid:3)(cid:4)
+
+(cid:5)
+(cid:5)
+
+(cid:2)
+
+(cid:3)(cid:4)
+
+(cid:5)
+
+(cid:2)
+
+(cid:3)(cid:4)
+
+(cid:5)
+
+(cid:2)
+
+(cid:3)(cid:4)
+
+(cid:5)
+
+(cid:2)
+
+(cid:3)(cid:4)
+
+(cid:5)
+
+T1
+T1
+
+T2
+
+T3
+
+gap-0 asubtrees
+
+gap-1 asubtrees
+
+Fig. 1. Example of an atrees database with some common asubtrees
+
+All tree mining algorithms dealing with unordered trees have to face the iso-
+morphism problem. To avoid the redundant generation of equivalent solutions,
+one tree is chosen as the canonical form and other alternative forms are discarded
+[3,8,17,23,25]. In previous works, canonical forms are based on a lexicographical
+ordering on node’s labels. In our work, we deﬁne an ordering based on node’s
+associated itemsets. Given two itemsets P and Q (P (cid:6)= Q), we say that P < Q
+iﬀ 1) ∀i ∈ [1, min(|P|,|Q|)] : Pi ≤ Qi and 2) if ∀i ∈ [1, min(|P|,|Q|)] : Pi = Qi,
+then |P| > |Q|. From the deﬁnition above, an ordering, ≺, among atrees can be
+deﬁned. From this, a canonical form of isomorphic atrees is easily deter-
+mined using the method presented by Chi et al. [7].
+
+Frequent Pattern Mining in Attributed Trees
+
+29
+
+The problem with frequent atrees mining is that the number of frequent pat-
+terns is often large. In real applications, generating all solutions can be very
+expensive or even impossible. Moreover, lots of these frequent atrees contain
+redundant information. In Fig. 1, for example, atree ”a e” is present in all trans-
+actions but the pattern is already encoded in atree ”a cde” because ”a e” is
+contained in atree ”a cde”. This is the same for atree ”a a” which is an asubtree
+of ”a ab $ c”.
+
+Since the proposal of Manilla et al. [13] huge eﬀorts have been made to design
+condensed representations that are able to summarize solutions in smaller sets.
+Set of closed patterns is an example of such a condensed representation [18]. We
+say that an atree T is a closed atree if none of its proper asupertrees has the
+same support as T . In this paper, we introduce another condensed representation
+which is deﬁned with respect to the contained in relationship only. We say that
+an atree T is a c-closed atree (content closed) if it is not contained (as deﬁned
+above) in another atree with the same support as T .
+
+2.2 Problem Statement
+Given a database B of atrees and an atree T , the per-tree frequency of T is
+deﬁned as the number of atrees in B for which T is an asubtree. An atree is
+frequent if its per-tree support is greater than or equal to a minimum threshold
+value. The problem consists in enumerating all frequent patterns in a given forest
+of atrees.
+
+3 Related Works
+
+Most of the earlier frequent tree mining algorithms are derived from the well-
+known Apriori strategy [1]: a succession of candidates generation phase followed
+by a support counting phase in which infrequent candidates are ﬁltered out.
+Two strategies are possible for candidate generation: extension and join. With
+extension, a new candidate tree is generated by adding a node to a frequent tree
+[3,17]. With join, a new candidate is created by combining two frequent trees
+[12,25]. Combination of the two principles has also been studied [8].
+
+Extension principle is a simple method suitable to mine implied trees because
+the number of nodes that can be used to extend a given subtree is often lower
+than the number of frequent subtrees.
+
+Other tree mining algorithms are derived from FP-growth approach [11].
+These algorithms, which adopt the divide-and-conquer pattern-growth princi-
+ple avoid the costly process of candidate generation. However, pattern-growth
+approach cannot be extended simply to tackle the frequent tree pattern mining
+problem. Existing implementations are limited in the type of trees they can han-
+dle: induced unordered trees with no duplicate labels in each node’s childs [23],
+ordered trees [21] or embedded ordered trees [26] are some kind of trees that
+were successfully mined with pattern-growth approach.
+
+Finding condensed representations of frequent patterns is a natural extension
+of pattern mining. For itemset mining, the notion of closure is formally deﬁned
+
+30
+
+C. Pasquier et al.
+
+[18]. Several works explored this topic in the context of tree mining and proposed
+mining methods as well as various implementations [9,19,20]. To the best of our
+knowledge, no method has been proposed for the general case of attributed trees.
+Recently we saw growing interest in mining itemsets organized in structures.
+Miyoshi et al. [14] consider labeled graphs with quantitative attributes associated
+with vertices. This kind of structure allows to solve the problem by combining
+a ”classical” subgraph mining algorithm for the labeled graph, and an existing
+itemset mining algorithm for quantitative itemsets in each vertex. Mining at-
+tributed subgraphs independently of labels of vertices is impossible with this
+approach. Several studies [10,15,16] deal with attributed graphs but are looking
+for frequent subgraphs sharing common sets of attributes. Our work diﬀers from
+these studies in the sense that itemsets associated with the vertices of a given
+frequent substructures are not necessarily identical.
+
+4 Mining Frequent Atrees
+
+We are mainly interested in identifying induced ordered and unordered asub-
+trees. Depending on applications, some patterns including gaps in the ancestor-
+descendant relationship can also be considered. However, in order to collect only
+interesting patterns, the gap used should remain small. Otherwise, the relation-
+ship between a node and its descendants is not really tangible. Although we
+focus on induced asubtrees, we designed a general method that is able to mine
+asubtrees with any gap value, including embedded asubtrees. However, because
+of the primary objective, our method works better for induced asubtree mining
+and performances decrease as gap parameter increases.
+
+4.1 Atrees Enumeration
+Using the operator ≺, it is possible to construct a candidate tree Q representing
+the complete search space [4] in the following way. The root node of the tree is at
+the top level and labeled with ∅. Recursively, for each leaf node n ∈ Q, children
+. Children of a node n ∈ Q, are generated either
+n(cid:3)
+by tree extension or by itemset extension.
+
+are added such that n ≺ n(cid:3)
+
+Tree Extension. For tree extension, we use a variation of the well-known
+rightmost path extension method [3,17]. Let T be an atree of size k. T can be
+extended to generate new atrees in two diﬀerent ways. In the ﬁrst way, a new
+child N is added to the rightmost node of T (right node extension). In the second
+way, a new sibling N is added to a node in the rightmost path of T (right path
+extension) [6].
+
+In the classical approach, N represents every valid node from the input
+database. In our approach, new nodes N are created from every valid node Q
+from the input database. In fact, each node Q, associated with an itemset of size
+k, generates a set of k nodes N = {N1, .., Nk} used for tree extension. Each Ni is
+associated with an itemset of size 1; the only item being the ith item of λ(Q).
+
+Frequent Pattern Mining in Attributed Trees
+
+31
+
+For example, in Fig. 1, the nodes that can be used for right node extension of
+pattern ”a cde” are ”ab”, ”a” (from atree T 2), ”abc” and ”c” (from atree T 3).
+From node ”abc”, three extensions are generated (”a”, ”b” and ”c”) while node
+”ab” generates ”a” and ”b”. Nodes ”a” and ”c” generate extensions ”a” and
+”c” respectively. Three diﬀerent candidates are then obtained by adding each of
+these extension to the candidate pattern: ”a cde a”, ”a cde b” and ”a cde c”
+
+For ordered trees, this method of candidate generation has been shown to be
+complete as well as non-redundant [3]. However, for unordered trees, it might
+generate redundant patterns in the form of isomorphic trees. Duplicate can-
+didates are detected and discarded before the candidate extension process by
+performing a canonical check.
+
+Itemset Extension. For itemset extension, we use a variation of the method
+[4]. With this variation, a new item I is added to the
+presented by Ayres et al.
+itemset associated with the rightmost node of the candidate atree T . Items used
+for itemset extension are derived from the itemset associated with this node in
+the input database. The constraint is that the new item must be greater than
+any item associated with the rightmost node of T .
+
+4.2 Frequency Computation
+
+We organize our data in a structure storing all information needed for the mining
+process. Our structure is an extension of the vertical representation of trees
+introduced by Zaki [24,25]. Brieﬂy, each candidate asubtree is associated with its
+pattern and several data allowing to pinpoint all its occurrences in the database.
+The ﬁrst candidates, composed of a unique node associated with one item, are
+generated by scanning the input database. Using only this unique structure,
+it is easy to compute the number of occurrences of each pattern. In addition,
+this same structure is suﬃcient to generate all possible extensions of a given
+pattern. When a pattern of size k is processed, all occurrences are extended
+with tree extension and itemset extension methods described before to generate
+new (k + 1)-candidates that are themselves stored in the structure.
+
+4.3 Search Space Exploration
+
+Several techniques can be used to prune the search tree.
+
+Candidate Pruning. The same rules speciﬁed by Agrawal and Srikant twenty
+years ago [1], can be applied to the case of atrees: i) any sub-pattern of a frequent
+pattern is frequent, and ii) any super-pattern of a non frequent pattern is non
+frequent. As the frequency count is an anti-monotonic function (extending a
+pattern cannot lead to a new pattern with a greater frequency), is it possible
+to stop the exploration of a branch when the frequency of a candidate is less
+than the minimum support. For example, in Fig. 1, during the mining of atrees,
+when we examine pattern ”a c a” and found that its frequency is lower than the
+minimum support, we do not generate candidates obtained by extending ”a c a”
+(e.g. ”a c ab”, ”a c a $ b”, ”a c a $ $ c”).
+
+32
+
+C. Pasquier et al.
+
+In addition, in the case of unordered tree mining, extension of a candidate is
+
+stopped if it is not in canonical form.
+
+We say that T is a c-closed atree if (cid:6) ∃T (cid:3) ∈ T UXI such that T <I T (cid:3)
+
+C-closed Atrees Enumeration. By enumerating only atrees that are not
+contained in another atree with the same support, the search space can be
+considerably reduced. Enumerating c-closed atrees involves the storage of every
+frequent pattern found with their associated per-tree frequency and their total
+number of occurrences in the database (the occurrence-match frequency).
+Let T be a candidate atree currently processed, T be the set of all previously
+identiﬁed frequent atrees and X be the set of candidates generated by extension
+of T . We distinguish two subsets of X . XI is the set of atrees generated by
+itemset extension of T and XT is composed of tree extensions of T . We deﬁne
+two functions: ft which gives the per-tree frequency of an atree and fo which
+returns its occurence-match frequency.
+and
+ft(T (cid:3)
+) = ft(T ). However, ﬁnding an itemset extension of T with the same per-
+tree frequency as T does not allows to stop the exploration of other candidates
+in X . The following additional conditions must also be satisﬁed: ∃T (cid:3) ∈ T UXI :
+T <I T (cid:3)
+In Fig. 1, for example, the ﬁrst candidate to be examined is ”a” with a per-tree
+frequency of 3. By itemset extension, we build XI = {”ab”, ”ac”}. Candidate
+”ab” has a per-tree frequency of 3, therefore, candidate ”a” is not c-closed as
+”a” <I ”ab”. However, pattern ”a” appears 7 times in the database while the
+total occurrence of candidate ”ab” is 3. The 4 times where ”a” occurs in an
+itemset which does not contain ”b” may lead to the generation of other patterns
+that are c-closed. This is the case in Fig. 1 where a right node extension of
+pattern ”a” generates candidate ”a e” with a per-tree frequency of 3.
+Closed Atrees Enumeration. We say that T is a a closed atree if (cid:6) ∃T (cid:3) ∈ T UX
+such that T < T (cid:3)
+) = ft(T ). The extension of T can be stopped if
+∃T (cid:3) ∈ T UX : T < T (cid:3)
+) = fo(T ). In addition, one has also to remove
+non closed trees from T , i.e. all atrees that are asubtrees of T with a same
+per-tree frequency. The check for closure requires to perform several subtree
+isomorphism checks that are costly operations.
+
+and fo(T (cid:3)
+
+) = fo(T ).
+
+and ft(T (cid:3)
+
+and fo(T (cid:3)
+
+4.4 Mining Algorithms
+
+Fig. 2 shows the high level structure of the IMIT algorithm. First, a set with all
+asubtree of size 1 is built by scanning the input database. Then, a loop allows
+to process every candidate in the set. The function GetF irst return the smallest
+candidate in the set according to the ≺ operator. The processing involves a
+canonical test and a frequency test. A frequent candidate which is in canonical
+form is added to the list of solutions and all of its extensions are added to the
+list of candidates. The processing of a candidate ﬁnishes by removing it from the
+candidates’ list.
+
+Frequent Pattern Mining in Attributed Trees
+
+33
+
+IM IT (D, minSup)
+1: C ← {all asubtrees of size 1 in D}
+2: while C (cid:3)= ∅ do
+3:
+4:
+5:
+6:
+7:
+8:
+9: end while
+10: printSolutions(T )
+
+T ← getF irst(C)
+if isCanonical(T ) and ft(T ) ≥ minSup then
+T ← T ∪ {T}
+C ← C ∪ X
+end if
+C ← C \ {T}
+
+Fig. 2. IMIT Algorithm
+
+This algorithm is suﬃcient to enumerate all solutions but it has a huge
+search space. To limit the redundancies in the set of solutions, we developed
+IMIT CLOSED, an algorithm extracting closed asubtrees (Fig. 3). As illus-
+trated in section 5, the algorithm is costly and is not usable to mine large input
+databases.
+
+We designed IMIT CONTENT CLOSED, a third algorithm extracting c-
+closed asubtrees. This new algorithm (not shown in this paper) can be easily
+deduced from the IMIT CLOSED algorithm (Fig. 3) by replacing < by <I , re-
+placing X by XI in line 5 and removing line 11 to 13. The use of <I instead
+of < allows to only perform itemsets inclusion tests that are less costly than
+subtree isomorphism checks. Lines 11 to 13 remove from the set of solutions
+those that are asubtree of the current candidate. This test is not needed for the
+
+T ← getF irst(C)
+if isCanonical(T ) and ft(T ) ≥ minSup then
+
+(cid:2)
+
+(cid:2)
+
+and ft(T
+
+) = ft(T ) then
+
+if (cid:3) ∃T
+
+(cid:2) ∈ T ∪ X : T < T
+
+T ← T ∪ {T}
+
+IM IT CLOSED(D, minSup)
+1: C ← {all asubtrees of size 1 in D}
+2: while C (cid:3)= ∅ do
+3:
+4:
+5:
+6:
+7:
+8:
+9:
+10:
+11:
+12:
+13:
+14:
+15:
+16: end while
+17: printSolutions(T )
+
+end for
+end if
+C ← C \ {T}
+
+(cid:2) ∈ T such that T
+
+(cid:2) ∈ T : T < T
+
+T ← T \ {T
+
+(cid:2)}
+
+end if
+for all T
+
+end if
+if (cid:3) ∃T
+
+C ← C ∪ X
+
+(cid:2)
+
+(cid:2)
+
+and fo(T
+
+) = fo(T ) then
+
+(cid:2) < T and fo(T
+
+(cid:2)
+
+) = fo(T
+
+(cid:2)
+
+) do
+
+Fig. 3. IMIT CLOSED Algorithm
+
+34
+
+C. Pasquier et al.
+
+extraction of c-closed patterns. Experiments show that this third algorithm is
+the best compromise between non redundancy of solutions and execution time.
+
+5 Experimental Results
+
+All algorithms are implemented in C++ using STL. Experiments were performed
+on a computer running Ubuntu 12.04 LTS and based on a Intel c(cid:11)CoreTMi5-2400
+@ 3.10GHz with 8 Gb main memory. All timings are based on total execution
+time, including all preprocessing and results output.
+
+5.1 Synthetic Datasets
+
+We modiﬁed the synthetic data generation program proposed by Zaki [24] in
+order to be able to generate atrees with diﬀerent size of itemsets. We added
+two new parameters controlling the minimum and maximum itemset’s size. This
+allows to generate atree with ﬁxed itemset’s size or with a size randomly chosen
+in a range.
+
+We used the default parameters as in [24] except for the number of subtrees
+T that is set to 10,000. We build ﬁve datasets by varying the size of itemsets. In
+T10K, all vertices are associated with itemsets of size 1. This allows us to com-
+pare our implementation with SLEUTH [25]. In T10K-3 and T10K-5, vertices
+are associated with itemsets of size 3 and 5 respectively. In T10K-1/10, vertices
+are associated with itemsets of size randomly selected between 1 and 10, while
+in T10K-1/20, itemsets’ size vary from 1 to 20.
+
+5.2 Web Logs Datasets
+
+We built a dataset on logs given by our university following the method described
+by Zaki [24]. However, instead of labeling nodes with URLs of the browsed
+pages, we associated them with itemsets representing keywords of their content.
+The dataset is composed of 126,396 attributed trees with itemsets of size 10
+(10 keywords by page).
+
+5.3 Performance Evaluation
+
+Fig. 4 shows the execution time for mining c-closed sets of induced unordered
+patterns using IMIT CONTENT CLOSED on our ﬁve synthetic datasets. For
+comparison, we added in the ﬁgure the execution time of SLEUTH, a refer-
+ence implementation of equivalence class extension paradigm [25], on the T10K
+dataset. IMIT CONTENT CLOSED is about two times slower than SLEUTH
+for all support values except the smallest ones where SLEUTH is penalized by
+the cost of joining millions of frequent patterns.
+
+Although IMIT CONTENT CLOSED is slower than SLEUTH, these results
+are satisfactory because our algorithm is designed to mine attributed trees.
+
+Frequent Pattern Mining in Attributed Trees
+
+35
+
+(cid:19)
+(cid:29)
+(cid:27)
+(cid:20)
+(cid:13)
+(cid:12)
+(cid:27)
+(cid:32)
+
+(cid:30)
+(cid:25)
+(cid:12)
+(cid:31)
+(cid:23)
+(cid:30)
+(cid:25)
+(cid:21)
+(cid:29)
+(cid:27)
+(cid:28)
+(cid:27)
+
+(cid:1)(cid:2)(cid:2)(cid:5)(cid:2)(cid:2)(cid:2)
+
+(cid:1)(cid:2)(cid:5)(cid:2)(cid:2)(cid:2)
+
+(cid:1)(cid:5)(cid:2)(cid:2)(cid:2)
+
+(cid:1)(cid:2)(cid:2)
+
+(cid:1)(cid:2)
+
+(cid:1)
+
+(cid:2)
+
+(cid:2)
+
+(cid:6)(cid:1)(cid:2)(cid:7)(cid:8)(cid:9)
+(cid:6)(cid:1)(cid:2)(cid:7)(cid:8)(cid:3)
+(cid:6)(cid:1)(cid:2)(cid:7)(cid:8)(cid:1)(cid:10)(cid:1)(cid:2)
+(cid:6)(cid:1)(cid:2)(cid:7)(cid:8)(cid:1)(cid:10)(cid:11)(cid:2)
+(cid:6)(cid:1)(cid:2)(cid:7)
+(cid:6)(cid:1)(cid:2)(cid:7)(cid:12)(cid:13)(cid:14)(cid:15)(cid:16)(cid:17)(cid:6)(cid:18)(cid:19)
+
+(cid:1)(cid:2)
+
+(cid:3)
+
+(cid:1)
+
+(cid:2)(cid:4)(cid:3)
+
+(cid:2)(cid:4)(cid:1)
+
+(cid:2)(cid:4)(cid:2)(cid:3)
+
+(cid:2)(cid:4)(cid:2)(cid:1)
+
+(cid:20)(cid:21)(cid:22)(cid:22)(cid:23)(cid:24)(cid:25)(cid:12)(cid:13)(cid:26)(cid:19)
+
+Fig. 4. Execution time of IMIT CONTENT CLOSED for mining c-closed sets of in-
+duced unordered patterns on 5 synthetic datasets
+
+(cid:29)
+(cid:19)
+(cid:2)
+(cid:20)
+(cid:27)
+(cid:10)
+(cid:2)
+(cid:26)
+
+(cid:4)
+(cid:23)
+
+(cid:11)(cid:14)(cid:12)(cid:12)(cid:12)(cid:14)(cid:12)(cid:12)(cid:12)
+
+(cid:11)(cid:12)(cid:12)(cid:14)(cid:12)(cid:12)(cid:12)
+
+(cid:11)(cid:12)(cid:14)(cid:12)(cid:12)(cid:12)
+
+(cid:11)(cid:14)(cid:12)(cid:12)(cid:12)
+
+(cid:11)(cid:12)(cid:12)
+
+(cid:11)(cid:12)
+
+(cid:11)
+
+(cid:11)(cid:12)(cid:12)(cid:14)(cid:12)(cid:12)(cid:12)(cid:14)(cid:12)(cid:12)(cid:12)
+
+(cid:11)(cid:12)(cid:14)(cid:12)(cid:12)(cid:12)(cid:14)(cid:12)(cid:12)(cid:12)
+
+(cid:11)(cid:14)(cid:12)(cid:12)(cid:12)(cid:14)(cid:12)(cid:12)(cid:12)
+
+(cid:20)
+(cid:15)
+(cid:24)
+(cid:2)
+(cid:23)
+(cid:23)
+(cid:8)
+(cid:22)
+(cid:10)
+(cid:18)
+(cid:17)
+(cid:10)
+(cid:24)
+(cid:2)
+(cid:16)
+(cid:26)
+(cid:3)
+(cid:15)
+
+(cid:11)(cid:12)(cid:12)(cid:14)(cid:12)(cid:12)(cid:12)
+
+(cid:11)(cid:12)(cid:14)(cid:12)(cid:12)(cid:12)
+
+(cid:11)(cid:14)(cid:12)(cid:12)(cid:12)
+
+(cid:11)(cid:12)(cid:12)
+
+(cid:11)(cid:12)
+
+(cid:11)
+
+(cid:15)(cid:16)(cid:10)(cid:17)(cid:18)(cid:10)(cid:19)(cid:5)(cid:17)(cid:20)(cid:2)(cid:21)(cid:10)(cid:22)(cid:8)(cid:23)(cid:23)(cid:2)(cid:24)(cid:15)(cid:20)
+
+(cid:15)(cid:16)(cid:10)(cid:17)(cid:18)(cid:10)(cid:19)(cid:25)(cid:19)(cid:5)(cid:17)(cid:20)(cid:2)(cid:21)(cid:10)(cid:22)(cid:8)(cid:23)(cid:23)(cid:2)(cid:24)(cid:15)(cid:20)
+
+(cid:15)(cid:16)(cid:10)(cid:17)(cid:18)(cid:10)(cid:22)(cid:8)(cid:23)(cid:23)(cid:2)(cid:24)(cid:15)(cid:20)
+
+(cid:23)(cid:4)(cid:26)(cid:2)(cid:10)(cid:18)(cid:17)(cid:24)(cid:10)(cid:19)(cid:5)(cid:17)(cid:20)(cid:2)(cid:21)(cid:10)(cid:22)(cid:8)(cid:23)(cid:23)(cid:2)(cid:24)(cid:15)(cid:20)
+
+(cid:23)(cid:4)(cid:26)(cid:2)(cid:10)(cid:18)(cid:17)(cid:24)(cid:10)(cid:19)(cid:25)(cid:19)(cid:5)(cid:17)(cid:20)(cid:2)(cid:21)(cid:10)(cid:22)(cid:8)(cid:23)(cid:23)(cid:2)(cid:24)(cid:15)(cid:20)
+
+(cid:23)(cid:4)(cid:26)(cid:2)(cid:10)(cid:18)(cid:17)(cid:24)(cid:10)(cid:8)(cid:5)(cid:5)(cid:10)(cid:22)(cid:8)(cid:23)(cid:23)(cid:2)(cid:24)(cid:15)(cid:20)
+
+(cid:11)(cid:12)
+
+(cid:6)
+
+(cid:11)
+
+(cid:12)(cid:13)(cid:6)
+
+(cid:12)(cid:13)(cid:11)
+
+(cid:12)(cid:13)(cid:12)(cid:6)
+
+(cid:20)(cid:3)(cid:22)(cid:22)(cid:17)(cid:24)(cid:23)(cid:10)(cid:27)(cid:28)(cid:29)
+
+Fig. 5. Induced unordered mining with 3 versions of IMIT on T10K-3 dataset
+
+As such, it is normal to perform worst on mining labeled trees than dedicated im-
+plementations. The memory footprint of our algorithm is twice as SLEUTH’s one.
+The ﬁgure also shows that mining attributed trees is extremely more comput-
+ing intensive than mining labeled trees; and the diﬀerence is largely underesti-
+mated because only c-closed patterns were mined. Mining all patterns generates
+a huge number of solutions and takes a long time. To give an idea, mining the
+T10K-3 dataset with a minimum support of 1% outputs 12 millions patterns in
+15 hours (Fig. 5). Mining c-closed atrees allows to reduce both the number of
+patterns and the execution time. Thus, at 1% minimum support, 200 c-closed
+patterns are found in 4 seconds.
+
+As shown in the same ﬁgure, the search for closed patterns allows to reduce
+further the number of patterns. At 1% minimum support, for example, the num-
+ber of patterns drops to 103. However, because of the costly subtree isomorphism
+checks, in return, performances collapse when patterns become numerous. The
+result is that the diﬀerence in computation time increases as the minimum sup-
+port decreases.
+
+Fig. 6 show the execution time and number of c-closed patterns in the weblogs
+dataset. This dataset is much larger than synthetic datasets used before and its
+mining cannot be performed with a minimum support of less than 10% in a
+reasonable amount of time. Mining the weblog dataset with a minimum support
+of 6% lasts 6 hours and returns 360 patterns.
+
+36
+
+C. Pasquier et al.
+
+(cid:20)(cid:3)(cid:21)(cid:22)(cid:2)(cid:23)(cid:10)(cid:24)(cid:25)(cid:10)(cid:26)(cid:27)(cid:26)(cid:5)(cid:24)(cid:28)(cid:2)(cid:29)(cid:10)(cid:30)(cid:8)(cid:31)(cid:31)(cid:2)(cid:23)(cid:20)(cid:28)
+
+(cid:31)(cid:4)(cid:21)(cid:2)
+
+(cid:34)
+(cid:26)
+(cid:2)
+(cid:28)
+(cid:32)
+(cid:10)
+(cid:2)
+(cid:21)
+
+(cid:4)
+(cid:31)
+(cid:10)
+
+(cid:20)
+(cid:24)
+
+(cid:4)
+(cid:31)
+
+(cid:3)
+(cid:26)
+(cid:2)
+(cid:35)
+(cid:2)
+
+(cid:15)(cid:11)(cid:12)(cid:12)(cid:12)
+
+(cid:15)(cid:12)(cid:12)(cid:12)(cid:12)
+
+(cid:6)(cid:11)(cid:12)(cid:12)(cid:12)
+
+(cid:6)(cid:12)(cid:12)(cid:12)(cid:12)
+
+(cid:11)(cid:12)(cid:12)(cid:12)
+
+(cid:12)
+
+(cid:13)(cid:12)(cid:12)
+(cid:14)(cid:11)(cid:12)
+(cid:14)(cid:12)(cid:12)
+(cid:15)(cid:11)(cid:12)
+(cid:15)(cid:12)(cid:12)
+(cid:6)(cid:11)(cid:12)
+(cid:6)(cid:12)(cid:12)
+(cid:11)(cid:12)
+(cid:12)
+
+(cid:28)
+(cid:20)
+(cid:23)
+(cid:2)
+
+(cid:31)
+(cid:31)
+
+(cid:8)
+(cid:30)
+
+(cid:10)
+(cid:25)
+
+(cid:24)
+(cid:10)
+(cid:23)
+(cid:2)
+(cid:22)
+(cid:21)
+(cid:3)
+(cid:20)
+
+(cid:11)(cid:12) (cid:13)(cid:11) (cid:13)(cid:12) (cid:14)(cid:11) (cid:14)(cid:12) (cid:15)(cid:11) (cid:15)(cid:12) (cid:6)(cid:11) (cid:6)(cid:12) (cid:16)
+
+(cid:17)
+
+(cid:18)
+
+(cid:19)
+
+(cid:28)(cid:3)(cid:30)(cid:30)(cid:24)(cid:23)(cid:31)(cid:10)(cid:32)(cid:33)(cid:34)
+
+Fig. 6. Performances of IMIT CONTENT CLOSED for mining c-closed sets of induced
+unordered patterns on weblogs datasets
+
+6 Conclusion and Perspectives
+
+In this paper, we introduce the problem of mining attributed trees. We investi-
+gate methods enumerating all frequent patterns or only closed ones, but these
+methods proved ineﬃcient because of, in the ﬁrst case, the huge number of pat-
+terns returned, and in the second case, the cost of subtree isomorphism checks.
+Finally, we propose a condensed representation of frequent atrees that is de-
+ﬁned with respect to itemset inclusion. This representation allows to drastically
+reduce both the number of patterns and the execution time. We evaluate the ef-
+ﬁciency of the proposed algorithm, IMIT CONTENT CLOSED, and show that
+it successfully extract frequent patterns in large datasets. One future work is
+to extend the proposed algorithm to eﬀectively mine frequent closed patterns.
+Another future work consists in developing similar methods for mining more
+complex structures such as attributed graphs.
+
+Acknowledgments. This work was funded by French contract ANR-2010-
+COSI-012 FOSTER.
+
+References
+
+1. Agrawal, R., Imieli´nski, T., Swami, A.: Mining association rules between sets of
+
+items in large databases. SIGMOD Rec. 22(2), 207–216 (1993)
+
+2. Agrawal, R., Srikant, R.: Mining sequential patterns. In: ICDE, pp. 3–14 (1995)
+3. Asai, T., Abe, K., Kawasoe, S., Arimura, H., Sakamoto, H., Arikawa, S.: Eﬃcient
+
+substructure discovery from large semi-structured data. In: SDM (2002)
+
+4. Ayres, J., Flannick, J., Gehrke, J., Yiu, T.: Sequential pattern mining using a
+
+bitmap representation. In: KDD, pp. 429–435 (2002)
+
+5. Balc´azar, J.L., Bifet, A., Lozano, A.: Mining frequent closed rooted trees. Mach.
+
+Learn. 78(1-2), 1–33 (2010)
+
+6. Chehreghani, M.H.: Eﬃciently mining unordered trees. In: ICDM, pp. 111–120
+
+(2011)
+
+7. Chi, Y., Muntz, R.R., Nijssen, S., Kok, J.N.: Frequent subtree mining - an overview.
+
+Fundam. Inf. 66(1-2), 161–198 (2004)
+
+Frequent Pattern Mining in Attributed Trees
+
+37
+
+8. Chi, Y., Yang, Y., Muntz, R.R.: Hybridtreeminer: An eﬃcient algorithm for mining
+frequent rooted trees and free trees using canonical form. In: SSDBM, pp. 11–20
+(2004)
+
+9. Chi, Y., Yang, Y., Xia, Y., Muntz, R.R.: Cmtreeminer: Mining both closed and
+maximal frequent subtrees. In: Dai, H., Srikant, R., Zhang, C. (eds.) PAKDD 2004.
+LNCS (LNAI), vol. 3056, pp. 63–73. Springer, Heidelberg (2004)
+
+10. Fukuzaki, M., Seki, M., Kashima, H., Sese, J.: Finding itemset-sharing patterns
+in a large itemset-associated graph. In: Zaki, M.J., Yu, J.X., Ravindran, B., Pudi,
+V. (eds.) PAKDD 2010, Part II. LNCS (LNAI), vol. 6119, pp. 147–159. Springer,
+Heidelberg (2010)
+
+11. Han, J., Pei, J., Yin, Y.: Mining frequent patterns without candidate generation.
+
+SIGMOD Rec. 29(2), 1–12 (2000)
+
+12. Hido, S., Kawano, H.: Amiot: Induced ordered tree mining in tree-structured
+
+databases. In: ICDM, pp. 170–177 (2005)
+
+13. Mannila, H., Toivonen, H.: Multiple uses of frequent sets and condensed represen-
+
+tations. In: KDD, pp. 189–194 (2005)
+
+14. Miyoshi, Y., Ozaki, T., Ohkawa, T.: Frequent pattern discovery from a single graph
+
+with quantitative itemsets. In: ICDM Workshops, pp. 527–532 (2009)
+
+15. Moser, F., Colak, R., Raﬁey, A., Ester, M.: Mining cohesive patterns from graphs
+
+with feature vectors. In: SDM, pp. 593–604 (2009)
+
+16. Mougel, P.-N., Rigotti, C., Gandrillon, O.: Finding collections of k-clique percolated
+components in attributed graphs. In: Tan, P.-N., Chawla, S., Ho, C.K., Bailey, J.
+(eds.) PAKDD 2012, Part II. LNCS (LNAI), vol. 7302, pp. 181–192. Springer,
+Heidelberg (2012)
+
+17. Nijssen, S., Kok, J.N.: Eﬃcient discovery of frequent unordered trees. In: First
+International Workshop on Mining Graphs, Trees and Sequences (MGTS) (2003)
+18. Pasquier, N., Bastide, Y., Taouil, R., Lakhal, L.: Discovering frequent closed item-
+sets for association rules. In: Beeri, C., Bruneman, P. (eds.) ICDT 1999. LNCS,
+vol. 1540, pp. 398–416. Springer, Heidelberg (1998)
+
+19. Termier, A., Rousset, M.C., Sebag, M.: Dryade: A new approach for discovering
+closed frequent trees in heterogeneous tree databases. In: ICDM, pp. 543–546 (2004)
+20. Termier, A., Rousset, M.C., Sebag, M., Ohara, K., Washio, T., Motoda, H.: Dryade-
+parent, an eﬃcient and robust closed attribute tree mining algorithm. IEEE Trans.
+on Knowl. and Data Eng. 20(3), 300–320 (2008)
+
+21. Wang, C., Hong, M., Pei, J., Zhou, H., Wang, W., Shi, B.: Eﬃcient pattern-growth
+methods for frequent tree pattern mining. In: Dai, H., Srikant, R., Zhang, C. (eds.)
+PAKDD 2004. LNCS (LNAI), vol. 3056, pp. 441–451. Springer, Heidelberg (2004)
+22. Washio, T., Motoda, H.: State of the art of graph-based data mining. SIGKDD
+
+Explor. Newsl. 5(1), 59–68 (2003)
+
+23. Xiao, Y., Yao, J.F., Li, Z., Dunham, M.H.: Eﬃcient data mining for maximal
+
+frequent subtrees. In: ICDM, pp. 379–386 (2003)
+
+24. Zaki, M.J.: Eﬃciently mining frequent trees in a forest. In: KDD, pp. 71–80 (2002)
+25. Zaki, M.J.: Eﬃciently mining frequent embedded unordered trees. Fundam.
+
+Inf. 66(1-2), 33–52 (2004)
+
+26. Zou, L., Lu, Y., Zhang, H., Hu, R.: Preﬁxtreeespan: a pattern growth algorithm for
+mining embedded subtrees. In: Aberer, K., Peng, Z., Rundensteiner, E.A., Zhang,
+Y., Li, X. (eds.) WISE 2006. LNCS, vol. 4255, pp. 499–505. Springer, Heidelberg
+(2006)
+
+

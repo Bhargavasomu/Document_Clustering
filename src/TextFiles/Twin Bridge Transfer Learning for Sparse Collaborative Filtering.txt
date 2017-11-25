@@ -1,0 +1,1693 @@
+Twin Bridge Transfer Learning
+
+for Sparse Collaborative Filtering
+
+Jiangfeng Shi1,2, Mingsheng Long1,2, Qiang Liu1,
+
+Guiguang Ding1, and Jianmin Wang1
+
+1 MOE Key Laboratory for Information System Security;
+
+TNLIST; School of Software
+
+2 Department of Computer Science & Technology,
+
+Tsinghua University, Beijing, China
+
+{shijiangfengsjf,longmingsheng}@gmail.com,
+{liuqiang,dinggg,jimwang}@tsinghua.edu.cn
+
+Abstract. Collaborative ﬁltering (CF) is widely applied in recommender
+systems. However, the sparsity issue is still a crucial bottleneck for most
+existing CF methods. Although target data are extremely sparse for a
+newly-built CF system, some dense auxiliary data may already exist in
+other matured related domains. In this paper, we propose a novel approach,
+Twin Bridge Transfer Learning (TBT), to address the sparse collaborative
+ﬁltering problem. TBT reduces the sparsity in target data by transferring
+knowledge from dense auxiliary data through two paths: 1) the latent fac-
+tors of users and items learned from two dense auxiliary domains, and 2)
+the similarity graphs of users and items constructed from the learned la-
+tent factors. These two paths act as a twin bridge to allow more knowledge
+transferred across domains to reduce the sparsity of target data. Exper-
+iments on two benchmark datasets demonstrate that our TBT approach
+signiﬁcantly outperforms state-of-the-art CF methods.
+
+Keywords: Collaborative Filtering, Sparsity, Transfer Learning, Latent
+Factor, Similarity Graph, Twin Bridge.
+
+1
+
+Introduction
+
+Recommender systems are widely deployed on the Web with the aim to improve
+the user experience [1]. Well-known e-commerce providers, such as Hulu (video)
+and NetFlix (movies), are highly relying on their developed recommender sys-
+tems. These systems attempt to recommend items that are most likely to attract
+users by predicting the preference (ratings) of the users to the items. In the last
+decade, collaborative ﬁltering (CF) methods [2–4], which utilize users’ past rat-
+ings to predict users’ future tastes, have been most popular due to their generally
+superior performance [5, 6]. Unfortunately, most of previous CF methods have
+not fully addressed the sparsity issue, i.e., the target data are extremely sparse.
+Recently, there has been an increasing research interest in developed transfer
+learning methods to alleviate the data sparsity problem [7–13]. The key idea
+behind is to transfer the common knowledge from some dense auxiliary data
+
+J. Pei et al. (Eds.): PAKDD 2013, Part I, LNAI 7818, pp. 496–507, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+Twin Bridge Transfer Learning for Sparse Collaborative Filtering
+
+497
+
+to the sparse target data. The common knowledge can be encoded into some
+common latent factors, and extracted by the latent factorization models [14].
+Good choices for the common latent factors can be the cluster-level codebook
+[8, 9], or the latent tastes of users/latent features of items [11–13]. The transfer
+learning methods have achieved promising performance over previous methods.
+However, when the target data are extremely sparse, existing transfer learning
+methods may confront the following issues. 1) Since the target data are extremely
+sparse, the latent factors extracted from the auxiliary data may transfer negative
+information to the target data, i.e., the latent factors are likely to be inconsistent
+with the target data, which may result in overﬁtting [15]. We refer to this issue
+as negative transfer. 2) As the target data are extremely sparse, it is expected
+that more common knowledge should be transferred from the auxiliary data to
+reduce the sparsity of the target data [16]. We refer to this issue as insuﬃcient
+transfer. Solving these two issues both can reduce the sparsity more eﬀectively.
+In this paper, we propose a novel approach, Twin Bridge Transfer Learning
+(TBT), for sparse collaborative ﬁltering. TBT aims to explore a twin bridge cor-
+responding to the latent factors which encode the latent tastes of users/latent
+features of items, and the similarity graphs which encode the collaboration infor-
+mation between users/items. TBT consists of two sequential steps. 1) It extracts
+the latent factors from dense auxiliary data and constructs the similarity graphs
+from these extracted latent factors. 2) It transfers both the latent factors and
+the similarity graphs to the target data. In this way, we can enhance suﬃcient
+transfer by transferring more common knowledge between domains, and allevi-
+ate negative transfer by ﬁltering out the negative information introduced in the
+latent factors. Extensive experiments on two real-world data sets show promising
+results obtained by TBT, especially when the target data are extremely sparse.
+
+2 Related Work
+
+Prior works using transfer learning for collaborative ﬁltering assume that there
+exist a set of common latent factors between the auxiliary and target data.
+Rating Matrix Generative Model (RMGM) [9] and Codebook Transfer (CBT) [8]
+transfer the cluster-level codebook to the target data. However, since codebook
+dimension cannot be too large, the codebook cannot transfer enough knowledge
+when the target data are extremely sparse. To avoid this limitation, Coordinate
+System Transfer (CST) [12], Transfer by Collective Factorization (TCF) [11],
+and Transfer by Integrative Factorization (TIF) [13] extract both latent tastes of
+users and latent features of items, and transfer them to the target data. However,
+these methods do not consider the negative transfer issue, which is more serious
+when the target data are extremely sparse. Also, they only utilize a single bridge
+for knowledge transfer. Diﬀerent from all these methods, our approach explores
+a twin bridge for transferring more useful knowledge to the sparse target data.
+Neighborhood structure has been widely used in memory-based CF [17] or graph
+regularized methods [4]. Neighborhood-Based CF Algorithm [17] predicts missing
+ratings of target users by their nearest neighbors. Graph Regularized Weighted
+Nonnegative Matrix Factorization (GWNMTF) [4] encodes the neighborhood
+
+498
+
+J. Shi et al.
+
+Table 1. Notations and their descriptions in this paper
+
+Notation
+
+τ
+m
+n
+p
+k
+
+Description
+
+dataset index, τ ∈ {1, 2}
+
+#target users
+#target items
+
+#nearest neighbors
+
+#latent factors
+
+Notation
+
+R
+Z
+U
+V
+B
+
+Description
+
+m × n rating matrix
+m × n indicator matrix
+
+m × k latent tastes of users
+n × k latent features of items
+k × k cluster-level codebook
+
+λU , λV regularization param of latent factors γU , γV regularization param of similarity graphs
+
+information into latent factor models, which can preserve the similarity between
+user tastes or item features. However, these methods depend largely on dense rat-
+ings to compute accurate neighborhood structure, which is impossible when the
+data are extremely sparse. Diﬀerent from these methods, our approach extracts the
+latent factors of users/items from some dense auxiliary data, and then constructs
+the neighborhood structure from these latent factors. In this way, the constructed
+neighborhood structure is more accurate for sparse CF.
+
+3 Problem Deﬁnition
+
+We focus on sparse collaborative ﬁltering where the target data are extremely
+sparse. Suppose in the target data, we have m users and n items, and a set of
+integer ratings ranging from 1 to 5. R ∈ R
+m×n is the rating matrix, where Rij is
+the rating that user i gives to item j. Z ∈ {0, 1} is the indicator matrix, Zij = 1
+if user i has rated item j, and Zij = 0 otherwise. In order to reduce the sparsity
+in the target data, we assume that there exist some dense auxiliary data, from
+which we can transfer some common knowledge to the target data. Speciﬁcally,
+we will consider two sets of auxiliary data, whose rating matrices are R1 and
+R2, with indicator matrices Z1 and Z2, respectively. R1 shares the common set
+of users with R, while R2 shares the common set of items with R. For clarity,
+the notations and their descriptions are summarized in Table 1.
+
+Deﬁnition 1 (Learning Goal). The goal of TBT is to construct 1) latent fac-
+tors U0,V0 from R1, R2 and 2) similarity graphs LU , LV from U0, V0 (Figure
+1), and use them as the twin bridge to predict missing values in R (Figure 2).
+
+4 Twin Bridge Transfer Learning for Recommendation
+
+In this section, we present our proposed TBT approach, which is comprised of
+two sequential steps: 1) twin bridge construction, and 2) twin bridge transfer.
+
+4.1 Twin Bridge Construction
+
+In the ﬁrst step, we aim to construct the latent factors and similarity graphs of
+users and items, which will be used as the twin bridge for knowledge transfer.
+
+Twin Bridge Transfer Learning for Sparse Collaborative Filtering
+
+499
+
+(cid:1847)(cid:3)
+(cid:1786)(cid:883)
+
+(cid:1795)(cid:882)(cid:2191)(cid:1499) 
+
+(cid:1792)(cid:883)(cid:1861)(cid:1862) 
+
+(cid:1776)(cid:883) 
+
+(cid:1796)(cid:2869)(cid:2192)(cid:1499) 
+
+(cid:2178)(cid:3)
+(cid:1786)(cid:2869)
+
+(cid:3022)(cid:3)
+(cid:1786)(cid:2870)
+
+(cid:1795)(cid:2870)(cid:2191)(cid:1499) 
+
+(cid:1792)(cid:2870)(cid:3284)(cid:3285) 
+
+(cid:1776)(cid:2870) 
+
+(cid:1796)(cid:2868)(cid:2192)(cid:1499) 
+
+(cid:2178)(cid:3)
+(cid:1786)(cid:2870)
+
+(cid:2191) (cid:3404) (cid:883)(cid:481) (cid:485) (cid:481) (cid:1865) 
+
+(cid:1862) (cid:3404) (cid:883)(cid:481) (cid:485) (cid:481) (cid:1866) 
+
+(cid:2191) (cid:3404) (cid:883)(cid:481) (cid:485) (cid:481) (cid:1865) 
+
+(cid:1862) (cid:3404) (cid:883)(cid:481) (cid:485) (cid:481) (cid:1866) 
+
+Fig. 1. Step 1 of TBT: twin bridge construction. The goal is to extract the latent
+factors and construct the similarity graphs from two sets of dense auxiliary data.
+
+(cid:1795)(cid:2868)(cid:2191)(cid:1499) 
+
+(cid:1786)(cid:1847)(cid:3)
+
+(cid:1795)(cid:2191)(cid:1499) 
+
+(cid:1792)(cid:1861)(cid:1862) 
+
+(cid:1776) 
+
+(cid:1796)(cid:2868)(cid:2192)(cid:1499) 
+
+(cid:1786)(cid:2178)(cid:3)
+
+(cid:1796)(cid:2192)(cid:1499) 
+
+(cid:2191) (cid:3404) (cid:883)(cid:481) (cid:485) (cid:481) (cid:1865) 
+
+(cid:1862) (cid:3404) (cid:883)(cid:481) (cid:485) (cid:481) (cid:1866) 
+
+(cid:1862) (cid:3404) (cid:883)(cid:481) (cid:485) (cid:481) (cid:1866)  
+(cid:1861) (cid:3404) (cid:883)(cid:481) (cid:485) (cid:481) (cid:1865) 
+Fig. 2. Step 2 of TBT: twin bridge transfer. ’−→’ represents matrix tri-factorization,
+’− →’ represents twin bridge transfer, (cid:2) represents the transferred knowledge structure
+
+Latent Factor Extraction. We adopt the graph regularized weighted nonneg-
+ative matrix tri-factorization (GWNMTF) method proposed by Gu et al. [4] to
+extract the latent factors from the two sets of dense auxiliary data R1 and R2
+L =
+
+Rτ − Uτ Bτ V
+
+(cid:2)Zτ (cid:3) (cid:3)
+
+V
+T
+τ L
+τ Vτ
+
++ γV tr
+
++ γU tr
+
+(cid:4)(cid:2)
+(cid:2)
+(cid:2)
+
+V
+
+T
+τ L
+
+U
+τ Uτ
+
+U
+
+(cid:2)
+(cid:2)
+
+T
+τ
+
+(cid:3)
+
+(cid:4)
+
+(cid:3)
+
+(cid:4)
+
+min
+
+Uτ ,Bτ ,Vτ ≥0
+
+2
+
+F
+
+R
+
+where γU and γV are graph regularization parameters, LU
+Laplacian matrices, (cid:3)·(cid:3) is the Frobenius norm of matrix. Uτ = [uτ∗1
+m×k are the k latent tastes of users, with each uτ
+of user i. Vτ = [vτ∗1
+each vτ
+codebook representing the association between Uτ and Vτ , τ ∈ {1, 2}.
+
+(1)
+τ are the graph
+, ..., uτ∗k] ∈
+i∗ representing the latent taste
+n×k are the k latent features of items, with
+k×k is the cluster-level
+
+i∗ representing the latent feature of item i. Bτ ∈ R
+
+, ..., vτ∗k] ∈ R
+
+τ , LV
+
+Since auxiliary data R1 share the common set of users with the target data
+R, we can share the latent tastes of users between them, that is, U0 = U1,
+where U0 denotes the common latent tastes of users. Similarly, since auxiliary
+data R2 share the common set of items with the target data R, we can share
+the latent features of items between them, that is, V0 = V2, where V0 denotes
+the common latent features of items. U0 and V0 are the common latent factors,
+which will be used as the ﬁrst type of bridge for knowledge transfer.
+
+It is worth noting that, the latent factors extracted by GWNMTF can respect
+the intrinsic neighborhood structure better than those extracted by Sparse Sin-
+gular Value Decomposition (SVD) [12], thus can ﬁt sparse target data better.
+
+500
+
+J. Shi et al.
+
+Similarity Graph Construction. Collaboration information between users or
+items contained in the rating matrix has been widely explored for CF. However,
+in extremely sparse target data, two users may rate the same item with low
+probability though they have the same taste. To avoid this data sparsity issue,
+we construct the similarity graphs from dense auxiliary data since they share
+common users or items with target data. Because U0 and V0 are denser than
+R1 and R2 and can better respect the collaboration information underlying the
+target data, we propose to construct similarity graphs of users and items from
+U0 and V0, respectively. We deﬁne the distance between users/items as follows:
+
+(cid:2)
+(cid:2)
+
+1,
+0,
+
+(WU )ij =
+
+(WV )ij =
+
+1,
+0,
+
+(cid:4)
+(cid:4)
+
+(cid:3)
+(cid:3)
+
+j∗
+u0
+
+j∗
+v0
+
+(cid:4)
+(cid:4)
+
+(cid:3)
+(cid:3)
+
+i∗
+u0
+
+i∗
+v0
+
+j∗ ∈ Np
+
+or u0
+
+j∗ ∈ Np
+
+or v0
+
+i∗ ∈ Np
+
+if u0
+otherwise
+i∗ ∈ Np
+if v0
+otherwise
+
+(2)
+
+i∗ is the ith row of U0 to denote the latent taste of user i, v0
+i∗) and Np(v0
+
+i∗ is the ith
+where u0
+row of V0 to denote the latent feature of item i, Np(u0
+i∗) are the
+sets of p-nearest neighbors of u0
+i∗, respectively. The positive semi-deﬁnite
+symmetric matrices WU and WV are the weight matrices for the similarity
+graphs, which will be used as the second type of bridge for knowledge transfer.
+
+i∗ and v0
+
+4.2 Twin Bridge Transfer
+
+In the second step, we introduce the objectives for latent factor transfer and
+similarity graph transfer respectively, and then integrate them into a uniﬁed
+optimization problem for twin bridge transfer learning.
+
+Latent Factor Transfer. Since the latent factors of users/items may not be
+shared as a whole between domains, we propose to transfer latent factors U0, V0
+to the target data via two regularization terms (cid:3)U − U0(cid:3)2
+F and (cid:3)V − V0(cid:3)2
+F ,
+instead of enforcing U ≡ U0, V ≡ V0. This leads to the latent factor transfer
+
+(cid:5)(cid:5)Z (cid:5)(cid:3)
+
+R − UBVT
+
+(cid:4)(cid:5)(cid:5)2
+F + λU (cid:3)U − U0(cid:3)2
+
+F + λV (cid:3)V − V0(cid:3)2
+
+F (3)
+
+OUV =
+
+min
+
+U,V,B≥0
+
+where λU , λV are regularization parameters indicating our conﬁdence on the
+latent factors. Since the target data are extremely sparse, the latent factors
+U0, V0 may transfer some negative information to the target data. Therefore,
+we introduce similarity graph transfer as a complementary method in the sequel.
+
+Similarity Graph Transfer. Based on the manifold assumption [18], similar
+users/items should have similar latent tastes/features. Therefore, preserving the
+neighborhood structure underlying the users/items in the target data are reduced
+to the following graph regularizers encoding the constructed similarity graphs
+
+Twin Bridge Transfer Learning for Sparse Collaborative Filtering
+
+501
+
+ij
+
+ij
+
+(cid:3)ui∗ − uj∗(cid:3)2(WU )ij = tr
+(cid:3)vi∗ − vj∗(cid:3)2(WV )ij = tr
+(cid:7)(cid:8)
+
+(cid:9)
+
+(cid:3)
+(cid:4)
+UT (DU − WU ) U
+(cid:3)
+(cid:4)
+VT (DV − WV ) V
+(cid:9)
+
+(cid:7)(cid:8)
+
+(cid:3)
+(cid:3)
+
+= tr
+
+= tr
+
+UT LU U
+
+VT LV V
+
+(cid:4)
+(cid:4)
+
+(cid:6)
+(cid:6)
+
+GU =
+GV =
+
+1
+2
+1
+2
+
+(4)
+. LU = DU − WU
+where DU = diag
+and LV = DV − WV are the graph Laplacian matrices for the similarity graphs.
+Incorporating the graph regularizers into the objective function of nonnegative
+
+, DV = diag
+
+j (WV )ij
+
+j (WU )ij
+
+matrix tri-factorization, we obtain the following similarity graph transfer
+
+(cid:5)(cid:5)Z (cid:5)(cid:3)
+
+R − UBVT
+
+(cid:4)(cid:5)(cid:5)2
+F + γUGU + γV GV
+
+OGUGV =
+
+min
+
+U,V,B≥0
+
+(5)
+
+where γU , γV are regularization parameters indicating our conﬁdence on the
+similarity graphs. With similarity graph transfer, we can essentially ﬁlter out
+the negative information in the latent factors by using the nearest neighbor rule.
+However, since the target data are extremely sparse, only transferring knowledge
+from the similarity graphs may be insuﬃcient. Thus we seek an integrated model.
+
+Twin Bridge Transfer. Considering the aforementioned limitations, we in-
+tegrate the latent factor transfer and similarity graph transfer into a uniﬁed
+twin bridge transfer (TBT) method. In TBT, ﬁrstly, we extract the latent fac-
+tors of users/items and construct the similarity graphs from them. Secondly, we
+transfer latent factors as the ﬁrst bridge to solve the insuﬃcient transfer issue.
+As mentioned before, these latent factors may contain negative information for
+the target data and result in the negative transfer issue. So thirdly, we transfer
+the similarity graphs as the second bridge to alleviate negative transfer and to
+transfer more knowledge to the target data. It is worth noting that, each of the
+twin bridge can enhance the learning of the other bridge during the optimiza-
+tion procedure due to their complementary property. Therefore, we incorporate
+Equations (3) and (5) into a uniﬁed Twin Bridge Transfer optimization problem
+
+min
+
+U,V,B≥0
+
+O =
+
+(cid:2)
+(cid:2)
+
+(cid:2)Z (cid:3) (cid:3)
+
+R − UBV
+
+T
+
+(cid:4)(cid:2)
+(cid:2)
+(cid:2)
+
+2
+
+F
+
++λU (cid:4)U − U0(cid:4)2
+
+F +λV (cid:4)V − V0(cid:4)2
+
+F +γUGU +γV GV
+
+(6)
+where λU , λV , γU , γV are regularization parameters. If λU , λV > γU , γV , the
+transferred latent factors dominate the recommendation results; otherwise, the
+transferred similarly graphs dominate the recommendation results. With TBT,
+we can transfer more knowledge from dense auxiliary data to sparse target data
+to reduce the data sparsity, and substantially avoid the negative transfer issue.
+
+4.3 Learning Algorithm
+We solve the optimization problem in Equation (6) using the gradient descent
+method. The derivative of O with respect to U (the other variables are ﬁxed) is
+
+= −2Z (cid:5) RVBT + 2Z (cid:5)(cid:3)
+
+∂O
+∂U
+
+(cid:4)
+
+UBVT
+
+VBT + 2λU (U − U0) + 2γU LU U
+
+502
+
+J. Shi et al.
+
+Algorithm 1. TBT: Twin Bridge Transfer Learning for Collaborative Filtering
+Input: Data sets R, Rτ , Z, Zτ , τ ∈ {1, 2}, parameters k, p, λU , λV , γU , γV .
+Ouput: Latent factors U, V, and B.
+1: Extract latent factor U0, V0 by Equations (1).
+2: Construct similarity graphs GU ,GV from U0, V0 by Equations (4).
+3: for it ← 1 to maxIt do
+4:
+5: end for
+
+update U, V, and B by Equations (7)∼(9), respectively.
+
+(cid:4)
+
+Using Karush-Kuhn-Tucker (KKT) condition [19] for nonnegativity of U, we get
+
+(cid:11) (cid:5) U = 0
+(cid:10)−Z (cid:5) RVBT + Z (cid:5)(cid:3)
+VBT + λU (U − U0) + γU LU U
+U − L
+−
+U , where L+
+Since LU may take mixed signs, we replace it with LU = L+
+2 (|LU| − LU ) are positive-valued matrices. We obtain
+2 (|LU| + LU ), L
+−
+(cid:12)
+1
+U = 1
+
+UBVT
+
+U =
+
+U ← U (cid:5)
+
+Z (cid:5) RVBT + λU U0 + γU L
+−
+U U
+Z (cid:5) (UBVT ) VBT + λU U + γU L+
+U U
+
+Likewise, we derive V and B in similar way and get the following update rules
+
+V ← V (cid:5)
+
+(cid:13)(cid:14)(cid:14)(cid:15) (Z (cid:5) R)
+(cid:12)
+
+(Z (cid:5) (UBVT ))
+
+T
+
+B ← B (cid:5)
+
+−
+UB + λV V0 + γV L
+V V
+UB + λV V + γV L+
+
+T
+
+V V
+
+UT (Z (cid:5) R) V
+
+(7)
+
+(8)
+
+UT (Z (cid:5) (UBVT )) V
+
+(9)
+According to [4], updating U, V and B sequentially by Equations (7)∼(9) will
+monotonically decrease the objective function in Equation (6) until convergence.
+The learning algorithm for TBT is summarized in Algorithm 1. The time
+complexity is O(maxIt· kmn + mn2 + m2n), which is the sum of TBT cost plus
+the time cost for the latent factor extraction and similarity graphs construction.
+
+5 Experiments
+
+In this section, we conduct experiments to compare TBT with state-of-the-art
+collaborative ﬁltering methods on benchmark data sets with high sparsity level.
+
+5.1 Data Sets
+
+MovieLens10M1 MovieLens10M consists of 10,000,054 ratings and 95,580 tags
+given by 71,567 users to 10,681 movies. The preference of the user for a movie
+is rated from 1 to 5 and 0 indicates that the movie is not rated by any user.
+
+1
+
+http://www.grouplens.org/node/73/
+
+Twin Bridge Transfer Learning for Sparse Collaborative Filtering
+
+503
+
+Table 2. Description of the data sets for evaluation
+
+Data Sets
+
+R
+
+R1 (user side)
+R2 (item side)
+
+Target (training)
+
+Target (test)
+
+Auxiliary
+Auxiliary
+
+MovieLens10M
+
+Epinions
+
+Size
+
+5000×5000
+
+Sparsity
+0.01∼1%
+8.22∼8.13%
+
+2.31%
+9.14%
+
+Size
+
+1662×2078
+
+Sparsity
+0.01∼1%
+1.86∼0.87%
+
+0.65%
+1.28%
+
+Epinions2 In epinions.com, users can assign products with integer ratings
+ranging from 1 to 5. The dataset used in our experiments is collected by crawling
+the epinions.com website during March, 2012. It consists of 3,324 users who
+have rated a total of 4,156 items, and the total number of ratings is 138,133.
+The data sets used in the experiments are constructed using the same strategy
+as [12]. For the MovieLens10M data set, we ﬁrst randomly sample a 104 × 104
+dense rating matrix X from the MovieLens data. Then we take the submatrices
+R = X1∼5000,1∼5000 as the target rating matrix, R1 = X1∼5000,5001∼10000
+as the user-side auxiliary data and R2 = X5001∼10000,1∼5000 as the item-side
+auxiliary data. In this way, R and R1 share common users but not common
+items, while R and R2 share common items but not common users. We use the
+same construction strategy for the Epinions data. In all experiments, the target
+ratings R are randomly split into a training set and a test set. To investigate the
+performance of each method on sparse data, we sampled training set randomly
+with a variety of sparsity levels from 0.01% to 1%, as summarized in Table 2.
+
+5.2 Evaluation Metrics
+
+We adopt two evaluation metrics, Mean Absolute Error (MAE) and Root Mean
+Square Error (RMSE), which are widely used for evaluating collaborative ﬁlter-
+ing algorithms [4, 12]. MAE and RMSE are deﬁned as
+
+(cid:8)
+
+(cid:16)(cid:16)(cid:16)Rij − (cid:17)Rij
+
+(cid:16)(cid:16)(cid:16)
+
+(cid:13)(cid:14)(cid:14)(cid:15)(cid:8)
+i,j (Rij − (cid:17)Rij )
+
+2
+
+|TE|
+
+M AE =
+
+i,j
+
+|TE|
+
+RM SE =
+
+Where Rij is the rating that user i gives to item j in test set, while (cid:17)Rij is the
+predicted value of Rij by CF algorithms, |TE| is the number of ratings in test
+set. We run each method 10 repeated trials with randomly generated training set
+and test set from R, and report the average MAE and RMSE of each method.
+
+5.3 Baseline Methods & Parameter Settings
+
+We compare TBT with Probabilistic Matrix Factorization (PMF) [20], Weight
+Nonnegative Matrix Factorization (WNMF) [21], Graph Regularized Weighted
+Nonnegative Matrix Tri-Factorization (GWNMTF) [4], Coordinate System Trans-
+fer (CST) [12], our proposed TBTUV (deﬁned in Equation (3)) and TBTG
+
+2
+
+http://www.epinions.com/
+
+504
+
+J. Shi et al.
+
+Table 3. MAE & RMSE comparison on MovieLens10M
+
+Methods Without Transfer
+PMF WNMF GWNMTF
+1.171
+1.0256
+0.90232
+0.73368
+0.70398
+0.9073
+1.3717
+1.2333
+1.1097
+0.93171
+0.90112
+1.1095
+
+2.7966
+1.3835
+0.9506
+0.697
+0.6743
+1.3004
+3.1434
+1.8779
+1.3199
+0.9076
+0.8718
+1.6241
+
+0.8321
+0.7663
+0.7407
+0.6862
+0.6728
+0.7396
+1.0299
+
+0.97
+0.944
+0.8802
+0.8645
+0.9377
+
+Method With Transfer
+
+CST TBTG TBTU V
+0.7272
+0.9814
+0.7492
+0.8409
+0.7629
+0.7275
+0.6785
+0.6799
+0.6677
+0.6677
+0.7100
+0.7866
+0.9397
+1.3926
+0.9594
+1.1225
+0.997
+0.935
+0.8734
+0.8755
+0.8601
+0.8605
+1.0496
+0.9135
+
+0.7535
+0.6945
+0.6853
+0.6707
+0.6649
+0.6938
+0.9445
+0.8896
+0.8812
+0.8628
+0.8561
+0.8868
+
+TBT
+
+0.6978±0.0006
+0.6903±0.0007
+0.6840±0.0005
+0.6690±0.0001
+0.6640±0.0000
+0.6810±0.0004
+0.8995±0.0011
+0.8893±0.0012
+0.8817±0.0008
+0.8608±0.0001
+0.8550±0.0000
+0.8772±0.0007
+
+Table 4. MAE & RMSE comparison on Epinions
+
+Method With Transfer
+
+MAE
+
+RMSE
+
+MAE
+
+RMSE
+
+Sparsity
+
+0.01%
+0.05%
+0.10%
+0.50%
+
+1%
+
+Average
+
+0.01%
+0.05%
+0.10%
+0.50%
+
+1%
+
+Average
+
+Sparsity
+
+0.01%
+0.05%
+0.10%
+0.50%
+
+1%
+
+Average
+
+0.01%
+0.05%
+0.10%
+0.50%
+
+1%
+
+Average
+
+Methods Without Transfer
+PMF WNMF GWNMTF CST TBTG TBTU V
+0.8806
+1.6758
+1.6341
+0.9122
+0.9258
+1.5555
+0.8846
+1.1083
+0.8478
+0.9824
+0.8902
+1.3912
+1.1366
+1.8474
+1.8136
+1.1755
+1.1919
+1.7464
+1.1369
+1.3641
+1.095
+1.218
+1.5979
+1.1472
+
+0.9066
+0.8838
+0.8773
+0.8543
+0.8379
+0.8720
+1.1427
+1.118
+1.1173
+1.0885
+1.0766
+1.1086
+
+3.7617
+3.0304
+2.3353
+1.0465
+0.8769
+2.2102
+3.999
+3.4811
+2.9094
+1.4222
+1.1457
+2.5915
+
+0.9781
+0.9629
+0.9506
+0.8837
+0.8467
+0.9244
+1.3063
+1.2695
+1.2403
+1.1422
+1.0981
+1.2113
+
+0.9875
+0.9792
+0.9682
+0.8902
+0.8539
+0.9358
+1.2665
+1.2508
+1.233
+1.1289
+1.0932
+1.1945
+
+TBT
+
+0.8737±0.0046
+0.8740±0.0043
+0.8682±0.0018
+0.8441±0.0016
+0.8294±0.0008
+0.8579± 0.0026
+1.1164±0.0022
+1.1116±0.0022
+1.1105±0.0021
+1.0790±0.0007
+1.0688±0.0005
+1.0973±0.0015
+
+(deﬁned in Equation (5)). Diﬀerent numbers of latent factors {5, 10, 15, 20} and
+diﬀerent values of regularization parameters {0.01, 0.1, 1, 10,100} of each method
+are tried, with the best ones selected for comparison. Since all the algorithms are
+iterative ones, we run each of them 1000 iterations and report the best results.
+
+5.4 Experimental Results
+
+The experimental results on MovieLens10M and Epinions are shown in Table 3
+and Table 4 respectively. From the tables, we can make several observations.
+• TBT performs better than all baseline methods under all sparsity levels. It
+conﬁrms that simultaneously transferring latent factors and similarity graphs as
+twin bridge can successfully reduce the sparsity in the target data.
+• It is interesting to see that, for our method, the sparser the target data are,
+the more improvement can be achieved. This can be explained by two reasons.
+
+First, when the rating data are sparse, matrix factorization methods that rely on
+neighborhood information is ineﬀective due to: 1) it is impossible to compute the
+similarity between users/items when data are extremely sparse, and 2) even if
+some similarity information is calculated, this information may be too limited to
+recommend correct items. So its prediction performance gets worse when rating
+
+Twin Bridge Transfer Learning for Sparse Collaborative Filtering
+
+505
+
+ 
+
+0.90
+
+0.89
+
+0.88
+
+0.87
+
+0.86
+
+0.85
+
+0.84
+
+0.83
+
+0.82
+
+0.69
+
+0.68
+
+ 
+
+0.68
+
+0.67
+
+0.67
+
+0.66
+
+NMF
+
+GWNMTF
+
+CST
+
+TBT_G
+
+TBT_UV
+
+TBT
+
+ 
+
+1.04
+1.02
+1.00
+0.98
+0.96
+0.94
+0.92
+0.90
+0.88
+0.86
+
+GWNMTF
+
+CST
+
+TBT_G
+
+TBT_UV
+
+TBT
+
+ 
+
+1.11
+
+1.08
+
+1.05
+
+1.02
+
+0.99
+
+0.96
+
+0.93
+
+0.90
+
+0.87
+
+GWNMTF
+
+CST
+
+TBT_G
+
+TBT_UV
+
+TBT
+
+5
+
+10
+
+15
+
+20
+
+5
+
+10
+
+15
+
+20
+
+5
+
+10
+
+15
+
+20
+
+(cid:1863) 
+
+(cid:1863) 
+
+(cid:1863) 
+
+NMF
+
+GWNMTF
+
+CST
+
+TBT_G
+
+TBT_UV
+
+TBT
+
+ 
+
+0.80
+
+0.78
+
+0.76
+
+0.74
+
+0.72
+
+0.70
+
+0.68
+
+GWNMTF
+
+CST
+
+TBT_G
+
+TBT_UV
+
+TBT
+
+ 
+
+1.04
+
+0.99
+
+0.94
+
+0.89
+
+0.84
+
+0.79
+
+0.74
+
+0.69
+
+GWNMTF
+
+CST
+
+TBT_G
+
+TBT_UV
+
+TBT
+
+5
+
+10
+
+15
+
+20
+
+5
+
+10
+
+15
+
+20
+
+5
+
+10
+
+15
+
+20
+
+(cid:1863) 
+
+(a) 1%
+
+(cid:1863) 
+
+(b) 0.1%
+
+(cid:1863) 
+
+(c) 0.01%
+
+Fig. 3. Impact of #latent factors on Epinions (above) and MovieLens10M (bottom)
+
+data are coming more spare. To handle this problem, we construct a twin bridge,
+which can transfer more knowledge from dense auxiliary data to the target data.
+Secondly, towards the negative transfer issue, CST encounters the problem
+that the transferred latent factors extracted from the auxiliary data may con-
+tain some negative information for the target data. Our twin bridge transfer
+mechanism alleviates this problem by using similarity graphs as regularization
+when training the recommendation model. Notably, the graph regularization can
+ﬁlter out the negative information introduced by the transferred latent factors.
+With this advantage, TBT is made more robust to the extremely sparse data.
+• Although TBT is a combination of our proposed TBTUV and TBTG, it
+outperforms both of them. This proves that the twin bridge transfer can reinforce
+the learning of both bridges. Each bridge emphasizes diﬀerent properties of the
+data and enriches the matrix tri-factorization with complementary information.
+• Unfortunately, transfer learning method CST has not consistently out-
+performed non-transfer learning methods GWNMTF. CST takes advantage on
+moderately sparse data (0.1%∼1%) by knowledge transfer. However, under ex-
+tremely sparsity levels (0.01%∼0.1%), the latent factors transferred by CST may
+contain some negative information for the target data. In this case, GWNMTF
+performs better than CST, since it is not aﬀected by the negative transfer issue.
+
+5.5 Parameter Sensitivity
+
+We investigate the parameter sensitivity by varying the values of k, λ and γ under
+diﬀerent sparsity levels. As Figure 3 shows, under a given sparsity level, the more
+latent factors used, the better the performance is. Typically, we set k = 20 as
+used by baseline methods. For λ and γ, We set λ = γ in TBT for easy comparison
+with baselines, and report average MAE in Figure 4. Each column corresponds
+
+506
+
+J. Shi et al.
+
+ 
+
+ 
+
+1.17
+
+1.12
+
+1.07
+
+1.02
+
+0.97
+
+0.92
+
+0.87
+
+0.82
+
+0.84
+0.82
+0.80
+0.78
+0.76
+0.74
+0.72
+0.70
+0.68
+0.66
+
+NMF
+
+GWNMTF
+
+CST
+
+TBT_G
+
+TBT
+
+ 
+
+1.17
+
+1.12
+
+1.07
+
+1.02
+
+0.97
+
+0.92
+
+0.87
+
+0.82
+
+GWNMTF
+CST
+TBT_G
+TBT
+
+ 
+
+1.17
+
+1.12
+
+1.07
+
+1.02
+
+0.97
+
+0.92
+
+0.87
+
+0.82
+
+GWNMTF
+CST
+TBT_G
+TBT
+
+0.01
+
+0.1
+
+1
+
+(cid:2019)  (cid:428)  (cid:2011) 
+
+10
+
+100
+
+0.01
+
+0.1
+
+1
+
+(cid:2019)  (cid:428)  (cid:2011) 
+
+10
+
+100
+
+0.01
+
+0.1
+
+1
+
+(cid:2019)  (cid:428)  (cid:2011) 
+
+10
+
+100
+
+NMF
+GWNMTF
+CST
+TBT_G
+TBT
+
+NMF
+GWNMTF
+CST
+TBT_G
+TBT
+
+ 
+
+1.06
+
+1.01
+
+0.96
+
+0.91
+
+0.86
+
+0.81
+
+0.76
+
+0.71
+
+0.66
+
+ 
+
+1.06
+
+1.01
+
+0.96
+
+0.91
+
+0.86
+
+0.81
+
+0.76
+
+0.71
+
+0.66
+
+GWNMTF
+CST
+TBT_G
+TBT
+
+0.01
+
+0.1
+
+1
+
+(cid:2019)  (cid:428)  (cid:2011) 
+
+(a) 1%
+
+10
+
+100
+
+0.01
+
+0.1
+
+1
+
+(cid:2019)  (cid:428)  (cid:2011) 
+
+10
+
+100
+
+0.01
+
+0.1
+
+1
+
+(cid:2019)  (cid:428)  (cid:2011) 
+
+10
+
+100
+
+(b) 0.1%
+
+(c) 0.01%
+
+Fig. 4. Regularization param impact on Epinions (above)/MovieLens10M (bottom)
+
+to a speciﬁc sparsity level of training ratings while each row corresponds to a
+diﬀerent dataset. We observe that, 1) TBT method performs much more stably
+under diﬀerent parameter values and sparsity levels than the baseline methods,
+and 2) neither non-transfer method GWNMTF or single bridge transfer methods
+CST/TBTG can perform stably under diﬀerent parameter values, sparsity levels,
+or data sets. Luckily, our TBT beneﬁts from its twin bridge mechanism and
+performs much more robustly under all of these experimentation settings.
+
+6 Conclusion
+
+In this paper, we proposed a novel approach, Twin Bridge Transfer Learning
+(TBT), to reduce the sparsity in the target data. TBT consists of two sequential
+steps: 1) TBT extracts latent factors of users and items from dense auxiliary data
+and constructs similarity graphs from them; 2) TBT utilizes the latent factors
+and similarity graphs as twin bridge to transfer knowledge from dense auxiliary
+data to sparse target data. By using the twin bridge, TBT can enhance suﬃcient
+transfer by transferring more knowledge, while alleviate negative transfer by
+regularizing the learning model with the similarity graphs, which can naturally
+ﬁlter out the negative information contained in the latent factors. Experiments
+on real-world data sets validate the eﬀectiveness of the proposed TBT approach.
+
+Acknowledgement. The work is supported by the National HGJ Key Project
+(No. 2010ZX01042-002-002-01), the 973 Program of China (No. 2009CB320706),
+the National Natural Science Foundation of China (No. 61050010, No. 61073005,
+No. 60972096).
+
+Twin Bridge Transfer Learning for Sparse Collaborative Filtering
+
+507
+
+References
+
+1. Adomavicius, G., Tuzhilin, A.: Toward the next generation of recommender sys-
+
+tems: a survey of the state-of-the-art and possible extensions. TKDE 17 (2005)
+
+2. Ma, H., King, I., Lyu, M.R.: Learning to recommend with social trust ensemble.
+
+In: SIGIR (2009)
+
+3. Song, Y., Zhuang, Z., Li, H., Zhao, Q., Li, J., Lee, W.C., Giles, C.L.: Real-time
+
+automatic tag recommendation. In: SIGIR (2008)
+
+4. Gu, Q., Zhou, J., Ding, C.: Collaborative ﬁltering: Weighted nonnegative matrix
+
+factorization incorporating user and item graphs. In: SDM (2010)
+
+5. Basilico, J., Hofmann, T.: Unifying collaborative and content-based ﬁltering. In:
+
+ICML (2004)
+
+6. Melville, P., Mooney, R., Nagarajan, R.: Content-boosted collaborative ﬁltering for
+
+improved recommendations. In: AAAI (2002)
+
+7. Cao, B., Liu, N., Yang, Q.: Transfer learning for collective link prediction in mul-
+
+tiple heterogenous domains. In: ICML (2010)
+
+8. Li, B., Yang, Q., Xue, X.: Can movies and books collaborate? cross-domain col-
+
+laborative ﬁltering for sparsity reduction. In: AAAI (2009)
+
+9. Li, B., Yang, Q., Xue, X.: Transfer learning for collaborative ﬁltering via a rating-
+
+matrix generative model. In: ICML (2009)
+
+10. Pan, S.J., Yang, Q.: A survey on transfer learning. TKDE 22 (2010)
+11. Pan, W., Liu, N.N., Xiang, E.W., Yang, Q.: Transfer learning to predict missing
+
+ratings via heterogeneous user feedbacks. IJCAI (2011)
+
+12. Pan, W., Xiang, E., Liu, N., Yang, Q.: Transfer learning in collaborative ﬁltering
+
+for sparsity reduction. In: AAAI (2010)
+
+13. Pan, W., Xiang, E., Yang, Q.: Transfer learning in collaborative ﬁltering with
+
+uncertain ratings. In: AAAI (2012)
+
+14. Bell, R.M., Koren, Y.: Scalable collaborative ﬁltering with jointly derived neigh-
+
+borhood interpolation weights. In: ICDM (2007)
+
+15. Long, M., Wang, J., Ding, G., Shen, D., Yang, Q.: Transfer learning with graph
+
+co-regularization. In: AAAI (2012)
+
+16. Long, M., Wang, J., Ding, G., Cheng, W., Zhang, X., Wang, W.: Dual transfer
+
+learning. In: SDM (2012)
+
+17. Herlocker, J., Konstan, J.A., Riedl, J.: An empirical analysis of design choices
+in neighborhood-based collaborative ﬁltering algorithms. Information Retrieval 5
+(2002)
+
+18. Belkin, M., Niyogi, P.: Laplacian eigenmaps and spectral techniques for embedding
+
+and clustering. In: NIPS, vol. 14 (2001)
+
+19. Boyd, S., Vandenberghe, L.: Convex optimization. Cambridge University Press
+
+(2004)
+
+20. Salakhutdinov, R., Mnih, A.: Probabilistic matrix factorization. In: NIPS (2008)
+21. Zhang, S., Wang, W., Ford, J., Makedon, F.: Learning from incomplete ratings
+
+using non-negative matrix factorization. SIAM (2006)
+
+

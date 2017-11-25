@@ -1,0 +1,1018 @@
+Diﬀerential Privacy Preserving Spectral Graph
+
+Analysis
+
+Yue Wang, Xintao Wu, and Leting Wu
+
+University of North Carolina at Charlotte
+
+{ywang91,xwu,lwu8}@uncc.edu
+
+Abstract. In this paper, we focus on diﬀerential privacy preserving
+spectral graph analysis. Spectral graph analysis deals with the analysis
+of the spectra (eigenvalues and eigenvector components) of the graph’s
+adjacency matrix or its variants. We develop two approaches to com-
+puting the -diﬀerential eigen decomposition of the graph’s adjacency
+matrix. The ﬁrst approach, denoted as LNPP, is based on the Laplace
+Mechanism that calibrates Laplace noise on the eigenvalues and every en-
+try of the eigenvectors based on their sensitivities. We derive the global
+sensitivities of both eigenvalues and eigenvectors based on the matrix
+perturbation theory. Because the output eigenvectors after perturbation
+are no longer orthogonormal, we postprocess the output eigenvectors by
+using the state-of-the-art vector orthogonalization technique. The sec-
+ond approach, denoted as SBMF, is based on the exponential mechanism
+and the properties of the matrix Bingham-von Mises-Fisher density for
+network data spectral analysis. We prove that the sampling procedure
+achieves diﬀerential privacy. We conduct empirical evaluation on a real
+social network data and compare the two approaches in terms of util-
+ity preservation (the accuracy of spectra and the accuracy of low rank
+approximation) under the same diﬀerential privacy threshold. Our em-
+pirical evaluation results show that LNPP generally incurs smaller utility
+loss.
+
+Keywords: diﬀerential privacy, spectral graph analysis, privacy preser-
+vation.
+
+1
+
+Introduction
+
+There have been attempts [1–3] to formalize notions of diﬀerential privacy in
+releasing aggregate information about a statistical database and the mechanism
+to providing privacy protection to participants of the databases. Diﬀerential pri-
+vacy [1] is a paradigm of post-processing the output of queries such that the
+inclusion or exclusion of a single individual from the data set make no statis-
+tical diﬀerence to the results found. Diﬀerential privacy is usually achieved by
+directly adding calibrated laplace noise on the output of the computation f .
+The calibrating process of this approach includes the calculation of the global
+sensitivity of the computation f that bounds the possible change in the compu-
+tation output over any two neighboring databases. The added noise is generated
+
+J. Pei et al. (Eds.): PAKDD 2013, Part II, LNAI 7819, pp. 329–340, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+330
+
+Y. Wang, X. Wu, and L. Wu
+
+from a Laplace distribution with the scale parameter determined by the global
+sensitivity of f and the user-speciﬁed privacy threshold . This approach works
+well for traditional aggregate functions (often with low sensitivity values) over
+tabular data. In [4], McSherry and Talwar introduced a general mechanism with
+diﬀerential privacy that comes with guarantees about the quality of the output,
+even for functions that are not robust to additive noise. The idea is to sample
+from the distribution speciﬁed by the exponential mechanism distribution. This
+mechanism skews a base measure to the largest degree possible while ensuring
+diﬀerential privacy, focusing probability on the outputs of highest value.
+
+In this paper, we focus on diﬀerential privacy preserving spectral graph anal-
+ysis. Spectral graph analysis deals with the analysis of the spectra (eigenvalues
+and eigenvector components) of the graph’s adjacency matrix or its variants. We
+develop two approaches to computing the -diﬀerential private spectra, the ﬁrst
+k eigenvalues and the corresponding eigenvectors, from the input graph G. The
+ﬁrst approach, denoted as LNPP, is based on the Laplace Mechanism [1] that
+calibrates Laplace noise on the eigenvalues and every entry of the eigenvectors
+based on their sensitivities. We derive the global sensitivities of both eigenvalues
+and eigenvectors based on the matrix perturbation theory [5]. Because the out-
+put eigenvectors after perturbation are no longer orthogonormal, we postprocess
+the output eigenvectors by using the state-of-the-art vector orthogonalization
+technique [6]. The second approach, denoted as SBMF, is based on the exponen-
+tial mechanism [4] and the properties of the matrix Bingham-von Mises-Fisher
+density for network data spectral analysis [7]. We prove that the Gibbs sampling
+procedure [7] achieves diﬀerential privacy. We conduct empirical evaluation on
+a real social network data and compare the two approaches in terms of utility
+preservation (the accuracy of spectra and the accuracy of low rank approxima-
+tion) under the same diﬀerential privacy threshold. Our empirical evaluation
+results show that LNPP generally incurs smaller utility loss.
+
+2 Preliminaries
+
+2.1 Diﬀerential Privacy
+
+We revisit the formal deﬁnition and the mechanism of diﬀerential privacy. For
+diﬀerential privacy, a database is treated as a collection of rows, with each row
+corresponding to an individual record. Here we focus on how to compute graph
+statistics (eigen-pairs) from private network topology described as its adjacency
+matrix. We aim to ensure that the inclusion or exclusion of a link between two
+individuals from the graph make no statistical diﬀerence to the results found.
+
+Deﬁnition 1. (Diﬀerential Privacy [1]) A graph analyzing algorithm Ψ that
+takes as input a graph G, and outputs Ψ (G), preserves -diﬀerential edge privacy
+if for all closed subsets S of the output space, and all pairs of neighboring graphs
+(cid:3)
+G and G
+
+from Γ (G),
+
+(1)
+
+where Γ (G) = {G
+(cid:3)
+
+(V, E
+
+P r[Ψ (G) ∈ S] ≤ eε · P r[Ψ (G
+(cid:3)
+)|∃!(u, v) ∈ G but (u, v) /∈ G
+(cid:3)
+
+) ∈ S],
+(cid:3)}.
+
+Diﬀerential Privacy Preserving Spectral Graph Analysis
+
+331
+
+A diﬀerentially private algorithm provides an assurance that the probability of
+a particular output is almost the same no matter whether any particular edge
+is included or not. A general method for computing an approximation to any
+function while preserving -diﬀerential privacy is given in [1]. This mechanism
+for achieving diﬀerential privacy computes the sum of the true answer and ran-
+dom noise generated from a Laplace distribution. The magnitude of the noise
+distribution is determined by the sensitivity of the computation and the privacy
+parameter speciﬁed by the data owner. The sensitivity of a computation bounds
+the possible change in the computation output over any two neighboring graphs
+(diﬀering at most one link).
+Deﬁnition 2. (Global Sensitivity [1]) The global sensitivity of a function f :
+D → Rd (G ∈ D),in the analysis of a graph G, is
+
+GSf (G) :=
+
+max
+
+G,G(cid:2)s.t.G(cid:2)∈Γ (G)
+
+(cid:6)f (G) − f (G
+(cid:3)
+
+)(cid:6)1
+
+(2)
+
+(3)
+
+Theorem 1. (The Laplace Mechanism [1]) An algorithm A takes as input a
+graph G, and some ε > 0, a query Q with computing function f : Dn → Rd,
+and outputs
+
+A(G) = f (G) + (Y1, ..., Yd)
+
+where the Yi are drawn i.i.d from Lap(GSf (G)/ε). The Algorithm satisﬁes -
+diﬀerential privacy.
+
+Another exponential mechanism was proposed to achieve diﬀerential privacy for
+diverse functions especially those with large sensitivities [4]. The exponential
+mechanism is driven by a score function q that maps a pair of input(G) and
+output(r) from Dn × Rd to a real valued score(q(G, r)) which indicates the
+probability associated with the output. Given an input graph G, an output r ∈
+Rd
+is returned such that q(G, r) is approximately maximized while guaranteeing
+diﬀerential privacy.
+Theorem 2. (The General Exponential Mechanism [4]) For any function q:
+(Dn × Rd) → R, based on a query Q with computing function f : Dn → Rd, and
+base measure μ over Rd, the algorithm Υ which takes as input a graph G and
+some α > 0 and outputs some r ∈ Rd is deﬁned as
+q (G) := Choosing r with probability proportional to exp(αq(G, r)) × μ(r).
+Υ α
+Υ α
+q (G) gives (2αΔq)-diﬀerential privacy, where Δq is the largest possible diﬀerence
+in q when applied to two input graphs that diﬀer only one link, for all r.
+
+Theorem 3. (Composition Theorem [2]) If we have n numbers of -diﬀerentially
+
+private mechanisms M1,··· , Mn, computed using graph G, then any composition
+
+of these mechanisms that yields a new mechanism M is nε-diﬀerentially private.
+
+Diﬀerential privacy can extend to group privacy as well: changing a group of k
+edges in the data set induces a change of at most a multiplicative ek in the cor-
+responding output distribution. In this paper, we focus on the edge privacy. We
+can extend the algorithm to achieve the node privacy by using the composition
+theorem [2].
+
+332
+
+Y. Wang, X. Wu, and L. Wu
+
+2.2 Spectral Analysis of Network Topologies
+
+A graph G can be represented as a symmetric adjacent matrix An×n with Ai,j =
+1 if there is an edge between nodes i and j, and Ai,j = 0 otherwise. We denote
+the i-th largest eigenvalue of A by λi and the corresponding eigenvector by ui.
+The eigenvector ui is a n × 1 column vector of length 1. The matrix A can be
+decomposed as
+
+λiuiuT
+i .
+
+(4)
+
+n(cid:2)
+
+A =
+
+i=1
+
+One major application of the spectral decomposition is to approximate the graph
+data A by a low dimension subspace Ak that captures the main information of the
+data, i.e., minimizes (cid:6)A− Ak(cid:6)F . Given the top-k eigenvalues and corresponding
+eigenvectors, we have a rank-k approximation to A as
+
+Ak =
+
+k(cid:2)
+
+i=1
+
+λiuiuT
+
+i = UkΛkUk
+
+T ,
+
+(5)
+
+where Λk is a diagonal matrix with Λii = λi and Uk = (u1, .., uk).
+Uk belongs to the Stiefel manifold. Denoted as νk,n, the Stiefel manifold is
+deﬁned as the set of rank-k k × n orthonormal matrices. One of the commonly
+used probability distributions on the Stiefel manifold νk,n is called the matrix
+Bingham-von Mises-Fisher density (Deﬁnition 3).
+
+Deﬁnition 3. (The matrix Bingham-von Mises-Fisher density [7]) The proba-
+bility density of the matrix Bingham-von Mises-Fisher distribution is given by
+
+PBMF(X|C1, C2, C3) ∝ etr{CT
+
+3 X + C2X T C1X},
+
+(6)
+
+where C1 and C2 are assumed to be symmetric and diagonal matrices, repectively.
+
+The matrix Bingham-von Mises-Fisher density arises as a posterior distribu-
+tion in latent factor models for multivariate and relational data. Recently, a
+Gibbs sampling scheme was developed for sampling from the matrix Bingham-
+von Mises-Fisher density with application of network spectral analysis [7] based
+on the latent factor model(Deﬁnition 4).
+
+Deﬁnition 4. (The latent factor model for network data [7]) The network data
+is represented with a binary matrix A so that Ai,j is the 0-1 indicator of a link
+between nodes i and j. The latent factor model with a probit link for such network
+data is deﬁned as:
+
+Ai,j = δ(c,∞) (Zi,j)
+Zi,j = uT
+i Λuj + ei,j
+
+Z = U ΛU T + E
+
+Diﬀerential Privacy Preserving Spectral Graph Analysis
+
+333
+
+where E is modeled as a symmetric matrix of independent normal noise, Λ is
+a diagonal matrix and U is an element of νk,n, with k generally much smaller
+than n. Given a uniform prior distribution for U, we have
+
+P(U|Z, Λ) ∝ etr(Z T U ΛU T /2) = etr(ΛU T ZU/2),
+
+which is a Bingham distribution with parameters C1 = Z/2, C2 = Λ and C3 = 0.
+
+Lemma 1.
+normal(0, τ 2) prior distributions for the eigenvalues Λ give
+
+[7]A uniform prior distribution on eigenvectors U and independent
+
+P(Λ|Z, U ) = Π k
+P(U|Z, Λ) ∝ etr(Z T U ΛU T /2) = etr(ΛU T ZU/2),
+
+i=1normal(τ 2uT
+
+i Zui/(2 + τ 2), 2τ 2/(2 + τ 2))
+
+where ‘normal(u, σ2)’ denotes the normal density with mean u and variance σ2.
+
+The sampling scheme by Hoﬀ [7] ensures Lemma 1 to approximate inferences for
+U and Λ for a given graph topology. As suggested in [7], the prior parameter τ 2
+is usually chosen as the number of nodes n since this is roughly the variance of
+the eigenvalues of an n × n matrix of independent standard normal noise.
+
+3 Mechanism for Spectral Diﬀerential Privacy
+
+In this section, we present two approaches to computing the -diﬀerential private
+spectra: LNPP, which is based on the Laplace Mechanism (Theorem1), and
+SBMF, which is based on the exponential mechanism [4] and the properties of the
+matrix Bingham-von Mises-Fisher density for network data spectral analysis [7].
+
+3.1 LNPP: Laplace Noise Perturbation with Postprocessing
+
+In this approach, we output the ﬁrst k eigenvalues, λ(k) = (λ1, λ2, ..., λk), and the
+(cid:3)
+corresponding eigenvectors, Uk = (u1, u2, ..., uk)
+, under -diﬀerential privacy
+with the given graph G and parameters k, . We ﬁrst derive the sensitivities for
+the eigenvalues and eigenvectors in Results 1, 2. We then follow Theorem 1 to
+calibrate Laplace noise to the eigenvalues and eigenvectors based on the derived
+sensitivities and privacy parameter. Because the perturbed eigenvectors will no
+longer be orthogonalized to each other, we ﬁnally do a postprocess to normalize
+and orthogonalize the perturbed eigenvectors following Theorem 4.
+
+Result 1. Given a graph G with its adjacent matrix A, the global sensitivity
+of each eigenvalue is GSλi (G) = 1,(i ∈ [1, n]); the global sensitivity of the ﬁrst
+k(k > 1) eigenvalues as a vector, λ(k) = (λ1, λ2, ..., λk), is GSλ(k) (G) =
+
+√
+2k.
+
+Proof. We denote adding/deleting an edge between nodes i and j on the original
+graph G as a perturbation matrix P added to the original adjacent matrix A.
+Pn×n is a symmetric matrix where only Pi,j and Pj,i have value 1/−1 and all
+other entries are zeros. We denote λi as the eigenvalue of the matrix A and ˜λi
+
+334
+
+Y. Wang, X. Wu, and L. Wu
+
+as that of matrix A + P . We have the Euclidean norm and Frobenius norm of
+2. Based on the matrix perturbation
+
+P respectively as (cid:6)P(cid:6)2 = 1 and (cid:6)P(cid:6)F =
+
+√
+
+theory [5](Chapter IV, Theorem 4.11), we have
+
+GSλi (G) ≤ max|˜λi − λi| ≤ (cid:6)P(cid:6)2 = 1
+
+and
+
+GSλ(k) (G) =
+
+k(cid:2)
+
+i=1
+
+|˜λi − λi| ≤
+
+(cid:4)(cid:5)(cid:5)(cid:6) k(cid:2)
+
+√
+k
+
+i=1
+
+(˜λi − λi)2 ≤
+
+√
+k(cid:6)P(cid:6)F =
+
+√
+2k.
+
+Result 2. Given a graph G with its adjacent matrix A, the sensitivity of each
+eigenvector, ui(i > 1), is GSui(G) =
+min{|λi−λi−1|,|λi−λi+1|} , where the denom-
+√
+inator is commonly referred as the eigen-gap of λi. Speciﬁcally, the sensitiv-
+n
+λ1−λ2 and
+ities of the ﬁrst and last eigenvector are respectively GSu1(G) =
+
+√
+n
+
+√
+
+n
+
+GSun (G) =
+
+λn−1−λn .
+
+Proof. We deﬁne the perturbation matrix P and other terminologies the same
+as those in the proof of Result 1. We denote eigenvectors of matrix A, A +
+P respectively as column vectors ui and ˜ui (i ∈ [1, k]). Based on the matrix
+perturbation theory [5](Chapter V, Theorem 2.8), for each eigenvector ui(i > 1),
+we have
+
+GSui(G) ≤ √
+≤
+
+n(cid:6) ˜ui − ui(cid:6)2 ≤
+√
+n
+
+min{|λi − λi−1|,|λi − λi+1|} .
+
+√
+n(cid:6)P ui(cid:6)2
+
+min{|λi − λi−1|,|λi − λi+1|}
+
+Speciﬁcally for i = 1 (similarly for i = n),
+
+GSu1(G) ≤ √
+
+n(cid:6) ˜u1 − u1(cid:6)2 ≤
+
+√
+n(cid:6)P(cid:6)2
+λ1 − λ2
+
+√
+n
+λ1 − λ2
+
+.
+
+=
+
+Theorem 4. (Orthogonalization of vectors with minimal adjustment [6]) Given
+a set of non-orthogononal vectors x1, ..., xk, we could construct components
+u1, ..., uk such that xi is close to ui for each i, and U T U is an identity ma-
+trix where U = (u1, ..., uk) following
+
+where X = (x1, ..., xk) is the set of n× 1vectors and X T X is non-singular, C is
+the symmetric square-root of (X T X)
+
+−1 and is unique.
+
+U = XC,
+
+Diﬀerential Privacy Preserving Spectral Graph Analysis
+
+335
+
+Algorithm 1. LNPP: Laplace noise calibration approach
+Input: Graph adjacent matrix A, privacy parameter  and dimension parameter k
+Output: The ﬁrst k eigenvalues (cid:2)λ(k) = (˜λ1, ˜λ2, ..., ˜λk) and corresponding eigenvectors
+˜u1, ˜u2, ..., ˜uk, which satisﬁes -diﬀerential privacy.
+1: Decomposition A to obtain the ﬁrst k eigenvalues λ(k) = (λ1, λ2, ..., λk) and the
+
+corresponding eigenvectors u1, u2, ..., uk;
+i=0 i;
+
+2: Distribute  into 0, ..., k, s.t. =
+3: Follow Theorem 1 to add Laplace noise to λ(k) with 0 based on GSλ(k) (G) derived
+
+(cid:3)k
+
+in Result 1 and obtain (cid:2)λ(k) = (˜λ1, ..., ˜λk);
+
+4: For i:=1 to k do
+
+Follow Theorem 1 to add Laplace noise to ui with i based on GSui (G) derived in
+Result 2 and obtain ˜xi;
+Endfor
+
+5: Normalize and orthogonalize ˜x1, ..., ˜xk to obtain ˜u1, ..., ˜uk following Theorem 4.
+6: Output ˜λ1, ˜λ2, ..., ˜λk and ˜u1, ˜u2, ..., ˜uk
+
+Algorithm 1 illustrates our LNPP approach. We output the ﬁrst k eigenvalues,
+(cid:7)λ(k) = (˜λ1, ˜λ2, ..., ˜λk), and the corresponding eigenvectors, ˜u1, ˜u2, ..., ˜uk), under
+-diﬀerential privacy with the given graph topology A and parameters k, . We
+ﬁrst compute the real values of eigenvalues λ(k) and eigenvectors ui(i ∈ [1, k])
+from the given graph adjacent matrix A (Line 1). Then we distribute the privacy
+parameter  among λ(k) and u1, u2, ..., uk respectively as 0 and 1, 2, ..., k
+where  =
+i=0 i (Line 2). With the derived the sensitivities for the eigenvalues
+(GSλ(k) (G)) and each of the k eigenvectors (GSui(G), i ∈ [1, k]) from Results 1
+and 2, next we follow Theorem 1 to calibrate Laplace noise and obtain the private
+answers (cid:7)λ(k) (Line 3) and ˜x1, ˜x2, ..., ˜xk (Line 4). Finally we do a postprocess to
+normalize and orthogonalize ˜x1, ˜x2, ..., ˜xk into ˜u1, ˜u2, ..., ˜uk following Theorem
+4 (Line 5).
+
+(cid:8)k
+
+3.2 SBMF: Sampling from BMF Density
+
+The SBMF approach to provide spectral analysis of network data is based on the
+sampling scheme proposed by Hoﬀ [7] as an application of their recently-proposed
+technique of sampling from the matrix Bingham-von Mises-Fisher density (Deﬁ-
+nitions 3, 4). In [8], the authors investigated diﬀerentially private approximations
+to principle component analysis and also developed a method based on the gen-
+eral exponential mechanism [4]. In our work we focus on the eigen-decomposition
+of the 0-1 adjacency matrix (rather than the second moment matrix of the nu-
+merical data) and prove that the sampling scheme from the matrix Bingham-von
+Mises-Fisher density satisﬁes diﬀerential privacy through the general exponen-
+tial mechanism (Theorem 2). The sampling scheme proposed by Hoﬀ [7] ensures
+Lemma 1, with the purpose to build the latent factor model (Deﬁnition 4) for
+network data, i.e, to approximate inferences for U and Λ. We derive the pri-
+vacy bounds of the output eigenvalues and eigenvectors following the sampling
+scheme respectively in Claims 1 and 2, based on Lemma 1. Then following the
+
+336
+
+Y. Wang, X. Wu, and L. Wu
+
+Composition Theorem (Theorem 3), we come to the conclusion that the SBMF
+approach satisﬁes -diﬀerential privacy (Theorem 5).
+
+Claim 1. The sampling scheme which outputs λ(k) satisﬁes Λ-diﬀerential pri-
+vacy where Λ = k( 2τ 2
+
+2+τ 2 )3/2.
+(cid:3)
+Proof. We denote A and A
+as the adjacent matrix of any neighboring graph
+(cid:3)
+G and G
+. The calibrated noise to a function f from the Gaussian distribution
+normal(0, σ2), similar as that from the Laplace distribution, provides a 2σGSf -
+diﬀerential privacy [1]. Based on Lemma 1, we have for each eigenvalue λi, the
+sampling scheme satisﬁes
+
+2τ 2
+
+λi = 2σGSλi = 2(
+
+2 + τ 2 )1/2{τ 2uT
+i Aui/(2 + τ 2) − τ 2uT
+i A
+)ui ≤ (
+i (A − A
+(cid:3)
+2τ 2
+uT
+2 + τ 2 )1/2
+2 + τ 2
+)ui ≤ 1 is straightforward. With the composition
+i (A − A
+(cid:3)
+where the proof of uT
+(cid:8)k
+i=1 λi = k( 2τ 2
+theorem (Theorem 3), Λ =
+
+(cid:3)ui/(2 + τ 2)}
+
+2τ 2
+2 + τ 2 )3/2
+
+2+τ 2 )3/2.
+
+= 2(
+
+τ 2
+
+Claim 2. Given the graph G’s adjacent matrix A, the sampling scheme which
+outputs U satisﬁes U -diﬀerential privacy where U = k2λ1.
+
+Proof. The sampling scheme for U can be considered as an instance for the
+exponential mechanism( Theorem 2) with α = 1 and q(A, U ) = tr(ΛU T AU/2).
+We have
+
+Δq(A, U ) =
+
+(cid:9)(cid:9) =
+
+(cid:9)(cid:9)tr(ΛU T (A − A
+
+(cid:3)
+
+(cid:9)(cid:9)
+)U )
+
+1
+2
+
+U/2)
+
+(cid:9)(cid:9)tr(ΛU T AU/2) − tr(ΛU T A
+(cid:3)
+(cid:9)(cid:9) ≤ 1
+≤ 1
+2
+
+(cid:9)(cid:9)tr(U T (A − A
+
+kλ1
+
+)U )
+
+2
+
+(cid:3)
+
+k2λ1.
+
+Following Theorem 2, we have U = 2αΔq(A, U ) = k2λ1.
+
+Theorem 5. The SBMF approach to computing the spectra, the ﬁrst k eigen-
+values and the corresponding eigenvectors of a given graph topology A satisﬁes
+ = (Λ + U )-diﬀerential privacy, where Λ = k( 2τ 2
+
+2+τ 2 )3/2 and U = αk2λ1.
+
+In this work, we take the prior parameter τ 2 as n, which is suggested by Hoﬀ [7]
+since this is roughly the variance of the eigenvalues of an n × n matrix of inde-
+pendent standard normal noise. We illustrate the SBMF approach in Algorithm
+2. In the Algorithm, the parameter α is used to change the privacy magnitude by
+changing U (Theorems 2, 5). Given the input graph topology A and dimension
+parameter k, we acquire the eigenvalues (cid:7)Λk and corresponding eigenvectors (cid:7)Uk
+from the sampler application provided by Hoﬀ [7] with input matrix αA. The
+output satisﬁes  = (Λ + U )-diﬀerential privacy following Theorem 5.
+
+Diﬀerential Privacy Preserving Spectral Graph Analysis
+
+337
+
+Algorithm 2. SBMF: Sampling from BMF density approach
+Input: Graph adjacent matrix An×n, privacy magnitude α and dimension parameter
+k
+Output: The ﬁrst k eigenvalues (cid:2)Λk and corresponding eigenvectors (cid:2)Uk, which satisﬁes
+ = (Λ + U )-diﬀerential privacy.
+1: Set the input matrix Y = αA, the parameter τ 2 = n and the number of iterations
+
+t;
+
+2: Acquire (cid:2)Λk and (cid:2)Uk from the sampler provided by Hoﬀ [7] with the input matrix
+
+Y , the output satisﬁes  = (Λ + U )-diﬀerential privacy(Theorem 5);
+
+3: Output (cid:2)Λk and (cid:2)Uk
+
+4 Empirical Evaluation
+
+We conduct experiments to compare the performance of the two approaches,
+LNPP and SBMF, in producing the diﬀerentially private eigenvalues and eigen-
+vectors. For the LNPP, we implement Algorithm 1. For the SBMF, we use the
+R-package provided by Hoﬀ [7]. We use ‘Enron’ (147 nodes, 869 edges) data set
+that is derived from an email network 1 collected and prepared by the CALO
+Project. We take the dimension k = 5 since it has been suggested in previous
+literatures [9] that the ﬁrst ﬁve eigenvalues and eigenvectors are suﬃcient to
+capture the main information of this graph. The ﬁrst two rows in Table 1 show
+the eigenvalues and their corresponding eigen-gaps (Result 2).
+
+4.1 Performance Comparison with α = 1
+
+In this section, we compare the performance of the LNPP approach with that of
+the SBMF approach in three aspects: the accuracy of eigenvalues, the accuracy
+of eigenvectors and the accuracy of graph reconstruction with the private eigen-
+pairs. With τ 2 = n and α = 1, we compute that λ = 14 and U = 446 following
+Claims 1 and 2. Therefore the SBMF approach satisﬁes  = 460 diﬀerential
+privacy following Theorem 5. On the other hand, the same  is taken as the input
+for the LNPP approach. Diﬀerent strategies have been proposed to address the
+ distribution problem(Line 2 in Algorithm 1) in previous literatures [10, 11].
+In our work, we just take one simple strategy, distributing  as 0 = 10 to the
+eigenvalues and i = 90, (i ∈ [1, k]) equally to each eigenvector. Therefore LNPP
+approach also satisﬁes  = 460 diﬀerential privacy.
+
+(cid:8)k
+
+i=1
+
+ﬁned as EΛ = |(cid:7)λ(k) − λ(k)|1 =
+
+For eigenvalues, we measure the output accuracy with the absolute error de-
+|(cid:7)λi − λi|. The absolute errors EΛ for LNPP
+and SBMF are respectively 0.9555 and 345.2301. One sample o eigenvalues In
+the third and fourth rows of Table 1, we show the output eigenvalues from the
+LNPP and the SBMF approaches. We can see that the LNPP outperforms the
+SBMF in more accurately capturing the original eigenvalues.
+
+For eigenvectors, we deﬁne the absolute error as EU = | (cid:7)Uk − Uk|1. EU for
+
+LNPP and SBMF approaches are respectively 11.9989 and 13.4224. We also
+
+1
+
+http://www.cs.cmu.edu/~enron/
+
+338
+
+Y. Wang, X. Wu, and L. Wu
+
+Table 1. Eigenvalues Comparison
+
+λ1
+
+λ2
+
+λ3
+
+λ4
+
+λ5
+
+eigenvalue 17.8317 12.7264 10.6071 9.7359 9.5528
+2.1193 0.8712 0.1832 0.1832
+5.1053
+eigen-gap
+18.1978 13.2191 10.6030 9.7311 9.4650
+LNPP
+SBMF
+107.8450 88.9362 76.1712 76.0596 56.6721
+
+Table 2. Eigenvector Comparison
+cos(cid:2) (cid:2)ui, ui(cid:3) = (cid:2)u(cid:2)
+u2
+
+u1
+
+u3
+
+Approaches EU
+
+i · ui
+u4
+
+u5
+
+LNPP
+SBMF
+
+11.9989 0.9591 0.7925 0.4786 0.1217 0.1280
+13.4224 0.6605 0.6995 0.7336 0.2921 0.4034
+
+i · ui(i ∈ [1, k]). We show the detailed values of EU and the
+
+deﬁne the cosine similarity to measure the accuracy of each private eigenvector
+as cos(cid:9)(cid:7)ui, ui(cid:10) = (cid:7)u(cid:3)
+cosine similarities in Table2. Note that the cosine value closer to 1 indicates
+better utility. We can see that LNPP generally outperforms SBMF in privately
+capturing eigenvectors that close to the original ones. Speciﬁcally, the LNPP
+approach is sensitive to eigen-gaps (second row in Table 1), i.e., it tends to show
+better utility when the eigen-gap is large such as for u1 and u2. Thus a better
+strategy will be distributing privacy parameter  according to magnitudes of
+eigen-gaps, instead of the equal distribution.
+
+The SBMF approach outputs much larger eigenvalues than the original ones.
+It does not tend to accurately approximate anyone of the original eigenvectors
+either. The reason is that SBMF approach is designed to provide a low rank
+spectral model for the original graph rather than approximating of the original
+eigenvalues and eigenvectors.
+
+(cid:8)k
+
+We consider the application of graph reconstruction using the diﬀerentially pri-
+vate ﬁrst k eigenvalues and the corresponding eigenvectors. Ak =
+i =
+UkΛkU T
+k is commonly used as a rank-k approximation to the original graph topol-
+ogy A when A is not available for privacy reasons or A’s rank is too large for analysis.
+Since Ak is not an 0/1 matrix, We discretize Ak as (cid:7)A1
+k by choosing the largest 2m
+entries as 1 and all others as 0 (so keeping the number of edges m the same as that
+of the original graph). We then compare the performance of the two approaches by
+the absolute reconstruction error deﬁned as γ = (cid:6)A− (cid:7)A1
+and SBMF approaches are 47.7912 and 34.1760 respectively. We can see that the
+result of the SBMF approach outperforms the LNPP.
+
+k(cid:6)F .The γ values for LNPP
+
+i=1 λiuiuT
+
+4.2 Performance Comparison with Varying α
+
+In this section, we change the privacy magnitude to additionally study the per-
+formance of the LNPP and SBMF approaches. α denotes the ampliﬁcation
+factor of the privacy parameter  used in section 4.1. We choose the value
+
+Diﬀerential Privacy Preserving Spectral Graph Analysis
+
+339
+
+Table 3. Comparison of two approaches for varying privacy magnitudes
+
+α
+
+0.01
+
+0.1
+
+0.5
+
+1
+
+5
+
+10
+
+EΛ
+
+EU
+
+γ
+
+0.9555
+
+LNPP 60.1586 4.0160 2.1452
+0.2528 0.0527
+SBMF 51.6551 89.0678 90.9442 345.2301 69.6852 96.8904
+LNPP 12.7419 13.2455 13.9874 11.9989 13.3967 12.7033
+SBMF 14.3155 13.7518 14.0238 13.4224 14.5114 13.6087
+LNPP 56.2139 55.4617 51.1859 47.4912 41.3763 39.7492
+SBMF 56.8155 55.8211 56.7450 34.1760 56.3715 56.9210
+
+of α as 0.01, 0.1, 0.5, 1, 5, 10 where the corresponding  values are respectively
+18.46, 58.6, 237, 460, 2244, 4474 following Theorem 5.
+
+We show the values of EΛ, EU and γ for the LNPP and the SBMF approaches
+in Table 3. The accuracy of the LNPP approach increases signiﬁcantly with α
+for both the eigenvalues(EΛ) and graph reconstruction (γ). Note that the greater
+the α, the weaker privacy protection, and hence the more utility preservation.
+However, the accuracy of eigenvectors measured by EU is not changed much
+with α, as shown in Figure 1. This is because of the normalization of eigenvectors
+in the postprocess step. While the SBMF approach cannot accurately capture
+eigenvalues for any α value; as to graph reconstruction, the case of α = 1 shows
+the best utility.
+
+Λ
+E
+
+103
+
+102
+
+101
+
+100
+
+10−1
+
+10−2
+
+ 
+
+ 
+
+LNPP
+SBMF
+
+U
+
+E
+
+20
+
+18
+
+16
+
+14
+
+12
+
+10
+
+8
+
+6
+
+4
+
+2
+
+0
+
+ 
+
+ 
+
+LNPP
+SBMF
+
+80
+
+70
+
+60
+
+50
+
+γ
+
+40
+
+30
+
+20
+
+10
+
+0
+
+ 
+
+ 
+
+LNPP
+SBMF
+Original
+
+1
+
+5
+
+10
+
+0.01
+
+0.1
+
+0.5
+
+α
+(c) γ
+
+0.01
+
+0.1
+
+0.5
+
+α
+
+1
+
+5
+
+10
+
+(b) EU
+
+0.01
+
+0.1
+
+0.5
+
+α
+
+1
+
+5
+
+10
+
+(a) EΛ
+
+Fig. 1. Utility comparison for varying privacy magnitude
+
+5 Conclusion
+
+In this paper we have presented two approaches to enforcing diﬀerential privacy
+in spectral graph analysis. We apply and evaluate the Laplace Mechanism [1]
+and the exponential mechanism [4] on the diﬀerential privacy preserving eigen
+decomposition on the graph topology. In our future work, we will investigate
+how to enforce diﬀerential privacy for other spectral graph analysis tasks (e.g.,
+spectral clustering based on graph’s Laplacian and normal matrices). Nissim et
+al. [3] introduced a framework that calibrates the instance-speciﬁc noise with
+smaller magnitude than the worst-case noise based on the global sensitivity. We
+
+340
+
+Y. Wang, X. Wu, and L. Wu
+
+will study the use of smooth sensitivity and explore how to better distribute
+privacy budget in the proposed LNPP approach. We will also study how diﬀer-
+ent sampling strategies in the proposed SBMF approach may aﬀect the utility
+preservation.
+
+Acknowledgments. This work was supported in part by U.S. National Science
+Foundation IIS-0546027, CNS-0831204, CCF-0915059, and CCF-1047621.
+
+References
+
+1. Dwork, C., McSherry, F., Nissim, K., Smith, A.: Calibrating noise to sensitivity in
+private data analysis. In: Halevi, S., Rabin, T. (eds.) TCC 2006. LNCS, vol. 3876,
+pp. 265–284. Springer, Heidelberg (2006)
+
+2. Dwork, C., Lei, J.: Diﬀerential privacy and robust statistics. In: Proceedings of the
+41st Annual ACM Symposium on Theory of Computing, pp. 371–380. ACM (2009)
+3. Nissim, K., Raskhodnikova, S., Smith, A.: Smooth sensitivity and sampling in
+private data analysis. In: Proceedings of the Thirty-ninth Annual ACM Symposium
+on Theory of Computing, pp. 75–84. ACM (2007)
+
+4. McSherry, F., Talwar, K.: Mechanism design via diﬀerential privacy. In: Proceed-
+ings of the 48th Annual IEEE Symposium on Foundations of Computer Science,
+pp. 94–103. IEEE (2007)
+
+5. Stewart, G., Sun, J.: Matrix perturbation theory. Academic Press, New York (1990)
+6. Garthwaite, P., Critchley, F., Anaya-Izquierdo, K., Mubwandarikwa, E.: Orthogo-
+
+nalization of vectors with minimal adjustment. Biometrika (2012)
+
+7. Hoﬀ, P.: Simulation of the Matrix Bingham-von Mises-Fisher Distribution, With
+Applications to Multivariate and Relational Data. Journal of Computational and
+Graphical Statistics 18(2), 438–456 (2009)
+
+8. Chaudhuri, K., Sarwate, A., Sinha, K.: Near-optimal algorithms for diﬀerentially-
+private principal components. In: Proceedings of the 26th Annual Conference on
+Neural Information Processing Systems (2012)
+
+9. Wu, L., Ying, X., Wu, X., Zhou, Z.: Line orthogonality in adjacency eigenspace
+with application to community partition. In: Proceedings of the Twenty-Second In-
+ternational Joint Conference on Artiﬁcial Intelligence, pp. 2349–2354. AAAI Press
+(2011)
+
+10. Xiao, X., Bender, G., Hay, M., Gehrke, J.: ireduct: Diﬀerential privacy with reduced
+relative errors. In: Proceedings of the ACM SIGMOD International Conference on
+Management of Data (2011)
+
+11. Wang, Y., Wu, X., Zhu, J., Xiang, Y.: On learning cluster coeﬃcient of private
+networks. In: Proceedings of the IEEE/ACM International Conference on Advances
+in Social Networks Analysis and Mining (2012)
+
+

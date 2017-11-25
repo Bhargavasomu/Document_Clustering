@@ -1,0 +1,1344 @@
+Domain Transfer via Multiple Sources
+
+Regularization
+
+Shaofeng Hu1, Jiangtao Ren1, Changshui Zhang2,3,4, and Chaogui Zhang1
+
+1 School of Software, Sun Yat-sen University, Guangzhou, P.R. China
+2 Department of Automation, Tsinghua University, Beijing, P.R. China
+
+3 State Key Lab. of Intelligent Technologies and Systems, Beijing, P.R. China
+
+4 Tsinghua National Laboratory for Information Science and Technology (TNList)
+
+{hugoshatzsu,daguizhang}@gmail.com, issrjt@mail.sysu.edu.cn,
+
+zcs@mail.tsinghua.edu.cn
+
+Abstract. The common assumption that training and testing samples
+share the same distribution is often violated in practice. When this hap-
+pens, traditional learning models may not generalize well. To solve this
+problem, domain adaptation and transfer learning try to employ training
+data from other related source domains. We propose a multiple sources
+regularization framework for this problem. The framework extends clas-
+siﬁcation model with regularization by adding a special regularization
+term, which penalizes the target classiﬁer far from the convex combina-
+tion of source classiﬁers. Then this framework guarantees the target clas-
+siﬁer minimizes the empirical risk in target domain and the distance from
+the convex combination of source classiﬁer simultaneously. By the way,
+the weights of the convex combination of source classiﬁers are embed-
+ded into the learning model as parameters, and will be learned through
+optimization algorithm automatically, which means our framework can
+identify similar or related domains adaptively. We apply our framework
+to SVM classiﬁcation model and develop an optimization algorithm to
+solve this problem in iterative manner. Empirical study demonstrates the
+proposed algorithm outperforms some state-of-art related algorithms on
+real-world datasets, such as text categorization and optical recognition.
+
+Keywords: domain adaptation, multiple sources regularization.
+
+1
+
+Introduction
+
+The common assumption that training and testing samples share the same dis-
+tribution is often violated in practice. When this happens, traditional learning
+models may not generalize well even with abundant training samples. Domain
+Adaptation is one of these situations where little labeled data is provided from
+target domain, but large amount of labeled data from source domains are avail-
+able. Domain adaptation methods [1,2] learn robust decision function by lever-
+aging labeled data both from target and source domains which usually don’t
+share the same distributions. This problem involves in many real world applica-
+tion such as natural language processing[3], text categorization[4], video concept
+detection[5], WiFi localization[4], remote sensor network[2], etc.
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part II, LNAI 8444, pp. 522–533, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+Domain Transfer via Multiple Sources Regularization
+
+523
+
+Most of domain adaptation methods can be classiﬁed into two classes accord-
+ing to their strategies of adapting source information: either with sources labeled
+data or with sources classiﬁer. The former strategy selects source labeled sam-
+ples that match target distribution to overcome distribution discrepancy. For
+example, [6] predicts unlabel samples via an ensemble method in local region
+including labeled samples of sources. [7] iteratively draws sources labeled sam-
+ples that are in the same cluster with target labeled data in projected subspace.
+Alternately, the latter strategy try to get the ﬁnal target classiﬁer by weighted
+sum of target classiﬁer fT trained from target domain data and multiple source
+classiﬁers {fS1, fS2, . . . , fSm} trained from source domain data. [8] seeks a con-
+vex combination of fT and 1
+k fSk by cross validation. [9] proposes Adaptive
+m
+Support Vector Machine (ASVM) to learn fT by incorporating the weighted sum
+k λkfSk into the objective function of SVM, where λk is
+of source classiﬁers
+evaluated by a meta-learning procedure. [10] obtains the ﬁnal fT by maximizing
+output consensus of source classiﬁers. [11] modiﬁes fT and penalizes the output
+diﬀerence between fT and each fSk on unlabeled data.
+
+(cid:2)
+
+(cid:2)
+
+We focus on the strategy of adapting source classiﬁers in this paer. Based on
+the related works, it can be summarized one of the simplest methods to adapt
+source classiﬁers is treating their weighted sum as a single classiﬁer. However,
+performance of this strategy is dependent on the weights for target and sources
+classiﬁers. It would be appropriate to assign higher weights to sources that are
+more similar with target domain. To our best of knowledge, although a few
+works have been addressed on domain weights assignment, little of them try to
+learn the appropriate weights automatically. [8] weights each source equally. [9]
+evaluates weights by meta-learning algorithm which is not promising since fea-
+tures of meta-learning are only dependent on the output of source classiﬁers. [11]
+determines domain weights by estimating the distribution similarity by MMD.
+In this paper, we propose a novel way of adapting source classiﬁers by con-
+sidering multiple source classiﬁers as prior information. Instead of learning the
+combination weights of target and source classiﬁers explicitly, we learn the tar-
+get classiﬁer directly from target domain data while keeping the target classiﬁer
+approximates a convex combination of source classiﬁers as closely as possible,
+and the convex combination weights of source classiﬁers will be learned jointly
+with the learning of target classiﬁer through optimization methods.
+
+To illuminate the motivation of our paper, let us consider an example in Fig-
+ure 1. Because of the rareness of labeled data in target domain, it is hard to
+learn a good target classiﬁer directly. For example, in Figure 1 (a), only one la-
+beled sample of each class is provided, denoted by (cid:2)/∗ respectively. There exists
+a very large classiﬁer space in which every classiﬁer can separate the training
+samples well with high uncertainty on test samples however. As depicted in Fig-
+ure 1(a), the horizontal hyperplane (solid line with circle) generalizes best based
+on the real classes distribution indicated by diﬀerent colors. But we will get a
+bad hyperplane (dotted line with triangular) by large margin principle[12]. How-
+ever, by the introduction of some useful prior information contained in related
+source domains, we can improve the target classiﬁer performance on test samples.
+
+524
+
+S. Hu et al.
+
+We can restrict the target classiﬁer approximates the convex combination of
+source classiﬁers, because we think the convex combination of the source clas-
+siﬁers is a compact version of the source classiﬁers. In this way, we can exploit
+every source classiﬁer with high conﬁdence. Further, when we add the convex
+combination of the source classiﬁers as a regularization term to object function,
+it will shrink the search space of target classiﬁer greatly and provide a good way
+to optimize it. For example, Figure 1(b) presents two source classiﬁers (dotted
+line with diamond), and a gray region which represents the convex combination
+space of the two source classiﬁers. It is clear that if the target classiﬁer is in
+or near to the convex combination space of source classiﬁers, the target classi-
+ﬁer (dotted line with triangular in Figure 1 (b)) will have better generalization
+performance than the one learned by large margin principle.
+
+Therefore, we propose a multiple sources regularization framework based on
+the above motivation. The framework extends general classiﬁcation model with
+regularization by adding a special regularization term, which penalizes the tar-
+get classiﬁer far from the convex combination of source classiﬁers. Then this
+framework make sure the target classiﬁer minimizes the empirical risk in target
+domain and the distance from the convex combination of source classiﬁer simul-
+taneously. By the way, the weights of the convex combination of source classiﬁers
+are embedded into the learning model as parameters, and will be learned through
+optimization algorithm automatically, which means our framework can identify
+similar or related domains adaptively. we propose an iterative algorithms to solve
+this optimization problem eﬃciently.
+
+1
+
+0.5
+
+0
+
+−0.5
+
+−1
+−1
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+0
+
+−0.2
+
+−0.4
+
+−0.6
+
+−0.8
+
+−1
+−1
+
+−0.5
+
+0
+
+0.5
+
+1
+
+(b) Transfer with multiple sources regu-
+larization
+
+−0.5
+
+0
+
+0.5
+
+1
+
+(a) No Transfer
+
+Fig. 1. Intuitive example about multiple sources regularization
+
+2 Multiple Sources Regularization Framework
+
+To solve multiple sources domain adaptation problem, we propose a multi-
+ple sources regularization framework. Supposed there exist m source domain
+data sets, denoted by S = {S1, S2, . . . , Sm}. We assume that all the samples
+in source data sets are labeled, etc. Sk = {Xsk , ysk
+| for
+
+} and |Xsk
+
+| = |ysk
+
+Domain Transfer via Multiple Sources Regularization
+
+525
+
+discrete. Correspondingly, target domain is unique and is divided into labeled
+
+domain adaptation problem can be summarized as: (a) each source domain has a
+
+all k ∈ {1, . . . , m}. ysk is output variable, which can be either continuous or
+training set and unlabel testing set, etc. T = {(XL, yL), XU}. A multiple sources
+diﬀerent but similar distribution with target domain, P rSk (X, Y ) (cid:4)= P rT (X, Y ).
+|XL| (cid:5) |XU|. (c) source and target domain share the same output variable. (d)
+
+(b) scale of training set of target domain is much smaller than that of test set,
+
+the objective of multiple sources domain adaptation is to utilize source data S to
+improve learning performance of target domain T . We ﬁrstly discuss our regu-
+larization framework under general linear form. Then the framework is extended
+to RKHS (Reproducing Kernel Hilbert Space) with SVM hinge loss function for
+classiﬁcation problem. Thirdly, an iterative optimization algorithm is proposed
+to eﬃciently solve multiple sources regularization SVM.
+
+2.1 Multiple Sources Regularization Framework
+
+In this section, multiple source regularization (MSR) framework is introduced
+for classiﬁcation. We start from the linear classiﬁcation model. Linear model is
+more intuitive and geometrically interpretable. Denote linear predictive function
+f (x) = wT x + b, where w is feature weights and b is bias term of separating
+hyperplane. Learning algorithms seek to ﬁnd optimum w and b that minimize
+structural risk, such as hinge loss. Generally, structural risk trade oﬀ between
+empirical risk and regularization:
+
+l(cid:3)
+
+i=1
+
+min
+w,b
+
+L(xi, yi; w, b) + λΦ(w)
+
+(1)
+
+L(·) is loss function while Φ(·) is regularization term. Φ(·) penalizes function com-
+plexity to avoid overﬁtting. When labeled data number l is large enough, Eq(1) is
+a tight upper bound of expected risk. However, under domain adaptation setting,
+training samples of T would be scarce. Therefore, structural risk will be too loose
+to be used as upper bound under supervised learning setting. As we know, loose
+bound created by Eq(1) will be tightened by introducing unlabeled data which is
+referred as semi-supervised learning. Alternately, our framework alleviates this
+problem by including multiple source classiﬁers trained from source domain la-
+beled data. To do this, we modify Eq(1) by adding an extra regularization term
+as following:
+
+min
+w,b,β
+
+s.t.
+
+l(cid:3)
+
+i=1
+m(cid:3)
+
+k=1
+
+L(xi, yi; w, b) + λΦ(w) + ρ(cid:6)w − Wsβ(cid:6)2
+
+2
+
+βk = 1, β ≥ 0
+
+(2)
+
+526
+
+S. Hu et al.
+
+where Ws = [ws1, ws2, . . . , wsm] ∈ Rd×m. wsk is a feature weight vector learned
+from the k-th source domain Sk. Learning model of each source domain should
+be consistent with that of target domain in order to maintain homogeneity of
+model coeﬃcients. The last regularization term of Eq(2) penalizes w far away
+from the convex combination of m source classiﬁers. ρ > 0 trade oﬀ between
+structural risk and multiple source regularization. Moreover, β ∈ Δ denotes
+the weight vector that determines convex combination of source classiﬁers. Δ
+represents the m dimensional simplex: Δ = {β :
+k=1 βk = 1, βk ≥ 0}. Our
+method of determining β also diﬀers from other state-of-art multiple source
+domain adaptation methods: other than manual setting, meta learning or model
+selection, our framework embedded the auxiliary domain weights vector β into
+model Eq(2) as a parameter, then β can be learned by optimization method
+automatically. When m = 1, Eq(2) degenerate to a simple situation. β is ﬁxed
+to be 1 which make Eq(2) much similar to Eq(1) from optimization aspect.
+Therefore, we only focus on the situation where m > 1 in Eq(2) in our paper.
+
+(cid:2)
+
+m
+
+2.2 Multiple Sources Regularization SVM (MSRSVM)
+
+Loss function L in Eq(2) varies according to diﬀerent models. It is easy to realize
+that our framework can be adapted to a wide variety of models including SVM,
+logistic regression, ridge regression and so on. SVM hinge loss is discussed in
+detail in the following. We choose SVM for discussion with the following reasons:
+(a) It is convenient to transform Eq(2) to its dual problem, extending linear
+model to kernel form.(b) SVM ﬁts for problems with very little training samples
+which is consistent with the setting of domain adaptation.
+
+Firstly, with hinge loss, Eq(2) can be reformulated as:
+
+l(cid:3)
+
+ξi + λΦ(w) + ρ(cid:6)w − Wsβ(cid:6)2
+
+2
+
+(3)
+
+min
+w,b,ξ,β
+
+i=1
+
+s.t. yi(wT x + b) ≥ 1 − ξi, ξi ≥ 0, i ∈ L
+
+βk = 1, β ≥ 0
+
+m(cid:3)
+
+k=1
+
+where ξ is the slack variable. From the viewpoint of optimization, Eq(3) is a QP
+problem. While Eq(3) is QP, it can be solved by numeric optimization package
+directly.
+
+However, we transform Eq(3) to dual form instead of optimizing the prime
+problem directly for two reasons: a) variable dimension of Eq(3) is d + n + m + 1
+while dual problem shrinks to n + m. Optimizing the dual problem reduces
+the problem complexity. b) the dual problem can generalize the linear model
+to nonlinear case in RHKS (Reproduced Hilbert Kernel Space). It is worth to
+note that we do not transform all variables to dual problem. β remains ﬁxed in
+prime form. This is because Eq(3) can be transform to an optimization whose
+structure is very closed to regular SVM dual problem without β. Then the
+
+Domain Transfer via Multiple Sources Regularization
+
+527
+
+Lagrange function of Eq(3) can be formulated as:
+
+L(w, b, ξ, α, μ) = C
+
+(cid:3)
+
+i∈L
+− (cid:3)
+i∈L
+(cid:3)
+
+ξi +
+
+1
+2
+
+(cid:6)w(cid:6)2 + (cid:6)w − Wsβ(cid:6)2
+yiwT φ(xi) + b − 1 + ξi
+
+(cid:5)
+
+(cid:4)
+
+αi
+
+μiξi
+
++
+
+i∈L
+
+Setting derivative of Lagrange function with (w, b, ξ) to zero and adding other
+constraints under KKT condition, we obtain the dual problem:
+
+max
+
+β
+
+(cid:4)
+
+ρβT Σsβ − αT Y KY α
+
+(cid:5)
+
+2(1 + ρ)
+
+1
+
+min
+
+α
+
+αT e −
+−ρβT Ωα
+s.t. αT y = 0
+0 ≤ α ≤ C
+m(cid:3)
+
+βk = 1, β ≥ 0
+
+(4)
+
+k=1
+
+Where Σs ∈ Rm×m is a symmetric matrix representing correlation of feature
+
+weight among multiple source domains, analogous to covariance matrix of Gaus-
+sian distribution. Moreover, Ωα is a vector related to the correlation of feature
+weight between target domain and source domain. Σs and Ω can be evaluated
+using deﬁnition of its element in kernel space:
+
+⎛
+
+⎜
+⎝
+
+⎛
+
+⎜
+⎝
+
+Σs =
+
+Ω =
+
+s1 Ks1,s2 αs2 . . .
+s2 Ks2,s2 αs2 . . .
+. . .
+
+...
+
+αT
+s1 Ks1,s1 αs1 αT
+s2 Ks2,s1 αs1 αT
+αT
+
+...
+
+αT
+
+s1 Ks1,t
+
+...
+
+⎞
+
+⎟
+⎠ Y
+
+⎞
+
+⎟
+⎠
+
+(5)
+
+αT
+
+sm Ksm,t
+
+Where α and Y = diag(y) denote dual variable and output diagonal matrix
+respectively. K are the kernel matrix constructed by input patterns from either
+source or target domains. We need to note that αsk is optimized SVM dual
+variable training only on Sk.
+
+Eq(4) appears to be more complicated than Eq(3). Actually, Eq(4) is a saddle-
+point minmax problem, which can be regard as a zero sum game between two
+players. In section 2.3, we develop a two stage iterative optimization algorithm to
+solve Eq(4) in a general framework. This problem is similar to the optimization
+problem referred in DIFFRC[13], SimpleNPKL[14] and SimpleMKL[15].
+
+528
+
+S. Hu et al.
+
+2.3 Iterative Optimization Algorithm for MSRSVM
+
+The special structure of Eq (4) indicates that MSRSVM needs a customized
+optimization algorithm. Fortunately, many optimization algorithms have been
+proposed to solve similar min-max problems. The main idea of such algorithms
+is to separately optimize part of variables while keep others ﬁxed. It turns out
+that Eq (4) can be decomposed into two subproblems.
+
+The main steps of our optimization algorithm for MSRSVM is described as
+∗
+following. Denote J(α, β) as the objective function of Eq (4) and α
+as
+the optimal solution of model variables. The complicated min-max problem of
+Eq (4) can be decomposed into two simple optimization problems: minimizing
+J(α, ˜β) as well as maximizing J(˜α, β) where ˜α and ˜β are ﬁxed values. Therefore,
+after initialization of α and β, the algorithm will loop over two steps until stop
+condition is met:
+
+and β
+
+∗
+
+– Step 1: solve subproblem min0≤α≤C,αT y=0 J(α, ˜β) under ﬁxed ˜β.
+– Step 2: solve subproblem max(cid:2)
+k βk=1,β≥0 J(˜α, β) under ﬁxed ˜α.
+
+The optimization problem in Step 1 shares similar problem structure with
+common SVM. They diﬀer only on the ﬁrst order term of objective functions.
+The ﬁrst order term of common SVM’s objective function is all one vector e
+while Eq (4) has an extra negative term ρβT Ω. Fast algorithms such as SMO or
+SVMlight could be adapted to solve this subproblem of MSRSVM without many
+modiﬁcations. Thus we optimize subproblem of Step 1 using a modiﬁed version
+of regular SVM algorithms. Without referring any speciﬁc implementation of
+SVM algorithm, we use SVMSolver (K, f, y) to deﬁne a general solver for SVM
+optimization where K, f, y denote kernel matrix, ﬁrst order term and label vector
+respectively.
+
+The subproblem of Step 2 is a classical QP problem. Since dimension of β
+is m and m is not large usually, Newton method is appropriate to optimize β.
+However, as stated in section 2.1, Eq (4) is a saddle point minmax problem. If
+both optimization steps are taken to local optimum point, ﬂuctuation happens
+and progress towards global optimum slows down. Therefore, as an alternately
+strategy we update β by taking one gradient step at each iteration. Regular
+gradient update formula can not be used here because the simplex constraint
+exists, and gradient method is for unconstrained optimization generally. In this
+paper, reduced gradient method is introduced to handle this simplex constraint
+optimization problem [15]. This method evaluates ascent gradient ﬁrstly, then
+projects the gradient into simplex using the formula stated below:
+
+⎧
+⎪⎪⎨
+⎪⎪⎩
+
+D =
+
+0
+− ∂J ˜α
+(cid:2)
+
+∂βk
+
++ ∂J ˜α
+(cid:16)
+∂βμ
+∂J ˜α
+∂βμ
+
+βν >0
+
+if βk = 0, ∂J ˜α
+if βk = 0, k (cid:4)= μ
+∂βk
+
+− ∂J ˜α
+
+∂βμ > 0
+
+for k = μ
+
+(cid:17)
+
+− ∂J ˜α
+
+∂βν
+
+(6)
+
+Where ∂J ˜α
+∂βμ are the gradients of objective function with ﬁxed ˜α, k
+and μ are vector indexes. Then we update β by using: βt+1 = βt + ηD. η
+
+∂βk and ∂J ˜α
+
+Domain Transfer via Multiple Sources Regularization
+
+529
+
+denotes the step length. Boyed [16] showed that when η is small enough at each
+iteration, global convergence could be guaranteed. η is choosen to be O( 1
+t ). We
+use objective gap as convergence criterion. Objective gap represents absolute
+diﬀerence between the objective value after Step 1 and Step 2 within the same
+iteration. Algorithm 1 summarizes the whole iterative optimization algorithm.
+
+target
+
+data
+{(Xs1 , ys1 ), (Xs2 , ys2 ), . . . , (Xsm , ysm )};
+and β∗
+;
+
+training
+
+(Xt, yt), m source
+
+construct kernel matrix Ksi using Xsi , Ksi,t using Xsi and Xt;
+optimize corresponding dual variable αsi = SVMSolver (Ksi , e, ysi );
+for j=1 to m do
+
+Algorithm 1. Iterative optimization algorithm for MSRSVM
+1. Input:
+2. Output: optimized variable α∗
+3. initialize α0 = 0 and β0 = 1
+e;
+m
+4. for i=1 to m do
+5.
+6.
+7.
+8.
+9.
+10. end for
+11. calculate Σs and Ω by Eq (5) with Ksi,sj and Ksi,t for i, j ∈ {1, . . . , m};
+12. while convergence criterion is not met do
+solve modiﬁed SVM subproblem, αt = SVMslover (Kt, (1 + ρ)(e − ρβT
+13.
+calculate D using Eq (6), then βt and update β: βt+1 = βt + ηD, and η = 1
+t ;
+14.
+15. end while
+
+construct kernel matrix Ksi,sj using Xsi and Xsj ;
+
+end for
+
+data
+
+sets
+
+t Ω), yt);
+
+3 Experiment
+
+To demonstrate the eﬀectiveness of our proposed framework MSRSVM, we per-
+form experiments on multiple transfer learning data sets. They are real world
+data sets that frequently used in the context of transfer learning or multitask
+learning. Performance of MSRSVM are compared with some other state-of-art
+algorithms that can handle multiple source domains.
+
+3.1 Data Sets and Experiment Setup
+
+Three data collections are used in our experiment study, they are Reuters-
+21578[17], 20-Newsgroups[18] and Letters. Among them, Reuters-21578 and 20-
+Newsgroups are benchmark of text categorization for transfer learning. Letters
+is optical recognition dataset that is preprocessed for multitask learning.
+
+Data Sets. All data sets that have been used in our experiment study are binary
+classiﬁcation tasks. Reuters-21578 and 20-Newsgroups are both text categoriza-
+tion data collections with hierarchical class structure. For each dataset, we need
+to construct both target and source domain dataset. Target and source domain
+datasets are sampled from diﬀerent subcategories of the same top categories.
+For example, for dataset ”comp vs rec”, its source task dataset is sampled from
+
+530
+
+S. Hu et al.
+
+subcategories ”comp.windows.x” and ”rec.autos”, while target task dataset is
+sampled from subcategories ”comp.graphics” and ”rec.motocycles”. Therefore,
+source and target domain datasets share the same feature space but diﬀerent
+words distribution. But in our multiple source adaptation setting, we need more
+than one source domain datasets for one target domain prediction task. To solve
+this problem, all the source domain datasets are grouped and shared as source do-
+main datasets. For example, in 20-Newsgroups task, the source domain datasets
+of ”comp vs sci”, ”rec vs talk”, ”rec vs sci”, ”sci vs talk”, ”comp vs rec” and
+”comp vs talk” constitute of the multiple source domains. While keeping the
+6 source domains ﬁxed, we can construct diﬀerent multiple source adaptation
+problems with diﬀerent target domain datasets.
+
+For Letters dataset without hierarchical class structure, we build diﬀerent
+learning tasks by randomly sampling from two diﬀerent handwritten digit letters
+that are diﬃcult to be distinguished. For example, ”c/e” denotes a prediction
+task that ”c” is the positive class while ”e” is the negative class. Each task is
+treated as target task and all the other tasks as source tasks. For example, if
+”c/e” is target task, then task ”g/y”, ”m/n”, ”a/g”, ”i/j”, ”a/o”, ”f/t” and
+”h/n” form the 7 source domain tasks.
+
+Baseline. We compare the performance of MSRSVM with other SVM based
+learning algorithms which can cope with multiple sources adaptation problems.
+They are ASVM[9], FR[19], MCCSVM[8]and regular SVM without any transfer.
+ASVM can be obtained online, which is based on LibSVM and programmed in
+C++. Others including MSRSVM are implemented in matlab basing on SMO.
+ASVM combines source classiﬁers with weights by an independent meta learning
+algorithm. SVM classiﬁcation parameter C is ﬁxed to 10. Other related parame-
+ter are set to default values. Moreover, RBF kernel k(x, y) = e
+is chosen
+as kernel function, where σ is set to 0.0001 for text data and 0.01 for optical
+recognition. For MSRSVM, model parameter ρ is set to 1.
+
+−σ(cid:7)x−y(cid:7)2
+
+3.2 Performance Study
+
+We adopt classiﬁcation accuracy as evaluation metric to compare MSRSVM with
+other four state-of-art methods. All of the accuracy results in this paper are the
+average results of 10 experiments. The accuracy comparison results are summa-
+rized in Table 1 and Table 2 for text and Letters dataset respectively. Training
+ratio are ﬁxed to 20% for text datasets, and 30 points are randomly selected as
+training set for Letters dataset. Note that the best results are highlighted in bold
+in the Table 1 and Table 2. On Reuters-21578 dataset, MSRSVM performs better
+than all of the baseline algorithms on all of the 3 tasks. For example, MSRSVM
+get the accuracy of 60.81% on Pe vs PI dataset, while ASVM get the accuracy
+of 59.27%, which is the best one of baseline methods. On 20-Newsgroup dataset,
+MSRSVM improves the accuracies signiﬁcantly in most of time, comparing with
+the baseline methods. MSRSVM performs at least 3% better than regular SVM
+on 4 of 6 data sets. Meanwhile, MSRSVM outperforms other methods on all data
+sets except Comp Vs Talk where MCCSVM achieves highest accuracy, slightly
+
+Domain Transfer via Multiple Sources Regularization
+
+531
+
+Table 1. Accuracy comparison on text data sets(%)
+
+Reuters
+
+20-Newsgroup
+
+Method
+
+SVM
+
+61.25
+MCCSVM 60.73
+53.17
+57.28
+
+57.25
+55.63
+55.28
+56.68
+MSRSVM 62.50 59.40
+
+O vs Pe O vs Pl Pe vs Pl C vs S T vs R R vs S S vs T C vs R C vs T
+86.94
+90.37
+83.22
+88.06 90.76
+84.37
+66.91
+53.07
+65.87
+83.00
+51.12
+65.26
+85.92 91.40 94.76 93.02 93.38 89.27
+
+93.76 88.01
+89.27 89.66
+52.80 57.54
+76.43 50.23
+
+58.91
+58.46
+48.26
+59.27
+60.81
+
+86.19
+87.80
+75.99
+64.80
+
+FR
+
+ASVM
+
+better than MSRSVM (less than 2%). Moreover, ASVM performs surprisingly
+poor on some tasks of 20-Newsgroup such as Sci vs Talk and Comp vs Rec,
+while MSRSVM behaves stable on all of the text datasets. Similar conclusions
+can be reached according to Letters dataset. MSRSVM achieves the highest ac-
+curacy on 5 of 8 datasets, and MCCSVM achieves on 3 of 8. And the performance
+of MSRSVM is still more stable than the others. Thus on the whole, MSRSVM
+signiﬁcantly improves the accuracy most of the time.
+
+Table 2. Accuracy comparison on Letters dataset(%)
+
+SVM
+
+Method
+
+c vs e g vs y m vs n a vs g i vs j a vs o f vs t h vs n
+84.89 67.98 81.02 83.59 67.15 82.49 80.79 81.87
+MCCSVM 84.07 68.99 87.58 89.79 94.49 88.25 78.14 90.14
+50.00 50.68 50.26 82.50 47.18 53.91 54.42 46.17
+ASVM 78.11 50.00 50.38 60.64 37.60 50.32 52.21 62.71
+MSRSVM 89.48 71.52 87.59 87.73 90.07 86.86 83.20 91.10
+
+FR
+
+Performance of classiﬁer may be dependent on the number of training data.
+When we refer training data here, it means training data of target domain. As
+mention before, samples of sources domains are ﬁxed and all labeled. Figure 2
+depicts the performance of MSRSVM, regular SVM and MCCSVM, with respect
+to diﬀerent ratio or number of training data in target domain. Training data of
+target domain is assumed to be sparse in domain adaptation problem. Thus
+the ratio of training data varies from 0.05 to 0.3 for text datasets, and number
+of training data for Letters datasets varies from 18 to 38(1∼2% of the whole
+sample set) in the experiments. MSRSVM is compared with regular SVM and
+MCCSVM because they are more sensitive to the size of training data. Two
+important conclusions can be reached based on Figure 2. Firstly, performance of
+the three algorithms improve with the increase of the size of training data most
+of time. This is because the target classiﬁer can get more information about
+target domain with more and more labeled data coming from target domain.
+Secondly, MSRSVM outperforms regular SVM and MCCSVM steadily most of
+time, especially when the size of training data are small. For example, MSRSVM
+wins on nearly all 20-Newsgroup data sets with only 5% of training data except
+
+532
+
+S. Hu et al.
+
+for Rec vs Sci. Similar phenomena happens for Letters datasets. The accuracy
+gap between MSRSVM and MCCSVM is maximum when the number of training
+data is about 18-22. The curves also demonstrate MSRSVM can utilize the
+information of source domains more eﬀectively than MCCSVM.
+
+Rec vs Talk
+
+Rec vs Sci
+
+ 
+
+ 
+
+95
+
+90
+
+85
+
+80
+
+75
+
+)
+
+%
+(
+y
+c
+a
+r
+u
+c
+c
+A
+
+ 
+
+70
+0.05
+
+0.1
+
+95
+
+90
+
+85
+
+80
+
+75
+
+)
+
+%
+(
+y
+c
+a
+r
+u
+c
+c
+A
+
+MSRSVM
+RegularSVM
+MCCSVM
+
+0.2
+
+0.15
+Training Ratio
+Comp vs Talk
+
+0.25
+
+0.3
+
+ 
+
+MSRSVM
+RegularSVM
+MCCSVM
+
+Comp vs Sci
+
+ 
+
+MSRSVM
+RegularSVM
+MCCSVM
+
+95
+
+90
+
+85
+
+80
+
+)
+
+%
+(
+y
+c
+a
+r
+u
+c
+c
+A
+
+)
+
+%
+(
+y
+c
+a
+r
+u
+c
+c
+A
+
+85
+
+80
+
+75
+
+70
+
+MSRSVM
+RegularSVM
+MCCSVM
+
+ 
+
+0.05
+
+0.1
+
+0.15
+Training Ratio
+
+0.2
+
+Sci vs Talk
+
+0.25
+
+0.3
+
+75
+0.05
+
+ 
+
+0.1
+
+0.2
+
+0.15
+Training Ratio
+Comp vs Rec
+
+0.25
+
+0.3
+
+95
+
+90
+
+85
+
+80
+
+75
+
+)
+
+%
+(
+y
+c
+a
+r
+u
+c
+c
+A
+
+ 
+
+ 
+
+MSRSVM
+RegularSVM
+MCCSVM
+
+95
+
+90
+
+85
+
+80
+
+75
+
+)
+
+%
+(
+y
+c
+a
+r
+u
+c
+c
+A
+
+MSRSVM
+RegularSVM
+MCCSVM
+
+ 
+
+70
+0.05
+
+0.1
+
+0.15
+Training Ratio
+
+0.2
+
+0.25
+
+0.3
+
+c/e
+
+ 
+
+0.05
+
+0.1
+
+0.15
+Training Ratio
+
+0.2
+
+0.25
+
+0.3
+
+ 
+
+70
+0.05
+
+0.1
+
+0.15
+Training Ratio
+
+0.2
+
+0.25
+
+0.3
+
+)
+
+%
+(
+y
+c
+a
+r
+u
+c
+c
+A
+
+90
+
+85
+
+80
+
+75
+
+ 
+
+18
+
+MSRSVM
+RegularSVM
+MCCSVM
+
+22
+
+Number of Training Samples
+
+26
+
+30
+
+34
+
+ 
+
+38
+
+75
+
+70
+
+65
+
+)
+
+%
+(
+y
+c
+a
+r
+u
+c
+c
+A
+
+60
+
+ 
+
+20
+
+g/y
+
+ 
+
+MSRSVM
+RegularSVM
+MCCSVM
+
+35
+Number of Training Samples
+
+25
+
+30
+
+)
+
+%
+(
+y
+c
+a
+r
+u
+c
+c
+A
+
+84
+
+82
+
+80
+
+78
+
+76
+
+74
+
+72
+
+ 
+
+20
+
+f/t
+
+ 
+
+MSRSVM
+RegularSVM
+MCCSVM
+
+35
+Number of Training Samples
+
+25
+
+30
+
+Fig. 2. Accuracy wrt ration or number of training data
+
+4 Conclusion
+
+We address multiple source domain adaptation problem in this paper. There
+exist more than one similar or related source domains whose distributions are not
+identical with the target domain. To adaptively utilize the information of sources
+domains and improve the performance of target classiﬁer, we propose a simple
+framework named Multiple Source Regularization framework. This framework
+regularizes target classiﬁer and make it approximate the convex combination of
+sources’ classiﬁer, while the combination weights will be learned adaptively. Our
+idea is that the sources information in regularization function acts as a prior to
+target domain. By substituting SVM’s loss function into MSR framework, we
+propose a Multiple Source Regularization SVM (MSRSVM) model, and develop
+an optimization algorithm to solve this model in iterative manner. Experiments
+on both text and optical recognition datasets verify that MSRSVM outperforms
+many other state-of-art domain adaptation algorithms.
+
+Acknowledgements. This work is supported by the Fundamental Research
+Funds for the Central Universities under grant 12lgpy40, Guangdong Natural
+Science Foundation under grant S2012010010390 and Beijing Municipal Educa-
+tion Commission Science and Technology Development Plan key project under
+grant KZ201210005007.
+
+Domain Transfer via Multiple Sources Regularization
+
+533
+
+References
+
+1. Crammer, K., Kearns, M., Wortman, J.: Learning from multiple sources. Journal
+
+of Machine Learning Research 9, 1757–1774 (2008)
+
+2. Bruzzone, L., Marconcini, M.: Domain adaptation problems: A dasvm classiﬁcation
+technique and a circular validation strategy. IEEE Trans. Pattern Anal. Mach.
+Intell. 32(5), 770–787 (2010)
+
+3. Jiang, J., Zhai, C.: Instance weighting for domain adaptation in nlp. In: ACL. The
+
+Association for Computer Linguistics (2007)
+
+4. Pan, S.J., Tsang, I.W., Kwok, J.T., Yang, Q.: Domain adaptation via transfer
+
+component analysis. In: IJCAI, pp. 1187–1192 (2009)
+
+5. Duan, L., Tsang, I.W.-H., Xu, D., Maybank, S.J.: Domain transfer svm for video
+
+concept detection. In: CVPR, pp. 1375–1381. IEEE (2009)
+
+6. Gao, J., Fan, W., Jiang, J., Han, J.: Knowledge transfer via multiple model local
+
+structure mapping. In: KDD, pp. 283–291 (2008)
+
+7. Zhong, E., Fan, W., Peng, J., Zhang, K., Ren, J., Turaga, D.S., Verscheure, O.:
+Cross domain distribution adaptation via kernel mapping. In: KDD, pp. 1027–1036
+(2009)
+
+8. Schweikert, G., Widmer, C., Sch¨olkopf, B., R¨atsch, G.: An empirical analysis
+of domain adaptation algorithms for genomic sequence analysis. In: NIPS, pp.
+1433–1440 (2008)
+
+9. Yang, J., Yan, R., Hauptmann, A.G.: Cross-domain video concept detection using
+
+adaptive svms. ACM Multimedia, 188–197 (2007)
+
+10. Luo, P., Zhuang, F., Xiong, H., Xiong, Y., He, Q.: Transfer learning from multiple
+
+source domains via consensus regularization. In: CIKM, pp. 103–112 (2008)
+
+11. Duan, L., Tsang, I.W., Xu, D., Chua, T.-S.: Domain adaptation from multiple
+
+sources via auxiliary classiﬁers. In: ICML, p. 37 (2009)
+
+12. Vapnik, V.: Statistical Learning Theory. JohnWiley, NewYork (1998)
+13. Bach, F., Harchaoui, Z.: Diﬀrac: a discriminative and ﬂexible framework for clus-
+
+tering. In: NIPS (2007)
+
+14. Zhuang, J., Tsang, I.W., Hoi, S.C.H.: Simplenpkl: simple non-parametric kernel
+
+learning. In: ICML, p. 160 (2009)
+
+15. Szafranski, M., Grandvalet, Y., Rakotomamonjy, A.: Composite kernel learning.
+
+Machine Learning 79(1-2), 73–103 (2010)
+
+16. Boyd, S., Xiao, L.: Least-squaures covariance matrix adjustment. SIAM Journal of
+
+Matrix Anal. Appl. 27, C532–C546 (2005)
+
+17. Asuncion, A., Newman, D.J.: UCI machine learning repository (2007),
+
+http://www.ics.uci.edu/mlearn/ML-Repository.html
+
+18. Davidov, D., Gabrilovich, E., Markovitch, S.: Parameterized generation of labeled
+datasets for text categorization based on a hierarchical directory. In: SIGIR, pp.
+250–257 (2004)
+
+19. Daum´e III, H.: Frustratingly easy domain adaptation. In: Conference of the Asso-
+
+ciation for Computational Linguistics (ACL), Prague, Czech Republic (2007)
+
+

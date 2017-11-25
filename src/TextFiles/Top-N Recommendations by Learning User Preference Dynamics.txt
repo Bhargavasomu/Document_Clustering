@@ -1,0 +1,1567 @@
+Top-N Recommendations
+
+by Learning User Preference Dynamics
+
+Yongli Ren, Tianqing Zhu, Gang Li(cid:2), and Wanlei Zhou
+
+School of Information Technology, Deakin University,
+{yongli,ztianqin,gang.li,wanlei}@deakin.edu.au
+
+221 Burwood Highway, Vic 3125, Australia
+
+Abstract. In a recommendation system, user preference patterns and
+the preference dynamic eﬀect are observed in the user× item rating ma-
+trix. However, their value has barely been exploited in previous research.
+In this paper, we formalize the preference pattern as a sparse matrix and
+propose a Preference Pattern Subspace to iteratively model the personal
+and the global preference patterns with an EM-like algorithm. Further-
+more, we propose a PrepSVD-I algorithm by transforming the Top-N
+recommendation as a pairwise preference learning process. Experiment
+results show that the proposed PrepSVD-I algorithm signiﬁcantly out-
+performs the state-of-the-art Top-N recommendation algorithms.
+
+1
+
+Introduction
+
+Although recommendation system research has seen the development of tech-
+niques about rating prediction, the majority of commercial recommender sys-
+tems aims to generate a list of recommended items, which is the task of Top-N
+recommendation [9].
+
+Various techniques have been proposed for Top-N recommendations. Most
+of them are based on the modelling of user rating patterns by analysing the
+user × item rating matrix. These methods show improved performance, but
+their abilities in Top-N recommendations are still limited by the availability
+of user ratings. Speciﬁcally, most of the available ratings are given to a small
+fraction of items, and this is known as the long tail eﬀect [2]. As shown in Fig. 1c,
+33% of ratings are observed from only around 5.5% of items in the MovieLens
+data set. These items are referred as popular items, while the other 94.5% are
+referred as unpopular or long tail items [4]. Thus, the long tail eﬀect indicates
+that ratings on long tail items are much fewer. Consequently, these analysing
+methods for rating patterns are naturally limited by the long tail eﬀect.
+
+In this work, we observe that each user has a preference pattern that is diﬀerent
+from his/her rating pattern, and the preference pattern tends to change over
+time. For example, Fig. 1a and 1b show the user preference patterns and the
+temporal dynamics observed on a real movie recommender system, MovieLens.
+Speciﬁcally, Fig. 1a shows that fresh users tend to rate movies from a larger
+
+(cid:2) Corresponding author.
+
+J. Pei et al. (Eds.): PAKDD 2013, Part II, LNAI 7819, pp. 390–401, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+Top-N Recommendations by Learning User Preference Dynamics
+
+391
+
+e
+r
+n
+e
+g
+
+ 
+
+n
+
+i
+ 
+
+e
+c
+n
+e
+r
+e
+
+f
+f
+i
+
+d
+
+6.5
+
+6
+
+5.5
+
+5
+
+4.5
+
+4
+
+3.5
+
+3
+
+0
+
+5
+
+10
+
+15
+
+20
+
+25
+
+30
+
+user age (weeks)
+
+(a)
+
+ 
+ 
+ 
+ 
+
+e
+c
+n
+e
+r
+e
+
+f
+f
+i
+
+d
+
+ 
+
+ 
+
+e
+r
+n
+e
+g
+e
+g
+a
+r
+e
+v
+a
+
+s
+k
+e
+e
+w
+e
+v
+i
+t
+
+ 
+
+u
+c
+e
+s
+n
+o
+c
+ 
+
+o
+w
+
+t
+ 
+
+n
+e
+e
+w
+e
+b
+
+t
+
+12
+
+11
+
+10
+
+9
+
+8
+
+7
+
+6
+
+5
+
+4
+
+3
+
+2
+
+0
+
+100%
+
+10%
+
+s
+m
+e
+
+t
+i
+ 
+f
+
+ 
+
+o
+%
+
+1%
+
+0.1%
+
+[popular]
+
+[unpopular or Long Tail]
+
+20%
+
+40%
+
+60%
+
+80%
+
+100%
+
+% of users
+
+(b)
+
+0
+
+0
+
+20%
+
+40%
+
+60%
+
+% of ratings
+
+80%
+
+100%
+
+(c)
+
+Fig. 1. Preference dynamics in MovieLens. a) genre diﬀerence by user age; b) user
+distribution over genre diﬀerence; c) rating distribution over item popularity.
+
+range of genres than experienced users. Fig. 1b shows that, about 80% of users
+rated movies that spread over at least 3.5 genres on average during every two
+consecutive weeks. These observations indicate the existence of patterns on user
+preference styles, as well as their dynamics. In this paper, we name this new eﬀect
+as the preference dynamic eﬀect. Please note that the temporal characteristic in
+user preference patterns is diﬀerent from the one observed by Koren [12], which
+is the temporal dynamics in user rating patterns.
+
+In this paper, we focus on the modelling of the preference dynamic eﬀect with
+the Preference Pattern Subspace. The basic idea is to model the user prefer-
+ence styles and their temporal dynamics by constructing a low-rank subspace.
+Firstly, a low-rank subspace is built to capture the global preference patterns for
+all users; then, the projection for each personal preference pattern on the sub-
+space is individually reﬁned based on his/her own preference styles. After that,
+the reﬁned user projections on the subspace are used to improve the modelling of
+the global preference patterns. Iteratively, we can obtain a well-trained low-rank
+subspace to model both the user preference styles and their temporal dynam-
+ics. Based on the model, we formulate Top-N recommendation as a pairwise
+preference learning process, and propose a PrepSVD-I algorithm. Experimental
+results show that PrepSVD-I signiﬁcantly outperforms the state-of-the-art Top-
+N recommendation techniques, especially when recommending long tail items.
+The contributions of this paper are as follows:
+
+– For the ﬁrst time, the preference dynamic eﬀect is proposed to capture the
+
+personal and temporal characteristics of user preferences.
+
+– We propose a novel Preference Pattern model and a subspace approach,
+
+Preference Pattern Subspace, to model the preference dynamic eﬀect.
+
+– Based on the Preference Pattern Subspace, we formulate Top-N recommen-
+
+dation as a pairwise preference learning process.
+
+The rest of this paper is organized as follows. In Section 2, the Preference Pattern
+is proposed. In Section 3, we present Preference Pattern Subspace. We present
+the results of the experiment in Section 4, and the conclusion in Section 5.
+
+392
+
+Y. Ren et al.
+
+2 The Preference Pattern
+
+In this section, we propose a novel Preference Pattern model to capture the pref-
+erence dynamic eﬀect. Notations used in this paper are summarized in Table 1.
+
+Table 1. Symbols
+
+Symbol
+
+ua
+rxl
+R
+
+TN (ux)
+
+Description
+the active user for whom the recommendations are generated
+the rating on an item tl by user ux
+the user × item rating matrix
+the list of Top-N items recommended to user ux
+
+U = {u1, · · · , um} a set of m users
+T = {t1, · · · , tn} a set of n items
+C = {c1, · · · , cq} a set of q categories
+the preference pattern for user ux
+P = {p1, · · · , pm} the preference patterns for m users
+V = {v1, · · · , vm} the projection of P on a low-rank subspace
+
+the projection of px
+
+px
+
+vx
+
+Deﬁnition 1. A preference pattern is a sequence of personal preference styles
+aligned in a time order. Precisely, for user ux, the preference pattern is denoted
+xi,··· , pq
+as px = [px1,··· , pxi]T , where pxi = [p1
+xi] denotes the preferences of ux
+at time i over category C = [c1,··· , cq], and pj
+xi denotes the preference of ux at
+time i on cj.
+
+The preference pattern has two key characteristics, personalization and time.
+All preference styles within a preference pattern come from the same user, and
+are sorted in a time order. For a particular user ux, a preference style refers
+to his/her preferences over a range of categories (e.g. genre in movies/songs) of
+items at a particular time. The preference style at time i can be represented as
+a q-D vector pxi, which is deﬁned as a preference pattern vector. Its value at
+position j, pj
+xi, indicates the preference of user ux over category j at time i. For
+the value of pj
+xi, we approximate it as a function of the implicit rating history
+of user ux. Formally, pj
+
+xi is deﬁned as follows:
+
+pj
+xi =
+
+n(cid:2)
+
+l=1
+
+bj
+xl,
+
+where n is the number of items, and
+
+(cid:3)
+
+1|Cl|
+0
+
+bj
+xl =
+
+rxl (cid:2)= (cid:3), tl ∈ cj , rxl is given at time i
+otherwise,
+
+(1)
+
+(2)
+
+where rxl (cid:2)= (cid:3) denotes that rxl is available, Cl denotes a set of categories to
+which tl belongs, and tl ∈ cj denotes that item tl belongs to category cj. Please
+note that there is an inverse relationship between bj
+
+xl and |Cl| in Eq. 2.
+
+The preference pattern is deﬁned for each user in a way to naturally integrate
+a user’s various needs with the corresponding dynamics. The preference pattern
+
+Top-N Recommendations by Learning User Preference Dynamics
+
+393
+
+vectors within a preference pattern captures the user’s corresponding preference
+styles, and the diﬀerences in two consecutive preference pattern vectors imply
+the dynamics of a user’s preference styles. If all values in each preference pattern
+vector are available, the preference pattern is complete, otherwise it is incomplete.
+In a real recommender system, as many missing values exist within the preference
+patterns, the modelling of preference patterns is a challenge.
+
+3 The Preference Pattern Subspace
+
+In this section, we build a Preference Pattern Subspace to model the preference
+patterns for each user, then propose the PrepSVD-I algorithm by formulating
+the task of Top-N recommendation as a pairwise preference learning process.
+
+3.1 Learning the Preference Pattern Subspace
+
+To model the user preference patterns, we propose a Preference Pattern Subspace
+by applying the Singular Value Decomposition (SVD). Conventionally, the SVD
+of the preference patterns P is the factorization of the form: P = U·Σ·V T , where
+U is an m× m orthogonal matrix, Σ is an m× n diagonal matrix containing the
+singular values of P on the diagonal, V is an n × n orthogonal matrix.
+According to the Eckart-Young theorem [7], it is well-known that the best
+rank-k approximation of matrix P can be achieved by SVD. However, con-
+ventional SVD is deﬁned without considering the existence of missing values.
+Therefore, as P is highly incomplete, SVD can not be directly applied to analyse
+preference patterns P. To overcome this problem, we propose an EM-like learn-
+ing algorithm to capture as much as possible the main variance of the highly
+incomplete preference patterns P. Speciﬁcally, px can be divided into two parts,
+pa
+x and pm
+x , representing the available part and the missing part of px, respec-
+tively. We estimate P using SVD to construct a low rank k subspace:
+
+where Uk contains the ﬁrst k columns of U, Σk is a k × k diagonal matrix that
+contains the ﬁrst k singular values of P, and Vk contains the ﬁrst k columns of
+V. Consequently, the reconstruction ˆpx of px is deﬁned as:
+
+x and ˆpm
+
+where vx is the xth row of Vk, and denotes the projection of px for user ux on
+the low rank k subspace. Similarly, the reconstruction ˆpx can also be divided
+into two parts ˆpa
+x , respec-
+tively. The SVD guarantees to produce the best k-rank approximation of P with
+minimal reconstruction errors. However, as P is highly incomplete, we change
+the modelling objective to minimize the reconstruction error on the available
+preferences in P. This is deﬁned as the squared distance between the original
+available part of P and their reconstructions:
+
+x , representing the reconstruction of pa
+
+x and pm
+
+εa
+
+=
+
+1
+m
+
+m(cid:2)
+
+x − ˆp
+a
+x)
+
+a
+(p
+
+x=1
+
+where m is the number of users.
+
+T · (p
+
+a
+
+x − ˆp
+
+a
+x),
+
+(5)
+
+ˆP = Uk · Σk · V T
+k ,
+
+ˆpx = Uk · Σk · v
+
+T
+x ,
+
+(3)
+
+(4)
+
+394
+
+Y. Ren et al.
+
+(cid:2)m
+
+To build the representative subspace, an EM-like algorithm is introduced as
+follows: ﬁrst, the missing values of P are replaced with their corresponding values
+in μ = 1
+x=1 px. Then, in the j-th iteration, the standard SVD algorithm is
+applied to calculate a low-rank subspace deﬁned by Uk and Σk. After that, the
+m
+reconstruction ˆpx of px can be calculated with Eq. 4. However, as only a small
+fraction of preferences are available in px ∈ P, its projection vx can not be
+directly estimated from Eq. 3. Please note that we can estimate vx from part of
+px, e.g, the available part pa
+x, and this estimation method has been widely used
+in the ﬁeld of multimedia research [6]. Thus, we estimate vx as the least squares
+solution for the following equation:
+
+(Uk · Σk) · v
+
+T
+x = [px]
+
+a,
+
+(6)
+
+x will then be updated with ˆpm
+
+where [px]a denotes px in the current iteration step but only has values on the
+positions corresponding to pa
+x. After vx is estimated, the reconstruction ˆpx of
+px can be calculated using Eq. 4. pm
+x , and the
+new μ(j+1) in the next (j + 1)-th iteration will be calculated with the updated
+px accordingly. With the updated P and the new mean vector μ(j+1), the SVD
+algorithm is once again applied to calculate Uk and Σk. This iterative process
+will continue until the reconstruction error εa is below a pre-deﬁned threshold.
+The proof for the convergence of this training algorithm is provided as follows.
+Proof 1. In the j-th iteration, the reconstruction ˆpx of px is deﬁned as: ˆpj
+x =
+(Uk·Σk)j·vT
+x , where (Uk·Σk)j denote Uk and Σk in the j-th iteration. We denote
+ˆpx(Uk · Σk)j and
+x obtained with (Uk · Σk)j as f j
+ˆpj
+the data in the next iteration, pj+1
+reconstruction error on pj
+
+ˆpx(Uk · Σk)j. Please note that f j
+
+, share values on missing part of px, thus the
+
+x
+
+x is represented as:
+ˆpx (Uk · Σk)
+f j
+
+= d
+
+(εa
+x)
+
+(cid:4)
+
+j
+
+(cid:5)
+
+j, p
+
+j+1
+x
+
+,
+
+where d(·,·) is the Euclidean distance between two vectors.
+If we use (Uk · Σk)j to calculate the reconstruction of pj+1
+
+x
+
+(cid:4)
+ˆpx (Uk · Σk)
+f j+1
+
+d
+
+(cid:5)
+
+(cid:4)
+
+j, p
+
+j+1
+x
+
+≤ d
+
+ˆpx (Uk · Σk)
+f j
+
+j , p
+
+j+1
+x
+
+(7)
+
+(8)
+
+, we obtain
+(cid:5)
+
+,
+
+because the orthogonal property of (Uk · Σk)j makes it sure that f j+1
+and pj+1
+
+have the minimum Euclidean distance.
+
+x
+
+ˆpx (Uk · Σk)j
+
+In the (j + 1)-th iteration, after applying SVD to the updated training data
+, we observe the minimum reconstruction error by obtaining (Uk · Σk)j+1:
+
+pj+1
+
+x
+
+ˆpx (Uk · Σk)
+f j+1
+
+j+1, p
+
+j+1
+x
+
+≤ d
+
+ˆpx (Uk · Σk)
+f j+1
+
+j, p
+
+j+1
+x
+
+.
+
+(9)
+
+(cid:5)
+
+(cid:4)
+
+(cid:5)
+
+(cid:4)
+
+d
+
+(cid:4)
+
+For the reconstruction error in the (j + 1)-th iteration, we obtain
+
+j+1
+
+(εa
+x)
+
+= d
+
+ˆpx (Uk · Σk)
+f j+1
+
+j+1, p
+
+j+1
+x
+
+(cid:5)
+
+(cid:4)
+
+≤
+
+ˆpx (Uk · Σk)
+f j+1
+m(cid:2)
+
+(cid:5)
+
+j , p
+
+j+1
+x
+
+j
+
+(εa
+x)
+
+= (εa
+
+j.
+
+)
+
+j+1
+
+(εa
+
+)
+
+=
+
+m(cid:2)
+
+(εa
+x)
+
+x=1
+
+1
+m
+
+j+1 ≤ 1
+m
+
+x=1
+
+Thus, the algorithm will converge to minimize εa.
+
+≤ (εa
+x)
+
+j .
+
+(10)
+
+(11)
+(cid:2)
+
+Top-N Recommendations by Learning User Preference Dynamics
+
+395
+
+The modelling process is an iterative reﬁnement of the global and the personal
+preference patterns. One advantage of this EM-like learning algorithm is that the
+well-trained Preference Pattern Subspace can model both the personal preference
+patterns and the global preference patterns simultaneously.
+
+3.2 Recommendation Generation
+
+After learning the well-trained Preference Pattern Subspace, we propose a
+PrepSVD-I algorithm to generate Top-N recommendations. In this paper, we
+apply the latent factor model to estimate the ratings ˆrxl for user ux on item tl:
+
+ˆrxl = ρT
+
+x ρl,
+
+(12)
+
+where ρx and ρl are the user factors and the item factors, and can be learnt with
+stochastic gradient descent method by looping through available ratings.
+
+Given the user factors and the item factors, TN (ux) can be generated by
+estimating ratings for un-known items with Eq. 12, then formed with the Top-N
+ranked ones. For tl ∈ TN (ux), tl can be temporarily absorbed into ux’s preference
+pattern vector pxi, and a tentatively changed preference pattern vector ˜pxi is
+available. Please note that because we only want to measure the degree to which
+the recommendations match ux’s preference styles captured by the Preference
+Pattern Subspace, we initialize ˜pxi as empty while keeping the other part the
+same as px. The value at the jth position of ˜pxi is then deﬁned as:
+
+(cid:3)
+
+˜pj
+xi =
+
+1|Cl|
+0
+
+tl ∈ cj , cj ⊆ Cl
+otherwise,
+
+(13)
+
+where Cl denotes a set of categories that tl belongs to, tl ∈ cj denotes that
+tl belongs to category cj. The reconstruction error for tl to ux at time i is
+deﬁned as the squared distance between the changed preference pattern and its
+reconstruction:
+
+a
+εa
+tl = (˜p
+
+x − ˆp
+a
+x)
+
+T · (˜p
+
+a
+
+x − ˆp
+
+a
+x),
+
+(14)
+
+where ˜pa
+calculated with Eq. 6 and Eq. 4, while ˆpa
+
+x is the available part of ˜px, ˆpx is the reconstruction of ˜px and is
+
+x is the available part of ˆpx.
+
+Moreover, the observed preference dynamic eﬀect implies one constraint to
+the objective function of recommendation generations. It can be formulated as:
+
+∀tl ∈ TN (ux), εa
+
+tl
+
+≤ ¯εa
+
+ux
+
+,
+
+(15)
+
+(cid:2)
+
+1
+
+ux =
+
+|S(ux)|
+
+where ¯εa
+εa
+tl(cid:2) and S(ux) is the set of items liked by ux.
+Following this, we formulate the Top-N recommendation generation as a pairwise
+preference learning problem [8], and utilize the user average reconstruction ¯εa
+ux
+as the negative preference:
+
+tl(cid:2)∈S(ux)
+
+(cid:2)
+
+min
+θ,ξ
+
+x
+
+(cid:2)
+
+(cid:2)
+
++
+
+(cid:8)ρl(cid:8)2
+(cid:8)ρx(cid:8)2
+)
+≥ 1 − ξx and ξx ≥ 0
+
+tl∈T
+
+ξx + λ(
+− ¯εa
+
+s.t.:εa
+tl
+
+ux
+
+ux∈U
+
+(16)
+
+where ξx is a non-negative value measuring the degree of violating the constraint
+in Eq. 15, λ is the regularization weight determined by cross validation.
+
+396
+
+Y. Ren et al.
+
+We apply a simple gradient descent algorithm to optimize the objective func-
+tion deﬁned in Eq. 16. Moreover, as there is an inverse relationship between bj
+and |Cl| in the approximation of preference values in Eq. 2, we name this pro-
+xl
+posed algorithm as the PrepSVD-I algorithm. It loops on all TN (ux),∀ux ∈ U,
+and updates the user factors and the item factors by following the negative
+gradient:
+
+ρl = ρl − γ(h(cid:3)
+ρx = ρx − γ(
+
+(ρT
+x ρl)ρx + λρl)
+(cid:2)
+
+h(cid:3)
+
+(ρT
+
+x ρl)ρl + λρx),
+
+(17)
+
+(18)
+
+tl∈TN (ux)
+= − |TN (ux)|Δ−1
+|TN (ux)|−1
+
+|,
+where γ is the learning rate, h(cid:4)
+and H(z) = 1 if z > 0 and 0 otherwise, denoting the Heaviside function [1]. When
+the training process is completed, we can calculate the predicted rating ˆrxl for
+each unknown item tl to user ux, then recommend the top ranked N items to ux
+with Eq. 12. Here the proposed PrepSVD-I algorithm takes both the personal
+preference patterns and the global preference patterns into consideration.
+
+ux ), Δ = |εa
+
+H(1− εa
+
+tl + ¯εa
+
+− ¯εa
+
+ux
+
+tl
+
+4 Experiment and Analysis
+
+The datasets we experimented with were the popular MovieLens dataset and
+Netﬂix dataset. MovieLens includes around 1 million ratings collected from
+6, 040 users on 3, 900 movies. Following literature [13], the Netﬂix dataset is
+a subset extracted from the Netﬂix Prize dataset, in which each user rated at
+least 20 movies, and each movie was rated by 20 − 250 users. For each dataset,
+we split it into two subsets, the training set and the test set. Following the work
+of [3, 4, 11], we reasonably assume that 5-star rated items are relevant to the
+active user, and adopt a similar strategy to conduct experiments. Speciﬁcally,
+we randomly select 2% of ratings and use all 5-star selected ratings to form the
+test set, and make sure that at least one 5-star rating exists for each individual
+user. The remaining ratings in the data set form the training set. After training
+the model on the training set, we randomly select 1000 additional items that
+are not rated by the active user, then predict ratings on the test item and addi-
+tional 1000 selected items. These items are then ranked and the top ranked N
+items are selected as Top-N recommendations for the active user. This testing
+strategy is common for Top-N recommendations research and has been adopted
+by [3,4,11]. To examine the algorithm performance thoroughly, we set up a series
+of conﬁgurations with diﬀerent data sparsity levels. Speciﬁcally, on MovieLens
+data set, we keep the test set the same, but vary the percentage of observed rat-
+ings for each user in the training set, from 10% to 100% with a 10% step. These
+conﬁgurations are called as Given10% to Given100% accordingly. Moreover, as
+recommending popular items is trivial [4], we will focus on recommending long
+tail items and all items that include both popular and unpopular items.
+
+Top-N Recommendations by Learning User Preference Dynamics
+
+397
+
+4.1 Comparison and Evaluation
+
+We examine the performance of the proposed PrepSVD-I algorithm by compar-
+ing it with 7 other Top-N recommendation algorithms, including PureSVD [4],
+SLIM [13], BPTF [14], itemKNN [5], NNcosNgbr [4], Top Popular (TopPop) [3,
+4] and Movie Average (MovieAvg) [11]. Please note BPTF considers the time
+information [14]. In PureSVD, the number of factors is set to 50. In SLIM, we
+set β = 0.1 and λ = 0.1. The number of the nearest neighbors in NNcosNgbr is
+set to 200, and the number of neighbors in itemKNN is set to 20. For BPTF, we
+set lrate = 0.001, D = 200 and the number of samples to 50. For our method,
+to train the Preference Pattern Subspace, we set k = 50, β = −1, and set the
+−6. For PrepSVD-I,
+max iteration of training to 50, the error threshold to 10
+γ = 0.0001, λ = 0.03, and the factors for both users and items are set to 50.
+
+The quality of Top-N recommendations is measured by the recall (or Hit
+Rate), the precision and the fall-out [4, 5, 10]. For the active user, if the Top-N
+recommendation list contains the test item, we call this a hit. Therefore, recall,
+precision and fall-out are deﬁned as follows:
+
+recall =
+
+#hits
+|X|
+
+,
+
+precision =
+
+#hits
+N · |X| ,
+
+f all-out =
+
+|X| · N − #hits
+|irrelevant|
+
+,
+
+where X is the test set and |irrelevant| is the number of all non-relevant items. A
+higher recall or precision value indicates better Top-N recommendations, while
+a lower fall-out value means better recommendations.
+
+4.2 Performance on Diﬀerent Datasets
+
+To fully examine the performance of the proposed model, we conduct experi-
+ments on two well-known data sets, MovieLens and Netﬂix. Table 2 shows the
+results on these datasets when N = 20. It is observed that PrepSVD-I outper-
+forms all the compared algorithms on both data sets for both long tail and all
+items recommendations in all the measurement metrics. Speciﬁcally, on Movie-
+Lens for long tail item recommendations, when measuring in recall, PrepSVD-
+I obtains a recall at 0.5389, which outperforms the best result 0.4987 (from
+PureSVD ) by 8.06%; when measuring in precision, PrepSVD-I achieves a pre-
+cision at 0.0269 that also outperforms all the other compared algorithms; for
+all items recommendations, PrepSVD-I also achieves better performance in re-
+call and precision. On Netﬂix, when measuring in recall, PrepSVD-I achieves a
+better recall at 0.6361 and 0.7526 for long tail and all items recommendations,
+respectively. When measuring in fall-out, it seems that, PrepSVD-I, PureSVD
+and SLIM show similar performance. The main reason behind this is that, ac-
+cording to the deﬁnition of fall-out, when the number of irrelevant items is
+large, the fall-out value tends to be small, and this diminishes the diﬀerence be-
+tween the performance of compared algorithms. Nevertheless, PrepSVD-I still
+achieves comparable performance to the compared algorithms. This indicates
+that the proposed Preference Pattern model can beneﬁt Top-N recommenda-
+tions for both long tail and all items recommendations. This is mainly because
+
+398
+
+Y. Ren et al.
+
+Table 2. Performance on MovieLens and Netﬂix when N = 20
+
+MovieLens
+
+Netﬂix
+
+Algorithm recall precision fall-out recall precision fall-out
+items
+long tail PrepSVD-I 0.5389 0.0269 0.0195 0.6361 0.0318 0.0194
+0.0308 0.0194
+0.0299 0.0194
+0.0195
+0.0249
+0.0196
+0.0220
+0.0197
+0.0148
+0.0198
+0.0102
+0.0016
+0.0200
+Netﬂix
+
+0.0249 0.0195 0.6165
+0.0226 0.0195 0.5987
+0.0226 0.0195 0.4988
+0.0197 0.4393
+0.0164
+0.0198 0.2960
+0.0100
+0.0200 0.2041
+0.0005
+0.0041
+0.0199 0.0312
+
+PureSVD 0.4987
+0.4527
+SLIM
+NNcosNgbr 0.4518
+itemKNN 0.3273
+0.1992
+BPTF
+0.0096
+TopPop
+0.0818
+MovieAvg
+
+MovieLens
+
+Algorithm recall precision fall-out recall precision fall-out
+items
+all items PrepSVD-I 0.6928 0.0346 0.0193 0.7526 0.0376 0.0192
+0.0193
+0.0193
+0.0195
+0.0194
+0.0196
+0.0195
+0.0199
+
+0.0335 0.0193 0.7193
+0.0340 0.0193 0.7295
+0.0248
+0.0195 0.5258
+0.0194 0.6436
+0.0281
+0.0197 0.3837
+0.0169
+0.0196 0.5000
+0.0193
+0.0087
+0.0198 0.0589
+
+PureSVD 0.6709
+0.6794
+SLIM
+NNcosNgbr 0.4962
+itemKNN 0.5625
+0.3389
+BPTF
+0.3857
+TopPop
+0.1734
+MovieAvg
+
+0.0360
+0.0365
+0.0263
+0.0322
+0.0192
+0.0250
+0.0029
+
+the Preference Pattern is based on users’ personal preference styles, and also be-
+cause it takes the global preference patterns into consideration. Therefore, it can
+lead to better recommendations regardless of whether the target item is popular
+or not.
+
+4.3 Performance on long tail Item Recommendations
+
+As recommending popular items is trivial [4], here we examine the proposed
+PrepSVD-I by comparing it with 7 other state-of-the-art recommendation algo-
+rithms under various data sparsity levels on long tail recommendations.
+
+Table 3 shows the recall performance of the examined algorithms when N
+equals 10 and 20. It is clear that the proposed PrepSVD-I algorithm signiﬁ-
+cantly outperforms all of the compared algorithms under all sparsity conditions
+except on Given10% when N = 10 with BPTF obtaining a slightly higher re-
+call. However, BPTF performs badly on all other sparsity levels. For example, on
+Given90% when N = 20, BPTF only obtains a recall at 0.1824, which is much
+worse than all the other personalized algorithms, e.g. PrepSVD-I, itemKNN,
+NNcosNgbr and SLIM. Moreover, PrepSVD-I performs steadily through var-
+ious sparsity levels, and always achieves better performance. Speciﬁcally, on
+Given50%, when N = 20, PrepSVD-I achieves a recall of 0.3147, which out-
+performs the best compared result of 0.2751 (from PureSVD ) by 14.39%. This
+is, as expected, because the proposed Preference Pattern Subspace is capable
+of capturing user preference styles and the corresponding dynamics, and is not
+aﬀected by whether the item is popular or not. Moreover, it is also observed
+that the sparser the training data set, the larger the improvements. For exam-
+ple, when N = 10, the improvement on Given100% is 12.66%, and increases to
+29.76% on Given40% data set. The reason behind this is that when the training
+set is sparser, the long tail eﬀect indicates that available ratings on long tail
+
+Top-N Recommendations by Learning User Preference Dynamics
+
+399
+
+Table 3. recall when N = 10 and N = 20 on long tail Items
+
+Given10%
+
+Given20%
+
+Given30%
+
+Given40%
+
+Given50%
+
+Algorithm N = 10 N = 20 N = 10 N = 20 N = 10 N = 20 N = 10 N = 20 N = 10 N = 20
+PrepSVD-I 0.0388 0.0903 0.0677 0.1490 0.1092 0.2112 0.1526 0.2728 0.1851 0.3147
+PureSVD 0.0299 0.0818 0.0525 0.1311 0.0848 0.1815 0.1176 0.2353 0.1474 0.2751
+0.0000 0.0000 0.0000 0.0004 0.0058 0.0167 0.0270 0.0623 0.0587 0.1188
+SLIM
+NNcosNgbr 0.0230 0.0598 0.0371 0.0785 0.0552 0.1141 0.1037 0.1949 0.1156 0.2257
+itemKNN 0.0267 0.0501 0.0517 0.0901 0.0726 0.1321 0.0935 0.1673 0.1112 0.1970
+0.0491 0.0873 0.0484 0.0910 0.0549 0.1064 0.0673 0.1265 0.0738 0.1359
+BPTF
+0.0000 0.0000 0.0000 0.0001 0.0000 0.0001 0.0000 0.0001 0.0000 0.0001
+TopPop
+0.0036 0.0232 0.0073 0.0367 0.0095 0.0431 0.0165 0.0586 0.0169 0.0560
+MovieAvg
+
+Given60%
+
+Given70%
+
+Given80%
+
+Given90%
+
+Given100%
+
+Algorithm N = 10 N = 20 N = 10 N = 20 N = 10 N = 20 N = 10 N = 20 N = 10 N = 20
+PrepSVD-I 0.2275 0.3701 0.2614 0.4088 0.3100 0.4559 0.3479 0.4957 0.3995 0.5389
+PureSVD 0.1801 0.3198 0.2091 0.3568 0.2515 0.4035 0.2988 0.4502 0.3546 0.4987
+0.1048 0.1938 0.1532 0.2679 0.1959 0.3151 0.2451 0.3741 0.3229 0.4527
+SLIM
+NNcosNgbr 0.1429 0.2531 0.1872 0.3034 0.2272 0.3562 0.2666 0.3889 0.3293 0.4518
+itemKNN 0.1256 0.2204 0.1414 0.2417 0.1616 0.2702 0.1816 0.2954 0.2086 0.3273
+0.0796 0.1490 0.0873 0.1600 0.0984 0.1733 0.1032 0.1824 0.1196 0.1992
+BPTF
+0.0000 0.0002 0.0000 0.0002 0.0001 0.0003 0.0001 0.0029 0.0013 0.0096
+TopPop
+0.0245 0.0673 0.0281 0.0716 0.0289 0.0745 0.0303 0.0755 0.0318 0.0818
+MovieAvg
+
+Long Tail
+
+ 
+
+Long Tail
+
+ 
+
+PrepSVD−I
+PureSVD
+SLIM
+NNcosNgbr
+itemKNN
+BPTF
+TopPop
+MovieAvg
+
+0.25
+
+0.2
+
+0.15
+
+l
+l
+
+a
+c
+e
+r
+
+0.1
+
+0.05
+
+0
+
+ 
+0
+
+PrepSVD−I
+PureSVD
+SLIM
+NNcosNgbr
+itemKNN
+BPTF
+TopPop
+MovieAvg
+
+5
+
+10
+N
+
+15
+
+20
+
+(a) Given40%
+
+0.35
+
+0.3
+
+0.25
+
+0.2
+
+l
+l
+
+a
+c
+e
+r
+
+0.15
+
+0.1
+
+0.05
+
+0
+
+ 
+0
+
+Long Tail
+
+ 
+
+PrepSVD−I
+PureSVD
+SLIM
+NNcosNgbr
+itemKNN
+BPTF
+TopPop
+MovieAvg
+
+0.45
+
+0.4
+
+0.35
+
+0.3
+
+0.25
+
+0.2
+
+0.15
+
+0.1
+
+0.05
+
+l
+l
+
+a
+c
+e
+r
+
+5
+
+10
+N
+
+15
+
+20
+
+0
+
+ 
+0
+
+5
+
+10
+N
+
+15
+
+20
+
+(b) Given60%
+
+(c) Given80%
+
+Fig. 2. recall at N on long tail
+
+items will be much more limited. Consequently, the user rating patterns will be
+extremely incomplete, and solely modelling them does not lead to good recom-
+mendations. In this case, the preference dynamic eﬀect becomes more valuable to
+predict users’ preferences on items. Therefore, the proposed Preference Pattern
+Subspace will show high eﬀectiveness for recommendation purposes.
+
+To thoroughly examine the performance of PrepSVD-I, we vary the N value
+from 1 to 20, and report the results on Given40%, Given60% and Given80%
+as shown in Fig. 2. We observe that PrepSVD-I outperforms all compared al-
+gorithms at all N values on all the data sets. This indicates that PrepSVD-I
+is eﬀective in recommending the desired items at the top of the recommenda-
+tion list. The experiment results show that, when recommending long tail items,
+PrepSVD-I is robust to the data sparsity issue, and can signiﬁcantly outperforms
+state-of-the-art Top-N recommendation algorithms in terms of accuracy.
+
+4.4 Performance on all items Recommendations
+
+we also conduct experiments on recommending all items, including both popular
+and long tail items. Table 4 shows the recall performance of all compared algo-
+
+400
+
+Y. Ren et al.
+
+Table 4. recall when N = 10 and N = 20 on All Items
+
+Given10%
+
+Given20%
+
+Given30%
+
+Given40%
+
+Given50%
+
+Algorithm N = 10 N = 20 N = 10 N = 20 N = 10 N = 20 N = 10 N = 20 N = 10 N = 20
+PrepSVD-I 0.1421 0.2300 0.1926 0.3007 0.2363 0.3585 0.2826 0.4165 0.3267 0.4637
+PureSVD 0.1310 0.2102 0.1716 0.2701 0.2115 0.3205 0.2471 0.3698 0.2840 0.4131
+0.2032 0.3059 0.2221 0.3238 0.2392 0.3472 0.2811 0.3960 0.3211 0.4462
+SLIM
+NNcosNgbr 0.2027 0.2990 0.2052 0.3095 0.2096 0.3248 0.2532 0.3709 0.2617 0.3818
+itemKNN 0.0290 0.0548 0.1383 0.2032 0.2252 0.3223 0.2748 0.3855 0.3042 0.4265
+0.1014 0.1756 0.1285 0.2065 0.1475 0.2332 0.1653 0.2549 0.1803 0.2736
+BPTF
+0.2088 0.3080 0.2247 0.3222 0.2256 0.3251 0.2332 0.3320 0.2413 0.3410
+TopPop
+0.0036 0.0443 0.0152 0.0812 0.0235 0.1003 0.0353 0.1198 0.0451 0.1253
+MovieAvg
+
+Given60%
+
+Given70%
+
+Given80%
+
+Given90%
+
+Given100%
+
+Algorithm N = 10 N = 20 N = 10 N = 20 N = 10 N = 20 N = 10 N = 20 N = 10 N = 20
+PrepSVD-I 0.3821 0.5242 0.4322 0.5746 0.4819 0.6213 0.5229 0.6588 0.5678 0.6928
+PureSVD 0.3267 0.4592 0.3721 0.5090 0.4275 0.5640 0.4939 0.6226 0.5534 0.6709
+0.3785 0.5090 0.4277 0.5640 0.4588 0.5897 0.5017 0.6273 0.5668 0.6794
+SLIM
+NNcosNgbr 0.2796 0.3905 0.3112 0.4156 0.3374 0.4426 0.3558 0.4553 0.4036 0.4962
+itemKNN 0.3360 0.4594 0.3595 0.4832 0.3836 0.5094 0.4128 0.5360 0.4423 0.5625
+0.1930 0.2884 0.2026 0.3003 0.2127 0.3118 0.2196 0.3221 0.2381 0.3389
+BPTF
+0.2484 0.3480 0.2559 0.3564 0.2661 0.3658 0.2717 0.3724 0.2860 0.3857
+TopPop
+0.0585 0.1456 0.0710 0.1631 0.0691 0.1629 0.0691 0.1613 0.0742 0.1734
+MovieAvg
+
+rithms across various sparsity levels on all item recommendations. We can ob-
+serve that PrepSVD-I achieves the best recall on all data sets, except Given10%,
+Given20% and Given30% (on N = 10). It is unexpected that TopPop achieves
+the highest recall values on Given10% and Given20% (on N = 10). This is
+mainly because when the training set is very sparse, the majority of available
+ratings are given for popular items. Therefore, the popularity of items will bias
+the performance of algorithms. This is consistent with the ﬁndings in [4]. SLIM
+achieves the best recall on Given20% (on N = 20) and Given30% (on N = 10).
+However, both TopPop and SLIM become almost useless in recommending long
+tail
+items on the same data sets, as shown in Table 3, which conﬁrms the
+popularity-related bias.
+
+On the other hand, it is also clear that PrepSVD-I outperforms all com-
+pared algorithms on 7 out of 10 data sets, including TopPop and SLIM. Specif-
+ically, when N = 20 on Given40% data set, PrepSVD-I achieves a recall at
+0.4165 which outperforms the best compared results of 0.3960 (from SLIM ); on
+Given100% data set, PrepSVD-I obtains a recall at 0.6928 that outperforms the
+best compared results of 0.6794 (from SLIM ). This indicates that the Preference
+Pattern Subspace can also beneﬁt all items recommendations, including popular
+items.
+
+In terms of accuracy on recommending both all items and long tail items, it
+is clear that PrepSVD-I performs better than all compared state-of-the-art Top-
+N recommendation algorithms. Although TopPop and SLIM achieve a slightly
+better recall values on Given10%, Given20% and Given30% when recommend-
+ing all items, they perform badly on the same data set when recommending long
+tail items, as shown in Table 3. This will limit their recommendation abilities.
+However, PrepSVD-I can perform very well on both all items and long tail item
+recommendations. This means PrepSVD-I possesses a better recommendation
+ability than other rating-pattern-based techniques.
+
+Top-N Recommendations by Learning User Preference Dynamics
+
+401
+
+5 Conclusion
+
+This paper introduces a novel preference dynamic eﬀect in the context of recom-
+mender systems, and proposes a Preference Pattern Subspace approach to model
+this eﬀect. The basic idea is to build a low-rank subspace to capture the personal
+preference patterns together with their temporal dynamics by reﬁning the global
+and the personal preference patterns iteratively with an EM-like algorithm. Ex-
+periment results show that the proposed PrepSVD-I signiﬁcantly outperforms
+the other state-of-the-art Top-N recommendation techniques in terms of accu-
+racy, and is robust to challenge the data sparsity issue.
+
+References
+
+1. Abramowitz, M., Stegun, I.A.: Handbook of Mathematical Functions: with Formu-
+
+las, Graphs, and Mathematical Tables. Dover, New York (1972)
+
+2. Anderson, C.: The Long Tail: Why the Future of Business Is Selling Less of More,
+
+vol. 33. Hyperion (2006)
+
+3. Cremonesi, P., Garzotto, F., Negro, S., Papadopoulos, A.: Comparative Evalua-
+tion of Recommender System Quality. In: CHI Extended Abstracts, pp. 1927–1932
+(2011)
+
+4. Cremonesi, P., Koren, Y., Turrin, R.: Performance of Recommender Algorithms on
+
+Top-N Recommendation Tasks. In: Recsys, pp. 39–46. ACM (2010)
+
+5. Deshpande, M., Karypis, G.: Item-based top- N recommendation algorithms. ACM
+
+TOIS 22(1), 143–177 (2004)
+
+6. Geng, X., Zhou, Z.-H., Smith-Miles, K.: Automatic age estimation based on facial
+
+aging patterns. IEEE TPAMI 29(12), 2234–2240 (2007)
+
+7. Golub, G.H., Van Loan, C.F.: Introduction to Matrix, 3rd edn., vol. 1. The Johns
+
+Hopkins University Press, Baltimore (1996)
+
+8. Herbrich, R., Graepel, T., Obermayer, K.: Support Vector Learning for Ordinal
+
+Regression. In: ICANN 1999, vol. 470, pp. 97–102 (1999)
+
+9. Herlocker, J.L., Konstan, J.A., Terveen, L.G., Riedl, J.T.: Evaluating Collabo-
+rative Filtering Recommender Systems. ACM Transactions on Information Sys-
+tems 22(1), 5–53 (2004)
+
+10. Karypis, G.: Evaluation of item-based top-n recommendation algorithms. In: CIKM
+
+2001, pp. 247–254. ACM (2001)
+
+11. Koren, Y.: Factorization meets the neighborhood: a multifaceted collaborative ﬁl-
+
+tering model. In: SIGKDD 2008, pp. 426–434. ACM (2008)
+
+12. Koren, Y.: Collaborative ﬁltering with temporal dynamics. In: SIGKDD 2009,
+
+pp. 447–456. ACM (2009)
+
+13. Ning, X., Karypis, G.: SLIM: Sparse Linear Methods for Top-N Recommender
+
+Systems. In: ICDM 2011, pp. 497 – 506 (2011)
+
+14. Xiong, L., Chen, X., Huang, T.K., Schneider, J., Carbonell, J.G.: Temporal collab-
+orative ﬁltering with bayesian probabilistic tensor factorization. In: Proceedings of
+SIAM Data Mining (2010)
+
+

@@ -1,0 +1,1441 @@
+Eﬃcient Mining
+
+of Combined Subspace and Subgraph Clusters
+
+in Graphs with Feature Vectors
+
+Stephan G¨unnemann, Brigitte Boden, Ines F¨arber, and Thomas Seidl
+
+{guennemann,boden,faerber,seidl}@cs.rwth-aachen.de
+
+RWTH Aachen University, Germany
+
+Abstract. Large graphs are ubiquitous in today’s applications. Besides
+the mere graph structure, data sources usually provide information about
+single objects by feature vectors. To realize the full potential for knowl-
+edge extraction, recent approaches consider both information types
+simultaneously. Thus, for the task of clustering, combined clustering
+models determine object groups within one network that are densely
+connected and show similar characteristics. However, due to the inherent
+complexity of such a combination, the existing methods are not eﬃciently
+executable and are hardly applicable to large graphs.
+
+In this work, we develop a method for an eﬃcient clustering of com-
+bined data sources, while at the same time ﬁnding high-quality results.
+We prove the complexity of our model and identify the critical parts in-
+hibiting an eﬃcient execution. Based on this analysis, we develop the al-
+gorithm EDCAR that approximates the optimal clustering solution using
+the established GRASP (Greedy Randomized Adaptive Search) princi-
+ple. In thorough experiments we show that EDCAR outperforms all com-
+peting approaches in terms of runtime and simultaneously achieves high
+clustering qualities. For repeatability and further research we publish all
+datasets, executables and parameter settings on our website1.
+
+1
+
+Introduction
+
+In recent years, real world networks have become bigger and also more numerous.
+Their growing availability motivated researchers and practitioners to analyze
+and use them for several purposes. One aim is the cluster analysis of graph
+data, which can be done in various ways [1] including the task of mining densely
+connected subgraphs hidden in one large graph. This task is useful for, e.g., social
+network analysis. Besides partitioning approaches [10, 9] some methods assume
+that the given graph naturally divides into (possibly overlapping) subgraphs of
+certain patterns, e.g. cliques or γ-quasi-cliques [20, 8].
+
+Restricting the considerations to the nodes’ relations only, however, does not
+realize the full potential for knowledge extraction. Usually for all objects a va-
+riety of additional information is available in form of attribute data (cf. Fig. 1).
+
+1
+
+http://dme.rwth-aachen.de/EDCAR
+
+J. Pei et al. (Eds.): PAKDD 2013, Part I, LNAI 7818, pp. 261–275, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+262
+
+S. G¨unnemann et al.
+
+(cid:73)(cid:72)(cid:68)(cid:87)(cid:88)(cid:85)(cid:72)(cid:3)(cid:89)(cid:72)(cid:70)(cid:87)(cid:82)(cid:85)(cid:86)(cid:29)
+(cid:87)(cid:72)(cid:80)(cid:83)(cid:72)(cid:85)(cid:68)(cid:87)(cid:88)(cid:85)(cid:72)(cid:3)(cid:62)(cid:131)(cid:38)(cid:64)
+(cid:75)(cid:88)(cid:80)(cid:76)(cid:71)(cid:76)(cid:87)(cid:92)(cid:3)(cid:62)(cid:8)(cid:64)
+(cid:81)(cid:82)(cid:76)(cid:86)(cid:72)(cid:3)(cid:79)(cid:72)(cid:89)(cid:72)(cid:79)(cid:3)(cid:62)(cid:71)(cid:69)(cid:64)
+
+(cid:20)(cid:25)(cid:131)(cid:38)
+(cid:23)(cid:28)(cid:8)
+(cid:22)(cid:71)(cid:69)
+
+(cid:20)
+
+(cid:20)(cid:25)(cid:131)(cid:38)
+(cid:22)(cid:24)(cid:8)
+(cid:25)(cid:71)(cid:69)
+
+(cid:21)
+
+(cid:20)(cid:24)(cid:131)(cid:38)
+(cid:24)(cid:20)(cid:8)
+(cid:25)(cid:71)(cid:69)
+
+(cid:22)
+
+(cid:22)(cid:19)(cid:131)(cid:38)
+(cid:23)(cid:27)(cid:8)
+(cid:21)(cid:71)(cid:69)
+
+(cid:24)
+
+(cid:25)
+
+(cid:20)(cid:23)(cid:131)(cid:38)
+(cid:24)(cid:19)(cid:8)
+(cid:20)(cid:71)(cid:69)
+
+(cid:26)
+
+(cid:20)(cid:23)(cid:131)(cid:38)
+(cid:24)(cid:28)(cid:8)
+(cid:24)(cid:71)(cid:69)
+
+(cid:20)(cid:24)(cid:131)(cid:38)
+(cid:24)(cid:19)(cid:8)
+(cid:21)(cid:71)(cid:69)
+
+(cid:23)
+
+Fig. 1. Exemplary graph with feature vectors and a combined subspace and dense
+subgraph cluster (located in subspace {temperature, humidity})
+
+This information allows for ﬁnding homogeneous node sets. In order to gain
+more informative patterns it is preferable to consider relationships together with
+shared characteristics. As shown, e.g., in [6, 18], clustering methods using both
+information sources can outperform methods using just a single one. Recently
+introduced techniques aim at combining traditional clustering (using attributes)
+and dense subgraph mining (using relationships). They group objects based on
+a high connectivity as well as on a high similarity concerning their attribute
+values. This responds to the requirements of many applications: To reduce en-
+ergy consumption in sensor networks, the long distance reports of connected
+sensors with similar measurements can be accumulated and transfered by just
+one representative. In systems biology, functional modules can be determined,
+which are groups of highly interacting genes with similar expression levels. In
+social networks, closely related friends with similar interests are useful for target
+marketing.
+
+While the domain’s data usually represents a multitude of diﬀerent recorded
+characteristics, not all of them need to be relevant for each cluster. In, e.g., social
+networks it is very unlikely that people are similar within all of their characteris-
+tics. In Fig. 1 the sensors 3, 4, 6, 7 are highly connected and they show similarity
+in two of their three measurements. In such scenarios, applying full-space cluster-
+ing leads to questionable clustering results since irrelevant dimensions strongly
+obfuscate the clusters. Subspace clustering methods solve this problem by ﬁnd-
+ing clusters in their locally relevant subspace projections of the attribute data
+[7]. Consequentially, recent approaches [12, 2–4] combine the paradigms of dense
+subgraph mining and subspace clustering.
+
+These methods enable us to detect more meaningful clusters in the data, like,
+e.g., the sensor group 3, 4, 6, 7 in Fig. 1. However, combining the paradigms of
+dense subgraph mining and subspace clustering poses several eﬃciency chal-
+lenges. First, analyzing subspace projections is inherently hard since the num-
+ber of subspaces grows exponentially in the number of attributes. Second, as
+shown in [2], to obtain high quality clusterings, an unbiased synthesis of both
+paradigms has to be conducted. Thus, the clustering process has to realize a
+complex optimization to fairly trade oﬀ the cluster properties ’size’, ’density’,
+and ’dimensionality’. Last, often an overlap between clusters is reasonable since
+objects can belong to multiple clusters when regarding diﬀerent attribute sub-
+sets. Musicians of an orchestra, e.g., may share similar musical interests but
+probably will practice sports with diﬀerent persons. However, if the clustering
+
+Eﬃcient Mining of Combined Subspace and Subgraph Clusters
+
+263
+
+model allows clusters to overlap, it is indispensable to avoid redundancy in-
+duced by highly overlapping clusters. As known from usual subspace clustering,
+redundancy elimination is highly complex [11, 13].
+
+As we have seen so far, for a proper combination of subspace clustering and
+dense subgraph mining, a model has to handle numerous aspects. Although
+mostly not accommodating all requirements, previous approaches already have
+high runtime and space consumptions. Thus, an execution on large datasets (if
+possible at all) is not eﬃcient. In our work we deal with all the aforementioned
+aspects, but lay special focus on the eﬃciency challenges.
+
+We start by taking the idea of GAMer [2] to the next level. While GAMer
+restricts the underlying clustering model to just greedily select good clusters for
+the result, which does not necessarily result in the most interesting clustering, we
+aim for a globally optimizing clustering model. Since even the previous models
+are rarely eﬃciently computable, it is not surprising that such a model, aiming at
+a global optimization, has a high complexity. We therefore analyze our model’s
+complexity to identify the most critical parts, which inhibit an eﬃcient execu-
+tion. We substitute these critical parts through highly eﬃcient heuristics that,
+however, inﬂuence the clustering quality only marginally. Thorough experiments
+demonstrate that our algorithm not only is far superior to all other approaches
+in terms of runtime but also shows better quality in nearly all experiments. Our
+main contributions are: (a) We develop a novel clustering model for a result
+having globally maximal quality, allowing clusters to overlap in general, and
+avoiding redundancy (b) We propose the eﬃcient algorithm EDCAR exploiting
+the GRASP principle and approximating the optimal result.
+
+2 Related Work
+
+Recently, clustering methods have been introduced analyzing graph data in com-
+bination with attribute data. [6] transforms the network into a distance and com-
+bines it with the original feature distance. Afterwards any distance-based clus-
+tering method can be applied. The clusters are diﬃcult to interpret since they
+do not have to obey a certain graph structure. In [19] the attribute information
+is transformed into a graph and densely connected subgraphs are mined by com-
+bining this novel graph with the original one. The work of [18] uses a combined
+objective function extending the modularity idea. All three approaches [6, 19, 18]
+perform full-space clustering on the attributes. [21] enriches the graph by fur-
+ther nodes corresponding to (categorical) attribute values and connects them to
+nodes showing this value. The clustered objects are only pairwise similar and no
+speciﬁc relevant dimensions can be deﬁned. Furthermore, the previous methods
+determine disjoint clusters.
+
+Only a few approaches deal with subspace clustering and dense subgraph min-
+ing. CoPaM’s [12] combination of both paradigms, however, is not sound since it
+solely maximizes the number of nodes; the density of subgraphs and the subspace
+dimensionality are incidental. Furthermore, CoPaM does not eliminate redun-
+dancy, which fast leads to an overwhelming result size. The GAMer approach [2]
+
+264
+
+S. G¨unnemann et al.
+
+simultaneously considers the density, the size, and the dimensionality of clusters
+by trading oﬀ these characteristics. Furthermore, GAMer uses a redundancy
+model to conﬁne the result to a manageable size. A disadvantage, however, is
+the simple determination of the ﬁnal clustering: GAMer does not globally ex-
+amine the result but simply successively adds (in a greedy manner) clusters to
+the result. Thereby, the resulting clustering does not necessarily correspond to
+the most interesting one. In [3, 4] a cluster deﬁnition has been introduced for
+ﬁnding arbitrarily shaped subspace clusters in graphs with feature vectors. The
+work uses the same redundancy model as proposed in [2].
+
+The major drawback of all methods is their high runtime and large space
+
+requirement, which prevents an application on larger datasets.
+
+3 Maximum Quality Clustering
+
+EDCAR (Eﬃcient Determination of Clusters regarding Attributes and Rela-
+tionships) realizes a novel clustering model. The model is based on the cluster
+deﬁnition introduced and already veriﬁed for its eﬀectiveness in GAMer [2].
+The input of our model is a vertex-labeled graph G = (V, E, l) with vertices V ,
+edges E ⊆ V × V and a labeling function l : V → Rd where Dim = {1, . . . , d}
+is the set of dimensions. We assume an undirected graph without self-loops. We
+use l(O) = {l(o) | o ∈ O} to denote the set of vectors that is associated to the
+set of vertices O ⊆ V .
+
+3.1 Clustering Model
+
+Our method combines objectives from subspace clustering and dense subgraph
+mining. Thus, the desired clusters are sets of objects O ⊆ V that are meaningful
+subspace clusters in the attribute space and also form dense subgraphs within
+the input graph. For identifying subspace clusters, we adapt the cell-based model
+of DOC [15]. According to this deﬁnition the values of all objects in a subspace
+cluster vary at most by a threshold w in the relevant dimensions. For identifying
+dense subgraphs, we use the deﬁnition of quasi-cliques [8]. The density of a
+, where degO(v) = |{o ∈
+quasi-clique is determined by γ(O) = minv∈O degO(v)
+O | (v, o) ∈ E}| is the vertex degree restricted to the set O.
+Deﬁnition 1. (Twofold cluster [2]) A twofold cluster C = (O, S) is a set of
+vertices O ⊆ V and a set of dimensions S ⊆ Dim with the following properties
+– (l(O), S) is a subspace cluster with dimensionality |S|≥smin
+– O is a quasi-clique with density γ(O) ≥ γmin
+– the induced subgraph of O is connected and |O|≥nmin
+
+|O|−1
+
+The resulting clusters are meaningful in the attribute space as well as in the
+graph. For example in Fig. 2 (choosing w = 0.5, nmin = 3, γmin = 0.4 and
+smin = 2) the vertex set C1 = {v1, v2, v4, v5, v6, v7} is a valid twofold cluster with
+
+Eﬃcient Mining of Combined Subspace and Subgraph Clusters
+
+265
+
+(cid:89)(cid:24)
+
+(cid:20)(cid:17)(cid:22)
+(cid:22)(cid:17)(cid:19)
+(cid:25)(cid:17)(cid:24)
+(cid:24)(cid:17)(cid:21)
+
+(cid:89)(cid:20)
+
+(cid:89)(cid:25)
+
+(cid:24)(cid:17)(cid:23)
+(cid:22)(cid:17)(cid:23)
+(cid:25)(cid:17)(cid:22)
+(cid:21)(cid:17)(cid:22)
+
+(cid:23)(cid:17)(cid:24)
+(cid:22)(cid:17)(cid:24)
+(cid:25)(cid:17)(cid:23)
+(cid:22)(cid:17)(cid:23)
+
+(cid:89)(cid:21)
+
+(cid:21)(cid:17)(cid:24)
+(cid:22)(cid:17)(cid:25)
+(cid:25)(cid:17)(cid:23)
+(cid:24)(cid:17)(cid:21)
+
+(cid:89)(cid:26)
+
+(cid:89)(cid:23)
+
+(cid:22)(cid:17)(cid:23)
+(cid:22)(cid:17)(cid:24)
+(cid:25)(cid:17)(cid:26)
+(cid:23)(cid:17)(cid:22)
+
+(cid:21)(cid:17)(cid:21)
+(cid:22)(cid:17)(cid:22)
+(cid:25)(cid:17)(cid:26)
+(cid:24)(cid:17)(cid:19)
+
+(cid:89)(cid:22)
+
+(cid:21)(cid:17)(cid:19)
+(cid:28)(cid:17)(cid:28)
+(cid:26)(cid:17)(cid:27)
+(cid:24)(cid:17)(cid:20)
+
+(cid:38)(cid:20)(cid:29)(cid:3)(cid:94)(cid:89)(cid:20)(cid:15)(cid:89)(cid:21)(cid:15)(cid:89)(cid:23)(cid:15)(cid:89)(cid:24)(cid:15)(cid:89)(cid:25)(cid:15)(cid:89)(cid:26)(cid:96)
+(cid:38)(cid:21)(cid:29)(cid:3)(cid:94)(cid:89)(cid:21)(cid:15)(cid:89)(cid:22)(cid:15)(cid:89)(cid:26)(cid:96)
+
+Fig. 2. Exemplary twofold clusters
+
+the relevant dimensions 2 and 3 (marked in orange). The set C2 = {v2, v3, v7} is
+
+a twofold cluster with the relevant dimensions 1 and 4 (marked in blue).
+
+Based on the above deﬁnition, the number of node sets fulﬁlling this deﬁnition
+is potentially very large and probably many clusters will overlap (e.g. C1 and
+C2 in Fig. 2). Furthermore, some subsets of the clusters are twofold clusters as
+well, e.g. {v1, v4, v5, v6}. Though it makes sense to allow overlapping clusters in
+
+general since one node can belong to several meaningful groups, clusters that
+are too similar to each other often contain nearly the same information.
+
+(cid:3)
+
+Since these redundant clusters are not beneﬁcial but obstructing, they should
+be excluded from the result. To identify a redundant cluster C w.r.t. another
+cluster C
+, several properties have to apply. First, the structural information
+of the corresponding clusters has to be similar, i.e. they have to share a large
+portion of their vertices and their dimensions. Second, the cluster C should be
+; otherwise one would prefer C. Formally, the
+less interesting than the cluster C
+redundancy of C w.r.t. C
+
+is based on the following relation:
+
+Deﬁnition 2. (Redundancy relation) Given the redundancy parameters robj ∈
+[0, 1] and rdim ∈ [0, 1], the binary redundancy relation ≺red is deﬁned by:
+
+(cid:3)
+
+(cid:3)
+
+For all twofold clusters C = (O, S), C
+
+C ≺red C
+
+(cid:3) ⇔ Q(C) < Q(C
+
+(cid:3)
+
+) ∧ |O∩O
+
+(cid:3)
+
+(cid:3)
+|S| ≥ rdim
+|O| ≥ robj ∧ |S∩S
+
+= (O
+
+, S
+(cid:3)|
+
+):
+
+(cid:3)|
+
+(cid:3)
+
+Using the parameters robj and rdim the user can determine to which extent two
+clusters may overlap without being deﬁned as redundant. For example, with
+robj = rdim = 0.5 the cluster C2 would not be redundant w.r.t. C1. Although
+many of C2’s nodes are covered by C1, the relevant dimensions of the two clusters
+do not overlap. With the values robj = 0.5 and rdim = 0, C2 would be redundant
+w.r.t. C1.
+Cluster selection based on global optimization. Our goal in selecting the
+ﬁnal clustering is a solution, that (a) does not contain clusters that are redun-
+dant to each other, i.e. it has to be redundancy-free, and (b) is most interesting.
+While the GAMer method greedily selects clusters according to their quality, we
+perform a more sophisticated selection. Instead of deciding locally which cluster
+to select next for the result, we perform a global optimization to get the most
+interesting clustering. We, thus, do not prefer the selection of single interesting
+clusters, since that carries the risk of selecting only uninteresting clusters after-
+wards, but we select the overall most interesting clustering. Correspondingly, we
+require of our Result that the sum of its clusters’ qualities is maximal compared
+
+266
+
+S. G¨unnemann et al.
+
+ER
+
+(cid:1909)
+
+1
+
+2
+
+(cid:1909)
+(cid:1909) (cid:1909) (cid:1909) (cid:1909)
+7
+
+3
+
+4
+
+5
+
+6
+
+8
+
+9
+
+Fig. 3. Global optimization in EDCAR vs. greedy selection in GAMer
+
+to all other possible clusterings. Formally, the maximum quality clustering is
+deﬁned as follows:
+
+Deﬁnition 3. (Maximum quality clustering) Given the set of all twofold clus-
+ters Clusters, the maximum quality clustering Result ⊆ Clusters fulﬁlls
+– (redundancy-freeness) ¬∃Ci, Cj ∈ Result : Ci ≺red Cj
+– (maximum quality sum) ¬∃Res
+(cid:3)
+
+(cid:3) ⊆ Clusters : Res
+
+fulﬁlls the redundancy-
+
+(cid:2)
+
+(cid:2)
+
+free property and
+
+Ci∈Res(cid:3) Q(Ci) >
+
+Ci∈Result Q(Ci)
+
+Fig. 3 shows an example for the ﬁnal clusterings of GAMer and EDCAR: Nine
+clusters, their quality values, and the redundancy relation are illustrated. The
+quality sums of the overall clusterings are depicted on the right. GAMer se-
+lects the cluster C2 since it is not redundant w.r.t. any other cluster. A greedy
+selection according to the quality values is performed. In EDCAR, cluster C2
+is not selected for the ﬁnal clustering. While C2 has a high quality itself, its
+admittance would prohibit the clusters C3, C4, and C6. However, by including
+these clusters and excluding C2, our ﬁnal clustering has a higher quality (39.7
+vs. 29.6). As the example illustrates, EDCAR optimizes the interestingness of
+the overall clustering, which can yield better results but is computationally more
+challenging.
+
+3.2 Complexity Analysis
+
+The complexity of our clustering model is given by the following two theorems
+(proofs on the web). First, the overall complexity of our model, i.e. of generating
+the twofold clusters and selecting the maximum quality clustering, is #P-hard.
+
+Theorem 1. Given a vertex-labeled graph G = (V, E, l), determining the maxi-
+mum quality clustering according to Def. 3 is #P-hard w.r.t. |V |.
+Second, even if the set of twofold clusters Clusters is given, selecting the maxi-
+mum quality clustering Result⊆Clusters (cf. Def. 3) is NP-complete w.r.t. the
+input size.
+
+Theorem 2. Given a set of twofold clusters Clusters, selecting the maximum
+quality clustering according to Def. 3 is NP-complete w.r.t. |Clusters|.
+Conclusions. From Theorem 1 we can infer that the input size |Clusters|
+can be exponential in |V |. Overall we can identify two parts that, especially
+
+Eﬃcient Mining of Combined Subspace and Subgraph Clusters
+
+267
+
+in combination, prevent an eﬃcient determination of the optimal solution: the
+tremendous amount of clusters used as candidates for the optimal clustering and
+the complexity of the selection process for a ﬁnal subset of these clusters.
+
+4 The Eﬃcient EDCAR Algorithm
+
+As shown, eﬃciently determining a maximum quality clustering is not possible.
+Thus, we develop the heuristic algorithm EDCAR to ensure an eﬃcient execu-
+tion. We have to tackle two major challenges: First, we have to reduce the number
+of result candidates (Section 4.1). We cannot use the whole set Clusters of ex-
+ponentially many candidates as the input for the selection procedure. Second,
+we have to resolve the NP-hardness of the selection process itself (Section 4.2).
+
+4.1 Reduce the Number of Result Candidates
+
+This ﬁrst phase generates the cluster candidates among which the subsequent
+process chooses the ﬁnal clustering. The goal is to eﬃciently determine a set of
+twofold clusters that is of manageable size and of high quality.
+
+To analyze sets of vertices whether they are twofold clusters, we enumerate
+them using the set enumeration tree [17]. An exemplary tree for a graph with
+four vertices is shown in Fig. 4. Each node of the tree represents a set of vertices
+
+O ⊆ V . Each node O is associated with a candidate set candO. A child node
+(cid:3)
+extends its parent node O through one of the vertices in candO. Thus, the
+subtree of a node O represents all potential clusters X with O ⊂ X ⊆ O∪candO.
+
+O
+
+By pruning a vertex v from the candidate set of a node O, the search space can
+be reduced. If we were able to remove e.g. the vertex v3 from the set cand{v1},
+the highlighted subsets in Fig. 4 would disqualify themselves as clusters without
+further analysis. EDCAR employs all pruning methods of [2].
+
+We want to avoid analyzing each node along each (non-pruned) path in the
+set enumeration tree since this could lead to an exponential number of twofold
+clusters which are used as candidates for the ﬁnal clustering. To reduce the
+number of candidates we implement two diﬀerent strategies. In the ﬁrst step,
+we avoid analyzing all paths of the tree by systematically determining single
+paths along which interesting clusters can be expected. By selecting a polynomial
+number of paths we will also only get a polynomial number of candidates. This
+
+(cid:50)(cid:32)(cid:94)(cid:89)(cid:20)(cid:96)
+
+(cid:70)(cid:68)(cid:81)(cid:71)(cid:50)(cid:32)(cid:94)(cid:89)(cid:21)(cid:15)(cid:89)(cid:22)(cid:15)(cid:89)(cid:23)(cid:96)
+(cid:94)(cid:89)(cid:20)(cid:96)
+
+(cid:94)(cid:3)(cid:96)
+
+(cid:89)(cid:20)
+
+(cid:89)(cid:21)(cid:3)(cid:3) (cid:89)(cid:22)(cid:3) (cid:89)(cid:23)
+
+(cid:94)(cid:89)(cid:21)(cid:96)
+
+(cid:94)(cid:89)(cid:22)(cid:96)
+
+(cid:94)(cid:89)(cid:23)(cid:96)
+
+(cid:94)(cid:89)(cid:20)(cid:15)(cid:89)(cid:21)(cid:96)
+
+(cid:94)(cid:89)(cid:20)(cid:15)(cid:89)(cid:22)(cid:96)
+
+(cid:94)(cid:89)(cid:20)(cid:15)(cid:89)(cid:23)(cid:96)
+
+(cid:94)(cid:89)(cid:21)(cid:15)(cid:89)(cid:22)(cid:96)
+
+(cid:94)(cid:89)(cid:21)(cid:15)(cid:89)(cid:23)(cid:96)
+
+(cid:94)(cid:89)(cid:22)(cid:15)(cid:89)(cid:23)(cid:96)
+
+(cid:94)(cid:89)(cid:20)(cid:15)(cid:89)(cid:21)(cid:15)(cid:89)(cid:22)(cid:96)
+
+(cid:94)(cid:89)(cid:20)(cid:15)(cid:89)(cid:21)(cid:15)(cid:89)(cid:23)(cid:96)
+
+(cid:94)(cid:89)(cid:20)(cid:15)(cid:89)(cid:22)(cid:15)(cid:89)(cid:23)(cid:96)
+
+(cid:94)(cid:89)(cid:21)(cid:15)(cid:89)(cid:22)(cid:15)(cid:89)(cid:23)(cid:96)
+
+(cid:50)(cid:182)(cid:32)(cid:94)(cid:89)(cid:21)(cid:15)(cid:89)(cid:22)(cid:96)
+(cid:70)(cid:68)(cid:81)(cid:71)(cid:50)(cid:182)(cid:32)(cid:94)(cid:89)(cid:23)(cid:96)
+
+(cid:94)(cid:89)(cid:20)(cid:15)(cid:89)(cid:21)(cid:15)(cid:89)(cid:22)(cid:15)(cid:89)(cid:23)(cid:96)
+
+(cid:83)(cid:85)(cid:88)(cid:81)(cid:72)(cid:71)(cid:3)(cid:89)(cid:72)(cid:85)(cid:87)(cid:72)(cid:91)(cid:3)(cid:86)(cid:72)(cid:87)
+
+e
+e
+r
+t
+ 
+n
+o
+i
+t
+a
+r
+e
+m
+u
+n
+e
+
+ 
+t
+
+e
+s
+
+selected paths
+
+best quality 
+
+clusters
+
+avoided 
+paths
+
+Fig. 4. Set enumeration tree
+
+Fig. 5. Reducing the number of candidates
+
+268
+
+S. G¨unnemann et al.
+
+. generateCandidates()
+
+α ← rand([0 . . . 1]) // trade oﬀ greedy & randomized
+
+Algorithm 1
+1: Cands ← {}
+2: for( 1 . . . maxClus )
+3:
+4: O ← {} // root of set enumeration tree
+5: while( true ) // generate path P
+6:
+7:
+8:
+9:
+10:
+11:
+12: Cands ← Cands ∪ {C+}
+13: return Cands
+
+determine candO and prune (cf. [2])
+if( candO = ∅ ) break;
+determine RCLO as in Equation 1
+v ← rand(RCLO)
+O ← O ∪ {v} // extend path P by v
+select cluster C+ along path P with highest quality
+
+path selection is illustrated in Fig. 5 by the solid lines. Even though this method
+reduces the number of clusters considerably, this set is still unnecessarily large
+and will be reduced in a second step. Since along each selected path the object
+sets successively grow by one vertex (cf. Fig. 4), the clusters along this path are
+most likely redundant to each other. Using all these clusters as the input for the
+selection step is needless since most clusters will be discarded anyway. Based on
+the deﬁnition of our redundancy relation we know that clusters with high quality
+are preferred. Thus, instead of using all clusters, we select along each path just
+the cluster with the highest quality (cf. dots in Fig. 5). Overall, we realize by
+our two strategies that only few candidates are used as the input for the cluster
+selection step. In the remaining of this section, we present more details on our
+path selection technique.
+GRASP for eﬃcient path selection. To systematically (and eﬃciently)
+achieve a selection of interesting paths, we adapt the GRASP principle (Greedy
+Randomized Adaptive Search Procedure) [14, 16], Naively, one could randomly
+determine a path. This, however, does not assure to generate high quality clus-
+
+ters. Alternatively, one could decide at node O which successor v ∈ candO (po-
+tentially) leads to a good cluster and one descends in the subtree with the high-
+est potential. We use a function g(v|O) to estimate the potential of each node
+v ∈ candO w.r.t. the current set O. The deﬁnition of g(v|O) will be derived in
+
+the next subsection. This approach corresponds to a greedy construction of the
+path. The huge advantage of this greedy method is that the graph structure and
+the cluster deﬁnition can be incorporated into the estimation function g to rate
+the potential of the path. Thus, it corresponds to an informed search and high
+quality clusters can be expected. Disadvantageously is the risk of reaching only
+local maxima and generating always very similar paths. These problems do not
+hold for the randomized approach, which is able to generate a diversity of paths
+in an uninformed fashion.
+
+To exploit the advantages of both methods (informed and randomized search),
+we use the GRASP principle, which acts as a metaheuristic to combine them.
+Several studies show that this principle often leads to optimal or nearly optimal
+solutions [14]. According to the GRASP principle, we ﬁrst construct a restricted
+candidate list (RCL) corresponding to a set of potentially meaningful vertices
+
+Eﬃcient Mining of Combined Subspace and Subgraph Clusters
+
+269
+
+for expanding the path. Afterwards, we randomly select one vertex v ∈ RCLO
+
+to descend into a subtree. Formally,
+
+RCLO = {v ∈ candO | g(v|O) ≥ gm + α · (gM − gm)}
+
+(1)
+
+with gm= min
+
+v∈candO
+
+{g(v|O)} and gM = max
+v∈candO
+
+{g(v|O)}.
+
+By choosing α=1 we can simulate the greedy approach whereas α=0 corre-
+sponds to a completely randomized selection. The determination of a single path
+is shown in Algorithm 1, line 5 to 10: In line 6 we determine the candidate set
+candO for the current vertex set O, which is then reduced using the pruning
+techniques from [2]. Next we determine the RCL as described above and add a
+randomly selected node to O. This procedure is repeated until candO=∅, i.e. no
+
+more nodes can be added to the path.
+
+(cid:3)
+
+As depicted in Fig. 5 we want to descend in several paths. This is done by
+line 2 and we use a randomly determined α to trade oﬀ the two GRASP principles
+for each novel path, leading to more stable results [16]. Overall, we eﬃciently
+generate diﬀerent paths containing high quality clusters based on the estimated
+potential.
+Potential of Paths. At last, we have to determine the potential of a sub-
+tree. Since our goal is to maximize the sum of qualities, we want to use the
+quality as our estimation function g(v|O). If eﬃciency was not required, one
+(v|O) = γ(O ∪ {v})a · |O ∪ {v}|b · |S(O ∪ {v})|c where S(X) de-
+could use g
+notes the subspace of the corresponding vertex set. However, eﬃciency is cru-
+cial in our case. While the size and the subspace can be eﬃciently determined,
+the exact density γ(O ∪ {v}) is computationally expensive. Keep in mind that
+g(v|O) has to be evaluated for each v ∈ candO. Therefore, we approximate
+the density γ(O ∪ {v}) of the potential cluster O ∪ {v} by the lower bound
+≤ γ(O ∪ {v}). The density approximation
+γ(O, v) := min{mino∈O deg
+|O|
+γ(O, v) can be eﬃciently computed for diﬀerent vertices v because it is mostly
+independent of v. We only have to compute the term degO(v). Our overall esti-
+mation function is g(v|O)=γ(O, v)a · (|O| + 1)b · |S(O ∪ {v})|c
+
+(v)}
+
+(o),deg
+
+O
+
+O
+
+4.2 GRASP for Eﬃcient Clustering Selection
+
+So far, we reduced the number of candidates used as the input for the cluster
+selection step. Now we approximate the maximum quality clustering (Def. 3))
+itself since its determination is NP-hard. We again use the GRASP principle.
+Therefore, we relax Def. 3 by only demanding the resulting clustering Res
+) ∧ (∀C ∈
+to be redundancy-free and maximal: (¬∃C, C
+(cid:3) ≺red C). Starting with an empty
+Cands\Res : ∃C
+result Res, we now successively add further clusters C ∈ Cands based on the
+GRASP principle. Since our goal is to ﬁnd clusterings with a high quality sum,
+we instantiate the estimation function h(C|Res), which assesses the potential of
+adding C to Res, by the quality of clusters: h(C|Res) = Q(C). This value is
+already given at this time. Thus, no additional computation has to be done. The
+
+(cid:3) ∈ Res : C ≺red C
+
+(cid:3) ∈ Res : C ≺red C
+
+(cid:3) ∨ C
+
+(cid:3)
+
+270
+
+S. G¨unnemann et al.
+
+.
+
+Algorithm 2 selectClustering(...)
+1: input: set of clusters Cands
+2: Res ← {} // (preliminary) result
+3: α ← rand([0 . . . 1])
+4: while( Cands (cid:9)= ∅ )
+5:
+6: RCL={s ∈ Cands | h(C|Res)≥gm +α(gM −gm)}
+7: C ← rand(RCL)
+8: Res ← Res ∪ {C}
+9: Cands ← {C ∈ Cands | ¬∃C
+
+gm = minC∈Cands h(C|Res), gM = max ...
+
+(cid:3)∈Res : C ≺red
+
+(cid:3) ∨ C
+
+(cid:3) ≺red C}
+
+C
+
+10: // improve clustering by local search
+11: for( N ewRes ∈ N eighborhood(Res) )
+12:
+13:
+14:
+15: return Res
+
+if( Q(N ewRes) > Q(Res) ) // higher quality sum
+Res ← N ewRes
+goto line 10 // eﬃcient ﬁrst-improving strategy
+
+.
+
+Algorithm 3 EDCAR algorithm
+1: Res ← {} // preliminary result
+2: do
+3: Cands ← generateCandidates()
+4:
+5: Res ← selectClustering(T mp)
+6: while( Cands (cid:9)= ∅ )
+7: return Res
+
+T mp ← Res ∪ Cands
+
+pseudo code for selecting the subset is given in Algorithm 2. Since our model
+requires redundancy-freeness, we are able to remove in line 9 all clusters that
+induce such a redundancy. These clusters can no longer be added to Res.
+To further increase the overall quality, we conduct in line 10-14 a local search
+on the set of valid clusterings. The idea is to replace a cluster C ∈ Res by
+a set of not yet selected clusters N ewC to get the potentially better clustering
+Res\{C}∪N ewC. The set N ewC is built by collecting clusters from Cands\Res,
+property of the overall result Res\{C} ∪ N ewC is not violated. Thus, an eﬃ-
+cient greedy approach can be used to generate N ewC . Formally, for each clus-
+ter X ∈ Cands\Res not selected for N ewC it holds: X /∈ N ewC ⇔ ∃C
+(cid:3) ∈
+N ewC : (X ≺red C
+(cid:3) ≺red X). The overall
+N eighborhood(Res)={Res\{C} ∪ N ewC | ∀C ∈ Res}. If no better clustering
+
+neighborhood of a clustering Res is the whole set of such generated alternatives
+
+in decreasing order w.r.t. their quality values, as long as the redundancy-freeness
+
+(cid:3) ∈ Res\{C} : (X ≺red C
+
+) ∨ ∃C
+
+(cid:3) ∨ C
+
+(cid:3)
+
+in the neighborhood exists, we have reached a local maximum and the cluster
+selection in this iteration is ﬁnished.
+
+4.3 Overall Processing Scheme
+
+The two phases of our method, generating a small number of candidates and
+selecting the resulting clustering based on these candidates, lead to an overall
+eﬃcient execution. Since we select just the one cluster with the highest qual-
+ity along each path, however, lower quality clusters do not get the chance to
+be selected for the result. Nevertheless, also clusters with lower qualities can
+contribute to the overall result, as C9 in Fig. 3. To give these low-quality but
+valuable clusters the chance to be considered as result candidates, we repeat
+both phases recurrently (cf. Algorithm 3).
+In the ﬁrst iteration no information is given (Res=∅) and we select the clusters
+with highest quality along each path. In subsequent iterations Res is used to
+avoid considering redundant candidates. We thus block redundant parts of a path
+and select the most interesting cluster among the remaining non-redundant ones
+as additional candidate. Overall, we generate in each iteration only candidates
+
+Eﬃcient Mining of Combined Subspace and Subgraph Clusters
+
+271
+
+EDCAR
+
+GAMer
+
+(cid:3)CoPaM
+
+Cocain°
+
+EDCAR
+
+GAMer
+
+CoPaM
+
+Cocain°
+
+EDCAR
+
+GAMer
+
+CoPaM
+
+Cocain°
+
+]
+c
+e
+s
+[
+(cid:3)
+e
+m
+
+i
+t
+n
+u
+r
+
+100000
+
+10000
+
+1000
+
+100
+
+10
+
+1
+
+]
+c
+e
+s
+[
+(cid:3)
+e
+m
+
+i
+t
+n
+u
+r
+
+100000
+
+10000
+
+1000
+
+100
+
+10
+
+1
+
+200
+
+2000
+
+number(cid:3)of(cid:3)nodes
+
+20000
+
+5
+
+15
+
+25
+number(cid:3)of(cid:3)nodes(cid:3)per(cid:3)cluster
+
+l
+
+e
+u
+a
+v
+1
+F
+
+(cid:3)
+
+EDCAR
+
+GAMer
+
+(cid:3)CoPaM
+
+Cocain°
+
+1
+0.9
+0.8
+0.7
+0.6
+0.5
+0.4
+0.3
+
+200
+
+2000
+
+number(cid:3)of(cid:3)nodes
+
+20000
+
+(a) w.r.t. database size
+
+l
+
+e
+u
+a
+v
+1
+F
+
+(cid:3)
+
+GAMer
+
+CoPaM
+
+Cocain°
+
+EDCAR
+1
+0.9
+0.8
+0.7
+0.6
+0.5
+0.4
+0.3
+
+5
+
+15
+
+25
+number(cid:3)of(cid:3)nodes(cid:3)per(cid:3)cluster
+(b) w.r.t. cluster size
+
+100000
+
+10000
+
+1000
+
+100
+
+10
+
+]
+c
+e
+s
+[
+(cid:3)
+e
+m
+
+i
+t
+n
+u
+r
+
+1
+3500
+
+EDCAR
+1
+0.9
+0.8
+0.7
+0.6
+0.5
+0.4
+0.3
+
+3500
+
+4500
+
+5500
+
+number(cid:3)of(cid:3)edges
+
+6500
+
+GAMer
+
+CoPaM
+
+Cocain°
+
+4500
+
+5500
+
+number(cid:3)of(cid:3)edges
+
+6500
+
+l
+
+e
+u
+a
+v
+1
+F
+
+(cid:3)
+
+(c) w.r.t. cluster density
+
+Fig. 6. Scalability and Quality w.r.t. diﬀerent data or ground truth characteristics
+
+(cid:3)∈Res : C ≺red C
+
+fulﬁlling ∀C∈Cands : ¬∃C
+. It is very likely that some of these
+clusters can be added to the ﬁnal clustering. Thus, we perform the clustering
+selection phase on the enriched set Cands ∪ Res to get the novel preliminary
+∗ ⊆ Cands ∪ Res. Overall, our processing interweaves the generation
+result Res
+and the selection of clusters by cyclically invoking both phases. The method
+automatically terminates if no further non-redundant candidates can be found.
+
+(cid:3)
+
+5 Experiments
+
+We compare EDCAR with GAMer [2] and CoPaM [12]; both consider subspaces
+◦
+of
+and dense subgraphs. As a further competitor we use the extension Cocain
+Cocain [20] as described in [2]. Eﬃciency is measured by the approaches’ runtime.
+All experiments were conducted on Opteron 2.3GHz CPUs using Java6 64 bit.
+Methods that did not ﬁnish within two days were aborted. Clustering quality is
+calculated via the F1 value [5]. We use several public real world datasets and
+synthetic data, by default with 80 clusters, each with 15 nodes, a density of 0.6
+and 5-10 relevant dimensions out of 20 dimensions. 6% of the clusters’ nodes
+overlap. We provide all datasets with descriptions, executables, and parameter
+settings on our website.
+
+Database size. First, we vary the number of vertices in the graph by increasing
+the number of clusters and keeping the number of objects per cluster ﬁxed. As
+depicted in Fig. 6(a) (top), EDCAR is several orders of magnitude faster than
+all competing approaches (note the logarithmic scale on both axes). EDCAR is
+the only method applicable on large data sets. Especially CoPaM is no longer
+executable for these settings since its limited redundancy model leads to an im-
+practicably large amount of clusters. GAMer scales worse than EDCAR, too. It
+has to analyze the complete set of all twofold clusters, leading to a high runtime.
+
+272
+
+S. G¨unnemann et al.
+
+Although EDCAR uses an even more complex clustering model, the runtime
+is lower since we systematically generate and select only the most interesting
+clusters.
+
+Besides EDCAR’s high eﬃciency, we observe in Fig. 6(a) (bottom) its high
+eﬀectiveness. Despite the used approximations, the quality of EDCAR is similar
+or even higher than that of GAMer. The remaining approaches CoPaM and
+◦
+Cocain
+achieve only low qualities, as also shown in [2]. This experiment has
+shown that EDCAR is also applicable on large datasets. Though, for the follow-
+ing experiments we chose medium-sized datasets to enable a comparison with
+the other algorithms.
+Cluster size. In this experiment, we keep the number of clusters ﬁxed but
+increase the number of vertices per cluster. This setting is more challenging
+since larger clusters correspond to longer paths in the set enumeration tree. In
+Fig. 6(b) (top) we observe only a slow increase in runtime for EDCAR. Since the
+number of hidden clusters is ﬁx, the number of required iterations in EDCAR is
+almost constant (about 15). All competing approaches show heavily increasing
+runtimes and are not applicable at an early stage. Fig. 6(b) (bottom) shows
+nearly perfect quality for EDCAR. The qualities of the other methods decrease to
+diﬀerent extents. The advantage of our novel clustering model becomes apparent.
+Graph density. In Fig. 6(c) we increase the graph’s density by adding edges
+between the clustered nodes. Again, EDCAR is orders of magnitudes faster con-
+ﬁrming the usefulness of our solution.
+
+EDCAR
+
+GAMer
+
+Cocain°
+
+]
+c
+e
+s
+[
+(cid:3)
+e
+m
+
+i
+t
+n
+u
+r
+
+1000000
+100000
+10000
+1000
+100
+10
+1
+
+10
+
+100
+
+dimensionality
+
+1000
+
+Fig. 7. Data dimensionality
+
+Data dimensionality. In Fig. 7 we increase the data’s dimensionality. Though
+the runtimes of the competing methods do not increase signiﬁcantly, they are
+not applicable for larger datasets due to the extreme memory usage. CoPaM is
+not applicable at all. The other methods have to manage a tremendous amount
+of clusters whereas our algorithm generates incrementally a small set of clusters.
+Overall, all experiments indicate that EDCAR achieves far better runtimes than
+all competitors. EDCAR is the only method applicable to large datasets. At the
+same time the results of our approximation achieve high eﬀectiveness.
+
+Eﬃcient Mining of Combined Subspace and Subgraph Clusters
+
+273
+
+Real world data. We use gene data2 and their interactions (3548 nodes; 8334
+edges; 115d), an extract of the Arxiv database3 (27769; 352284; 300d), patent
+information 4 (492007; 528333; 5d), and a co-author graph extracted out of the
+DBLP database5 (133097; 631384; 2695d). Since for real world data no hidden
+clusters are given, we analyze in Fig. 8 diﬀerent properties of the clustering
+results (runtime, avg. number of vertices, density, dimensionality of the detected
+clusters). For all datasets EDCAR is orders of magnitude faster than the other
+methods. GAMer is only applicable on three of the datasets. CoPaM can only
+◦
+be executed on the gene data and achieves extremely high runtimes. Cocain
+ﬁnished on none of the datasets within 2 days. The clusters identiﬁed by EDCAR
+and GAMer have nearly similar properties. Thus, our approximations do not
+impair the clustering quality.
+
+Gene
+r
+e
+M
+A
+G
+
+m
+a
+P
+o
+C
+
+R
+A
+C
+D
+E
+
+Arxiv Patent DBLP
+R
+A
+C
+D
+E
+
+r
+e
+M
+A
+G
+
+r
+e
+M
+A
+G
+
+R
+A
+C
+D
+E
+
+R
+A
+C
+D
+E
+
+runt. [s]
+
+76 33060 179 945 282 574 25752
+8.8
+
+49
+∅ vertices 9
+9.67 7.7 8.2 12 11.7
+∅ density 0.74 0.72 0.24 0.69 0.6 0.6 0.6
+5 3.0 3.0
+
+15.8 15.47 12.21
+
+9.3
+0.83
+3.02
+
+∅ dim.
+
+5
+
+- IEEE ICME
+- ACM Multimedia
+- TREC
+
+Fig. 8. Clustering properties for real world data
+
+Fig. 9. Exemplary cluster for DBLP
+
+An exemplary cluster from EDCAR’s clustering result on the DBLP co-author
+graph is shown in Fig. 9. Here, each node represents an author, each edge cor-
+responds to a co-authorship, and the 2695 attributes of a node indicate the
+conferences which an author has attended. Fig. 9 illustrates a cluster consisting
+of 12 authors who jointly published papers at the conferences IEEE ICME, ACM
+Multimedia, and TREC (i.e., the cluster is located in a 3d subspace). Please note
+that the cluster does not form a clique (its quasi-clique density is 0.64), thus not
+all authors collaborated together. EDCAR is the only method that can handle
+this data set; all competing methods fail due to their high runtime and space
+complexity.
+
+6 Conclusion
+
+We introduced the method EDCAR for eﬃciently detecting clusters showing
+high density in graphs as well as feature similarity in subspace projections. Our
+model combines subspace clustering with dense subgraph mining and performs
+
+2
+
+3
+
+4
+
+5
+
+http://thebiogrid.org,http://genomebiology.com/2005/6/3/R22
+http://www.cs.cornell.edu/projects/kddcup/datasets.html
+http://www.nber.org/patents/
+http://dblp.uni-trier.de
+
+274
+
+S. G¨unnemann et al.
+
+an overall optimization of the result to get the most interesting, redundancy-free
+clustering. Based on the proven complexity of our model, we developed the algo-
+rithm EDCAR to eﬃciently calculate an approximate solution. By interweaving
+the process of cluster generation and cluster selection, which both make use of
+the GRASP principle, EDCAR determines high quality clusters and ensure low
+runtimes. Thorough experiments demonstrate that EDCAR has high eﬀective-
+ness and at the same time constantly outperforms all competing approaches in
+terms of eﬃciency.
+
+Acknowledgments. This work has been supported by the UMIC Research
+Centre, RWTH Aachen University, Germany.
+
+References
+
+1. Aggarwal, C., Wang, H.: Managing and Mining Graph Data. Springer (2010)
+2. G¨unnemann, S., F¨arber, I., Boden, B., Seidl, T.: Subspace clustering meets dense
+
+subgraph mining: A synthesis of two paradigms. In: ICDM, pp. 845–850 (2010)
+
+3. G¨unnemann, S., Boden, B., Seidl, T.: DB-CSC: A density-based approach for sub-
+space clustering in graphs with feature vectors. In: Gunopulos, D., Hofmann, T.,
+Malerba, D., Vazirgiannis, M. (eds.) ECML PKDD 2011, Part I. LNCS (LNAI),
+vol. 6911, pp. 565–580. Springer, Heidelberg (2011)
+
+4. G¨unnemann, S., Boden, B., Seidl, T.: Finding density-based subspace clusters in
+
+graphs with feature vectors. Data Min. Knowl. Discov. 25(2), 243–269 (2012)
+
+5. G¨unnemann, S., F¨arber, I., M¨uller, E., Assent, I., Seidl, T.: External evaluation
+
+measures for subspace clustering. In: CIKM, pp. 1363–1372 (2011)
+
+6. Hanisch, D., Zien, A., Zimmer, R., Lengauer, T.: Co-clustering of biological net-
+
+works and gene expression data. Bioinformatics 18, 145–154 (2002)
+
+7. Kriegel, H.P., Kr¨oger, P., Zimek, A.: Clustering high-dimensional data: A sur-
+vey on subspace clustering, pattern-based clustering, and correlation clustering.
+TKDD 3(1), 1–58 (2009)
+
+8. Liu, G., Wong, L.: Eﬀective pruning techniques for mining quasi-cliques. In:
+Daelemans, W., Goethals, B., Morik, K. (eds.) ECML PKDD 2008, Part II. LNCS
+(LNAI), vol. 5212, pp. 33–49. Springer, Heidelberg (2008)
+
+9. Long, B., Wu, X., Zhang, Z.M., Yu, P.S.: Unsupervised learning on k-partite
+
+graphs. In: KDD, pp. 317–326 (2006)
+
+10. Long, B., Zhang, Z.M., Yu, P.S.: A probabilistic framework for relational clustering.
+
+In: KDD, pp. 470–479 (2007)
+
+11. Moise, G., Sander, J.: Finding non-redundant, statistically signiﬁcant regions in
+high dimensional data: a novel approach to projected and subspace clustering. In:
+KDD, pp. 533–541 (2008)
+
+12. Moser, F., Colak, R., Raﬁey, A., Ester, M.: Mining cohesive patterns from graphs
+
+with feature vectors. In: SDM, pp. 593–604 (2009)
+
+13. M¨uller, E., Assent, I., G¨unnemann, S., Krieger, R., Seidl, T.: Relevant subspace
+clustering: Mining the most interesting non-redundant concepts in high dimen-
+sional data. In: ICDM, pp. 377–386 (2009)
+
+14. Pitsoulis, L., Resende, M.: Greedy randomized adaptive search procedures. In:
+Handbook of Applied Optimization, pp. 168–183. Oxford University Press, New
+York (2002)
+
+Eﬃcient Mining of Combined Subspace and Subgraph Clusters
+
+275
+
+15. Procopiuc, C., Jones, M., Agarwal, P., Murali, T.: A Monte Carlo algorithm for
+
+fast projective clustering. In: SIGMOD, pp. 418–427 (2002)
+
+16. Resende, M.G.C., Ribeiro, C.C.: Greedy Randomized Adaptive Search Procedures:
+Advances, Hybridizations, and Applications. Int. Series in Op. Research & Man-
+agement Science, pp. 283–320 (2010)
+
+17. Rymon, R.: Search through systematic set enumeration. In: KR, pp. 539–550 (1992)
+18. Shiga, M., Takigawa, I., Mamitsuka, H.: A spectral clustering approach to opti-
+mally combining numerical vectors with a modular network. In: KDD, pp. 647–656
+(2007)
+
+19. Ulitsky, I., Shamir, R.: Identiﬁcation of functional modules using network topology
+
+and high-throughput data. BMC Systems Biology 1(1) (2007)
+
+20. Zeng, Z., Wang, J., Zhou, L., Karypis, G.: Coherent closed quasi-clique discovery
+
+from large dense graph databases. In: KDD, pp. 797–802 (2006)
+
+21. Zhou, Y., Cheng, H., Yu, J.X.: Graph clustering based on structural/attribute
+
+similarities. PVLDB 2(1), 718–729 (2009)
+
+

@@ -1,0 +1,3677 @@
+Sparse Reductions for Fixed-Size Least Squares
+Support Vector Machines on Large Scale Data
+
+Raghvendra Mall and Johan A.K. Suykens
+
+Department of Electral Engineering, ESAT-SCD, Katholieke Universiteit Leuven,
+
+Kasteelpark Arenberg,10 B-3001 Leuven, Belgium
+
+Abstract. Fixed-Size Least Squares Support Vector Machines (FS-LS-
+SVM) is a powerful tool for solving large scale classiﬁcation and regres-
+sion problems. FS-LSSVM solves an over-determined system of M linear
+equations by using Nystr¨om approximations on a set of prototype vectors
+(PVs) in the primal. This introduces sparsity in the model along with
+ability to scale for large datasets. But there exists no formal method
+for selection of the right value of M . In this paper, we investigate the
+sparsity-error trade-oﬀ by introducing a second level of sparsity after per-
+forming one iteration of FS-LSSVM. This helps to overcome the problem
+of selecting a right number of initial PVs as the ﬁnal model is highly
+sparse and dependent on only a few appropriately selected prototype
+vectors (SV) is a subset of the PVs. The ﬁrst proposed method performs
+an iterative approximation of L0-norm which acts as a regularizer. The
+second method belongs to the category of threshold methods, where we
+set a window and select the SV set from correctly classiﬁed PVs closer
+and farther from the decision boundaries in the case of classiﬁcation. For
+regression, we obtain the SV set by selecting the PVs with least mini-
+mum squared error (mse). Experiments on real world datasets from the
+UCI repository illustrate that highly sparse models are obtained without
+signiﬁcant trade-oﬀ in error estimations scalable to large scale datasets.
+
+1
+
+Introduction
+
+LSSVM [3] and SVM [4] are state of the art learning algorithms in classiﬁcation
+and regression. The SVM model has inherent sparsity whereas the LSSVM model
+lacks sparsity. However, previous works like [1],[5],[6] address the problem of
+sparsity for LSSVM. One such approach was introduced in [7] and uses a ﬁxed-
+size least squares support vector machines. The major beneﬁt which we obtain
+from FS-LSSVM is its applicability to large scale datasets. It provides a solution
+to the LSSVM problem in the primal space resulting in a parametric model and
+sparse representation. The method uses an explicit expression for the feature
+map using the Nystr¨om method [8],[9] as proposed in [16]. In [7], the authors
+obtain the initial set of prototype vectors (PVs) i.e. M vectors while maximizing
+the quadratic R`enyi entropy criterion leading to a sparse representation in the
+primal space. The error of FS-LSSVM model approximates to that of LSSVM for
+M (cid:2) N . But this is not the sparsest solution and selecting an initial value of M
+
+J. Pei et al. (Eds.): PAKDD 2013, Part I, LNAI 7818, pp. 161–173, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+162
+
+R. Mall and J.A.K. Suykens
+
+is an existent problem. In [11], they try to overcome this problem by iteratively
+building up a set of conjugate vectors of increasing cardinality to approximately
+solve the over-determined FS-LSSVM linear system. But if few iterations don’t
+suﬃce to result in a good approximation then the cardinality will be M .
+
+The L0-norm counts the number of non-zero elements of a vector. It results
+in very sparse models by returning models of low complexity and acts as a
+regularizer. However, obtaining this L0-norm is an NP-hard problem. Several
+approximations to it are discussed in [12]. In this paper, we modify the iterative
+sparsifying procedure introduced in [13] and used for LSSVM the technique as
+shown in [14] and reformulate it for the FS-LSSVM. We apply this formulation
+on FS-LSSVM because for large scale datasets like Magic Gamma, Adult and
+Slice Localization we are overwhelmed with memory O(N 2) and computational
+time O(N 3) constraints when applying the L0-norm scheme directly on LSSVM
+[14] or SVM [13]. The second proposed method performs an iteration of FS-
+LSSVM and then based on a user-deﬁned window selects a subset of PVs as
+SV. For classiﬁcation, the selected vectors satisfy the property of being correctly
+classiﬁed and are either closer or farther from the decision boundary since they
+well determine the extent of the classes. But for regression, the SV set comprises
+those PVs which have the least mse and are best-ﬁtted by the regressor. Once the
+SV set is determined we re-perform FS-LSSVM resulting in highly sparse models
+without signiﬁcant trade-oﬀ in accuracy and scalable to large scale datasets.
+
+The contribution of this work involves providing smaller solutions which use
+(cid:3)
+< M PVs for FS-LSSVM, obtaining highly sparse models with guarantees
+M
+of low complexity (L0-norm of ˜w) and overcoming the problem of memory and
+computational constraints faced by L0-norm based approaches for LSSVM and
+SVM on large scale datasets. Sparseness enables exploiting memory and com-
+putationally eﬃciency, e.g. matrix multiplications and inversions. The solutions
+that we propose utilize the best of both FS-LSSVM and sparsity inducing mea-
+sures on LSSVM and SVM resulting in highly sparse and scalable models. Table
+1 provides a conceptual overview of LSSVM, FS-LSSVM and proposes Reduced
+FS-LSSVM along with the notations used in the rest of the paper. Figures 1 and
+2 illustrate our proposed approaches on the Ripley and Motorcycle dataset.
+
+Table 1. For Reduced FS-LSSVM, we ﬁrst perform FS-LSSVM in the Primal. Then a
+sparsifying procedure is performed in the Dual of FS-LSSVM as highlighted in the box
+in the middle resulting in a reduced SV set. Then FS-LSSVM is re-performed in the
+Primal as highlighted by the box on the right. We propose two sparsifying procedures
+namely L0 reduced FS-LSSVM and Window reduced FS-LSSVM.
+
+LSSVM
+
+FS-LSSVM
+
+Reduced FS-LSSVM
+
+SV/Train
+
+N/N
+
+Primal
+
+Dual
+
+w
+φ(·) ∈ R
+α
+K ∈ R
+
+N×N
+
+Nh Step 1
+
+→
+
+M/N
+
+˜w
+
+˜φ(·) ∈ R
+
+˜α
+˜K ∈ R
+
+M×M
+
+M Step 2
+
+→
+
+(cid:2)
+
+w
+
+(cid:2)
+
+φ
+
+M
+
+M(cid:2)
+
+/M
+(cid:2)
+(·) ∈ R
+(cid:2)
+α
+(cid:2) ∈ R
+M(cid:2)×M(cid:2)
+
+K
+
+Sparse Reductions for Fixed-Size Least Squares Support Vector Machines
+
+163
+
+Fig. 1. Comparison of the best randomization result out of 10 randomizations for the
+proposed methods with FS-LSSVM for Ripley Classiﬁcation data
+
+Fig. 2. Comparison of the best randomization result out of 10 randomizations for the
+proposed methods with FS-LSSVM for Motorcycle Regression data
+
+164
+
+R. Mall and J.A.K. Suykens
+
+2 L0 reduced FS-LSSVM
+
+Algorithm 1 gives a brief summary of the FS-LSSVM method. We ﬁrst propose
+an approach using the L0-norm to reduce ˜w and acting as a regularizer in the
+objective function. It tries to estimate the optimal subset of PVs leading to sparse
+solutions. For our formulation, the objective function is to minimize the error
+estimations of these prototype vectors regulated by L0-norm of ˜w. We modify the
+procedure described in [13], [14] and consider the following generalized primal
+problem:
+
+(cid:2)
+
+j
+
+1
+2
+
+λj ˜α2
+
+j +
+
+γ
+2
+
+(cid:2)
+
+˜e2
+i
+
+i
+
+J(˜α, ˜e) =
+(cid:2)
+
+min
+˜α,˜b,˜e
+
+s.t.
+
+j
+
+˜αj ˜Kij + ˜b = yi − ˜ei, i = 1, . . . , M
+
+(1)
+
+(cid:3)
+
+j
+
+M and can be written as ˜w =
+
+where ˜w ∈ R
+˜αj ˜φ(xj ). The regularization term
+is now not on (cid:4) ˜w (cid:4)2 but on (cid:4) ˜α (cid:4)2. The regularization weights are given by the
+preﬁx λj coeﬃcients. This formulation is similar to [14] with the diﬀerence that
+it is made applicable here to large scale datasets. These ˜αj are coeﬃcients of
+linear combination of the features which result in ˜w vector. The set of PVs is
+represented as SP V . The ˜ei are error estimates and are determined only for the
+vectors belonging to the set SP V . Thus, the training set comprises of the vectors
+belonging to the set SP V .
+Introducing the coeﬃcient β for Lagrangian L one obtains: ∂L/∂ ˜αj = 0 ⇒
+βiKij/λj, ∂L/∂˜b = 0 ⇒ (cid:3)
+βi = 0, ∂L/∂˜ei = 0 ⇒ βi = γ˜ei, ∂L/∂βi = 0
+˜αj Kij + ˜b = yi − ˜ei, ∀i.Combining the conditions ∂L/∂ ˜αi = 0, ∂L/∂˜ei = 0
+βkHik + ˜b = yi,
+−1 ˜K + IM /γ and ˜K is a kernel matrix. The kernel matrix
+M and
+
+⇒ (cid:3)
+and ∂L/∂βi = 0 and after little algebraic manipulation yields
+with H = ˜Kdiag(λ)
+˜K is deﬁned as ˜Kij = ˜φ(xi)
+H ∈ R
+
+(cid:2) ˜φ(xj ) where xi ∈ SP V , xj ∈ SP V , ˜φ(xi) ∈ R
+
+M×M .
+
+(cid:3)
+
+k
+
+(cid:3)
+
+j
+
+˜αj =
+
+j
+
+i
+
+Algorithm 1. Fixed-Size LSSVM method
+Data: Dn = {(xi, yi) : xi ∈ R
+
+d, yi ∈ {+1, −1} for classiﬁcation & yi ∈ R for
+
+regression, i = 1, . . . , N}.
+
+Determine the kernel bandwidth using the multivariate rule-of-thumb [17].
+Given the number of PVs, perform prototype vector selection using quadratic
+R`enyi entropy criterion.
+Determine the tuning parameters σ and γ performing fast v-fold cross
+validation as described in [10].
+Given the optimal tuning parameters, get FS-LSSVM parameters ˜w & ˜b.
+
+Sparse Reductions for Fixed-Size Least Squares Support Vector Machines
+
+165
+
+This, together with ∂L/∂˜b = 0, results in the linear system
+
+(2)
+
+(cid:4)
+
+(cid:2)
+0 1
+k
+1k H
+
+˜b
+β
+
+(cid:5) (cid:4)
+
+(cid:5)
+
+(cid:4)
+
+(cid:5)
+
+=
+
+0
+y
+
+The procedure to obtain sparseness involves iteratively solving the system (2)
+for diﬀerent values of λ and is described in Algorithm 2. Considering the tth
+−1 ˜K + IM /γ and solve the
+iteration, we can build the matrix H t = ˜Kdiag(λt)
+system of linear equations to obtain the value of βt and ˜bt. From this solution
+−1 will end up
+we get ˜αt+1 and most of its element tend to zero, the diag(λt+1)
+having many zeros along the diagonal due to the values allocated to λt+1. It was
+shown in [13] that as t → ∞, ˜αt converges to a stationary point ˜α
+∗
+and this
+model is guaranteed to be sparse and result in set SV. This iterative sparsifying
+procedure converges to a local minimum as the L0-norm problem is NP-hard.
+∗
+Since this ˜α
+depends on the initial choice of weights, we set them to the FS-
+LSSVM solution ˜w, so as to avoid ending up in diﬀerent local minimal solutions.
+
+Algorithm 2. L0 reduced FS-LSSVM method
+Data: Solve FS-LSSVM to obtain initial ˜w & ˜b
+˜α = ˜w(1 : M )
+λi ← ˜αi, i = 1, . . . , M
+while convergence do
+H ← ˜Kdiag(λ)
+Solve system (2) to give β and ˜b
+˜α ← diag(λ)
+λi ← 1/ ˜α2
+
+−1 ˜K + IM /γ
+
+−1 ˜Kβ
+
+Result: indices = ﬁnd(| ˜αi| > 0)
+
+i , i = 1, . . . , M
+
+(cid:2)
+
+The convergence of Algorithm 2 is assumed when the (cid:4) ˜αt − ˜αt+1 (cid:4) /M
+
+is
+−4 or when the number of iterations t exceeds 50. The result of
+lower than 10
+the approach is the indices of those PVs for which |˜αi| > 10
+−6. These indices
+provide the set of most appropriate prototype vectors (SV). The FS-LSSVM
+method (Algorithm 1) is re-perfomed using only this set SV. We are training
+only on the set CP V and not on the entire training data because the H matrix
+becomes N × N matrix which cannot in memory for large scale datasets.
+
+(cid:3)
+
+1, . . . , ˜α2
+
+The time complexity of the proposed methods is bounded by solving the
+linear system of equations (2). An interesting observation is that the H matrix
+−1 =
+becomes sparser after each iteration. This is due to the fact that diag(λ)
+M ) and most of these ˜αi → 0. Thus the H matrix becomes sparser
+diag(˜α2
+in each iteration such that after some iterations inverting H matrix is equivalent
+to inverting each element of the H matrix. The computation time is dominated
+by matrix multiplication to construct the H matrix. The H matrix construction
+−1 and
+can be formulated as multiplications of two matrices i.e. P = ˜Kdiag(λ)
+H = P ˜K. The P matrix will become sparser as it multiplies the ˜K matrix with
+−1. Let ˜M be the number of columns in P matrix with elements (cid:9)= 0.
+diag(λ)
+
+166
+
+R. Mall and J.A.K. Suykens
+
+This number i.e. ˜M can be much less than M . Thus, for the L0 reduced FS-
+LSSVM the time required for the sparsifying procedure is given by O(M 2 ˜M )
+and the average memory requirement is O(M 2).
+
+3 Window Reduced FS-LSSVM
+In [5], it was proposed to remove the support vectors with smaller |αi| for the
+LSSVM method. But this approach doesn’t greatly reduce the number of support
+vectors. In [6], the authors proposed to remove support vectors with the larger
+yif (xi) as they are farther from decision boundary and easiest to classify. But
+these support vectors are important as they determine the true extent of a class.
+We propose window based SV selection method for both classiﬁcation and
+regression. For classiﬁcation, we select the vectors which are correctly classiﬁed
+and closer and farther from the decision boundary. An initial FS-LSSVM method
+determines the ˜y for the PVs. To ﬁnd the reduced set SV, we ﬁrst remove the
+prototype vectors which were misclassiﬁed (˜y (cid:9)= y) as shown in [2]. Then, we sort
+the estimated f (xj ), ∀j ∈ CorrectP V where CorrectP V is the set of correctly
+classiﬁed PVs to obtain a sorted vector S. This sorted vector is divided into
+two halves one containing the sorted positive estimations (˜y) corresponding to
+positive class and the other containing sorted negative values (˜y) correspond-
+ing to negative class. The points closer to the decision boundary have smaller
+positive and smaller negative estimations (|˜y|) and the points farther from the
+decision boundary have the larger positive and larger negative estimations (|˜y|)
+as depicted in Figure 1. So these vectors corresponding to these estimations are
+selected. Selecting correctly classiﬁed vectors closer to decision boundary pre-
+vents over-ﬁtting and selecting vectors farther from the decision boundary helps
+to identify the extent of the classes.
+
+For regression, we select the prototype vectors which have least mse after
+one iteration of FS-LSSVM. We estimate the squared errors for the PVs and
+out of these prototype vectors select those vectors which have the least mse to
+form the set SV. They are the most appropriately estimated vectors as they
+have the least error and so are most helpful in estimating a generalization of
+the regression function. By selection of prototype vectors which have least mse
+we prevent selection of outliers as depicted in Figure 2. Finally, a FS-LSSVM
+regression is re-performed on this set SV.
+
+The percentage of vectors selected from the initial set of prototype vectors
+is determined by the window. We experimented with various window size i.e.
+(30, 40, 50) percent of the initial prototype vectors (PVs). For classiﬁcation, we
+selected half of the window from the positive class and the other half from
+the negative class. In case the classes are not balanced and number of PVs
+in one class is less than half the window size then all the correctly classiﬁed
+vectors from those PVs are selected. In this case, we observe that the number of
+selected prototype vectors (SV) can be less than window size. The methodology
+to perform this Window reduced FS-LSSVM is presented in Algorithm 3.
+
+This method result in better generalization error with smaller variance achiev-
+ing sparsity. The trade-oﬀ with estimated error is not signiﬁcant and in several
+
+Sparse Reductions for Fixed-Size Least Squares Support Vector Machines
+
+167
+
+cases it leads to better results as will be shown in the experimental results. As
+we increase the window size the variation in estimated error decreases and es-
+timated error also decreases until the median of the estimated error becomes
+nearly constant as is depicted in Figure 3.
+
+Fig. 3. Trends in error & SV with increasing window size for Diabetes dataset compared
+with the FS-LSSVM method represented here as ‘O’
+
+Algorithm 3. Window reduced FS-LSSVM
+Data: Dn = {(xi, yi) : xi ∈ R
+
+d, yi ∈ {+1, −1} for Classif ication & yi ∈ R for
+
+Regression, i = 1, . . . , N}.
+
+Perform FS-LSSVM using the initial set of PVs of size M on training data.
+if Classiﬁcation then
+
+CorrectP V = Remove misclassiﬁed prototype vectors
+S = sort(f (xi)) ∀i ∈ CorrectP V ;
+A = S(:) > 0; B = S(:) < 0;
+begin = windowsize/4;
+endA = size(A) − windowsize/4;
+endB = size(B) − windowsize/4;
+SV = [A[begin endA]; B[begin endB]];
+
+if Regression then
+
+Estimate the squared error for the initially selected PVs
+SV = Select the PVs with least mean squared error
+
+Re-perform the FS-LSSVM method using the reduced set SV of size M
+training data
+
+(cid:2)
+
+on
+
+4 Computational Complexity and Experimental Results
+
+4.1 Computational Complexity
+
+The computation time of FS-LSSVM method involves:
+
+168
+
+R. Mall and J.A.K. Suykens
+
+– Solving a linear system of size M + 1 where M is the number of prototype
+
+vectors selected initially (PV).
+
+– Calculating the Nystr¨om approximation and eigenvalue decomposition of the
+
+kernel matrix of size M once.
+
+– Forming the matrix product [ ˜φ(x1), ˜φ(x2), . . . , ˜φ(xn)]
+
+˜φ(xn)].
+
+(cid:2)
+
+[ ˜φ(x1), ˜φ(x2), . . . ,
+
+The computation time is O(N M 2) where N is dataset size as shown in [10]. We
+already presented the computation time for the iterative sparsifying procedure
+for L0 reduced FS-LSSVM. For this approach, the computation time O(M 3).
+So, it doesn’t have an impact on the overall computational complexity as we
+(cid:10)k × √
+will observe from the experimental results. In our experiments, we selected M =
+N(cid:12) where k ∈ N, the complexity of L0 reduced FS-LSSVM can be re-
+written as O(k2N 2). We experimented with various values of k and observed that
+after certain values of k, the change in estimated error becomes nearly irrelevant.
+In our experiments, we choose the value of k corresponding to the ﬁrst instance
+after which the change in error estimations becomes negligible.
+
+For the window based method, we have to run the FS-LSSVM once and
+based on window size obtain the set SV which is always less than PVs i.e.
+(cid:3) ≤ M . The time-complexity for re-performing the FS-LSSVM on the set SV
+M
+is O(M
+(cid:3)2N ) where N is the size of the dataset. The overall time complexity of
+the approach is O(M 2N ) required for Nystr¨om approximation and the average
+memory requirement is O(N M ).
+
+4.2 Dataset Description
+
+All the datasets on which the experiments were conducted are from UCI bench-
+mark repository [15]. For classiﬁcation, we experimented with Ripley (RIP),
+Breast-Cancer (BC), Diabetes (DIB), Spambase (SPAM), Magic Gamma (MGT)
+and Adult (ADU). The corresponding dataset size are 250,682,768,4061,19020,
+48842 respectively. The corresponding k values for determining the initial num-
+ber of prototype vector are 2,6,4,3,3 and 3 respectively. The datasets Motorcycle,
+Boston Housing, Concrete and Slice Localization are used for regression whose
+size is 111, 506, 1030, 53500 and their k values are 6,5,6 and 3 respectively.
+
+4.3 Experiments
+
+All the experiments are performed on a PC machine with Intel Core i7 CPU
+and 8 GB RAM under Matlab 2008a. We use the RBF-kernel for kernel matrix
+construction in all cases. As a pre-processing step, all records containing un-
+known values are removed from consideration. Input values have been normal-
+ized. We compare the performance of our proposed approaches with the normal
+FS-LSSVM classiﬁer/regressor, L0 LSSVM [14], SVM and ν-SVM. The last two
+methods are implemented in the LIBSVM software with default parameters. All
+methods use a cache size of 8 GB. Shrinking is applied in the SVM case. All
+comparisons are made on 10 randomizations of the methods.
+
+Sparse Reductions for Fixed-Size Least Squares Support Vector Machines
+
+169
+
+The comparison is performed on an out-of-sample test set consisting of 1/3 of
+the data. The ﬁrst 2/3 of the data is reserved for training and cross-validation.
+The tuning parameters σ and γ for the proposed FS-LSSVM methods and SVM
+methods are obtained by ﬁrst determining good initial starting values using the
+method of coupled simulated annealing (CSA) in [18]. After that a derivative-free
+simplex search is performed. This extra step is a ﬁne tuning procedure resulting
+in more optimal tuning parameters and better performance.
+Table 2 provides a comparison of the mean estimated error ± its deviation,
+mean number of selected prototype vectors SV and a comparison of the mean
+computation time ± its deviation for 10 randomizations of the proposed ap-
+proaches with FS-LSSVM and SVM methods for various classiﬁcation and re-
+gression data sets. Figure 4 represents the estimated error, run time and varia-
+tions in number of selected prototype vectors for Adult (ADU) and Slice Local-
+ization (SL) datasets respectively.
+
+4.4 Performance Analysis
+
+The proposed approaches i.e L0 reduced FS-LSSVM and Window reduced FS-
+LSSVM method introduce more sparsity in comparison to FS-LSSVM and SVM
+methods without signiﬁcant trade-oﬀ for classiﬁcation. For smaller datasets L0
+LSSVM produces extremely few support vectors but for datasets like SPAM,
+Boston Housing and Concrete it produces more support vectors. For some
+datasets like breast-cancer and diabetes, it can be seen from Table 2 that pro-
+posed approaches results in better error estimations than other methods with
+much smaller set SV. For datasets like SPAM and MGT, the trade-oﬀ in error
+is not signiﬁcant considering the reduction in number of PVs (only 78 prototype
+vectors required by L0 reduced FS-LSSVM for classifying nearly 20,000 points).
+From Figure 4, we observe the performance for Adult dataset. The window
+based methods result in lower error estimate using fewer but more appropriate
+SV. Thus the idea of selecting correctly classiﬁed points closer and farther from
+the decision boundary results in better determining the extent of the classes.
+These sparse solutions typically lead to better generalization of the classes. The
+mean time complexity for diﬀerent randomizations is nearly the same.
+
+For regression, as we are trying to estimate a continuous function, if we greatly
+reduce the PVs to estimate that function, then the estimated error would be
+higher. For datasets like boston housing and concrete, the estimated error by
+the proposed methods is more than FS-LSSVM method but the amount of spar-
+sity introduced is quite signiﬁcant. These methods result in reduced but more
+generalized regressor functions and the variation in the estimated error of win-
+dow based approach is lesser as in comparison to L0-norm based method. This is
+because in each randomization, the L0-norm reduces to diﬀerent number of pro-
+totype vectors whereas the reduced number of prototype vectors (SV) for window
+based method is ﬁxed and is uninﬂuenced by variations caused by outliers as the
+SV have least mse. This can be observed for the Slice Localization dataset in
+Figure 4. For this dataset, L0 reduced FS-LSSVM estimates lower error than
+window approach. This is because for this dense dataset, the L0-norm based
+
+170
+
+R. Mall and J.A.K. Suykens
+
+U
+D
+A
+
+T
+G
+M
+
+M
+A
+P
+S
+
+B
+I
+D
+
+C
+B
+
+P
+I
+R
+
+)
+V
+S
+
+n
+a
+e
+M
+d
+n
+a
+
+r
+o
+r
+r
+E
+(
+n
+o
+i
+t
+a
+c
+ﬁ
+
+i
+s
+s
+a
+l
+C
+t
+s
+e
+T
+
+d
+n
+a
+
+n
+o
+i
+t
+a
+d
+
+i
+l
+a
+v
+-
+s
+s
+o
+r
+c
+
+o
+n
+
+s
+t
+n
+e
+s
+e
+r
+p
+e
+r
+
+’
+*
+‘
+
+e
+h
+T
+
+.
+s
+t
+e
+s
+a
+t
+a
+d
+
+y
+r
+o
+t
+i
+s
+o
+p
+e
+r
+
+I
+
+C
+U
+
+r
+o
+f
+
+s
+d
+o
+h
+t
+e
+m
+
+t
+n
+e
+r
+e
+ﬀ
+d
+
+i
+
+f
+o
+
+e
+c
+n
+a
+m
+r
+o
+f
+r
+e
+p
+
+f
+o
+
+n
+o
+s
+i
+r
+a
+p
+m
+o
+C
+
+.
+2
+
+e
+l
+
+b
+a
+T
+
+.
+s
+t
+n
+i
+a
+r
+t
+s
+n
+o
+c
+
+y
+r
+o
+m
+e
+m
+o
+t
+
+e
+u
+d
+
+n
+u
+r
+
+t
+o
+n
+n
+a
+c
+
+s
+t
+n
+e
+s
+e
+r
+p
+e
+r
+
+’
+-
+‘
+
+d
+n
+a
+
+n
+e
+d
+r
+u
+b
+
+l
+a
+n
+o
+i
+t
+a
+t
+u
+p
+m
+o
+c
+
+o
+t
+
+e
+u
+d
+
+s
+r
+e
+t
+e
+m
+a
+r
+a
+p
+
+g
+n
+
+i
+
+n
+u
+t
+
+d
+e
+x
+ﬁ
+
+n
+o
+
+e
+c
+n
+a
+m
+r
+o
+f
+r
+e
+p
+
+V
+S
+
+4
+6
+6
+
+-
+
+5
+8
+0
+,
+1
+1
+
+5
+0
+2
+,
+2
+1
+
+8
+7
+
+4
+5
+1
+
+3
+8
+1
+
+3
+1
+2
+
+V
+S
+
+4
+9
+6
+
+-
+
+2
+1
+0
+,
+3
+1
+
+4
+2
+5
+,
+2
+1
+
+5
+9
+4
+
+8
+0
+2
+
+8
+7
+2
+
+7
+4
+3
+
+n
+o
+i
+t
+a
+z
+i
+l
+a
+c
+o
+L
+
+e
+c
+i
+l
+
+S
+
+e
+t
+e
+r
+c
+n
+o
+C
+
+g
+n
+
+i
+s
+u
+o
+H
+n
+o
+t
+s
+o
+B
+
+e
+l
+c
+y
+c
+r
+o
+t
+o
+M
+
+-
+
+)
+∗
+(
+9
+1
+5
+1
+.
+0
+
+3
+3
+3
+2
+0
+0
+0
+0
+0
+0
+0
+0
+.
+.
+.
+)
+.
+0
+0
+0
+∗
+0
+(
+±
+±
+±
+±
+1
+6
+9
+7
+9
+6
+1
+1
+.
+4
+4
+4
+0
+5
+4
+4
+4
+1
+1
+1
+1
+.
+0
+.
+.
+.
+0
+0
+0
+
+-
+
+0
+0
+0
+7
+
+2
+5
+2
+7
+
+5
+1
+1
+
+0
+9
+
+0
+1
+1
+
+0
+3
+1
+
+-
+
+3
+7
+4
+2
+6
+2
+0
+1
+0
+0
+4
+4
+0
+0
+0
+0
+1
+1
+0
+0
+.
+.
+0
+0
+.
+.
+0
+0
+.
+.
+0
+0
+0
+0
+±
+±
+±
+±
+±
+±
+2
+9
+1
+8
+6
+4
+6
+2
+8
+6
+4
+4
+5
+5
+4
+4
+1
+1
+1
+1
+1
+1
+.
+.
+.
+.
+.
+.
+0
+0
+0
+0
+0
+0
+
+3
+0
+0
+0
+r
+.
+0
+o
+r
+±
+r
+E
+6
+4
+1
+.
+0
+
+V
+S
+
+4
+1
+4
+
+1
+0
+0
+.
+0
+r
+o
+±
+r
+r
+1
+E
+6
+3
+1
+.
+0
+
+V
+S
+
+4
+0
+2
+
+0
+4
+3
+
+0
+0
+8
+
+5
+2
+5
+1
+
+4
+4
+1
+
+0
+6
+
+8
+7
+
+8
+9
+
+5
+7
+3
+2
+2
+2
+7
+0
+2
+0
+0
+0
+0
+5
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+.
+0
+.
+.
+.
+.
+0
+0
+.
+0
+0
+0
+0
+.
+0
+r
+.
+0
+0
+o
+±
+±
+±
+±
+±
+±
+r
+±
+±
+r
+7
+0
+4
+5
+6
+E
+7
+3
+4
+2
+6
+5
+4
+2
+7
+1
+1
+0
+9
+9
+7
+7
+0
+1
+1
+1
+0
+0
+0
+0
+.
+.
+.
+.
+.
+.
+.
+0
+0
+0
+0
+0
+0
+0
+.
+0
+
+V
+S
+
+1
+1
+1
+
+0
+1
+
+0
+9
+2
+
+1
+3
+3
+
+6
+3
+
+6
+2
+
+6
+3
+
+5
+4
+
+6
+8
+5
+3
+8
+0
+0
+0
+2
+4
+3
+7
+4
+0
+0
+0
+3
+0
+0
+0
+3
+.
+.
+.
+0
+0
+.
+0
+0
+0
+0
+0
+0
+.
+.
+r
+.
+.
+0
+0
+0
+0
+o
+±
+±
+±
+±
+±
+±
+r
+±
+±
+r
+9
+8
+4
+2
+E
+8
+3
+9
+2
+3
+3
+5
+4
+3
+4
+4
+4
+2
+2
+2
+2
+2
+2
+2
+2
+.
+.
+.
+2
+2
+2
+0
+.
+.
+0
+0
+0
+0
+.
+.
+.
+0
+0
+0
+
+V
+S
+
+5
+5
+1
+
+7
+1
+
+8
+1
+3
+
+0
+3
+3
+
+9
+1
+
+6
+4
+
+9
+5
+
+6
+6
+
+6
+8
+9
+9
+1
+2
+3
+0
+4
+0
+0
+0
+1
+7
+5
+0
+0
+0
+0
+0
+1
+0
+0
+.
+0
+.
+.
+.
+.
+.
+0
+0
+.
+0
+0
+0
+0
+0
+r
+.
+0
+0
+o
+±
+±
+±
+±
+±
+±
+±
+r
+±
+r
+1
+4
+4
+E
+7
+2
+1
+2
+4
+5
+6
+0
+4
+4
+3
+3
+0
+0
+0
+0
+3
+.
+.
+.
+4
+4
+4
+.
+0
+0
+0
+0
+0
+0
+0
+0
+.
+.
+.
+.
+0
+0
+0
+0
+
+V
+S
+
+2
+3
+
+7
+
+1
+8
+
+6
+8
+
+7
+1
+
+0
+1
+
+2
+1
+
+6
+1
+
+)
+V
+S
+
+n
+a
+e
+M
+d
+n
+a
+
+r
+o
+r
+r
+E
+(
+n
+o
+i
+s
+s
+e
+r
+g
+e
+R
+t
+s
+e
+T
+
+1
+5
+9
+5
+9
+3
+8
+0
+1
+0
+4
+0
+0
+0
+1
+.
+0
+0
+0
+0
+0
+.
+.
+0
+.
+.
+.
+0
+0
+.
+.
+0
+0
+0
+0
+r
+0
+±
+±
+±
+o
+±
+±
+±
+±
+±
+r
+r
+2
+3
+4
+3
+E
+2
+4
+8
+5
+1
+2
+1
+5
+4
+4
+1
+9
+9
+9
+9
+1
+.
+1
+0
+0
+.
+0
+0
+0
+0
+.
+1
+0
+.
+0
+.
+.
+.
+0
+.
+0
+0
+0
+0
+M
+V
+S
+S
+L
+-
+S
+F
+
+)
+
+)
+
+)
+
+m
+h
+t
+i
+r
+o
+g
+l
+A
+
+M
+V
+S
+S
+L
+-
+S
+F
+
+M
+V
+S
+S
+L
+
+0
+L
+
+C
+V
+S
+-
+C
+
+C
+V
+S
+-
+ν
+
+%
+0
+3
+(
+w
+o
+d
+n
+W
+
+i
+
+%
+0
+4
+(
+w
+o
+d
+n
+W
+
+i
+
+%
+0
+5
+(
+w
+o
+d
+n
+W
+
+i
+
+d
+e
+c
+u
+d
+e
+r
+
+0
+L
+
+0
+.
+0
+r
+±
+o
+r
+r
+3
+E
+5
+0
+.
+0
+
+-
+
+)
+*
+(
+7
+1
+0
+1
+.
+0
+
+8
+6
+5
+6
+0
+0
+0
+0
+0
+0
+0
+)
+.
+0
+0
+0
+0
+*
+.
+.
+.
+0
+0
+(
+0
+±
+1
+±
+±
+2
+±
+2
+9
+4
+4
+3
+0
+6
+0
+4
+1
+.
+1
+0
+1
+0
+3
+1
+.
+1
+1
+.
+0
+.
+.
+0
+0
+0
+
+V
+S
+
+2
+9
+1
+
+5
+1
+2
+
+0
+7
+6
+
+0
+3
+3
+
+3
+4
+
+8
+5
+
+8
+7
+
+6
+9
+
+6
+9
+6
+0
+3
+3
+7
+0
+0
+2
+2
+0
+0
+5
+0
+0
+0
+0
+.
+0
+0
+.
+.
+.
+0
+0
+.
+.
+.
+0
+0
+0
+0
+0
+0
+r
+.
+±
+o
+0
+±
+±
+±
+±
+±
+±
+r
+r
+±
+6
+5
+1
+7
+E
+3
+2
+8
+1
+6
+3
+8
+2
+2
+2
+8
+2
+1
+7
+1
+.
+.
+2
+.
+6
+.
+1
+0
+0
+0
+1
+.
+1
+0
+.
+0
+.
+0
+.
+0
+0
+
+V
+S
+
+2
+1
+1
+
+5
+6
+
+6
+2
+2
+
+6
+2
+2
+
+8
+4
+
+4
+3
+
+6
+4
+
+6
+5
+
+1
+9
+7
+6
+0
+0
+7
+2
+0
+5
+0
+0
+5
+4
+0
+3
+0
+0
+0
+0
+.
+0
+.
+.
+.
+.
+0
+0
+0
+.
+.
+.
+0
+0
+0
+0
+0
+r
+±
+o
+±
+±
+±
+±
+±
+±
+±
+r
+r
+5
+6
+5
+2
+7
+E
+6
+6
+8
+6
+7
+0
+8
+9
+1
+1
+5
+4
+7
+4
+1
+2
+.
+.
+1
+1
+1
+1
+0
+0
+1
+1
+.
+.
+.
+.
+0
+0
+0
+0
+.
+.
+0
+0
+
+V
+S
+
+7
+3
+
+9
+
+9
+6
+
+1
+5
+
+5
+
+2
+1
+
+5
+1
+
+1
+2
+
+7
+3
+3
+0
+4
+2
+4
+0
+9
+3
+3
+2
+7
+7
+0
+0
+0
+0
+2
+0
+0
+.
+.
+0
+0
+.
+.
+.
+.
+.
+.
+0
+0
+0
+0
+0
+0
+r
+±
+o
+±
+±
+±
+±
+±
+±
+±
+r
+r
+7
+7
+E
+3
+2
+2
+3
+2
+7
+1
+2
+6
+3
+2
+2
+4
+3
+7
+0
+.
+.
+.
+.
+2
+5
+5
+0
+0
+0
+0
+2
+.
+2
+2
+0
+.
+.
+.
+0
+0
+0
+
+8
+4
+7
+1
+U
+±
+D
+5
+A
+6
+5
+,
+3
+2
+
+6
+.
+8
+6
+T
+±
+G
+6
+M
+.
+5
+0
+1
+3
+
+-
+
+)
+*
+(
+0
+3
+7
+,
+9
+3
+1
+
+0
+5
+0
+0
+4
+0
+2
+5
+)
+0
+7
+5
+*
+6
+2
+1
+1
+(
+±
+7
+±
+±
+±
+2
+9
+5
+6
+4
+1
+,
+8
+9
+3
+6
+2
+4
+3
+7
+4
+6
+,
+1
+,
+,
+,
+2
+2
+2
+2
+2
+2
+2
+2
+
+-
+
+2
+6
+7
+.
+8
+0
+5
+9
+2
+4
+4
+0
+3
+3
+8
+4
+1
+±
+±
+±
+±
+±
+±
+9
+9
+3
+2
+9
+.
+7
+0
+9
+2
+5
+2
+.
+6
+2
+8
+0
+1
+5
+,
+,
+0
+3
+3
+8
+0
+5
+3
+1
+2
+3
+3
+
+5
+2
+1
+3
+3
+5
+3
+8
+5
+5
+.
+.
+7
+.
+.
+5
+8
+8
+2
+.
+.
+2
+4
+8
+7
+7
+2
+M
+±
+±
+7
+±
+±
+±
+±
+±
+A
+±
+2
+4
+P
+8
+9
+5
+0
+1
+6
+7
+7
+3
+S
+0
+.
+.
+3
+8
+1
+.
+.
+1
+2
+5
+.
+7
+0
+1
+7
+8
+7
+3
+9
+1
+7
+6
+1
+1
+9
+1
+1
+1
+
+8
+5
+5
+5
+8
+3
+.
+.
+9
+1
+5
+7
+.
+6
+0
+0
+.
+.
+.
+2
+.
+.
+0
+3
+5
+0
+0
+±
+±
+B
+±
+±
+±
+±
+±
+±
+I
+1
+5
+D
+3
+5
+1
+8
+8
+5
+2
+6
+2
+.
+.
+.
+3
+2
+.
+.
+0
+9
+4
+4
+.
+.
+3
+4
+.
+3
+2
+1
+5
+4
+2
+1
+5
+1
+1
+1
+
+6
+7
+5
+1
+7
+1
+3
+2
+4
+0
+3
+3
+9
+4
+.
+.
+.
+.
+4
+1
+.
+.
+6
+1
+1
+1
+.
+5
+3
+.
+2
+±
+0
+±
+±
+±
+C
+±
+±
+±
+±
+1
+B
+5
+2
+8
+2
+6
+6
+7
+7
+4
+5
+.
+2
+3
+4
+6
+4
+6
+9
+8
+.
+.
+.
+.
+.
+.
+.
+2
+8
+3
+8
+1
+8
+8
+7
+2
+4
+2
+4
+2
+2
+2
+
+3
+8
+2
+7
+7
+4
+2
+9
+5
+2
+2
+2
+1
+4
+.
+.
+.
+.
+.
+.
+.
+4
+0
+0
+0
+0
+0
+0
+±
+P
+±
+±
+±
+±
+±
+±
+±
+I
+7
+R
+6
+2
+9
+.
+3
+8
+6
+6
+3
+1
+.
+4
+2
+3
+3
+4
+3
+1
+.
+3
+.
+.
+.
+3
+5
+1
+.
+4
+4
+4
+.
+4
+4
+
+)
+e
+m
+T
+
+i
+
+l
+a
+n
+o
+i
+t
+a
+t
+u
+p
+m
+o
+C
+(
+n
+o
+i
+s
+s
+e
+r
+g
+e
+R
+t
+s
+e
+T
+&
+n
+
+i
+a
+r
+T
+
+i
+
+)
+e
+m
+T
+n
+o
+i
+t
+a
+t
+u
+p
+m
+o
+C
+(
+n
+o
+i
+t
+a
+c
+ﬁ
+
+i
+s
+s
+a
+l
+C
+t
+s
+e
+T
+&
+n
+
+i
+a
+r
+T
+
+m
+h
+t
+i
+r
+o
+g
+l
+A
+
+M
+V
+S
+S
+L
+-
+S
+F
+
+M
+V
+S
+S
+L
+
+0
+L
+
+R
+V
+S
+-
+
+
+R
+V
+S
+-
+ν
+
+M
+V
+S
+S
+L
+-
+S
+F
+
+d
+e
+c
+u
+d
+e
+r
+
+0
+L
+
+)
+
+%
+0
+3
+(
+w
+o
+d
+n
+W
+
+i
+
+)
+
+%
+0
+4
+(
+w
+o
+d
+n
+W
+
+i
+
+)
+
+%
+0
+5
+(
+w
+o
+d
+n
+W
+
+i
+
+m
+h
+t
+i
+r
+o
+g
+l
+A
+
+M
+V
+S
+S
+L
+-
+S
+F
+
+M
+V
+S
+S
+L
+
+0
+L
+
+C
+V
+S
+-
+C
+
+C
+V
+S
+-
+ν
+
+M
+V
+S
+S
+L
+-
+S
+F
+
+d
+e
+c
+u
+d
+e
+r
+
+0
+L
+
+)
+
+%
+0
+3
+(
+w
+o
+d
+n
+W
+
+i
+
+)
+
+%
+0
+4
+(
+w
+o
+d
+n
+W
+
+i
+
+)
+
+%
+0
+5
+(
+w
+o
+d
+n
+W
+
+i
+
+n
+o
+7
+i
+4
+t
+0
+a
+1
+z
+i
+l
+±
+a
+c
+2
+o
+5
+L
+1
+,
+7
+3
+
+e
+c
+i
+l
+
+S
+
+-
+
+)
+*
+(
+8
+3
+4
+,
+2
+5
+2
+
+2
+6
+2
+5
+2
+8
+6
+9
+)
+8
+0
+0
+9
+*
+1
+1
+1
+1
+(
+4
+±
+±
+±
+±
+2
+7
+6
+7
+7
+3
+,
+2
+4
+8
+0
+8
+4
+5
+0
+9
+1
+2
+,
+,
+,
+,
+6
+6
+5
+6
+3
+3
+3
+3
+
+8
+3
+3
+5
+1
+8
+5
+8
+3
+8
+8
+0
+e
+.
+.
+.
+.
+.
+2
+3
+5
+t
+.
+0
+1
+0
+0
+1
+e
+3
+±
+±
+r
+±
+±
+±
+±
+±
+c
+±
+n
+1
+8
+7
+5
+3
+3
+6
+6
+3
+o
+3
+4
+4
+7
+6
+0
+1
+1
+C
+5
+.
+.
+.
+.
+.
+5
+5
+6
+5
+7
+5
+5
+5
+5
+5
+5
+
+g
+n
+
+7
+7
+5
+2
+7
+5
+i
+.
+1
+2
+1
+s
+3
+2
+3
+.
+.
+.
+u
+.
+.
+0
+0
+0
+1
+1
+0
+0
+o
+±
+H
+±
+±
+±
+±
+±
+±
+±
+6
+n
+4
+4
+8
+4
+1
+3
+6
+4
+o
+.
+0
+0
+0
+6
+6
+.
+.
+8
+t
+.
+.
+.
+4
+5
+5
+5
+5
+5
+s
+1
+1
+o
+1
+1
+1
+1
+B
+
+3
+8
+4
+2
+5
+5
+5
+6
+e
+4
+1
+9
+7
+7
+1
+1
+2
+l
+.
+2
+.
+c
+.
+.
+.
+.
+2
+3
+0
+y
+.
+4
+1
+0
+0
+.
+0
+c
+0
+±
+±
+±
+±
+±
+±
+r
+±
+±
+o
+5
+6
+t
+6
+2
+6
+5
+.
+2
+2
+o
+4
+.
+.
+2
+5
+5
+4
+5
+0
+4
+M
+.
+.
+4
+2
+.
+.
+3
+1
+2
+3
+.
+3
+3
+3
+
+m
+h
+t
+i
+r
+o
+g
+l
+A
+
+M
+V
+S
+S
+L
+-
+S
+F
+
+M
+V
+S
+S
+L
+
+0
+L
+
+R
+V
+S
+-
+
+
+R
+V
+S
+-
+ν
+
+M
+V
+S
+S
+L
+-
+S
+F
+
+d
+e
+c
+u
+d
+e
+r
+
+0
+L
+
+)
+
+%
+0
+3
+(
+w
+o
+d
+n
+W
+
+i
+
+)
+
+%
+0
+4
+(
+w
+o
+d
+n
+W
+
+i
+
+)
+
+%
+0
+5
+(
+w
+o
+d
+n
+W
+
+i
+
+Sparse Reductions for Fixed-Size Least Squares Support Vector Machines
+
+171
+
+Fig. 4. Comparison of performance of proposed approaches with FS-LSSVM method
+for Adult & Slice Localization datasets
+
+FS-LSSVM requires more SV (495) than window based method (208, 278, 347)
+which signiﬁes more vectors are required for better error estimation. The pro-
+posed models are of magnitude (2 − 10)x sparser than the FS-LSSVM method.
+
+5 Conclusion
+
+In this paper, we proposed two sparse reductions to FS-LSSVM namely L0 re-
+duced and Window reduced FS-LSSVM. These methods are highly suitable for
+mining large scale datasets overcoming the problems faced by L0 LSSVM [14]
+
+172
+
+R. Mall and J.A.K. Suykens
+
+and FS-LSSVM. We developed the L0 reduced FS-LSSVM based on iteratively
+sparsifying L0-norm training on the initial set of PVs. We also introduced a Win-
+dow reduced FS-LSSVM trying to better determine the underlying structure of
+model by selection of more appropriate prototype vectors (SV). The resulting
+approaches are compared with normal FS-LSSVM, L0 LSSVM and two kinds of
+SVM (C-SVM and ν-SVM from LIBSVM software) with promising performances
+and timing results using smaller and sparser models.
+
+Acknowledgements. This work was supported by Research Council KUL, ERC
+AdG A-DATADRIVE-B, GOA/10/09MaNet, CoE EF/05/006, FWO G.0588.09,
+G.0377.12, SBO POM, IUAP P6/04 DYSCO, COST intelliCIS.
+
+References
+
+[1] Hoegaerts, L., Suykens, J.A.K., Vandewalle, J., De Moor, B.: A comparison of
+pruning algorithms for sparse least squares support vector machines. In: Pal,
+N.R., Kasabov, N., Mudi, R.K., Pal, S., Parui, S.K. (eds.) ICONIP 2004. LNCS,
+vol. 3316, pp. 1247–1253. Springer, Heidelberg (2004)
+
+[2] Geebelen, D., Suykens, J.A.K., Vandewalle, J.: Reducing the Number of Support
+Vectors of SVM classiﬁers using the Smoothed Seperable Case Approximation.
+IEEE Transactions on Neural Networks and Learning Systems 23(4), 682–688
+(2012)
+
+[3] Suykens, J.A.K., Vandewalle, J.: Least Squares Support Vector Machine Classi-
+
+ﬁers. Neural Processing Letters 9(3), 293–300 (1999)
+
+[4] Vapnik, V.N.: The Nature of Statistical Learning Theory. Springer (1995)
+[5] Suykens, J.A.K., Lukas, L., Vandewalle, J.: Sparse approximation using Least
+Squares Support Vector Machines. In: Proceedings of IEEE International Sympo-
+sium on Circuits and Systems (ISCAS 2000), pp. 757–760 (2000)
+
+[6] Li, Y., Lin, C., Zhang, W.: Improved Sparse Least-Squares Support Vector Ma-
+
+chine Classiﬁers. Neurocomputing 69(13), 1655–1658 (2006)
+
+[7] Suykens, J.A.K., Van Gestel, T., De Brabanter, J., De Moor, B., Vandewalle, J.:
+Least Squares Support Vector Machines. World Scientiﬁc Publishing Co., Pte.,
+Ltd., Singapore (2002)
+
+[8] Nystr¨om, E.J.: ¨Uber die praktische Auﬂ¨osung von Integralgleichungen mit An-
+
+wendungen auf Randwertaufgaben. Acta Mathematica 54, 185–204 (1930)
+
+[9] Baker, C.T.H.: The Numerical Treatment of Integral Equations. Oxford Claredon
+
+Press (1983)
+
+[10] De Brabanter, K., De Brabanter, J., Suykens, J.A.K., De Moor, B.: Optimized
+Fixed-Size Kernel Models for Large Data Sets. Computational Statistics & Data
+Analysis 54(6), 1484–1504 (2010)
+
+[11] Karsmakers, P., Pelckmans, K., De Brabanter, K., Hamme, H.V., Suykens, J.A.K.:
+Sparse conjugate directions pursuit with application to ﬁxed-size kernel methods.
+Machine Learning, Special Issue on Model Selection and Optimization in Machine
+Learning 85(1), 109–148 (2011)
+
+[12] Weston, J., Elisseeﬀ, A., Sch¨olkopf, B., Tipping, M.: Use of the Zero Norm with
+Linear Models and Kernel Methods. Journal of Machine Learning Research 3,
+1439–1461 (2003)
+
+Sparse Reductions for Fixed-Size Least Squares Support Vector Machines
+
+173
+
+[13] Huang, K., Zheng, D., Sun, J., et al.: Sparse Learning for Support Vector Classi-
+
+ﬁcation. Pattern Recognition Letters 31(13), 1944–1951 (2010)
+
+[14] Lopez, J., De Brabanter, K., Dorronsoro, J.R., Suykens, J.A.K.: Sparse LSSVMs
+
+with L0-norm minimization. In: ESANN 2011, pp. 189–194 (2011)
+
+[15] Blake, C.L., Merz, C.J.: UCI repository of machine learning databases, Irvine, CA
+
+(1998), http://archive.ics.uci.edu/ml/datasets.html
+
+[16] Williams, C.K.I., Seeger, M.: Using the Nystr¨om method to speed up kernel
+machines. In: Advances in Neural Information Processing Systems, vol. 13, pp.
+682–688 (2001)
+
+[17] Scott, D.W., Sain, S.R.: Multi-dimensional Density Estimation. Data Mining and
+
+Computational Statistics 23, 229–263 (2004)
+
+[18] Xavier de Souza, S., Suykens, J.A.K., Vandewalle, J., Bolle, D.: Coupled Simulated
+Annealing for Continuous Global Optimization. IEEE Transactions on Systems,
+Man, and Cybertics - Part B 40(2), 320–335 (2010)
+
+

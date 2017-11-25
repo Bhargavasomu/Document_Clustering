@@ -1,0 +1,1094 @@
+Probabilistic User Modeling in the Presence
+
+of Drifting Concepts
+
+Vikas Bhardwaj and Ramaswamy Devarajan
+
+Columbia University, New York NY 10027, USA
+
+Department of Computer Science
+{vsb2108,rd2446}@columbia.edu
+
+Abstract. We investigate supervised prediction tasks which involve
+multiple agents over time, in the presence of drifting concepts. The moti-
+vation behind choosing the topic is that such tasks arise in many domains
+which require predicting human actions. An example of such a task is
+recommender systems, where it is required to predict the future ratings,
+given features describing items and context along with the previous rat-
+ings assigned by the users. In such a system, the relationships among
+the features and the class values can vary over time. A common chal-
+lenge to learners in such a setting is that this variation can occur both
+across time for a given agent, and also across diﬀerent agents, (i.e. each
+agent behaves diﬀerently). Furthermore, the factors causing this varia-
+tion are often hidden. We explore probabilistic models suitable for this
+setting, along with eﬃcient algorithms to learn the model structure. Our
+experiments use the Netﬂix Prize dataset1, a real world dataset which
+shows the presence of time variant concepts. The results show that the
+approaches we describe are more accurate than alternative approaches,
+especially when there is a large variation among agents. All the data and
+source code would be made open-source under the GNU GPL.
+
+1 Introduction
+
+In this article we investigate prediction problems in which there are multiple
+evolving entities, which we refer to as agents. We address two complications
+that frequently arise in problems that involve modeling agents: variation among
+(1) agents and (2) within an agent across time. Let’s consider the problem of
+estimating the probability of a movie reviewer’s rating. Here we have features
+describing the context such as genre, release time, reviewer’s preferences etc. In
+this problem we may have both kinds of variation. Clearly, there will be variation
+among the agents, as every person is diﬀerent. Also, there will be variation in
+the user’s ratings because of his tastes, mood etc. which vary with time.
+
+These variations pose problems to the modeler. One approach would be to
+learn a single model that applies to all agents. This approach has the advantage
+that training examples from all agents can be pooled together. Given plentiful
+
+1 http://archive.ics.uci.edu/ml/datasets/Netﬂix+Prize
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part I, LNAI 6118, pp. 328–339, 2010.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2010
+
+Probabilistic User Modeling in the Presence of Drifting Concepts
+
+329
+
+training observations for an agent, another approach is to learn a diﬀerent model
+for each agent from only that agent’s examples, and then use the appropriate
+agent speciﬁc model when making predictions. However, if training examples
+are scarce, this agent speciﬁc approach is susceptible to overﬁtting. Even when
+training data is relatively plentiful for a given agent there may be contexts that
+have not been observed very often.
+
+Our approach takes the middle ground between these two extremes. Like
+the agent speciﬁc or heterogeneous approach, we learn a diﬀerent model for
+each agent, but unlike it, training observations of multiple agents may have an
+inﬂuence on the learned probabilities for a given agent. We do this by identifying
+a neighborhood of agents with similar probability proﬁles and then combining
+their models if training data is scarce.
+
+In addition to variation across agents, we consider patterns of change within
+a single agent over time. Problems in which class distributions change with time
+are said to exhibit concept drift. See, for example, Widmer [15]. Our approach
+to modeling concept drift utilizes hidden Markov models [12], that have found
+widespread use in many sequential processing tasks.
+
+2 Related Work
+
+We investigate the approaches to model multiple evolving users or entities over
+time. Our approach is closely related to previous work in Concept drift and
+Collaborative Filtering.
+
+Concept Drift has received considerable attention both in the ﬁeld of Data
+Mining [16,11,15,14] and Computational Learning Theory [1,5]. Previous work
+on concept drift have addressed the problem of concept drift over time, but
+concept drift across agents has not received particular attention. Incremental
+(or online) concept drift was discussed by [15]. Widmer and Kubat’s FLORA
+framework used a window based learning system. The FLORA2 algorithm and
+the FLORA3 algorithm addressed the issue of recurring contexts. [7], addressed
+concept drift with the CVFDT algorithm, which uses ﬂexible windowing and
+decision trees. [11] have also used Decision Trees for online concept learning, the
+algorithm OnlineTree2 introduces multiple ﬂexible windows. Concept Drift has
+also been applied in the ﬁeld of Network Security to model the user behavior
+and to use it for Anomaly Detection.[9].
+
+Collaborative Filtering Methods have become a popular system on the In-
+ternet and are often used as techniques to complement content-based ﬁltering
+systems [6]. [10] uses a Collaborative Framework based on Fuzzy Association
+Rules and Multiple-level Similarity (FARAMS). Recommender Systems often
+rely heavily on Collaborative ﬁltering, where past transactions are analyzed to
+establish connections between users and products [8]. [8] introduces an approach
+which uses Neighborhood models and Latent factor models to do Collaborative
+Filtering. The ﬁltering methods uses both implicit and explicit feedback from
+user (agents), to improve results. Current Recommender Systems consider the
+relations between the various users (agents), but do not consider the Concept
+Drift over time.
+
+330
+
+V. Bhardwaj and R. Devarajan
+
+Other work similar to what we present here include approaches for training
+probabilistic models by combining examples from multiple contexts. Interpo-
+lated Markov models [3] are models that combine diﬀerent order Markov mod-
+els based, in part, on the number of training examples observed in each case.
+This approach was originally developed for ﬁnding genes in microbes. More re-
+cently variable length HMMs [14] were introduced. These models dynamically
+adapt the length of an HMM memory using context trees. Interpolated hidden
+Markov models have also been used in many domains such as ﬁnding genes and
+in automatic instrument recognition [13].
+
+3 Overview
+
+Figure 1 shows diagrams of some of the graphical probability models we use here.
+In this example there are N agents. For each agent we have multiple observations
+at various time points. We use Y t
+a to represent the output random variable for
+agent a at time t. Each Y is associated with M observable features, denoted by
+the feature vector X.
+
+When we are learning a classiﬁer to predict the output Y of each agent, there
+can be two extreme cases, (i) the Homogeneous Case, where we learn a single
+model for all agents (Fig. 1 A) and (ii) the Heterogeneous Case, where we learn
+a model for each agent, (Fig. 1 B).
+
+Both these approaches are ﬂawed in many real world scenarios, as there is
+usually some diﬀerence between the behavior of each agent, but yet its never
+
+A
+
+B
+
+Y
+
+Early
+
+C
+
+Y1
+
+Later
+
+D
+
+Y1
+
+X(1)
+
+X(M)
+
+Y1
+
+1X  (1)
+
+1X  (2)
+
+1X  (3)
+
+1X  (1)
+
+1X  (2)
+
+1X  (3)
+
+X (1)
+
+1
+
+X (M)
+
+1
+
+Y2
+
+Y2
+
+YN
+
+X  (1)
+
+N
+
+NX  (M)
+
+ Strong Link
+Weak Link
+Very Feeble Link
+
+2X   (1)
+
+X   (2)
+
+2
+
+X   (3)
+
+2
+
+2X   (1)
+
+X   (2)
+
+2
+
+X   (3)
+
+2
+
+Y3
+
+Y3
+
+X   (1)
+
+3
+
+X   (2)
+
+3
+
+X   (3)
+
+3
+
+X   (1)
+
+3
+
+X   (2)
+
+3
+
+X   (3)
+
+3
+
+Fig. 1. Illustration of Bayesian Probabilistic Models used in our approach. Solid lines
+with arrows represent probabilistic dependencies. Dashed lines in C and D represent
+inﬂuences between agent models on learned probability parameters. A: A single model
+is learned for all agents viz. Homogeneous Model. B: A model is learned for each agent
+viz. Heterogeneous Model. C: An Interpolated Model near beginning of training. D: An
+Interpolated Model later during training, strength of ties have weakened, and new ties
+are found. Inﬂuences change with more training. See diﬀerence between C and D.
+
+Probabilistic User Modeling in the Presence of Drifting Concepts
+
+331
+
+A
+
+tH
+1
+
+tY
+1
+
+H
+
+t
+N
+
+Y t
+N
+
+t+1H
+
+1
+
+Y t+1
+
+1
+
+H
+
+t+1
+N
+
+Y t+1
+
+N
+
+B
+
+Initially
+
+C
+
+Later
+
+tH 1
+
+tY 1
+
+t
+H 2
+
+Y t
+2
+
+H
+
+t
+3
+
+Y t
+3
+
+t+1H 1
+
+1Y t+1
+
+t+1
+
+H 2
+
+Y t+1
+
+2
+
+H
+
+t+1
+3
+
+Y t+1
+
+3
+
+ Strong Link
+Weak Link
+Very Feeble Link
+
+tH 1
+
+tY 1
+
+t
+H 2
+
+Y t
+2
+
+H
+
+t
+3
+
+Y t
+3
+
+t+1H 1
+
+1Y t+1
+
+t+1
+
+H 2
+
+Y t+1
+
+2
+
+H
+
+t+1
+3
+
+Y t+1
+
+3
+
+Fig. 2. Illustration of Hidden Markov Models used in our approach. A: An HMM is
+learned for each agent (similar to the Heterogeneous Model, but captures concept drift
+over time). B: An Interpolated HMM near beginning of training. C: An Interpolated
+HMM later during training, strength of ties have weakened, and new ties are found.
+
+true that all agents are entirely diﬀerent from each other. Thus to model pre-
+dictive classiﬁers close to real world scenarios, we choose an approach which is
+somewhere in between the two extreme cases.
+
+Figure 1 C and D illustrate our approach to modeling variation among agents.
+In this example we have three agents and a set of three features per agent.
+Early on during training, or when a new agent appears, and training data for
+individual agent is scarce, its probabilities are inﬂuenced heavily by neighboring
+agents. This is illustrated in the ﬁgure with dashed lines connecting the nodes.
+Outputs(class) of Agent1 and Agent3 are similar, but X(1) of Agent1 is closer to
+X(1) of Agent2. As we have more training data, we learn that output of Agent1
+is closely tied to Agent2, and closeness between X(3)’s of Agent1 and Agent3 has
+grown weaker.
+
+To model concept drifts over time, we investigate Hidden Markov Models, as
+shown in Fig. 2. Figure 2 A illustrates the case where we learn one HMM for
+each agent. Variables Ht
+
+i represent the Hidden Variable for Agenti at time t.
+
+The Hidden Variables capture the drift over time as each hidden variable
+relearns its probability distribution for state transitions and emissions, as new
+training data is encountered. Figure 2 B and C, illustrate an Interpolated HMM,
+in which we have a model for each agent and an agent’s prediction probabilities
+are inﬂuenced both by its own training data and that of other agent’s in its
+neighborhood similar to the static HMM explained above.
+
+Thus, these Interpolated models attempt to capture the real world scenario,
+where there are varying relationships among agents. Agent1 may be closer to
+Agent2 in some ways and closer to Agent3 in some ways.
+
+332
+
+V. Bhardwaj and R. Devarajan
+
+4 Methods
+
+For agent a at time t(cid:3) we have the labeled data set {(xt
+
+As our setting involves multiple agents over time, we assume that we have labeled
+data for N agents through time t. For our models in Figure 1, we estimate a
+naive Bayes model for each agent.
+a)|t ≤ t(cid:3)} where
+1 ≤ yt
+a ≤ C is a discrete class value (C possible class values) with feature values
+xt
+a = (xt
+a(j) is the value of feature j for an observation
+at time t.
+
+a(M)) where xt
+
+a, yt
+
+a(1), ..., xt
+
+Assumptions
+
+– Throughout this article, we shall assume that each of the features X(j) take
+discrete values 1, 2, . . . , sj where sj is the size of the domain for X(j). Our
+approach, however, is general and can be applied to the continuous case as
+well.
+
+– We assume the number of features and their domains are constant across
+
+agents and time.
+
+– We use a value of 0 to denote a missing feature value.
+– We do not require the observations of diﬀerent agents to be aligned in time.
+
+Homogeneous and Heterogeneous Models
+To learn the homogeneous model we pool all examples from all agents into a
+a)|∀a, t < t(cid:3)}. We compute counts nj(k, c), the
+single training set T = {(xt
+number of examples in which feature j had a value of k with class c, and n(c),
+the total number of observations of class c. Then we compute the maximum
+a-posteriori (MAP) estimates with pseudo-counts of 1 for all parameters:
+
+a, yt
+
+ˆP (X(j) = k|Y = c) =
+
+(cid:2)(cid:3)
+
+(cid:4)
+nj(k, c) + 1
+nj(k(cid:3), c)
+
+1≤k(cid:2)≤sj
+
++ sj
+
+and
+
+ˆP (Y = c) =
+
+(cid:2)(cid:3)
+
+(cid:4)
+n(c) + 1
+1≤c(cid:2)≤C n(c(cid:3))
+
++ C
+
+(1)
+
+(2)
+
+Here we have dropped the agent subscripts because we use the same model for
+each agent.
+
+Learning in the heterogeneous case is the same as the homogeneous case with
+the exception that each agent’s model is learned from a training set consisting
+of only that agent’s examples.
+
+Interpolated Model
+Given plentiful training data (and assuming stationary concepts) we would ex-
+pect the heterogeneous model ˆPa(Ya|Xa) to be more accurate than the homo-
+geneous model ˆP (Y |X) on predictions for any agent a. On the other hand, if
+training data for agent a is scarce there is concern of over-ﬁtting. Even if train-
+ing data for a is scarce, however, we may have many examples for other agents.
+
+Probabilistic User Modeling in the Presence of Drifting Concepts
+
+333
+
+This happens if the numbers of observations for each agent is skewed so that
+some agents have many observations while others have few. In this case, we’d
+like to be able to use training examples from the other agents to help estimate
+the model for a. Our approach is to form a model for a by combining its own
+MAP estimate with the MAP estimates of other agents in the neighborhood of
+a. We call this the interpolated approach.
+
+Since learning naive Bayes models from complete data is just a set of separate
+estimation problems, one for each conditional distribution and one for the prior
+of the class variable, we describe our approach in terms of estimating just a
+single distribution for a discrete domain.
+Let W be the random variable we are estimating a distribution for (i.e.,
+P (W ) is either Pa(Y ) or P (Xa(j)|Ya = c)) and K be the number of values in
+W ’s domain. We begin with the table of counts, where n(a, k) is the number of
+observations of value k for agent a, and ﬁrst compute the agent speciﬁc MAP
+estimates ˆPa(W ) using equations analogous to Equations 1 or 2 (but of course
+using only a’s observations). This estimate is identical to the estimate used in
+the heterogeneous model for a.
+
+a (W ) as a mixture of its
+a (W ) (described below):
+
+We construct the interpolated distribution for a, ˆP I
+MAP estimate and its “neighborhood” distribution P N
+a (W ) = λa × ˆPa(W ) + (1 − λa)P N
+ˆP I
+
+a (W )
+
+(3)
+where 0 ≤ λa ≤ 1 is the mixing coeﬃcient that determines the relative contri-
+butions of a’s MAP distribution and its neighborhood distribution. We set λa
+using the logistic function so that it smoothly varies as its number of observa-
+tions grows. M here is a tuneable parameter that controls how fast we transition
+from the neighborhood distribution to the MAP distribution. A large value of
+M causes a slow transition.
+
+λa =
+
+1 + exp(M − (cid:3)
+
+1
+
+1≤k≤K n(a, k))
+
+(4)
+
+An agent’s neighborhood distribution is a combination of the MAP distribu-
+tions of its eligible neighbors and an average agent distribution. We represent
+the “distance” d(a, a(cid:3)) between agents a and a(cid:3) (for estimating W ) with the
+Kullback-Leibler divergence:
+
+(cid:6)
+
+(cid:7)
+
+d(a, a(cid:3)
+
+) =
+
+ˆPa(W = k) log
+
+ˆPa(W = k)
+ˆPa(cid:2)(W = k)
+
+(cid:5)
+
+1≤k≤K
+
+(5)
+
+(6)
+
+Next, we form an “average agent” model ¯P (W ) that is the average of the MAP
+models for all agents:
+
+(cid:8)
+
+¯P (W ) ∝
+
+ˆPa(W )
+
+where the product is a normalized point-wise product of distributions. Notice
+that ¯P is not the same as the estimate learned by the homogeneous model be-
+cause ¯P is inﬂuenced equally by all agents whereas in the homogeneous model
+
+a
+
+334
+
+V. Bhardwaj and R. Devarajan
+
+an agent’s inﬂuence is proportional to how many observations it has. Our rea-
+soning is that when little or nothing is known about an agent, which is when ¯P
+has inﬂuence, we believe it is more reasonable to model it more like the average
+agent than the average training example.
+An agent a(cid:3) is an eligible neighbor of a if both (i) λa(cid:2) > 0.5 and (ii) d(a, a(cid:3))
+is less than the distance between a(cid:3)s MAP distribution ˆPa(W ) and the agent
+average distribution ¯P (W ). The ﬁrst condition ensures that eligible neighbors
+have seen enough training examples so that their MAP estimates are more likely
+to be reliable and the second condition prevents distant “neighbors” from having
+any inﬂuence. We deﬁne the neighborhood of a, N a, to be its D closest eligible
+neighbors. If there are less than D eligible neighbors then N a contains all eligible
+neighbors, which could be zero. Finally, we construct the neighborhood distri-
+bution P n
+a by taking the normalized point-wise product of the average agent
+distribution with the MAP distributions of all neighbors:
+
+P n
+
+a (W ) =
+
+× ¯P (W )
+
+(7)
+
+(cid:6) (cid:8)
+
+a(cid:2)∈N
+
+(cid:7)
+ˆPa(cid:2)(W )
+
+We now compute the interpolated model with Equation 3. In this way we com-
+pute all distributions for all agents. Before we move on, we stress a few important
+details about this approach:
+
+– The neighborhood for a is distribution speciﬁc. It is possible that a has a
+diﬀerent set of neighbors when estimating P (X(i)|Y = c) than it has when
+estimating P (X(i)|Y = c(cid:3)). Although, this can be seen as a virtue, this
+may be exasperating problems associated with using a generative model for
+discriminative classiﬁcation.
+
+– The neighborhood distribution behaves like an evolving bias or prior. Implicit
+in this formulation is that while agents may be diverse, the distributions tend
+to cluster.
+
+– If the MAP distribution for an agent is near the center of its neighborhood
+the interpolated distribution will be similar to the MAP. On the other hand if
+most of an agent’s neighbors are in the same direction then the neighborhood
+distributions combine to pull the interpolated distribution toward that center.
+
+Hidden Markov Models
+We now turn toward our approach for representing changes within an agent over
+time. For this we use hidden Markov models. We explore both a regular HMM
+with one model for each agent and an Interpolated version which applies the
+interpolated approach to an agent’s HMM.
+
+Our HMM consists of two states. These state represent diﬀerent modes of the
+agent’s distribution over class labels. In the domain of our dataset, the hidden
+states could correspond to changes in a reviewers’ calibration or even changes
+in actual human reviewer associated with a given user ID, though we have no
+deﬁnite knowledge of what these states maybe, we can learn their behavior. To
+learn the parameters of the HMM for agent a at time t we train an HMM using
+
+Probabilistic User Modeling in the Presence of Drifting Concepts
+
+335
+
+a, ..., yt
+the expectation-maximization algorithm [4] using the single sequence y1
+a.
+Thus, this approach is similar to the heterogeneous method, in which each agent’s
+model is trained using only examples from that agent. But, of course, it is diﬀer-
+ent, as here we allow the agent’s probability distribution over the class to change
+with time.
+
+In the Interpolated hidden Markov model, we learn an interpolated distribu-
+tion for the emissions, similar to the method explained above. For each agent,
+the probability distribution of the emissions are learned by using its distribution
+and the distributions of its “neighbors”.
+
+The HMMs we consider here, is in some ways the simplest possible in that
+the emissions involve a single variable. More complex HMMs in which emissions
+include both the class and features are possible as well.
+
+5 Evaluation
+
+We conducted a set of experiments to assess that how well our approaches model
+evolving heterogeneous agent behavior in real world domains. We wish to (i)
+compare the predictive accuracies of the various models, (ii) investigate the eﬀect
+of the training set size, and (iii) use HMMs to model concept drift over time We
+have have assembled a publicly available real world data set involving humans.
+Our set is derived from the Netﬂix prize2 data. This data set contains over 100
+million movie ratings (integer values 1-5) for 400,000+ users and 17,770 movies
+from 1999 to 2005. We use a subset of this data in our experiments. We extracted
+all the ratings from 2000 randomly selected users (the agents in this problem) for
+a total of 422,692 ratings. The rating is the class variable, and we divided ratings
+such that ratings (1,2,3) are classiﬁed as low or ’0’ and ratings (4,5) are classiﬁed
+as high or ’1’. Making it a binary class problem We have 103 features for each
+rating: (i) The day of week of the rating, (ii) The month of the rating (iii) The
+movie’s year of release. The remaining features are the ratings (if available) of
+100 “heavy” users who have rated more than 1,000 movies. These 100 users are
+disjoint from the agents.
+
+The ﬁrst experiment was designed to see how well the interpolated method
+models the prior distribution P (Ya). In this experiment the 30% of the examples
+with greatest time index were held aside for evaluation. We trained models with
+successively more training data. We use all data from the time of the earliest
+instance through t where t is set so that 1%, 2%, ..., 70% of the available labeled
+examples are in the training set. Each trained model predicts the value of the
+held aside 30%. We measure the performance of each trained model with the
+test set log-likelihood. The parameter M was set to 20.
+
+Figure 3 shows the results of this experiment. As expected, the heterogeneous
+model shows the most improvement as the size of the training set increases and
+the homogeneous model shows the least with the interpolated model in between.
+The interpolated model surprisingly continues to slightly improve throughout the
+whole range. Given the large amount of data it is unlikely that this trend is caused
+
+2 http://archive.ics.uci.edu/ml/datasets/Netﬂix+Prize
+
+336
+
+V. Bhardwaj and R. Devarajan
+
+x 106
+
+LogLikelihood Estimates
+
+ 
+
+−6.4
+
+−6.5
+
+−6.6
+
+−6.7
+
+−6.8
+
+−6.9
+
+d
+o
+o
+h
+
+i
+l
+
+i
+
+e
+k
+L
+g
+o
+L
+
+−7
+
+ 
+0
+
+10
+
+20
+
+Homogeneous
+Heterogeneous
+Interpolated
+
+50
+
+60
+
+70
+
+30
+
+40
+
+Training Percents
+
+Fig. 3. Log-Likelihood Estimates for Homogeneous, Heterogeneous and Interpolated
+Model
+
+by estimation error, but suggests that drift may be present. Comparing the inter-
+polated curve to the others, we see that performance begins close to the homoge-
+neous model and then improves as the individual agent models begin to diversify.
+These trends suggest high inter-agent variability. We see that the interpolated
+models perform best in settings with diverse agents. From these results we con-
+clude that the interpolated approach can lead to more accurate estimation of
+probability distributions, especially if agents are diverse.
+
+To compare the predictive accuracy of the interpolated model, we compute
+ROC curves (Fig. 4) for each of our static models. In this experiment we use all
+features (as well as class labels) to train the models with the ﬁrst 70% of the data
+and predict the labels on the ﬁnal 30%. Although the interpolated model was
+the most accurate in terms of test-set log likelihood this doesn’t translate into
+a clear win in the ROC curves. It is only slightly better than the homogeneous
+and heterogeneous models.
+
+Our investigations into using HMMs to model concept drift focus on the pre-
+dicting the class values using only the priors and not the features. Similar to the
+ﬁrst experiment, 30% of the examples with greatest time (in total, not per agent)
+index were held aside for evaluation. A separate HMM is trained from the ﬁrst
+40% using only that agent’s observed label sequence. We also learn an Interpo-
+lated HMM for each agent by applying the interpolated approach to the emission
+distributions. We compare the results of the HMM to the heterogeneous model
+and the Interpolated-HMM to the Interpolated Model. We measure the perfor-
+mance of each trained model with the test set log-likelihood. Figure 5 shows
+the results of the 2 types of HMMs learned. The results showed strong evidence
+of concept drift, as the diﬀerence in the test set log likelihoods (summed over
+
+Probabilistic User Modeling in the Presence of Drifting Concepts
+
+337
+
+1
+
+0.9
+
+0.8
+
+0.7
+
+0.6
+
+0.5
+
+0.4
+
+0.3
+
+0.2
+
+0.1
+
+t
+
+e
+a
+r
+ 
+
+e
+v
+i
+t
+i
+s
+o
+p
+
+ 
+
+e
+u
+r
+t
+
+ROC SCORES
+
+ 
+
+Interpolated
+Homogeneous
+Heterogeneous
+
+0
+
+ 
+0
+
+0.1
+
+0.2
+
+0.3
+
+0.4
+0.6
+false positive rate
+
+0.5
+
+0.7
+
+0.8
+
+0.9
+
+1
+
+Fig. 4. ROC Curves for Homogeneous, Heterogeneous and Interpolated Models
+
+x 104
+
+Hidden Markov Models
+
+ 
+
+l
+
+s
+e
+u
+a
+V
+d
+o
+o
+h
+
+ 
+
+i
+l
+
+i
+
+e
+k
+L
+−
+g
+o
+L
+
+−8.6
+
+−8.65
+
+−8.7
+
+−8.75
+
+−8.8
+
+ 
+5
+
+Heterogeneous HMM
+Interpolated HMM
+
+10
+
+15
+
+20
+
+Training Percents
+
+25
+
+30
+
+35
+
+Fig. 5. Log-Likelihood of Heterogeneous and Interpolated Hidden Markov Models
+
+all agents) of the interpolated model and the HMMs was in favor of the HMMs.
+We see that initially the heterogeneous HMM starts lower than the interpolated
+HMM, which can be attributed to lack of training data for each agent. As more
+training data is made available, both models almost tie with each other, but still
+increasing, which suggests the presence of concept drift. Observing the agent
+speciﬁc log likelihoods shows that most of the diﬀerence between that static
+models and the HMMs is accounted for by a relatively small number of agents.
+
+338
+
+V. Bhardwaj and R. Devarajan
+
+It might be that these agents are strongly drifting while the others are weakly
+or not drifting. This suggests an alternate approach in which some agents are
+modeled with HMMs while others are modeled with static models.
+
+6 Conclusion and Future Work
+
+In this paper we investigated probabilistic models for multiple evolving agents.
+We addressed the common complications that may arise in such a setting, viz.
+(i) concept drift over time for a given agent, (ii) varying relationships among
+diﬀerent agents. We compare and contrast 3 diﬀerent static models, viz. (i)
+the homogeneous model in which we learn a single model for each agent, (ii)
+a heterogenous model where we learn a diﬀerent model for each agent. (iii)
+an interpolated model where similar to the heterogeneous approach, we have
+a diﬀerent model for each agent, but unlike it, observations from other agents
+can have an inﬂuence on an agent’s model. Then we investigate hidden Markov
+models to address the issue of concept drift over time. Lastly we applied the
+interpolated approach to HMM to get an interpolated hidden Markov model for
+each agent. The contribution of this paper is the introduction of a novel method
+for learning agent models that involves combining the models of multiple agents
+in the same neighborhood.
+
+Importantly, the concept of neighborhood is context speciﬁc, so the neigh-
+boring agents that combine to form one distribution may be distinct from those
+that combine in another. We demonstrated the validity and need of such models
+in real world scenarios. In settings with diverse agents, models learned with our
+interpolated approach proved to be empirically better than purely homogeneous
+or purely heterogeneous models. Concept drift over time was investigated using
+hidden Markov models and strong evidence of concept drift was found.
+
+Our Interpolated Hidden Markov Model , that is used in conjunction with hid-
+den variables, can be used to represent cases where there are time varying con-
+cepts aﬀected by unknown factors. For example, such models may ﬁnd use in risk
+assessment in ﬁnancial data such as stocks. Thus, modeling the evolving relation-
+ship among various agents together with accounting for time varying concepts can
+prove to be very useful in several ﬁelds like ﬁnance, marketing or medicine. This
+work can be further extended by considering models where there are more than
+one type of hidden variable, each type aﬀecting diﬀerent observable features of the
+agent. Hence this can eﬀectively model cases where certain features of an agent
+vary over time and others remain consistent. A typical setting would be a behav-
+ioral analysis of a multi-agent system which integrates models into an intelligent
+structure that improves the eﬃciency of an agent[2].
+
+References
+
+1. Case, J., Jain, S., Kaufmann, S., Sharma, A., Stephan, F.: Predictive learning
+models for concept drift. In: Richter, M.M., Smith, C.H., Wiehagen, R., Zeugmann,
+T. (eds.) ALT 1998. LNCS (LNAI), vol. 1501, pp. 276–290. Springer, Heidelberg
+(1998)
+
+Probabilistic User Modeling in the Presence of Drifting Concepts
+
+339
+
+2. Coulondre, S., Simonin, O., Ferber, J.: Dynamo: a behavioural analysis model for
+multi-agent systems. In: Proceedings 1999 International Conference on Information
+Intelligence and Systems, pp. 614–621 (1999)
+
+3. Delcher, A., Kasif, S., Fleischmann, R., Peterson, J., White, O., Salzberg, S.: Align-
+
+ment of whole genomes. Nucleic Acids Research 27(11), 2369–2376 (1999)
+
+4. Dempster, A., Laird, N., Rubin, D.: Maximum likelihood from incomplete data via
+
+the EM algorithm. Journal of the Royal Statistical Society B 39, 1–38 (1977)
+
+5. Helmbold, D.P., Long, P.M.: Tracking drifting concepts by minimizing disagree-
+
+ments. Machine Learning, 27–45 (1994)
+
+6. Herlocker, J.L., Konstan, J.A., Borchers, A., Riedl, J.: An algorithmic framework
+for performing collaborative ﬁltering. In: SIGIR 1999: Proceedings of the 22nd
+annual international ACM SIGIR conference on Research and development in in-
+formation retrieval, pp. 230–237. ACM, New York (1999)
+
+7. Hulten, G., Spencer, L., Domingos, P.: Mining time-changing data streams. In:
+KDD 2001: Proceedings of the seventh ACM SIGKDD international conference on
+Knowledge discovery and data mining, pp. 97–106. ACM, New York (2001)
+
+8. Koren, Y.: Factorization meets the neighborhood: a multifaceted collaborative ﬁl-
+tering model. In: KDD 2008: Proceeding of the 14th ACM SIGKDD international
+conference on Knowledge discovery and data mining, pp. 426–434. ACM, New York
+(2008)
+
+9. Lane, T., Brodley, C.E.: Approaches to online learning and concept drift for user
+identiﬁcation in computer security. In: KDD, pp. 259–263. AAAI Press, Menlo
+Park
+
+10. Leung, C.W.-k., Chan, S.C.-f., Chung, F.-l.: A collaborative ﬁltering frame-
+work based on fuzzy association rules and multiple-level similarity. Knowl. Inf.
+Syst. 10(3), 357–381 (2006)
+
+11. N´u´nez, M., Fidalgo, R., Morales, R.: Learning in environments with unknown dy-
+namics: Towards more robust concept learners. J. Mach. Learn. Res. 8, 2595–2628
+(2007)
+
+12. Rabiner, L.R.: A tutorial on hidden Markov models and selected applications in
+
+speech recognition. Proceedings of the IEEE 77(2), 257–286 (1989)
+
+13. Virtanen, T., Heittola, T.: Interpolating hidden markov model and its applica-
+tion to automatic instrument recognition. In: ICASSP 2009: Proceedings of the
+2009 IEEE International Conference on Acoustics, Speech and Signal Processing,
+Washington, DC, USA, pp. 49–52. IEEE Computer Society, Los Alamitos (2009)
+14. Wang, Y., Zhou, L., Feng, J., Wang, J., Liu, Z.-Q.: Mining complex time-series
+data by learning markovian models. In: ICDM 2006: Proceedings of the Sixth
+International Conference on Data Mining, Washington, DC, USA, pp. 1136–1140.
+IEEE Computer Society, Los Alamitos (2006)
+
+15. Widmer, G., Kubat, M.: Learning in the presence of concept drift and hidden
+
+contexts. Mach. Learn. 23(1), 69–101 (1996)
+
+16. Zhang, P., Zhu, X., Shi, Y.: Categorizing and mining concept drifting data streams.
+In: KDD 2008: Proceeding of the 14th ACM SIGKDD international conference on
+Knowledge discovery and data mining, pp. 812–820. ACM, New York (2008)
+
+

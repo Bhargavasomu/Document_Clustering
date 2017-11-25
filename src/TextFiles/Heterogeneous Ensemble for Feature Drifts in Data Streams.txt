@@ -1,0 +1,1014 @@
+Heterogeneous Ensemble for Feature Drifts
+
+in Data Streams
+
+Hai-Long Nguyen1, Yew-Kwong Woon2, Wee-Keong Ng1, and Li Wan3
+
+1 Nanyang Technological University, Singapore
+
+nguy0105@ntu.edu.sg, wkn@acm.org
+2 EADS Innovation Works Singapore
+
+david.woon@eads.net
+3 New York University
+
+wanli@cs.nyu.edu
+
+Abstract. The nature of data streams requires classiﬁcation algorithms
+to be real-time, eﬃcient, and able to cope with high-dimensional data
+that are continuously arriving. It is a known fact that in high-dimensional
+datasets, not all features are critical for training a classiﬁer. To improve
+the performance of data stream classiﬁcation, we propose an algorithm
+called HEFT-Stream (Heterogeneous Ensemble with Feature drifT for
+Data Streams) that incorporates feature selection into a heterogeneous
+ensemble to adapt to diﬀerent types of concept drifts. As an example
+of the proposed framework, we ﬁrst modify the FCBF [13] algorithm so
+that it dynamically update the relevant feature subsets for data streams.
+Next, a heterogeneous ensemble is constructed based on diﬀerent on-
+line classiﬁers, including Online Naive Bayes and CVFDT [5]. Empiri-
+cal results show that our ensemble classiﬁer outperforms state-of-the-art
+ensemble classiﬁers (AWE [21] and OnlineBagging [15]) in terms of ac-
+curacy, speed, and scalability. The success of HEFT-Stream opens new
+research directions in understanding the relationship between feature se-
+lection techniques and ensemble learning to achieve better classiﬁcation
+performance.
+
+1
+
+Introduction
+
+With rapid technological advancement, many real-life applications, such as stock
+markets, online stores and sensor networks can produce massive datasets, or data
+streams. To discover knowledge from data streams, scientists have to confront
+the following challenges: (1) tremendous volumes of data; (2) dynamic changes of
+the discovered patterns, which is commonly referred to as concept drifts; and (3)
+real-time response. Concept drifts are categorized into two types: gradual drifts
+with moderate changes and sudden drifts with severe changes. Motivated by
+the above challenges, there are two common approaches of existing classiﬁcation
+models for data streams: online incremental learning and ensemble learning.
+
+Incremental learning trains a single classiﬁer and updates it with newly arrived
+data. For example: Domingos and Hulten [5] proposed a very fast Hoeﬀding tree
+
+P.-N. Tan et al. (Eds.): PAKDD 2012, Part II, LNAI 7302, pp. 1–12, 2012.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2012
+
+2
+
+H.-L. Nguyen et al.
+
+Optimal 
+Weighting
+
+(cid:153)wi*(cid:545)i
+wi
+
+w1
+
+Replace the
+
+outdated classifier
+
+wn
+
+Classifier C1
+
+. . . 
+
+Classifier Ci
+
+. . . 
+
+Classifier Cn
+
+Classifier 
+
+Cn+1
+
+Update
+
+Update
+
+Update
+
+Feature 
+subset FS1
+
+. . . 
+
+Feature 
+subset FSi
+
+. . . 
+
+Feature 
+subset FSn
+
+Feature 
+
+subset FSn+1
+
+No
+
+Feature Drift?
+
+Yes
+
+Library of 
+
+online 
+classifiers
+
+Feature selection
+
+Data Stream
+
+X1 X2
+Time t
+
+… ...
+
+Xt-1 Xt
+
+Fig. 1. Ensemble Learning of Feature Drifts
+
+learner (VFDT) for data streams. The VFDT was later extended to CVFDT [12],
+which can handle the concept drifting streams by constructing alternative nodes
+and replacing them to the outdated nodes when concept drifts occur. Incremen-
+tal learning is quite eﬃcient but it cannot adapt to sudden drifts. Ensemble
+learning, which aims to combine multiple classiﬁers for boosting classiﬁcation
+accuracy, has attracted a lot of research due to its simplicity and good perfor-
+mance. It can manage concept drifts with the following adaptive approaches: (1)
+using dynamic combiner like a majority vote or weighting combination [18], (2)
+continuously updating the individual classiﬁers online [2,15], and (3) changing
+the ensemble structure by replacing outdated classiﬁers [16,21]. However, it has
+high computational complexity as there are many time-consuming processes, eg.
+generating new classiﬁers, and updating classiﬁers.
+
+In this paper, we address the above problems by presenting a novel framework
+to integrate feature selection techniques and ensemble learning for data streams.
+To alleviate ensemble updating, we propose a new concept of “feature drifts”
+and use it to optimize the updating process. With a gradual drift, each classiﬁer
+member is updated in a real-time manner. When a feature drift occurs, which
+represents a signiﬁcant change in the underlying distribution of the dataset, we
+train a new classiﬁer to replace an outdated classiﬁer in the ensemble.
+
+Moreover, feature selection helps to enhance ensemble learning. It not only im-
+proves the accuracy of classiﬁer members by selecting the most relevant features
+
+Heterogeneous Ensemble for Feature Drifts in Data Streams
+
+3
+
+and removing irrelevant and redundant features, but also reduces the complexity
+of the ensemble signiﬁcantly as only a small subset of feature space is processed.
+Finally, we propose a heterogeneous ensemble where diﬀerent types of classiﬁer
+members are well selected to maximize the diversity of the ensemble [11,22].
+Figure 1 gives an overview of our framework. The ensemble consists of many
+classiﬁers, each of which has its own feature subset. If there is a feature drift,
+the ensemble is updated with a new classiﬁer together with a new feature subset;
+otherwise, each classiﬁer is updated accordingly. To aggregate the classiﬁcation
+results of classiﬁer members, we assign each classier a weight w.r.t its perfor-
+mance. This weighting method is proven to minimize the expected added error
+of the ensemble.
+
+In summary, the following are contributions of our framework which integrates
+
+feature selection and ensemble learning techniques for data streams:
+
+– We enhance ensemble learning with feature selection which helps to lessen
+
+computational complexity and increase accuracy.
+
+– We propose the deﬁnition of feature drifts and explore relationships between
+
+feature drifts and concept drifts.
+
+– We signiﬁcantly increase the accuracy of the ensemble by designing a het-
+erogeneous ensemble with well-chosen member classiﬁers and an optimal
+weighting scheme.
+
+2 Related Work
+
+Ensemble learning, a process to construct accurate classiﬁers from an ensem-
+ble of weak classiﬁers, has attracted extensive research in the past decade. In
+general, these methods vary in the way of they construct various classiﬁers and
+combine their predictions. The ﬁrst step of constructing a group of classiﬁers
+can be diﬀerentiated according to the dependencies among classiﬁers. The inde-
+pendent approach trains classiﬁers randomly and can be easily parallelized, for
+example, bagging [3], random subspace [19], and random forest [4]. The depen-
+dent approach constructs a new classiﬁer while taking advantage of knowledge
+obtained during the construction of past classiﬁers, such as AdaBoost [8], Ad-
+aBoost.M2 [7], and Gradient boosting [9]. In the second step of combining the
+classiﬁers’ predictions, majority voting is one intuitive method to choose the
+dominant decision [3,4,19]. As majority voting cannot guarantee that the voting
+result will be better than the best individual one, the weighting method is intro-
+duced which assigns competent classiﬁers higher weights, such as performance
+weighting [7,8,9,21], Naive Bayes weighting [6], and entropy weighting [17].
+
+Ensemble learning can also work well with data streams by eﬀectively tackling
+the challenges of continuous incoming data and concept drifts [2,15,16,18,21].
+In [15], Oza et al. employed the Poisson distribution to adapt the traditional
+bagging and AdaBoost techniques for data streams. Bifet et al. [2] proposed an
+ensemble of Adaptive-Size Hoeﬀding Trees (ASHT) and used a statistical test
+to detect concept drifts. Street and Kim [18] proposed a streaming ensemble
+
+4
+
+H.-L. Nguyen et al.
+
+of decision trees using majority voting. Wang et al. [21] proposed a carefully
+weighted ensemble for concept-drifting data streams and proved that the en-
+semble is more accurate than a single classiﬁer trained on the aggregated data
+of k sequential chunks. In [16], Sattar et al. adapted the traditional one-vs-all
+(OVA) classiﬁers for data streams where k individual concept-adapting very fast
+decision trees (CVFDT) [12] are learnt and each one is used to distinguish the
+instances of one class from the instances of all other classes. However, the above
+algorithms suﬀer from high complexity and the inability to adapt to diﬀerent
+types of concept drifts.
+
+Feature selection is another important research issue as data streams are usu-
+ally high-dimensional. Feature selection techniques can be classiﬁed into three
+categories: ﬁlter, wrapper and embedded models [14]. The ﬁlter model evaluates
+a feature subset by using some independent measure, which only relies on the
+general characteristics of data. The wrapper model is attached to a learning al-
+gorithm and uses its performance to evaluate a feature subset. A hybrid model
+takes advantage of the above two models. As data streams require real-time re-
+sponses, we favor the ﬁlter approach due to its simplicity and independence to
+classiﬁcation models. Moreover, in data streams, the deﬁnition of relevant fea-
+tures is dynamic and restricted to a certain period of time. Features that are
+previously informative may become irrelevant, and previously rejected features
+may become important features. Thus, dynamic feature selection techniques are
+required to monitor the evolution of features. Unfortunately, to the best of our
+knowledge, there is limited research about the relationship between feature se-
+lection and ensemble learning, especially for data streams.
+
+In this paper, we will address this gap between feature selection and ensemble
+learning and propose a novel framework for integrating feature selection and
+heterogeneous ensembles. Our framework not only adapts to diﬀerent kinds of
+concept drifts properly, but also has low complexity due to its dynamic updating
+scheme and the support of feature selection techniques.
+
+3 Proposed Framework
+
+In this section, we propose a general framework for ensemble learning for data
+streams. We assume inﬁnite data streams X = [x1, x2, . . . , xt, . . .] as input in
+p
+the framework, where xt = [f 1
+t ]T is a p-dimensional vector arriving
+at time t. We assume the data streams have c diﬀerent class labels. For any
+data vector xt, it has a class label yt ∈ {y1, y2, . . . , yc}. Generally when the
+dimension p is large, there is often only a small set of key features that is critical
+for building accurate models for classiﬁcation.
+
+t , . . . , f
+
+t , f 2
+
+Data streams tend to evolve over time and so do the key features correspond-
+
+ingly. For ease of discussion, we will use the following deﬁnitions:
+
+Deﬁnition 1. A data source or a concept is deﬁned as set of prior probabilities
+of the classes and class-conditional probability density function (pdf ):
+
+S = {(P(y1), P(X|y1)), . . . , (P(yc), P(X|yc))}.
+
+(1)
+
+Heterogeneous Ensemble for Feature Drifts in Data Streams
+
+5
+
+Deﬁnition 2. Given data streams X, every instance xt is generated by a data
+source or a concept St. If all the data is sampled from the same source, i.e.
+S1 = S2 = . . . = St = S, we say that the concept is stable. If for any two time
+points i and j Si (cid:3)= Sj , we say that there is a concept drift.
+Deﬁnition 3. Given a feature space F , at time point t, we can always select the
+most discriminative subset (cid:2)Ft ⊆ F. If for any two time points i and j (cid:2)Fi (cid:3)= (cid:2)Fj,
+we say that there is a feature drift.
+
+Next, we explore the relationship between concept drifts and feature drifts.
+
+Lemma 1. Concept drifts give rise to feature drifts.
+
+Proof. Assume that certain feature selection techniques evaluate the discrimi-
+nation of a feature subset F at time t by a function:
+
+D(Ft, t) = D(P (f i|yj), t), f i ∈ Ft ⊆ {f 1, . . . , f p}, yj ∈ {y1, . . . , yc}
+
+(2)
+
+And, there is a feature drift in [ti, ti+δt],
+
+⎧
+
+⎨
+
+⎩
+
+ˆFt = argmaxFi⊆FD(Fi, t)
+Ft+δt = argmaxFi⊆FD(Fi, t + δt)
+ˆFt (cid:3)= ˆFt+δt
+
+(3)
+
+We can always ﬁnd a feature f a ∈ F and a class yb so that P (f a|yb, t) (cid:3)=
+P (f a|yb, t + δt). Else, P (f i|yj, t) = P (f i|yj, t + δt),∀(i, j), then ˆFt = ˆFt+δt.
+Hence, P (X|yb, t) (cid:3)= P (X|yb, t + δt) ⇒ Si (cid:3)= Si+δi. This denotes a concept drift
+in the time interval [ti, ti+δt].
+
+Lemma 2. Concept drifts may not lead to feature drifts.
+
+Proof. For example, given data streams X within a time period [ti, ti+δt] we
+assume the prior probability of a class i and j, P (yi) and P (yj), are changed;
+but their sum (P (yi) + P (yj)) and other probabilities remain the same. In this
+scenario, there is a concept drift but no feature drift.
+
+Combining Lemmas 1 and 2, we can conclude that:
+
+Theorem 1. Feature drifts occur at a slower rate than concept drifts.
+
+Feature drifts, which are observed in high dimensional data streams, occur no
+faster than concept drifts. As shown in the overview of our framework Figure 1,
+we need to modify feature selection techniques to detect feature drifts. The
+key idea is using feature selection to accelerate ensemble learning and steer
+its updating process. Moreover, feature selection techniques not only remove
+irrelevant and redundant features, but also accelerate the learning process by
+reducing the dimensionality of the data. Thus, the overall performance of the
+ensemble is improved in terms of accuracy, time and space complexities.
+
+6
+
+H.-L. Nguyen et al.
+
+First, we select online classiﬁers as classiﬁer members as they can be incre-
+mentally updated with new data. Then, we construct a heterogeneous ensemble
+with a capability to adapt to both concept and feature drifts. With gradual
+drifts, we only need to update the classiﬁer members. With feature drifts, we
+adjust the ensemble by replacing the outdated classiﬁer with a new one. We
+further deploy a weighting technique to minimize the cumulative error of the
+heterogeneous ensemble.
+
+3.1 Feature Selection Block
+Feature selection selects a subset of q features from the original p features (q ≤ p)
+so that the feature space is optimally reduced. Generally, we expect the feature
+selection process to remove irrelevant and redundant features. We decide to use
+FCBF [13] as it is simple, fast and eﬀective. FCBF is a multivariate feature
+selection method where the class relevance and the dependency between each
+feature pair are taken into account. Based on information theory, FCBF uses
+symmetrical uncertainty to calculate dependencies of features and the class rele-
+vance. Starting with the full feature set, FCBF heuristically applies a backward
+selection technique with a sequential search strategy to remove irrelevant and
+redundant features. The algorithm stops when there are no features left to elim-
+inate.
+
+Symmetrical Uncertainty (SU ) uses entropy and conditional entropy values
+to calculate dependencies of features. If X, Y are random variables, X receives
+value xi with probability P (xi), Y receives value yj with probability P (yj); the
+symmetrical uncertainty between X and Y is:
+H(X) − H(X|Y )
+H(X) + H(Y )
+
+H(X) + H(Y )
+
+SU (X, Y ) = 2
+
+I(X, Y )
+
+= 2
+
+(cid:6)
+
+(cid:7)
+
+(cid:6)
+
+(cid:7)
+
+,
+
+(4)
+
+where H(X) and H(Y ) are the entropies of X and Y respectively; I(X, Y ) is
+the mutual information between X and Y ; the higher the SU (X, Y ) value, the
+more dependent X and Y are.
+
+We choose to the sliding window version of FCBF so that it has low time
+and space complexities. Incoming data is stored in a buﬀer (window) with a
+predeﬁned size. Next, the matrix of symmetrical uncertainty values is computed
+to select the most relevant feature subset. The process is performed in a sliding
+window fashion, and the selected feature subsets are monitored to detect feature
+drifts. When two consecutive subsets are diﬀerent, we postulate that a feature
+drift has occurred.
+
+3.2 Ensemble Block
+
+Heterogeneous Ensemble. When constructing an ensemble learner, the diver-
+sity among member classiﬁers is expected as the key contributor to the accuracy
+of the ensemble. Furthermore, a heterogeneous ensemble that consists of dif-
+ferent classiﬁer types usually attains high diversity [11,23]. Motivated by this
+
+Heterogeneous Ensemble for Feature Drifts in Data Streams
+
+7
+
+Algorithm 1. Ensemble Learning
+
+t , f 2
+
+Input: A series of inﬁnite streaming data X = [x1, x2, . . . , xt, . . .], where xt is a
+t ]T with a class label yt arriving at time t, yi ∈
+p dimensional vector [f 1
+{y1, y2, . . . , yc}.
+A set of l diﬀerent classiﬁer types, M = {M1,M2, . . . ,Ml}.
+Output: An heterogenous ensemble E .
+1: Initialize the ensemble E with k classiﬁers of each model
+
+in M, denoted as
+
+t , . . . , f p
+
+C1,C2, . . . ,Ck∗l.
+
+Add xi to chunk.
+
+if chunk is not full then
+
+2: while X has more instance do
+3:
+4:
+5:
+6:
+7:
+8:
+
+else
+
+9:
+
+10:
+11:
+12:
+13:
+14:
+15:
+16:
+17:
+18:
+19:
+20: end while
+
+end if
+
+end for
+
+end for
+
+Perform FCBF to get the relevant and non-redundant feature subset ϕi.
+if ϕi (cid:3)= ϕi−1 then
+
+Find the best accurate classiﬁer Cbest having the smallest aggregated error
+in the ensemble and get its type.
+Build a new classiﬁer Cnew having the same type with Cbest, and associated
+with the feature subset ϕi.
+Remove the classiﬁer with the worst accuracy from E .
+Add the new created classiﬁer Cnew into E .
+
+end if
+for each classiﬁer in the ensemble C do
+
+for each instance x in chunk do
+Set m according to Poisson(1)
+Update m times each classiﬁer member with x.
+
+observation, we construct a small heterogeneous ensemble rather than a big ho-
+mogeneous ensemble with a large number of classiﬁers of the same type, which
+will compromise speed.
+
+As mentioned, we aim to select online classiﬁers so that the ensemble can
+properly adapt to diﬀerent types of concept drifts. Here, CVFDT [12] and On-
+line Naive Bayes (OnlineNB) are chosen as the basic classiﬁer types, but the
+framework can work with any classiﬁcation algorithm. The OnlineNB is an
+online version of the Naive Bayes classier. When a training instance (xt, yt)
+comes, OnlineNB updates the corresponding prior and likelihood probabilities,
+i |yt). To classify a testing instance, it applies Bayes’ theorem
+P (yt) & P (Fi = f t
+to select the class having the maximum posterior probability as follows:
+
+OnlineN B(xt) = argmaxyj P (yj)
+
+P (Fi = f t
+
+i |yj)
+
+n
+
+(cid:8)
+
+i=1
+
+(5)
+
+Details of the heterogeneous ensemble’s learning process are given in Algo-
+rithm 1. Given a data stream X and a predeﬁned set M of diﬀerent classiﬁer
+
+8
+
+H.-L. Nguyen et al.
+
+Algorithm 2. Real Time Classiﬁcation
+Input: A new testing unlabeled instance xt.
+An ensemble E of N classiﬁers, denoted as C1,C2, . . . ,CN . Every classiﬁer Ci is associated
+with a feature subset ϕi.
+Given a testing instance, every classiﬁer Ci outputs a probability distribution vector
+(cid:2)c
+ρi = [ρi1, ρi2, . . . , ρic], (
+Output: The ensemble ’s probability distribution vector for xt.
+1: for every classiﬁer Ci in the ensemble E do
+2:
+
+Project the arriving testing instancext onto a low dimensional feature space ϕi
+and get (cid:3)xt.
+Compute the probability distribution vector ρi = Ci((cid:3)xt).
+Get the aggregated error of Ci, erri, and calculate the weight following the
+Equation 8, wi = 1/(erri + α).
+
+j=1 ρij = 1, i ∈ {1, 2, . . . , N}).
+
+3:
+4:
+
+5: end for
+6: Aggregate all probability distribution vectors as follows:
+
+E (ρ) =
+
+z(cid:4)
+
+wi ∗ ρi
+
+7: Normalize and return vector E (ρ).
+
+i=1
+
+types, we initialize the ensemble with k classiﬁers of each type in M. Next, data
+streams are processed in a sliding window mode and data instances are grouped
+into predeﬁned-size chunks. When a new chunk arrives, we apply a feature se-
+lection technique to ﬁnd the most discriminative feature subset. If the subset
+is diﬀerent from the previous one, there is a feature drift. We would then need
+to construct a new classiﬁer with the selected feature subset. We add it to the
+ensemble, and remove the worst classiﬁer if the ensemble is full; the new classiﬁer
+will be of the same type as the best classiﬁer member which has the smallest
+aggregated error (lines 7-12). Finally, we employ online bagging [15] for updating
+classiﬁer members to reduce the variance of the ensemble (lines 13-18).
+
+Ensemble Classiﬁcation. Based on the research work of Tumer et. al [20] and
+Fumera et. al [10], the estimate error of the ensemble are:
+
+Eens
+
+add =
+
+N
+
+(cid:9)
+
+k=1
+
+w2
+
+kEk
+
+add +
+
+N
+
+(cid:9)
+
+(cid:9)
+
+k=1
+
+l(cid:4)=k
+
+(cid:10)
+
+wlwk
+
+βkβl + ρkl(σk
+
+i σl
+
+i + σk
+
+j σl
+
+j)/s2 (cid:11)
+
+,
+
+(6)
+
+where βk and σk are the bias and the standard deviation of the estimate error
+εk of classiﬁer Ck , ρkl is the correlation coeﬃcient of the errors εk and εl.
+We assume that classiﬁer members are unbiased and uncorrelated (i.e. βk =
+0, ρkl = 0, k (cid:3)= l). Then, we have Eens
+k=1 wk = 1. To
+minimize the added error of the ensemble, the weights of classiﬁer members are
+set as follows:
+
+k=1 w2
+
+add =
+
+kEk
+
+add,
+
+(cid:12)N
+
+(cid:12)N
+
+(cid:14)
+
+wk = (Ek
+
+add)
+
+−1
+
+−1
+
+(Em
+
+add)
+
+(7)
+
+(cid:13) N
+
+(cid:9)
+
+m=1
+
+Heterogeneous Ensemble for Feature Drifts in Data Streams
+
+9
+
+When constructing the ensemble classiﬁer, we estimate the added error of every
+classiﬁer member, Ek
+add, which is its accumulated error from its creation time to
+add ≈ 0, we modify
+the current time. Moreover, to alleviate the extreme case of Em
+the Equation 7 as follows:
+
+wk = (Ek
+
+add + α)
+
+−1
+
+(cid:13) N
+
+(cid:9)
+
+(Em
+
+add + α)
+
+−1
+
+(cid:14)
+
+,
+
+(8)
+
+m=1
+
+where α is a padding value which is empirically set to 0.001.
+Details of the ensemble classiﬁcation process are shown in Algorithm 2. Given
+the ensemble E where each member can classify a testing instance and output
+the result as a probability distribution vector, we use a weighting combination
+scheme to get the result. First, for each classiﬁer Ci we project the testing in-
+stance xt onto the subspace ϕi. Then, the classiﬁer Ci processes the projected
+instance and outputs a probability distribution vector. We attain the aggregated
+accuracy of Ci from its creation time, and calculate its optimal weight according
+to Equation 8 to minimize the expected added error of the ensemble. Finally,
+the ensemble’s result is set as the normalized sum of the weighted classiﬁcation
+results of the members (lines 6-7).
+
+4 Experiments and Analysis
+
+4.1 Experimental Setup
+
+For our experiments, we use three synthetic datasets and three real life datasets.
+The three synthetic datasets, SEA generator (SEA), Rotating Hyperplane (HYP),
+and LED dataset (LED), are generated from the MOA framework [1]. Concept
+drifts are generated by moving 10 centroids at a speed of 0.001 per instance in
+the RBF dataset, and changing 10 attributes at a speed of 0.001 per instance in
+the HYP dataset. The three real life datasets are: network intrusion (KDD’991),
+hand-written digit recognition (MNIST2), and protein crystallography diﬀraction
+(CRYST3) datasets. Table 1 shows the characteristics of the six datasets.
+
+We compare our algorithm HEFT-Stream with other prominent ensemble
+methods: AWE [21] and OnlineBagging [15]. The experiments were conducted
+on a Windows PC with a Pentium D 3GHz Intel processor and 2GB memory. To
+enable more meaningful comparisons, we try to use the same parameter values
+for all the algorithms. The number of classiﬁer members is set to 10 for all the
+ensemble algorithms, and the chunk size is set to 1000. To simulate the data
+stream environment, we process all experiments in a practical approach, called
+Interleaved-Chunk. In this approach, data instances are read to form a data
+chunk. Each new data chunk is ﬁrst used to test the existing model. Then it is
+used to update the model and it is ﬁnally discarded to save memory.
+
+1 http://kdd.ics.uci.edu/databases/kddcup99/kddcup99.html
+2 http://www.csie.ntu.edu.tw/ cjlin/libsvmtools/datasets
+3 http://ajbcentral.com/CrySis/dataset.html
+
+10
+
+H.-L. Nguyen et al.
+
+Table 1. Characteristics of datasets used for evaluation
+
+Name #Instances #Attributes #Classes Noise #Selected Features Ratio of FS
+
+SEA
+HYP
+LED
+KDD’99
+MNIST
+CRYST
+
+100,000
+100,000
+100,000
+494,022
+60,000
+5,500
+
+3
+10
+24
+34
+780
+1341
+
+2
+2
+3
+5
+10
+2
+
+10%
+5%
+10%
+N/A
+N/A
+N/A
+
+2.25
+6.71
+15.84
+2.33
+30.77
+7.49
+
+75%
+
+67.13%
+65.98%
+6.87%
+3.95%
+0.56%
+
+4.2 Experimental Results
+
+As AWE and OnlineBagging are homogeneous ensembles and can only work with
+one classiﬁer type, we set diﬀerent classiﬁer types for these ensembles accord-
+ingly. For AWE, we set classiﬁer members as Naive Bayes and C4.5, which are
+recommended by the authors [21], and denoted as AWE(NB) and AWE(C4.5).
+For OnlineBagging, we set its classiﬁer members as OnlineNB and CVFDT, and
+denoted as Bagging(OnlineNB) and Bagging(CVFDT) respectively. We conduct
+the experiments ten times for each dataset and summarize their average accu-
+racy and running times in Table 2. Readers may visit our website 4 for algorithms’
+implementation, more experimental results, and detailed theoretical proofs.
+
+We observe that the AWE ensemble has the worst accuracy and the longest
+running time. This is because the AWE ensemble uses traditional classiﬁers as
+its members and trains them once; when there are concept drifts, these members
+become outdated and accuracy is degraded. Moreover, the AWE ensemble always
+trains a new classiﬁer for every upcoming chunk, and this increases processing
+time. The OnlineBagging has better performance but it largely depends on the
+classiﬁer type. For example, Bagging(OnlineNB) is more accurate and faster
+than Bagging(CVFDT) for the LED dataset but Bagging(OnlineNB) become
+less precise and slower than Bagging(CVFDT) for the KDD’99 dataset. It is
+also noteworthy that both AWE and OnlineBagging do not work well with high
+dimensional datasets, such as MNIST and CRYST.
+
+Our approach, HEFT-Stream, addresses the above problems and achieves bet-
+ter performance than WCE and OnlineBagging. It achieves the best accuracy
+values and the lowest running time for most datasets. HEFT-Stream continu-
+ously updates classiﬁer members with gradual drifts, and only trains new clas-
+siﬁers whenever there are feature drifts or sudden drifts. This property not only
+enables HEFT-Stream to adapt to diﬀerent types of concept drifts but also
+conserve computational resources. Furthermore, HEFT-Stream can dynamically
+change the ratio among classiﬁer types to adapt to diﬀerent types of datasets;
+when a particular classiﬁer type works well with a certain dataset, its ratio in
+the ensemble will be increased. Finally, with integrated feature selection capabil-
+ity, HEFT-Stream only works with the most informative feature subsets which
+improves accuracy and reduces processing time. The last column of the Table 1
+
+4 http://www3.ntu.edu.sg/home2008/nguy0105/heftstream.html
+
+Heterogeneous Ensemble for Feature Drifts in Data Streams
+
+11
+
+Table 2. Comparisons of AWE(NB), AWE(C4.5), Bagging(OnlineNB), Bag-
+ging(CVFDT), and HEFT-Stream. Time is measured in seconds. For each dataset,
+the highest accuracy value is boldfaced, and the lowest running time is underlined.
+
+Dataset
+
+AWE(NB) AWE(C4.5) Bagging(OnlineNB) Bagging(CVFDT) HEFT-Stream
+Acc Time Acc Time
+SEA 88.08 6.61 88.12 26.08
+HYP 87.94 19.42 72.72 27.40
+LED 73.91 74.33 72.13 40.34
+KDD’99 95.09 280.33 94.68 281.33
+MNIST 9.87 2054.0 78.49 1246.7
+CRYST 53.70 40.38 83.30 147.00
+
+Time
+Acc Time
+21.47 89.28 22.65
+40.41 89.18 12.42
+83.00 74.07 28.02
+209.6
+142.0
+1456.00 79.36 439.00
+101.33 83.52 37.10
+
+Acc
+89.12
+88.90
+73.79
+97.75
+21.13
+76.18
+
+Acc
+87.91
+86.92
+73.93
+92.95
+9.87
+54.28
+
+Time
+
+2.9
+8.07
+26.21
+230.3
+1286.00
+57.63
+
+96.37
+
+Average 68.10 412.51 81.57 294.80
+
+67.64
+
+268.53
+
+74.48
+
+318.65 85.30 113.53
+
+shows the ratios of the selected features to the full feature sets for all datasets.
+We realize that feature selection techniques are very useful for high dimensional
+datasets. For example, the percentages of the selected features are 3.95% for the
+MNIST dataset, and only 0.56% for the CRYST dataset.
+
+5 Conclusions
+
+In this paper, we proposed a general framework to integrate feature selection and
+heterogeneous ensemble learning for stream data classiﬁcation. Feature selection
+helps to extract the most informative feature subset which accelerates the learning
+process and increases accuracy. We ﬁrst apply feature selection techniques on the
+data streams in a sliding window manner and monitor the feature subset sequence
+to detect feature drifts which represent sudden concept drifts. The heterogeneous
+ensemble is constructed from well-chosen online classiﬁers. The ratios of classiﬁer
+types are dynamically adjusted to increase the ensemble ’s diversity, and allows
+the ensemble to work well with many kinds of datasets. Moreover, the ensemble
+adapts to the severity of concept drifts; we update the online classiﬁer members
+for gradual drifts, and replace an outdated member by a new one for sudden drifts.
+We have conducted extensive experiments to show that our ensemble outperforms
+state-of-the-art ensemble learning algorithms for data streams.
+
+In our future work, we will investigate more intelligent methods to adjust the ra-
+tios of classiﬁer types as well as the ensemble size. We will continue to examine the
+relationship between concept and feature drifts and develop a metric to quantify
+concept drifts and use it to further adapt ensembles to achieve better accuracy.
+
+References
+
+1. Bifet, A., Holmes, G., Kirkby, R.: Moa: Massive online analysis. The Journal of
+
+Machine Learning Research 11, 1601–1604 (2010)
+
+2. Bifet, A., Holmes, G., Pfahringer, B., Kirkby, R., Gavald, R.: New ensemble meth-
+ods for evolving data streams. In: 15th ACM SIGKDD, pp. 139–148. ACM (2009)
+
+12
+
+H.-L. Nguyen et al.
+
+3. Breiman, L.: Bagging predictors. The Journal of Machine Learning Research 24(2),
+
+123–140 (1996)
+
+4. Breiman, L.: Random forests. The Journal of Machine Learning Research 45(1),
+
+5–32 (2001)
+
+5. Domingos, P., Hulten, G.: Mining high-speed data streams. In: The Sixth ACM
+
+SIGKDD, pp. 71–80. ACM (2000)
+
+6. Domingos, P., Pazzani, M.: On the optimality of the simple bayesian classiﬁer
+under zero-one loss. The Journal of Machine Learning Research 29(2-3), 103–130
+(1997)
+
+7. Eibl, G., Pfeiﬀer, K.-P.: Multiclass boosting for weak classiﬁers. The Journal of
+
+Machine Learning Research 6, 189–210 (2005)
+
+8. Freund, Y., Schapire, R.: Experiments with a new boosting algorithm. In: The 13th
+
+ICML, pp. 148–156 (1996)
+
+9. Friedman, J.H.: Stochastic gradient boosting. Computational Statistics & Data
+
+Analysis 38(4), 367–378 (2002)
+
+10. Fumera, G., Roli, F.: A theoretical and experimental analysis of linear combiners
+for multiple classiﬁer systems. IEEE Transactions on Pattern Analysis and Machine
+Intelligence 27(6), 942–956 (2005)
+
+11. Hsu, K.-W., Srivastava, J.: Diversity in Combinations of Heterogeneous Classiﬁers.
+In: Theeramunkong, T., Kijsirikul, B., Cercone, N., Ho, T.-B. (eds.) PAKDD 2009.
+LNCS, vol. 5476, pp. 923–932. Springer, Heidelberg (2009)
+
+12. Hulten, G., Spencer, L., Domingos, P.: Mining time-changing data streams. In:
+
+ACM SIGKDD, pp. 97–106. ACM (2001)
+
+13. Lei, Y., Huan, L.: Feature selection for high-dimensional data: A fast correlation-
+
+based ﬁlter solution. In: The 20th ICML, pp. 856–863 (2003)
+
+14. Liu, H., Yu, L.: Toward integrating feature selection algorithms for classiﬁcation
+and clustering. IEEE Transactions on Knowledge and Data Engineering 17(4),
+491–502 (2005)
+
+15. Oza, N.C.: Online bagging and boosting. In: 2005 IEEE International Conference
+
+on Systems, Man and Cybernetics, vol. 3, pp. 2340–2345. IEEE (2005)
+
+16. Sattar, H., Ying, Y., Zahra, M., Mohammadreza, K.: Adapted one-vs-all decision
+trees for data stream classiﬁcation. IEEE Transactions on Knowledge and Data
+Engineering 21, 624–637 (2009)
+
+17. Shen, C., Li, H.: On the dual formulation of boosting algorithms. IEEE Transac-
+
+tions on Pattern Analysis and Machine Intelligence 32(12), 2216–2231 (2010)
+
+18. Street, W.N., Kim, Y.: A streaming ensemble algorithm (sea) for large-scale clas-
+
+siﬁcation. In: The 7th ACM SIGKDD, pp. 377–382. ACM (2001)
+
+19. Tin Kam, H.: The random subspace method for constructing decision forests. IEEE
+Transactions on Pattern Analysis and Machine Intelligence 20(8), 832–844 (1998)
+20. Tumer, K., Ghosh, J.: Linear and order statistics combiners for pattern classiﬁca-
+
+tion. Springer (1999)
+
+21. Wang, H., Fan, W., Yu, P.S., Han, J.: Mining concept-drifting data streams using
+
+ensemble classiﬁers. In: ACM SIGKDD, pp. 226–235. ACM (2003)
+
+22. Woods, K., Philip Kegelmeyer, J.W., Bowyer, K.: Combination of multiple classi-
+ﬁers using local accuracy estimates. IEEE Transactions on Pattern Analysis and
+Machine Intelligence 19(4), 405–410 (1997)
+
+23. Zhenyu, L., Xindong, W., Bongard, J.: Active learning with adaptive heterogeneous
+
+ensembles. In: The 9th IEEE ICDM, pp. 327–336 (2009)
+
+

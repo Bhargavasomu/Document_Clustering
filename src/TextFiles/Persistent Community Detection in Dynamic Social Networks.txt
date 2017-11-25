@@ -1,0 +1,1649 @@
+Persistent Community Detection
+
+in Dynamic Social Networks
+
+Siyuan Liu1, Shuhui Wang2, and Ramayya Krishnan1
+
+1 Heinz College, Carnegie Mellon University, Pittsburgh, PA, 15213, USA
+
+{siyuan,rk2x}@cmu.edu
+
+2 Key Lab of Intell. Info. Process., Inst. of Comput. Tech., CAS, Beijing, 100190, China
+
+wangshuhui@ict.ac.cn
+
+Abstract. While community detection is an active area of research in social net-
+work analysis, little effort has been devoted to community detection using time-
+evolving social network data. We propose an algorithm, Persistent Community
+Detection (PCD), to identify those communities that exhibit persistent behavior
+over time, for usage in such settings. Our motivation is to distinguish between
+steady-state network activity, and impermanent behavior such as cascades caused
+by a noteworthy event. The results of extensive empirical experiments on real-life
+big social networks data show that our algorithm performs much better than a set
+of baseline methods, including two alternative models and the state-of-the-art.
+
+Keywords: Community detection, persistent behavior, social networks.
+
+1 Introduction
+
+Much effort has been devoted to the development of community detection algorithms
+[7,2,3,5], which can be used to identify clusters of nodes in social network data whose
+connections exhibit similar tendencies. Such clusterings may be intended for use as a
+predictive feature, or as a crude summary of network structure. In empirical studies,
+these algorithms often produce clusters that agree with general intuition about the net-
+work that is being studied, corresponding closely with known afﬁliations or genres held
+by the network nodes.
+
+Here we develop a community detection model for time-evolving network data, and
+use this model to analyze a real-world call network. This data set is challenging to
+analyze, in part because of its large size (3.6 million users), and more importantly,
+because its structure also appears to change over time. To illustrate that the network
+is time-varying, Figure 1 shows a Q-Q plot of the degree distribution for calls made
+between 7-8AM and 8-9AM on a single day. The plot suggests that 7-8AM exhibits
+higher call density, and also a more heavy-tailed distribution (i.e., the largest values of
+the degree distribution grow more extreme). However, it is unclear to what extent the
+change in layout is due to time-varying structure (as opposed to being an artifact of the
+visualization process), and more importantly, how to quantify our observations.
+
+In light of these concerns, we take a statistical model-based approach. Statistical
+modeling of dynamic network structure is challenging, and still nascent as a ﬁeld of
+research. Sociological theories for dynamic networks are not as well developed as for
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part I, LNAI 8443, pp. 78–89, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+Persistent Community Detection in Dynamic Social Networks
+
+79
+
+(cid:3)
+
+(cid:21)(cid:91)(cid:3)(cid:20)(cid:19)(cid:25)
+
+(cid:20)(cid:17)(cid:24)
+
+(cid:20)
+
+(cid:19)(cid:17)(cid:24)
+
+(cid:48)
+(cid:36)
+(cid:28)
+(cid:16)
+(cid:27)
+
+(cid:3)
+
+(cid:3)
+
+(cid:19)
+(cid:19)
+
+(cid:21)
+
+(cid:23)
+(cid:26)(cid:16)(cid:27)(cid:3)(cid:36)(cid:48)
+
+(cid:25)
+
+(cid:27)
+
+(cid:20)(cid:19)
+(cid:91)(cid:3)(cid:20)(cid:19)(cid:23)
+
+Fig. 1. Dynamics in mobile phone social networks on March 3rd, 2008. Q-Q plot of call volumes
+from 7-8 AM and 8-9 AM.
+
+static networks, and hence less guidance is available for modeling. Perhaps due to this,
+existing time-varying models are typically designed to model many potential types of
+behavior [14]. Here we take a different approach. Our model is designed to detect only
+a single type of behavior; speciﬁcally, we ﬁnd communities that exhibit persistent lev-
+els of communication over time. Our motivation is to distinguish between steady-state
+activity and impermanent behavior, such as cascades caused by a noteworthy event. We
+feel that persistence is the simplest type of dynamic behavior, making it a logical next
+step from the static setting.
+
+Our contributions are summarized as follows.
+
+1. We formally deﬁne a new network structure, persistent community, which exhibits
+
+persistent behavior/ structure over time.
+
+2. We propose a novel algorithm to detect persistent community by a time and degree
+
+corrected blockmodel. We also provide inference of the model.
+
+3. We conduct extensive empirical experiments on real-life big social networks data.
+
+Interesting ﬁndings and discussions are provided.
+
+The rest of the paper is organized as follows. Section 2 surveys the previous work
+on community detection in dynamic networks. Section 3 proposes our algorithm. The
+empirical experiment results are reported in Section 4. At last, we conclude our work
+and give the future research directions in Section 5.
+
+2 Related Work
+
+The literature on static community detection is very large. Various extensions to the
+basic community model have been proposed, such as overlapping or mixed community
+membership [1,13], degree-corrections which allow for heterogeneity within commu-
+nities [6,16], and community detection from trajectories [12]. In particular, without
+degree-correction, maximum likelihood methods often group the nodes according to
+their degree (i.e. their number of neighbors) [6]. As such behavior is typically undesir-
+able, we will also include degree-corrections in our model.
+
+Recent attention has been paid to community detection in dynamic social networks.
+Existing approaches, such as [7,8,4], generally detect communities separately for each
+time slot, and then determine correspondences by various methods [15,18,17]. How-
+ever, such approaches often result in community structures with high temporal variation
+
+80
+
+S. Liu, S. Wang, and R. Krishnan
+
+[10,9]. Our approach differs in that inference in performed jointly across time, so as to
+ﬁnd communities with low temporal variation (excepting network-wide ﬂuctuations in
+call volume, such as night/day and weekday/weekend cycles).
+
+3 Methodology
+
+Our model can be considered to be a time-varying version of degree-corrected block-
+model in [6], specialized to directed graphs, where the expected call volumes within
+each community are assumed to all follow a single network-wide trajectory over time.
+
+3.1 Time and Degree-Corrected Blockmodel
+General Model. We assume a network of N nodes over T time periods, where nodes
+are free to leave and re-enter the network. Let It ⊂ {1, . . . , N}, t = 1, . . . , T denote
+the subset of nodes which are present in the network at time t. Let K denote the number
+of communities, which determines the model order. Let A(t) ∈ NN×N denote a matrix
+of call counts at time t = 1, . . . , T ; i.e., for i (cid:4)= j, A
+(t)
+ij denotes the number of calls
+from node i to node j at time t. Our model is that the elements of A(1), . . . , A(T )
+are independent Poisson random variables, whose parameters are jointly parameterized
+(with explanation of all parameters to follow):
+
+(cid:2)
+
+(cid:3)
+
+(t)
+ij
+
+λ
+
+A
+
+(t)
+ij
+
+∼ Pois
+
+(cid:4)
+
+(t)
+λ
+ij =
+
+(t)
+i φ
+
+(t)
+j μ(t)ω
+
+θ
+
+0
+
+(t)
+
+gigj if i ∈ It, j ∈ It
+
+otherwise
+
+We see that the expected number of calls λij for each dyad (i, j) is a function of
+parameters g, ω, θ, φ, and μ. We now describe each parameter, its allowable values, and
+its function:
+1. The vector g ∈ {1, . . . , K}N assigns each node to a latent community in 1, . . . , K.
+2. The matrix ω(t) ∈ RK×K gives the expected total call volume between each com-
+(t)
+ab is the expected call volume from
+munity at time t = 1, . . . , T . In other words, ω
+community a to community b at time t. To enforce persistence, ω is restricted to
+satisfy the following constraint:
+
+(cid:2))
+aa = ω(t
+ω(t)
+aa
+
+(cid:2) ∈ 1, . . . , T, a ∈ 1, . . . , K.
+
+t, t
+
+(1)
+
+As a result, intra-community call volumes are modeled as being constant over
+time (up to the network-wide effect of μ, which we discuss shortly), while inter-
+community call volumes may follow arbitrary trajectories over time.
+3. The vector θ(t) ∈ [0, 1]N controls the out-degree for each node at time t = 1, . . . , T .
+Nodes whose element in θ(t) is high will have higher expected outgoing call vol-
+umes than whose with low values in θ(t). This allows for heterogeneity within com-
+munities. For identiﬁability, θ is restricted to satisfy the following constraint:
+
+(cid:5)
+
+i∈It,gi=a
+
+(t)
+i = 1
+
+θ
+
+t = 1, . . . , T, a = 1, . . . , K
+
+Persistent Community Detection in Dynamic Social Networks
+
+81
+
+(t)
+The effect of this constraint is that ω
+ab determines the total number of calls from
+community a to community b, while θ determines the proportion of calls emanating
+from each node in community a.
+4. The vector φ(t) ∈ [0, 1]N controls the in-degree for each node at time t = 1, . . . , T ,
+
+but is otherwise analogous to θ. A similar constraint is also enforced:
+
+(cid:5)
+
+i∈It,gi=a
+
+(t)
+φ
+i = 1
+
+t = 1, . . . , T, a = 1, . . . , K.
+
+5. The scalar μ(t) ∈ [0, 1] for t = 1, . . . , T , modiﬁes the total network call volume
+as a function of t. This allows for network-wide trends to be modelled, such as
+day/night or weekday/weekend cycles. For identiﬁability, μ is restricted to satisfy
+the following constraint:
+
+T(cid:5)
+
+μ(t) = 1.
+
+t=1
+
+(1)
+The effect of this constraint is that T ω
+aa determines the total number of calls within
+community a, while μ determines the proportion of those calls occurring within
+each time slot.
+
+Discussion. While self-calls are disallowed in a phone network, we note that our model
+(t)
+ii . This is a simpliﬁcation which de-
+assigns nonzero probability to positive values of A
+couples estimation of θ(1:T ), φ(1:T ), μ(1:T ) and ω(1:T ), leading to analytically tractable
+expressions for the parameter estimates. Self-calls predicted under the model should
+be disregarded as a modeling artifact. As the number of predicted self-calls will be a
+vanishing fraction of the total call volume, the effect will be negligible.
+
+In the data, there exist pairs of individuals with extremely high call volumes, exceed-
+ing an average of 10 calls to each other per day. Such pairs are very sparse in the data
+(< 1% of all dyads), and do not seem to conform to the idea of community-based call-
+ing behavior. It is unlikely that the Poisson-based community model will explain these
+dyads. As such, we have opted to treat these dyads as outliers, and remove them before
+estimating the model parameters. Our interpretation is that the data is best described
+by the community based model, plus a small set of dyads whose high call volumes
+distinguish them from the overall network.
+
+We note that θ and φ involve large numbers of parameters, as they are allowed to vary
+over time. A simpler model, in which θ and φ are constant over time, was considered.
+However, formulas for parameter inference become signiﬁcantly more complicated in
+this case, unless It is also constant over time. If It is constant over time, so that nodes
+cannot enter and leave the network, then the equations to be presented in Section 3.2
+may be used with only slight modiﬁcation if θ and φ are held constant over time.
+
+3.2 Inference
+We will estimate g and {θ(t), φ(t), μ(t), ω(t)}T
+t=1 by maximum likelihood. We show
+here that given g, the maxmizing values of the remaining parameters can be found
+
+82
+
+S. Liu, S. Wang, and R. Krishnan
+
+analytically, so that the maximizing the likelihood consists of a search over all commu-
+nity assignments in {1, . . . , K}N . While this exact maximization is computationally
+intractable, heuristic methods seem to give good results in practice, and we use a greedy
+search method described in [6] with multiple restarts.
+We now derive formula for the remaining parameter estimates given g. The joint
+distribution of A(1:T ) ≡ (A(1), . . . , A(T )) (or equivalently the likelihood) is given by
+the product of Poisson distributions
+
+L(θ, φ, ω, μ, g; A(1:T )) =
+
+(cid:3)
+
+(t)
+ij
+
+A
+
+(cid:2)
+θ
+
+(t)
+i φ
+
+T(cid:6)
+
+(cid:6)
+
+t=1
+
+× exp
+
+i,j∈It
+(cid:2)
+−θ
+
+(t)
+gigj
+
+(t)
+j μ(t)ω
+Aij!
+(cid:3)
+
+(t)
+i φ
+
+(t)
+j μ(t)ω(t)
+
+gigj
+
+.
+
+This expression can be simpliﬁed using the following intermediate terms. Given g
+
+and A(1:T ), for all i, j, t let:
+
+(cid:5)
+
+A
+j∈It
+(cid:5)
+
+(t)
+i· =
+d
+
+m
+
+(t)
+ab =
+
+i,j∈It
+T(cid:5)
+
+m(t)
+aa
+
+t=1
+
+m(·)
+aa =
+
+(cid:5)
+
+(t)
+ij
+
+A
+
+(t)·i =
+d
+
+(t)
+ji ,
+ij 1{gi = a, gj = b},
+
+j∈It
+
+(t)
+
+A
+
+(t)·· =
+
+m
+
+K(cid:5)
+
+a=1
+
+m(t)
+aa .
+
+In words, d
+
+(t)
+i· and d
+
+(t)·i are the out-degree and in-degree of node i at time t; m
+
+(t)
+ab is
+(·)
+the call volume between communities a and b at time t; m
+aa is the total call volume
+within community a over all time, and m
+is the total intra-community call volume
+(versus inter-community call volume) at time t. Using these terms, the likelihood L can
+be written as
+
+(t)··
+
+L(θ, φ, ω, μ, g; A
+
+(1:T )) =
+
+× T(cid:3)
+
+t=1
+
+(cid:2)
+
+t,i,j Aij!
+K(cid:3)
+
+(cid:4)
+(cid:5)
+
+a,b=1
+
+(cid:7)
+
+(cid:4)
+
+T(cid:3)
+
+N(cid:3)
+
+1
+
+(cid:6)d(t)
+i·
+
+(cid:5)
+θ
+
+(t)
+i
+
+(cid:6)d(t)·i
+
+(cid:5)
+φ
+
+(t)
+i
+
+(cid:7)
+
+t=1
+
+i=1
+(cid:6)m(t)
+
+(t)
+
+(t)
+ab
+
+ω
+
+μ
+
+ab exp
+
+(cid:7)
+
+(cid:9)
+
+,
+
+(t)
+ab
+
+ω
+
+(t)
+
+i∈It,gi=a θ
+
+(t)
+i
+
+and
+
+i∈It,gi=a φ
+
+(t)
+i = 1. The
+
+(cid:8)−μ
+(cid:7)
+
+(cid:3)
+
+where we have used the constraints that
+function (cid:6) ≡ log L is given by
+
+T(cid:5)
+
+N(cid:5)
+
+(cid:6)(θ, φ, μ, g) =
+
+(cid:2)
+
+log θ
+
+(t)
+i·
+d
+(cid:2)
+
+(t)·i
+
+(t)
+i + d
+(cid:8)
+μ(t)ω
+
+(t)
+ab
+
+(t)
+log φ
+i
+(cid:9)
+
+− μ(t)ω
+
+(cid:3)
+
+.
+
+(t)
+ab
+
+t=1
+
+T(cid:5)
+
+i=1
+
+K(cid:5)
+
++
+
+m
+
+t=1
+
+a,b=1
+
+(t)
+ab log
+
+Persistent Community Detection in Dynamic Social Networks
+
+83
+
+We observe that (cid:6) can be grouped into terms which can be separately maximized,
+
+T(cid:5)
+
+(cid:6)(θ, φ, μ, g) =
+
+N(cid:5)
+
+log θ
+
+(cid:2)
+(t)
+i·
+d
+(cid:2)
+K(cid:5)
+m(t)
+
+t=1
+
+i=1
+
+T(cid:5)
+
+(cid:3)
+
+(t)
+i + d
+
+(t)·i
+
+(t)
+log φ
+i
+
+(cid:3)
+
+− μ(t)ω(t)
+
+aa
+
+aa log ω(t)
+
+aa
+
++
+
++
+
++
+
+t=1
+
+T(cid:5)
+
+a=1
+
+K(cid:5)
+
+t=1
+
+K(cid:5)
+
+a=1
+
+(cid:5)
+
+t=1
+
+a(cid:4)=b
+
+m(t)
+(cid:2)
+
+aa log μ(t)
+(cid:8)
+μ(t)ω
+
+(t)
+ab log
+
+m
+
+(cid:9)
+
+(t)
+ab
+
+(cid:3)
+
+.
+
+− μ(t)ω
+
+(t)
+ab
+
+For ﬁxed g, the maximizing value of the other parameters {θ(t), φ(t), μ(t), ω(t)}T
+
+t=1
+
+can be analytically shown to satisfy for t = 1, . . . , T :
+
+ω
+
+(t)··
+
+μ(t) =
+
+(t)··(cid:7)
+m
+T
+τ =1 m
+(t)
+m
+(t)
+ab
+ab =
+μ(t)
+aa = m(·)
+ω(t)
+(cid:7)
+i∈It di·1{gi = a}
+(cid:7)
+i∈It d·i1{gi = a}
+
+(t)
+φ
+i =
+
+(t)
+i =
+
+(t)
+i·
+d
+
+(t)·i
+d
+
+aa
+
+θ
+
+a (cid:4)= b
+
+a = 1, . . . , K
+
+i = 1, . . . , N
+
+i = 1, . . . , N
+
+Subsitution of the optimal values yields a function of g:
+
+(cid:6)(g) =
+
+T(cid:5)
+
+K(cid:5)
+
+(cid:8)
+
+(cid:2)
+
+H
+(cid:5)
+
+t=1
+
+a=1
+
+T(cid:5)
+
++
+
+t=1
+
+a(cid:4)=b
+
+h(m
+
+{d
+i· }i∈It,gi=a
+
+(t)
+
+(cid:3)
+
++ H
+
+(t)
+ab ) +
+
+K(cid:5)
+
+a=1
+
+h(m(·)
+
+aa) + H
+
+(cid:3)(cid:9)
+
+(cid:2)
+{d
+(t)·i
+(cid:2)
+
+}i∈It,gi=a
+(cid:3)
+
+{m
+
+(t)·· }T
+
+t=1
+
+,
+
+(2)
+
+(cid:7)
+
+where the mapping H is given by H({xi}k
+k
+i=1 xi log
+and the mapping h is given by h(x) = x log x − x for x ∈ R+.
+We estimate the model parameters by optimizing (cid:6)(g) over all group assignments
+g ∈ {1, . . . , K}N. While it is intractable to ﬁnd a global maximum, a local maximum
+can be found using the method described in [6]. After multiple restarts, the highest
+scoring local optima was chosen for the parameter estimate.
+
+for x ∈ Rk
++,
+
+i=1) =
+
+k
+j=1 xj
+
+xi(cid:2)
+
+84
+
+S. Liu, S. Wang, and R. Krishnan
+
+4 Empirical Experiment Results
+
+4.1 Description of Data and Fitting Procedure
+
+The call records correspond to all mobile calls involving a particular service provider,
+with origin and destination within a particular city region, in the year 2008. The city
+area is roughly 8700 km2, is covered by 5120 base stations, and serves 3.6 million
+mobile phone users. The data set is roughly 1 TB in size (more than 10 billion phone
+call records). The data set was prepared by the service provider, for the purpose of data
+mining to improve service and marketing capabilities. It contains call metadata (such
+as phone number, date of call, instant location of call), linked with customer proﬁle
+information.
+
+Using the call metadata, a set of directed adjacency matrices
+
+was
+created, with nodes corresponding to customers (i.e., phone numbers), and edge weights
+corresponding to the number of calls between the sender and receiver on each day of
+the year. Community labels g were chosen to maximize (cid:6) as given by Eq.(2), using the
+algorithm described in Section 3.2, with the number of groups K chosen to be 800.
+
+(cid:10)
+A(1), . . . , A(365)
+
+(cid:11)
+
+4.2 Out of Sample Prediction
+
+To test the model, out of sample prediction was conducted, by randomly withholding
+(cid:3)
+5% of the dyads from the ﬁtting procedure. After ﬁtting, the probability of connection
+) was used to predict which of the with-
+according to the model (i.e., P
+held dyads had non-zero call volume. The model was highly predictive of the withheld
+dyads, with precision is 0.74±0.05 and recall is 0.53±0.05.
+
+(t)
+ij > 0
+
+(cid:2)
+
+A
+
+4.3 Description of Model Fit
+
+To describe the ﬁtted model, we give the following statistics. From the CDF giving
+the fraction of customers belong to the k largest communities, for k = 1, . . . , 800, it
+shows that the majority of customers are concentrated in the 10 largest communities
+by the algorithm. Figure 2 (a) shows the ﬁtted intra-community call densities, i.e., the
+call volume divided by the number of dyads in each community. The ﬁgure shows that
+the network is quite dense, with 30% of users in the largest community, in which every
+pair of members experienced an average of 0.008 phone calls over the course of a year.
+Figure 2 (b) plots the call densities (i.e., normalizing by the square of the community
+ab , for a (cid:4)= b and
+size). Figure 2 (c) shows the ﬁtted inter-community call volumes ω
+t = 1, . . . , T , as a quantile-plot. Based on Figure 2 (b) and Figure 2 (c), we see that the
+inter- and intra- community parameters follow different different distributions. Figure
+3 (a) and 3 (b) shows the ﬁtted degree corrections θ and φ as quantile plots. Figure 4
+shows the ﬁtted time-corrections μ(1), . . . , μ(T ). We note that larger values of μ occur
+on holidays and weekends.
+
+(t)
+
+To further understand the inferred communities, we compared the community labels
+g with groupings produced by various customer covariates included in the customer
+proﬁle information:
+
+Persistent Community Detection in Dynamic Social Networks
+
+85
+
+6400
+
+3200
+
+1600
+
+800
+
+400
+
+e
+m
+u
+l
+o
+v
+ 
+l
+l
+a
+c
+ 
+y
+t
+i
+n
+u
+m
+m
+o
+c
+−
+a
+r
+t
+n
+I
+
+200
+1
+Index of community (decreasing size rank)
+
+200
+
+800
+
+400
+
+600
+
+0.01
+
+0.008
+
+0.006
+
+0.004
+
+0.002
+
+y
+t
+i
+s
+n
+e
+d
+ 
+l
+l
+a
+c
+ 
+y
+t
+i
+n
+u
+m
+m
+o
+c
+−
+a
+r
+t
+n
+I
+
+0
+0
+
+0.008
+
+0.006
+
+0.004
+
+0.002
+
+y
+t
+i
+s
+n
+e
+d
+ 
+l
+l
+a
+c
+ 
+y
+t
+i
+n
+u
+m
+m
+o
+c
+−
+r
+e
+t
+n
+I
+
+0
+0
+
+0.6
+0.2
+Call Density Quantiles
+
+0.4
+
+0.8
+
+0.6
+0.2
+Call Density Quantiles
+
+0.4
+
+0.8
+
+(a) Intra-community call vol-
+ume distribution
+
+(b) Intra-community call vol-
+ume density distribution
+
+(c) Inter-community call vol-
+ume density distribution
+
+Fig. 2. (a) Call volumes for within-community communication, (b) Call densities for within-
+community communication, (c) Call densities for between-community communication
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+θ
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+φ
+
+0
+0
+
+0.2
+
+0.4
+0.6
+θ Quantiles
+
+0.8
+
+1
+
+0
+0
+
+0.2
+
+0.4
+0.6
+φ Quantiles
+
+0.8
+
+1
+
+(a) θ quantiles.
+
+(b) φ quantiles.
+
+Fig. 3. Fitted values of in-degree and out-degree corrections θ and φ, in ranked order
+
+– Age: the age of the customer, grouped by increments of six months.
+– Gender: the gender of the customers.
+– Workplace: the geographic region containing the registered workplace address of
+the customer. In our record, we have almost ten thousand workplace address and
+half a million customers provide this information.
+
+– Residence: the geographic region containing the registered home address of the
+customer. In our record, we have almost ten thousand workplace address and half a
+million customers provide this information.
+
+– Shopping mall: the shopping mall location. In our record, we have ﬁfty shopping
+mall locations. On the other hand, based on the location information of each call,
+we are able to localize each customer, as reported in [11].
+
+– Occupation: The occupational category reported by the customer. In our record,
+
+one hundred thousand customers have this information.
+
+Table 1 (second column) reports the Jacaard similarity between the inferred community
+labels g and the customer covariates 1. We ﬁnd that the model has high similarity with
+Age, Workplace, and Residence, and Occupation, but not with Gender and Shopping
+Mall.
+
+Figure 5 (a) shows the correlation coefﬁcient for the intra-community and inter-
+
+community call volumes, for time lags varying from 10 to 40 weeks.
+1 J(A, B) = |A∩B|
+
+|A∪B| , where A and B are two label sets.
+
+86
+
+S. Liu, S. Wang, and R. Krishnan
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+μ
+
+0
+0
+
+0.2
+
+0.4
+
+0.6
+
+0.8
+
+1
+
+Time (365 days)
+
+Fig. 4. Time-corrections μ(t) as a function of time
+
+Table 1. Community Detection Evaluation on PCD
+
+Age
+
+Gender
+
+Covariate
+
+A2
+PCD A1
+0.713 0.387 0.331
+0.137 0.007 0.008
+0.728 0.411 0.527
+0.617 0.208 0.317
+Shopping Mall 0.21 0.087 0.012
+0.678 0.310 0.423
+
+Workplace
+Residence
+
+Occupation
+
+The ﬁgure shows that the observed intra-community call volumes are more persistent
+over time compared to the inter-community call volumes, suggesting that the method is
+successful in ﬁnding communities with persistent intra-community call volumes.
+
+4.4 Work v.s. Leisure Groupings
+
+To differentiate work and leisure interactions, the data was separated into weekdays and
+weekends, and then g was ﬁt separately by Eq.(2) on the two scenarios. As shown in
+Table 2, we found that the weekday groupings corresponded more closely to (place of
+employment, or some other covariate), which the weekend groups were more closely
+aligned with family relationships (which are recorded in the data set).
+
+We also notice that the usage of persistence constraints had a larger effect in the
+weekend groups; this suggests that the social/weekend groups are less visible in the
+data (i.e., a “weaker signal”), causing the model regularization to have greater effect.
+
+Table 2. Weekday grouping v.s. weekend grouping (Jacaard Similarity)
+
+Covariate Weekday Weekend
+
+Age
+
+Gender
+
+Workplace
+Residence
+
+Shopping Mall
+
+Occupation
+
+0.731
+0.152
+0.801
+0.578
+0.124
+0.831
+
+0.702
+0.120
+0.568
+0.817
+0.453
+0.542
+
+Persistent Community Detection in Dynamic Social Networks
+
+87
+
+0.8
+
+0.7
+
+0.6
+
+0.5
+
+0.4
+
+t
+n
+e
+i
+c
+i
+f
+f
+e
+o
+c
+ 
+n
+o
+i
+t
+a
+l
+e
+r
+r
+o
+C
+
+0.3
+
+10
+
+In 10 (SD=0.02)
+In 20 (SD=0.03)
+In 30 (SD=0.05)
+Out 20 (SD=0.09)
+Out 40 (SD=0.13)
+
+20
+
+Time (weeks)
+
+30
+
+0.8
+
+0.7
+
+0.6
+
+0.5
+
+0.4
+
+t
+n
+e
+i
+c
+i
+f
+f
+e
+o
+c
+ 
+n
+o
+i
+t
+a
+l
+e
+r
+r
+o
+C
+
+In 10 (SD=0.03)
+In 20 (SD=0.06)
+In 30 (SD=0.08)
+Out 20 (SD=0.14)
+Out 40 (SD=0.19)
+
+0.8
+
+0.7
+
+0.6
+
+0.5
+
+0.4
+
+t
+n
+e
+i
+c
+i
+f
+f
+e
+o
+c
+ 
+n
+o
+i
+t
+a
+l
+e
+r
+r
+o
+C
+
+In 10 (SD=0.04)
+In 20 (SD=0.08)
+In 30 (SD=0.09)
+Out 20 (SD=0.18)
+Out 40 (SD=0.19)
+
+40
+
+0.3
+
+10
+
+20
+
+Time (weeks)
+
+30
+
+40
+
+0.3
+
+10
+
+20
+
+Time (weeks)
+
+30
+
+40
+
+(a) Persistence evaluation of
+our PCD algorithm.
+
+(b) Persistence evaluation of
+the alternative model 1.
+
+(c) Persistence evaluation of
+the alternative model 2.
+
+Fig. 5. Persistence evaluation. Within-group call volumes are persistent over time, up to network-
+wide trends. In contrast, the call volumes in the off-diagonal plots are much lower, and do not
+follow network-wide trends, suggesting that communication between groups was more sporadic.
+The persistence of the communities detected by alternative model 1 and 2 are not good as the
+result of PCD.
+
+4.5 Comparison with Other Community Detection Algorithms
+
+The results of our method were compared against several other algorithms. Speciﬁcally:
+
+– A1: The persistence constraint ω
+
+(cid:2))
+(t
+aa given by Eq. 1 is removed when ﬁtting
+the model. As a result, the intra-community expected call volumes are no longer
+constrained to follow any particular trajectory over time.
+
+(t)
+aa = ω
+
+– A2: A static degree-corrected blockmodel, as described in [6], is ﬁt to the static
+
+(cid:7)
+
+matrix A =
+
+T
+
+t=1 A(t).
+
+– DSBM: A bayesian approach [17] for detecting communities in dynamic social
+
+networks.
+
+Under the algorithm A1, as shown in Table 1 (third column), the groupings differed
+signiﬁcantly compared to those found by our proposed method, and did not correspond
+as well to observed covariates, as described in Table 1 (second column). Figure 5 (b)
+shows the average correlation coefﬁcients for the intra- and inter-community call vol-
+umes. We observe that the coefﬁcients are lower compared to our proposed algorithm,
+suggesting that the call volumes are less persistent over time.
+
+Under the algorithm A2, similar ﬁndings resulted, as shown in Table 1 (fourth col-
+umn) and Figure 5 (c). It is interesting that the similarity results of A1 and A2 are
+different and can be interpreted by the methods we use. For A1, we release the persis-
+tence constraint for intra-community connection, while for A2, we use a static model.
+For Age and Gender, A1 and A2 give similar results, but for Workplace, Residence
+and Occupation, A2 can give much better similarity result than A1, while for Shopping
+Mall, A1 is better. It means in working places and resident locations, people prefer to
+make connections within communities, while in shopping mall locations, the dynamics
+of social connection is much stronger and impacted by time of day and day of week.
+We can further interpret the result as that human social behavior is not only impacted
+by real life behaviors, but also the time of day and day of week.
+
+88
+
+S. Liu, S. Wang, and R. Krishnan
+
+3000
+
+2500
+
+2000
+
+1500
+
+1000
+
+)
+s
+d
+n
+o
+c
+e
+s
+(
+ 
+t
+s
+o
+c
+ 
+e
+m
+T
+
+i
+
+500
+1
+
+A1
+A2
+Our Method
+DSBM
+
+2
+
+3
+
+Number of nodes (million)
+
+4
+
+Fig. 6. Efﬁciency evaluation of different algorithms. The running time cost of our algorithm
+(PCD) is much lower than two other baseline algorithms.
+
+4.6 Computational Runtime
+
+In Figure 6, we report computational runtimes for the different algorithms. The results
+show that our method runs much faster than two other baseline methods. For a ﬁxed
+number of random restarts, the runtime scales nearly linearly for the graph sizes con-
+sidered here. All algorithms were conducted on a standard server (Linux), with four
+Intel Core Quad CPUs, Q9550 2.83 GHz and 32 GB main memory.
+
+5 Conclusion and Future Work
+
+In this paper, we studied an interesting but challenging problem, persistent community
+detection in evolving social graphs. Extensive empirical experiment results show that
+our proposed method performs much better than a set of baseline methods, in merits of
+persistence in time series analysis, consistency in social graph structure and efﬁciency
+in algorithm running time cost.
+
+In the future, we are going to apply our method to online social networks (e.g.,
+Facebook and Twitter), and then we would like to compare the persistent community in
+mobile social networks with the persistent community in online social networks.
+
+Acknowledgments. This research was supported by the Singapore National Research
+Foundation under its International Research Centre @ Singapore Funding Initiative and
+administered by the IDM Programme Ofﬁce, Media Development Authority (MDA)
+and the Pinnacle Lab at Singapore Management University. Shuhui Wang was sup-
+ported in part by National Basic Research Program of China (973 Program):
+2012CB316400, and National Natural Science Foundation of China: 61303160. The au-
+thors also thank David Choi for valuable discussions and support regarding this work.
+
+References
+
+1. Anandkumar, A., Ge, R., Hsu, D., Kakade, S.M.: A tensor spectral approach to learning
+
+mixed membership community models. CoRR, –1–1 (2013)
+
+2. Barbieri, N., Bonchi, F., Manco, G.: Cascade-based community detection. In: WSDM 2013,
+
+pp. 33–42 (2013)
+
+3. D’Amore, R.J.: Expertise community detection. In: SIGIR 2004, pp. 498–499 (2004)
+
+Persistent Community Detection in Dynamic Social Networks
+
+89
+
+4. Drugan, O.V., Plagemann, T., Munthe-Kaas, E.: Detecting communities in sparse manets.
+
+IEEE/ACM Trans. Netw, 1434–1447 (2011)
+
+5. Fortunato, S.: Community detection in graphs. CoRR, –1–1 (2009)
+6. Karrer, B., Newman, M.: Stochastic blockmodels and community structure in networks.
+
+Physical Review E 83(1), 016107 (2011)
+
+7. Leskovec, J., Lang, K.J., Mahoney, M.W.: Empirical comparison of algorithms for network
+
+community detection. In: WWW 2010, pp. 631–640 (2010)
+
+8. Lin, W., Kong, X., Yu, P.S., Wu, Q., Jia, Y., Li, C.: Community detection in incomplete
+
+information networks. In: Proc. of WWW 2012 (2012)
+
+9. Lin, Y.-R., Chi, Y., Zhu, S., Sundaram, H., Tseng, B.L.: Facetnet: a framework for analyzing
+communities and their evolutions in dynamic networks. In: WWW 2008, pp. 685–694 (2008)
+10. Lin, Y.-R., Chi, Y., Zhu, S., Sundaram, H., Tseng, B.L.: Analyzing communities and their
+
+evolutions in dynamic social networks. TKDD, –1–1 (2009)
+
+11. Liu, S., Kang, L., Chen, L., Ni, L.M.: Distributed incomplete pattern matching via a novel
+
+weighted bloom ﬁlter. In: ICDCS 2012, pp. 122–131 (2012)
+
+12. Liu, S., Wang, S., Jeyarajah, K., Misra, A., Krishnan, R.: TODMIS: Mining communities
+
+from trajectories. In: ACM CIKM (2013)
+
+13. Nguyen, N.P., Dinh, T.N., Tokala, S., Thai, M.T.: Overlapping communities in dynamic net-
+
+works: their detection and mobile applications. In: MOBICOM 2011, pp. 85–96 (2011)
+
+14. Skyrms, B., Pemantle, R.: A dynamic model of social network formation. Proceedings of the
+
+National Academy of Sciences of the United States of America 97(16), 9340–9346 (2000)
+
+15. Tang, L., Wang, X., Liu, H.: Community detection via heterogeneous interaction analysis.
+
+Data Min. Knowl. Discov., 1–33 (2012)
+
+16. Yan, X., Jensen, J.E., Krzakala, F., Moore, C., Shalizi, C.R., Zdeborov, L., Zhang, P., Zhu,
+
+Y.: Model selection for degree-corrected block models. CoRR, –1–1 (2012)
+
+17. Yang, T., Chi, Y., Zhu, S., Gong, Y., Jin, R.: Detecting communities and their evolutions in
+
+dynamic social networks - a bayesian approach. Machine Learning, 157–189 (2011)
+
+18. Zhang, Y., Wang, J., Wang, Y., Zhou, L.: Parallel community detection on large networks
+
+with propinquity dynamics. In: KDD 2009, pp. 997–1006 (2009)
+
+

@@ -1,0 +1,1045 @@
+Finding Itemset-Sharing Patterns in a Large
+
+Itemset-Associated Graph
+
+Mutsumi Fukuzaki1, Mio Seki1, Hisashi Kashima2, and Jun Sese1
+
+1 Dept. of Computer Science, Ochanomizu Univ. 2-1-1 Otsuka, Bunkyo, Tokyo, Japan
+2 Dept. of Math. Informatics, Univ. of Tokyo. 7-3-1 Hongo, Bunkyo, Tokyo, Japan
+
+Abstract. Itemset mining and graph mining have attracted consider-
+able attention in the ﬁeld of data mining, since they have many impor-
+tant applications in various areas such as biology, marketing, and social
+network analysis. However, most existing studies focus only on either
+itemset mining or graph mining, and only a few studies have addressed
+a combination of both. In this paper, we introduce a new problem which
+we call itemset-sharing subgraph (ISS) set enumeration, where the task
+is to ﬁnd sets of subgraphs with common itemsets in a large graph in
+which each vertex has an associated itemset. The problem has various
+interesting potential applications such as in side-eﬀect analysis in drug
+discovery and the analysis of the inﬂuence of word-of-mouth communica-
+tion in marketing in social networks. We propose an eﬃcient algorithm
+ROBIN for ﬁnding ISS sets in such graph; this algorithm enumerates
+connected subgraphs having common itemsets and ﬁnds their combina-
+tions. Experiments using a synthetic network verify that our method
+can eﬃciently process networks with more than one million edges. Ex-
+periments using a real biological network show that our algorithm can
+ﬁnd biologically interesting patterns. We also apply ROBIN to a citation
+network and ﬁnd successful collaborative research works.
+
+1 Introduction
+
+Since the origin of the ﬁeld of data mining, frequent pattern mining has been
+one of the main topics of interests for researchers in this ﬁeld. These researchers
+initially worked on itemset patterns [1, 2] in the context of market basket anal-
+ysis; these studies were later extended to event sequence patterns [3]. Recently,
+graph-structured data have attracted considerable attention [4–6] because graph
+pattern mining can be applied to many interesting application areas such as bi-
+ological networks, social networks, and the Web. While itemset mining seeks
+frequent combinations of items in a set of tuples, graph mining seeks frequent
+subgraphs in a set of graphs. Most of the prior studies have addressed only one
+type of their patterns, and only a few studies have considered combinatorial
+mining of two types of data structures [7–9].
+
+In this paper, we consider a new combinatorial mining problem of itemsets and
+subgraphs, which we call the itemset-sharing subgraph (ISS) set enumeration prob-
+lem. Let us assume that we have a graph in which each vertex is associated with
+an itemset (Fig. 1(A)). We refer to this graph as an itemset-associated graph. Our
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part II, LNAI 6119, pp. 147–159, 2010.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2010
+
+148
+
+M. Fukuzaki et al.
+
+(A) Example of IA graph ( Graph and itemsets on each vertex )
+
+(B) Itemset-sharing subgraphs with 
+
+Fig. 1. An example of itemset-sharing subgraph
+
+task is to enumerate the patterns that we call the ISS set, which is a set of large
+subgraphs in which all vertices share a large common itemset. The ISS set shown
+in Fig. 1(B) consists of two subgraphs depicted by the bold lines. All vertices in the
+ISS set share the itemset {i1, i2}. Although the subgraph consisting of only v8 also
+shares the itemset, it is not included in the ISS set since it is quite small. Similarly,
+although the subgraph consisting of {v0, v1, v4, v5} shares {i1}, it is not suﬃcient
+to be an ISS set since the shared itemset is very small. The ISS set enumeration
+problem diﬀers from other graph mining problems in the sense that the subgraphs
+included in an ISS set need not be identical.
+
+We now illustrate how ISS sets are used in drug discovery. Let us consider
+the metabolic pathway networks, which describe biochemical processes occurring
+within a cell. A pathway is represented as a graph, where vertices denote genes
+and chemical compounds and edges denote chemical reactions among the genes
+and the compounds. The pathway networks play a considerably important role
+in drug discovery, because by ﬁnding a sub-pathway that is closely related to a
+disease, we can determine the target genes or chemical compounds on which the
+drug candidate should act. However, the drug candidate can aﬀect several dif-
+ferent pathways simultaneously, which may lead to unexpected outcomes. Such
+phenomena are called side eﬀects. We would like to not only ﬁnd the drug targets
+but also predict the side eﬀects that may be caused by the action of the drug
+on the targets. Taking the drugs into account, we considered a pathway network
+to be an itemset-associated graph (Fig. 1(A)), where each vertex (a gene or a
+chemical compound) is associated with an itemset that indicates the set of drugs
+activating the gene or the compound ({i1, i2, . . . , i5} shown in Fig. 1(A)). In the
+above context, an ISS set (Fig. 1(B)) corresponds to a set of sub-pathways that
+share the common activation drug; this implies that there are hidden or unknown
+connections among the sub-pathways and that the drugs designed to target genes
+or compounds in one sub-pathway might also act on the other sub-pathways. In
+Fig. 1(B), the sub-pathway consisting of only v8 is also activated by the drugs
+{i1, i2}. However, this sub-pathway is very small, which implies that the acti-
+vation would result from accidental observations. Large sub-pathways are more
+reliable and indicate that the side eﬀects are more serious because these eﬀects
+cover a wide range of pathway networks. Similarly, we expect that as the size of
+the set of common activation drugs increases, the possibility of the occurrence of
+side eﬀects increases. Therefore, networks that consist of the large sub-pathways
+with a large set of activation drugs are important clues in predicting side eﬀects
+for drug discovery and biological experimental design.
+
+Finding Itemset-Sharing Patterns in a Large Itemset-Associated Graph
+
+149
+
+Let us now consider a marketing scenario in social network analysis. In social
+networks, vertices are considered to be participants, and edges are considered
+to be the relationships between these participants (e.g., friendships). Let us as-
+sume that each participant (vertex) is associated with the items that he or she
+has bought. The network can be considered to be an itemset-associated graph,
+and the subgraphs with large common itemsets can be regarded as underlying
+communities. Further, in a social network, common itemsets shared by many
+communities are considered as the (sets of) products that can be easily mar-
+keted through word-of-mouth communication; hence, the products with common
+features would be suitable for social marketing.
+
+In order to solve the ISS set enumeration problem, one approach is to use an
+itemset mining technique [1, 2] to obtain all the frequent itemsets and then check-
+ing the connections between the itemsets in the networks. However, the itemset
+mining in real dataset are very long computation time because the supports
+(frequencies) of the items included in the ISS sets are usually low. To overcome
+the computation time problem, we propose an eﬃcient algorithm called ROBIN.
+The ROBIN algorithm consists of two stages; it enumerates subgraphs that are
+larger than a speciﬁed threshold value at the ﬁrst stage, and then it combines
+them at the second stage. By introducing eﬀective pruning techniques in both
+the stages, we can enumerate the graphs very eﬃciently.
+
+Finally, the eﬃciency of the proposed algorithm is shown in the experiments
+by using a synthetic dataset. ROBIN can solve problems with more than 100K
+vertices and 1, 000K edges for about a half hour. In the experiments using a
+real biological network, we discover hidden connections in metabolic pathways;
+this suggests the practical utility of ROBIN in the context of drug discovery.
+Furthermore, by applying ROBIN to a citation network, we ﬁnd interesting pat-
+terns indicating successful collaborative works containing well-known database
+research topics. In both of the real dataset experiments, we show that execution
+time of ROBIN are faster than that of the method which ﬁrst enumerates the
+itemset and then checks their connectivity.
+
+Our contributions are summarized as follows:
+
+1. We introduce the ISS set enumeration problem, which has sound potential
+applications in various real-world problems including ﬁnding side eﬀects in
+drug discovery and estimating eﬀects of word-of-mouth communication in
+marketing in social networks.
+
+2. We propose a very eﬃcient algorithm called ROBIN to solve the ISS set
+enumeration problem; In the ISS enumeration stage, we develop a novel
+pruning technique using hash tables called a visited itemset table, which
+stores itemsets shared by generated subgraphs, and allows us to enumerate
+ISSes very eﬃciently. In the ISS combination stage, we propose an eﬃcient
+algorithm for ﬁnding ISS sets using an extend depth-ﬁrst search (DFS) tree
+called ISS tree, which enables us to generate combinations of ISSes without
+unnecessary checking of graph inclusion.
+
+3. We conduct experiments using two real-world network data, a biological net-
+work and a citation network, and show scenarios where the ISS set
+
+150
+
+M. Fukuzaki et al.
+
+enumeration problem is useful. The results also show that ROBIN is much
+faster than the itemset-enumeration approach.
+
+2 Itemset-Sharing Subgraph (ISS) Set Enumeration
+
+Problem
+
+In this section, we introduce a novel data mining problem for analyzing itemset-
+associated graphs, which we refer to as the ISS set enumeration problem.
+
+Let G be an undirected1, unlabelled, and unweighted graph with an itemset
+on each vertex. We refer to this graph as an itemset-associated graph (IA graph).
+Let V (G), E(G) and I(G) respectively signify a set of the vertices in G, a set of
+edges in G and a set of itemsets on vertices in G. Note that the size of graph G
+is given as the number of edges, i.e., |G| = |E(G)|.
+
+We next deﬁne subgraphs whose vertices share itemsets.
+
+(cid:2)
+
+v∈V (G(cid:2))
+
+Deﬁnition 1. (Shared Itemset) Let G(cid:3) be a connected subgraph of an IA graph
+G, where G(cid:3) is also an IA graph. We deﬁne I(G(cid:3)) as I(G(cid:3)) =
+I(v),
+and refer to I(G(cid:3)) as a shared itemset of G(cid:3).
+Among the subgraphs having a shared itemset, we focus on an important subset,
+which cannot be expanded while retaining the currently shared itemsets.
+Deﬁnition 2. (Itemset-Sharing Subgraph (ISS)) We call G(cid:3) an itemset-sharing
+subgraph (ISS) with I(G(cid:3)) if I(G(cid:3)) (cid:2)= φ and I(v) (cid:2)⊇ I(G(cid:3)) for any vertex v in the
+neighbor vertices of G(cid:3).
+Note that the itemset shared by an ISS is deﬁned without reference to its edges.
+Now, we deﬁne the sets of ISSes that we want to enumerate in our task. As
+described in Section 1, sets of ISSes are useful in the context of drug discovery
+and marketing in social networks.
+Deﬁnition 3. (ISS Set) Let G = {G1, G2, . . . , Gn} be a set of ISSes, where each
+(cid:2)
+Gi is an ISS. Deﬁne I(G) as I(G)=
+v∈G I(v).
+We call G an ISS set with I(G), if all of the following conditions are satisﬁed:
+(1) V (Gi) ∩ V (Gj) = φ for any Gi and Gj (i (cid:2)= j) in G. (2) I(v) (cid:2)⊇ I(G) for
+any vertex v in the neighbor vertices of G(cid:3) ∈ G. (3) |Gi| ≥ θS, where θS is a
+user-speciﬁed value. (4) No ISS G(cid:3) with I(G) exists except in G.
+The ﬁrst two conditions are an extension of the deﬁnition of ISS for dealing with
+multiple ISSes. The third condition gives the minimum size of the obtained ISSes
+because larger ISSes are of greater interest to us. The last condition ensures the
+maximality of the found ISS sets. Let |G| indicate the number of disconnected
+components of G, and hence, |G| = n.
+
+G∈G I(G). Note that I(G)=
+
+G∈G
+
+(cid:2)
+
+(cid:2)
+
+Finally, we deﬁne our new data mining problem where the task is to enumerate
+
+all ISS sets from a given IA graph.
+
+1 Although for simplicity, we assume that G is undirected, our method can be used
+
+for directed graphs in the same manner.
+
+Finding Itemset-Sharing Patterns in a Large Itemset-Associated Graph
+
+151
+
+n1
+
+v0 :{i1,i3}
+
+v1 :{i1,i2,i4}
+
+n2
+v1 :{i1} v4 :{i1} v2 :{i2}
+
+n4
+
+v4 :{i1,i2,i4}
+
+v5 :{i1,i2,i4}
+
+n3
+
+v5 :{i1,i2,i4}
+
+{i1,i2}
+{i1,i2,i3}
+{i1,i2}
+{i1,i2,i4}
+{i2,i3,i4}
+{i2,i4}
+{i1,i2,i4}
+
+{G1}
+{G2}
+{G3}
+{G4}
+{G5}
+{G6}
+{G7}
+(cid:15)(cid:2)(cid:16)(cid:1)(cid:4)(cid:5)(cid:5)(cid:1)(cid:13)(cid:6)(cid:7)(cid:10)(cid:8)(cid:1)
+
+(cid:1)I
+
+i1 :
+
+i2 :
+
+i2 : G1,G3,G4,G7
+
+i3 : G2,G5
+
+i4 : G6,G7
+
+(cid:15)(cid:3)(cid:16)(cid:1)(cid:4)(cid:5)(cid:5)(cid:1)(cid:11)(cid:12)(cid:8)(cid:9)(cid:14)(cid:1)(cid:13)(cid:12)(cid:8)(cid:8)(cid:1)
+
+i3 : G2
+
+i4 : G4,G7
+
+i4 : G5
+
+Fig. 2. The DFS itemset
+Fig. 1(A)
+
+tree for
+
+Fig. 3. An ISS table and an itemset-graph pre-
+ﬁx tree
+
+Deﬁnition 4. (ISS Set Enumeration Problem) Given an IA graph and user-
+speciﬁed values θS, θI and θF , from the IA graph, enumerate all ISS sets G
+satisfying |G| ≥ θF , |I(G)| ≥ θI for any ISS set G ∈ G, and |G| ≥ θS for any
+ISS G ∈ G in any ISS set G ∈ G.
+
+3 Proposed Method
+
+In this section, we propose an eﬃcient algorithm called ROBIN (RelatiOn Be-
+tween Items and Networks) for solving the ISS set enumeration problem. To
+solve the problem, one strategy ﬁrst enumerates all the itemsets such as Apri-
+ori [1] and FP-trees [2], and then check the connectivity between the itemsets.
+The other strategy ﬁrst enumerates the subgraphs, and then check the condi-
+tions of the subgraphs. Here, we use the latter method. We will show that the
+computing time of the former method requires longer than the latter method
+using real dataset in Section 4.
+
+Robin consists of two stages. In the ﬁrst stage, we enumerate all the ISSes
+eﬃciently by introducing DFS itemset tree and visited itemset table. Their de-
+tails are described in Section 3.1. In the second stage, we generate ISS sets by
+combining the ISSes according to Section 3.2. In order to enumerate the ISS sets
+eﬃciently, we introduce an ISS preﬁx tree that contains the preﬁx of itemsets
+and their associated ISSes.
+
+3.1 ISS Enumeration
+In the ﬁrst stage of the ROBIN, we enumerate ISSes from the given IA graph.
+We introduce eﬃcient techniques for the enumeration of ISSes in this section. In
+the second stage of ROBIN, the obtained ISSes are combined with the generated
+ISS sets (Section 3.2).
+We use a depth-ﬁrst search (DFS) tree for enumerating ISSes G where |G| ≥ θS
+and |I(G)| ≥ θI for G ∈ G. Each node of the tree contains a vertex and an
+itemset related to the path from the root to the node. We denote the tree as a
+DFS itemset tree. On the DFS itemset tree, we do not need to maintain edges
+because I(G) can be computed from vertices and their itemsets.
+
+The generation of the subgraphs itself is considered to be a simpliﬁed version
+of the DFS lexicographic order used in the gSpan algorithm [6], and hence, this
+
+152
+
+M. Fukuzaki et al.
+
+DFS itemset tree can avoid duplicate generation of identical graphs. Fig. 2 shows
+the DFS itemset tree for the IA graph in Fig. 1(A). Each node in the DFS itemset
+tree contains a vertex and an itemset. The vertices included in the path from
+the root to the tree node represent the vertices of the subgraph.
+
+Thanks to the following monotonic property of ISS about itemset size, we can
+prune subtrees in the DFS itemset tree, which dramatically reduces the search
+space.
+Property 1. Let us denote two ISSes by G(cid:3) and G(cid:3)(cid:3), and let V (G(cid:3)) ⊃ V (G(cid:3)(cid:3)).
+Then, I(G(cid:3)) ⊆ I(G(cid:3)(cid:3)) holds.
+The tree nodes indicated by dotted boxes in Fig. 2 can be pruned by using this
+property when θI = 2.
+
+The next theorem allows us to avoid generating subgraphs that have the
+same vertices as those of already generated subgraphs and have itemsets that
+are subsets of itemsets associated with the already generated graphs.
+Theorem 1. Let n1 and n2 be a pair of nodes of the DFS itemset tree, where
+n1 was generated before n2. If vertices associated with n1 and n2 are identical,
+and I(n1) ⊇ I(n2), no ISS exists in a descendant of n2.
+This theorem implies that if we visit one of already visited vertices and the
+common itemset of the current path is identical to or a subset of one of the
+itemsets of the previously visited vertices, we can prune the subtree rooted by
+the current node in the DFS itemset tree. Therefore, this property is useful for
+avoiding unnecessary exploration of subgraphs.
+
+Theorem 1 prompts us to make the hash table from nodes to their related
+itemsets for eﬃcient pruning of subgraphs. We call the hash table a visited item-
+set table and build it while constructing a DFS itemset tree.
+
+Using the DFS itemset tree, we can generate all ISSes whose subgraph size is
+greater than θS and common itemset size is greater than θI. Fig. 3(A) illustrates
+the ISSes and their associated itemsets. We refer to this table as the ISS table.
+In the next section, in order to enumerate ISS sets eﬃciently, we introduce an
+eﬃcient method of generating combinations of the ISSes.
+
+3.2 ISS Set Combination
+
+In this section, we introduce an eﬃcient method for enumerating ISS sets from
+the ISS table created in the previous section. One simple method for computing
+the ISS sets is to generate combinations of all the ISSes. However, this procedure
+is quite redundant because diﬀerent combinations of ISSes may result in the same
+shared itemset. Our method generates ISS sets eﬃciently by grouping ISSes by
+shared itemsets. Once we ﬁx one itemset, an ISS set sharing the itemset is
+uniquely determined. Therefore, one approach to enumerating all ISS sets is
+to generate all itemsets that can be associated with ISS sets. For the eﬃcient
+generation of the itemsets, we use the depth ﬁrst search.
+Deﬁnition 5. (ISS Tree) Let TI be a tree, each of whose node n contains itemset
+I(n) and a set of ISSes G(n) which shares I(n). The root of TI contains an
+
+Finding Itemset-Sharing Patterns in a Large Itemset-Associated Graph
+
+153
+
+itemset including all items and a vacant set of ISSes. Let n1 and n2 be a pair of
+nodes of TI. When n1 is an ascendant of n2, I(n1) ⊇ I(n2).
+We call the tree ISS tree. Nodes closer to the root contain larger itemset. A
+child of a node in the ISS tree can be generated by adding an ISS to a parent
+node’s ISSes, and its shared itemset can be computed. Thanks to the monotonic
+property of itemset size, we can prune subtrees in the ISS tree.
+
+Although we can enumerate all the combinations of ISSes by the simple DFS
+method, the size of ISS tree may increase considerably especially when the num-
+ber of ISSes is large. In order to eﬃciently generate the ISS tree, we add a group
+of ISSes sharing an itemset to ISSes in its parent node.
+
+We here divide ISS sets into two types: explicit ISS sets and implicit ISS
+sets. Explicit ISS sets are associated with itemset appeared in an ISS table,
+while implicit ISS sets are associated with itemset which is a subset of itemsets
+appeared in the ISS table. We ﬁrst generate explicit ISS sets quickly using preﬁx
+tree structure, and then produce implicit ISS sets by the combinations of explicit
+ISS sets.
+Deﬁnition 6. (Explicit and Implicit ISS Set) Let G be all the ISSes in an ISS
+table, and I(G) be itemsets associated with ISSes in G. Let GI be an ISS set
+with I. When I ∈ I(G), we call GI an explicit ISS set; otherwise we call GI an
+implicit ISS set.
+
+Basis of the above deﬁnition, any ISS set can be classiﬁed as explicit or implicit.
+For the eﬃcient generation of all ISS sets, we ﬁrst extract all of the explicit ISS
+sets, and then generate ISS sets by removing overlapping ISSes. The following
+theorem guarantees us to generate all the ISS sets.
+Theorem 2. Let GI be GC − {G | G ⊆ G(cid:3) where G, G(cid:3) ∈ Gc}. Then, GI is an
+ISS set with I.
+
+This theorem allows us to generate the explicit ISS sets with I. All the explicit
+ISS sets can be generated by computing GI for all the itemsets in the ISS table.
+However, the procedure requires many checks related to the inclusion relations
+among graphs. Here, we introduce an eﬃcient way to generate explicit ISS sets
+by using a preﬁx tree representing itemsets.
+
+Deﬁnition 7. (ISS Preﬁx Tree) Let TP be a tree, each of whose nodes n contains
+an item in and an ISS set G(n). Let denote two nodes in TP by n1 and where
+n1 is an ascendant of n2. Then, in1 < in2 holds. Any itemset I in the ISS table
+is represented by a path in TP . The ISS set in node n in TP shares an itemset
+represented by a corresponding path from the root to n.
+
+We call the tree an ISS preﬁx tree. Using the ISS preﬁx tree, we represent all the
+associations between the itemsets contained in the ISS table and the ISSes. Fig.
+3(B) represents the ISS preﬁx tree of Fig. 3(A). We put no ISSes to nodes whose
+depth is less than θI because none of the nodes generate ISS sets. Thanks to this
+preﬁx tree structure, we can accelerate the ﬁnding of the associations between
+itemsets and explicit ISS sets.
+
+154
+
+M. Fukuzaki et al.
+
+Table 1. Parameters for ROBIN
+
+Name Description
+Parameters for ISS sets
+|I| Size of the itemset shared
+
+Default
+
+10
+
+by an ISS set
+ISS size
+Size of ISS set
+
+S
+7
+F
+5
+P Number of ISS sets patterns
+10
+Q Number of ISSes not included |V |/30
+
+in ISS sets
+
+Parameters for graphs and itemsets
+
+Name Description
+|V | Number of vertices
+|E| Number of edges
+N Number of items
+|T| Avg. size of itemsets in a vertex
+
+User-speciﬁed thresholds
+
+θS Minimum ISS size
+θI Minimum shared itemset size
+θF Minimum size of ISS set
+
+Default
+
+15,000
+10 ×|V |
+100
+10
+S − 1
+|I| − 1
+P − 1
+
+We here generate itemsets shared by implicit ISS sets by using the combination
+of two explicit ISS sets. From the itemset, we generate ISS sets by using the
+ISS preﬁx tree. The following theorem guarantees that the combinations can
+enumerate all of the implicit ISS sets.
+Theorem 3. Any itemset shared by an implicit ISS set is represented by the
+intersection of the itemsets shared by some of the explicit ISS sets.
+On the basis of this theorem, we can generate implicit ISS sets by using com-
+binations of the itemsets shared by explicit ISS sets. Therefore, we generate
+a DFS tree each of whose nodes contains an itemset and an ISS set. We can
+prune the branches in the ISS tree from the monotonic property in Deﬁnition 5.
+Furthermore, the following property substantially reduces the search space.
+Property 2. Let node n contain an itemset I(n) and an ISS set G(n). If I(n)
+and an itemset I(cid:3) of an existing node are identical, we need not traverse the
+branch rooted by n.
+To use these pruning techniques, we need not calculate inclusion relations be-
+tween graphs in ISSes.
+
+4 Experiments
+
+In this section, we present the results of our experiments using a synthetic dataset
+and two real-world datasets.
+
+4.1 Results for a Synthetic Network
+
+We generated a synthetic network dataset in order to evaluate the performance
+of the ROBIN algorithm. The parameters for ROBIN and their default values are
+presented in Table 1. We generated synthetic datasets having |V | vertices and |E|
+edges. Each dataset includes P ISS sets whose shared itemset size is |I| and size
+of ISS set is F . Moreover, we add the fake itemsets whose size is 1.7 × |I|. The
+detail procedure is omitted due to the space limitation. All experiments were
+performed using a 3.2 GHz AMD R(cid:2) OpteronTM machine with 1 GB memory
+running on Linux kernel 2.6. We implemented ROBIN in JavaTM 5.
+
+We investigated the eﬃciency of the ROBIN algorithm by using the synthetic
+network data and varying the size of the network, the average size of itemsets,
+and the parameters for ROBIN.
+
+Finding Itemset-Sharing Patterns in a Large Itemset-Associated Graph
+
+155
+
+)
+s
+d
+n
+o
+c
+e
+s
+(
+ 
+
+e
+m
+T
+
+i
+
+DFS tree
+ROBIN
+ISS Enumeration Time
+
+ 4000
+ 3500
+ 3000
+ 2500
+ 2000
+ 1500
+ 1000
+ 500
+ 0
+   10K   20K   30K   40K   50K   60K   70K   80K   90K  100K
+
+ 300
+
+ 250
+
+ 200
+
+ 150
+
+ 100
+
+ 50
+
+)
+s
+d
+n
+o
+c
+e
+s
+(
+ 
+
+e
+m
+T
+
+i
+
+ 0
+
+    5
+
+|V|: Number of vertices
+
+(A) Graph size
+
+DFS tree
+ROBIN
+ISS Enumeration Time
+
+   10
+
+   15
+
+   20
+
+   25
+
+|E|/|V|: Average degree
+
+ 300
+
+ 250
+
+ 200
+
+ 150
+
+ 100
+
+ 50
+
+)
+s
+d
+n
+o
+c
+e
+s
+(
+ 
+
+e
+m
+T
+
+i
+
+ 0
+   10
+
+DFS tree
+ROBIN
+ISS Enumeration Time
+
+   12
+
+   14
+
+   16
+
+   18
+
+   20
+
+|I|: Average itemset size
+
+(B) Average degree
+
+(C) Average itemset size
+
+Fig. 4. Performance study with respect to overall graph size
+
+In order to investigate the eﬃciency of enumerating combinations of the ISSes
+in ROBIN, we measured the execution times in the case of ROBIN (labeled as
+“ROBIN”) and the times in the case of the algorithm in which we replace the
+ISS tree and the groups of ISSes generated by ISS preﬁx tree with the standard
+DFS tree by adding single ISS to its parent node to generate combinations of
+ISSes (labeled as “DFS tree”). We also show the execution times required for
+enumerating ISSes (Section 3.1) because these times are independent of the
+approach we choose. The diﬀerences between the execution times of ROBIN
+and ISS enumeration and those of the DFS tree approach and ISS enumeration
+indicate the computing time required to enumerate the combinations of ISSes.
+Fig. 4(A) presents the execution times by varying the number of nodes in the
+network. This ﬁgure depicts that our method is more scalable than the alter-
+native approach. The largest network in this experiment has 100K vertices and
+one million edges. The execution times increase quadratically with respect to the
+increase in the number of vertices. In particular, the larger the graph becomes,
+the larger is the execution time diﬀerence between the two approaches. Because
+the support (ratio of the number of vertices in ISS sets to the total number of
+vertices) was F × S/|V | = 0.0023, when the values were set to the default values,
+it is diﬃcult to ﬁnd itemset patterns using the Apriori algorithm [1] and the
+FP-trees [2]. In contrast, ROBIN can work with such a low support and can still
+ﬁnd important itemsets because it uses subgraphs that connect the itemsets.
+
+Fig. 4(B) shows the execution times by varying the number of degrees in the
+network. In general, the execution time increases rapidly according to the density
+of the graph, because we need to check many neighbor vertices. However, our
+result demonstrates that the execution time of ROBIN increases rather gradually.
+We can observe that as the degree of the graph increases, the diﬀerence between
+the execution times of the two methods increases. This observation veriﬁes the
+computational eﬃciency of ROBIN.
+
+Next, we investigate the performance of ROBIN by varying the itemset size
+shared in ISSes. The dependence of the execution time on the itemset size is
+shown in Fig. 4(C). As shown in the ﬁgure, the average itemset size is not
+signiﬁcant impact to ROBIN. Note that the algorithms succeeded in ﬁnding
+ISS sets with relatively large itemsets (more than 10 items). This result is in
+contrast to that of the existing studies on mining long patterns [10], in which
+ﬁnding low-frequency itemset patterns eﬃciently is diﬃcult.
+
+156
+
+M. Fukuzaki et al.
+
+YDR178W YDR148C
+
+YEL011W
+
+YDR074W
+
+YLR174W
+
+YER065C
+
+YKL085W
+
+YBL015W
+
+YMR250W
+
+YFR053C
+
+YCL040W
+
+YGR244C
+
+YGR287C
+
+YFR015C
+
+YLR258W
+
+YPR026W
+
+YLR304C
+
+YKR097W
+
+YNL117W
+
+YOR374W
+
+YIL107C
+
+YJL155C
+
+YMR105C
+
+YMR118C
+
+YLL041C
+
+YKL148C
+
+YLR164W YJL045W
+
+YKL141W
+
+YPR184W
+
+YNL009W
+
+YPR001W
+
+YLR377C
+
+(A) TCA Cycle
+
+(B) Starch and sucrose metabolism
+
+(C) TCA Cycle and Pyruvate metabolism (D) Fructose and mannnose metabolism
+
+YBR006W
+
+YCR005C
+
+YAL054C
+
+YGR019W
+
+Fig. 5. One of the ISS sets found in the real biological network. All of the vertices
+sharing ﬁve stress conditions.
+
+Table 2. All of the ISS sets found in the DBLP citation network
+
+No. Authors
+
+1 Rajeev Rastogi,
+
+# of # of # of
+ISSes refs. papers
+3
+
+23
+
+30
+
+Abraham Silberschatz
+
+2 Amr El Abbadi,
+
+Divyakant Agrawal
+
+3 Riccardo Torlone,
+
+2
+
+2
+
+Paolo Atzeni
+
+40
+
+13
+
+25
+
+11
+
+No. Authors
+
+4 Marc Gyssens,
+
+# of # of # of
+ISSes refs. papers
+2
+
+12
+
+11
+
+Dirk Van Gucht
+Ling Liu, Calton Pu
+
+5
+2
+6 Raghu Ramakrishnan, 2
+
+Praveen Seshadri
+
+11
+11
+
+11
+11
+
+4.2 Results for a Biological Network
+We applied ROBIN to a real metabolic pathway dataset with 6, 152 vertices
+and 3, 318 edges; here, the vertices and edges represent genes and chemical in-
+teractions, respectively. The dataset was obtained under 173 diﬀerent stressed
+conditions [11] by using yeast microarrays. Each of the conditions causes stim-
+uli to cells, and ﬁnding stimuli associated with treatments of diseases is a good
+starting point for development of new drugs. Therefore, we used the set of the
+conditions as the items. In biological systems, highly expressed genes play an
+important role within the cells. Therefore, we converted the quantitative values
+into Boolean values using a threshold t. We set the parameters as t = 1.5, θS = 7,
+θI = 5 and θF = 4. The average itemset size in the dataset was 4.78, and its exe-
+cution time was 35.9 seconds. We extracted eight ISS sets in total. One of the ISS
+sets depicted in Fig. 5 was associated with the conditions of 8 hours, 10 hours,
+1 day, 2 days and 3 days grown under YPD condition at 30 degree Celsius; all
+of these conditions are high-nutrition and high-temperature conditions. Conse-
+quently, our algorithm could extract biologically consistent conditions automat-
+ically. The four connected graphs were associated with four biological metabolic
+pathways. Some genes in Fig. 5(C) are known as the activator of the TCA cy-
+cle including Fig. 5(A). Also associated pathways with Fig 5(D) are related to
+TCA cycle, and hence, the relationship between these two ISS sets is biologically
+reasonable.
+
+4.3 Results for a Citation Network
+We applied ROBIN to a citation network consisting of academic papers to
+demonstrate that ROBIN can extract successful collaborative researches auto-
+matically.
+
+We create a citation network from the DBLP dataset [12], which is a snapshot
+of the DBLP as of April 12, 2006. Each vertex in the network corresponds to a
+
+Finding Itemset-Sharing Patterns in a Large Itemset-Associated Graph
+
+157
+
+paper and is associated with an itemset representing the author of the paper.
+Each edge indicates a citation. The DBLP network has 22, 178 vertices (papers),
+112, 304 edges (citations), and 16, 638 items (authors). All papers have at least
+one author and one reference. The average number of authors for a paper is 2.29.
+We set the parameters for ROBIN as θI = 2, θS = 10, and θF = 2.
+
+Table 2 summarizes the six ISS sets found by ROBIN. The columns represent
+the ISS sets number, co-authors, numbers of disconnected networks, number of
+references in the ISS set, and number of papers in the ISSes. For example, the
+ISS set No.1 consists of three diﬀerent ISSes, and the ISS set contains 23 papers
+and 30 references.
+
+The research topics corresponding to the three ISSes in the ISS set No.1 are
+multi-databases, video-on-demand storage, and main memory databases. This
+result implies that Rajeev Rastogi and Abraham Silberschatz have successfully
+collaborated on three diﬀerent research topics.
+
+5 Related Work
+
+In recent years, graph mining has received increasing interest from researchers.
+Frequent subgraph discovery methods [4–6, 13] enable us to enumerate all fre-
+quent common-structured subgraphs in a graph database. In this study, we are
+not concerned about the structure of the subgraph, and the existing methods
+cannot handle itemsets on subgraphs, hence we cannot apply the existing meth-
+ods to our problem directly.
+
+For the discovery of ISS sets, one straightforward approach might be to use
+the frequent pattern or closed itemset mining methods [1, 2, 14, 15] and then
+to check the connection among the found itemsets in the networks. However, in
+Section 4, we demonstrated that this approach is not eﬃcient and requires huge
+amount of memory, which implies the eﬀectiveness of ROBIN’s approach which
+enumerates all subgraphs ﬁrst.
+
+The combinatorial mining of networks with numerical vectors has been studied
+in constrained clustering [7, 9]. The studies attempt to ﬁnd the simultaneous
+clustering of the vertices in a network and the numerical vectors associated with
+the vertices. One signiﬁcant diﬀerence between our problem and these problems
+is that the associated features on every vertex are discrete values in our problem.
+This property makes it diﬃcult to apply the constrained clustering methods to
+our problem. MATISSE [16] and CoPaM [17] study the combinatorial mining of
+networks with feature vectors. Both methods ﬁnd dense subgraphs whose vertices
+having similar features. However, we are not concerned about the density of the
+subgraph, and our method can ﬁnd the sparse hub network shown in Fig. 5(A).
+Hashimoto et al. [8] proposed a combinatorial mining of sequence structured data
+and tree structured data. Their approach can be naturally extended to handle
+graph structured data, but the goal of our problem is not the enumeration of
+frequent subgraphs. Seki and Sese [18] introduced a problem to ﬁnd the largest
+connected common pattern graph. However in the present paper, we focus on
+enumerating frequent disconnected graphs.
+
+158
+
+M. Fukuzaki et al.
+
+6 Concluding Remarks
+
+In this paper, we introduced a novel problem called ISS set enumeration prob-
+lem, which enumerates a set of large disconnected subgraphs in which all vertices
+share a large common itemset. The problem has wide application such as in side
+eﬀect analysis for drug discovery and in viral-marketing eﬀect investigations.
+However, it is diﬃcult to ﬁnd the graphs because of the diﬃculty of handling
+itemsets and a graph structure simultaneously. We designed a novel algorithm
+called ROBIN in order to solve this problem eﬃciently. Our demonstration with
+synthetic data showed that our algorithm is eﬀective even in the case of a large
+and dense graph. Using our method, we found interesting graphs and itemsets
+from both a biological network and a citation network. From a biological net-
+work, we demonstrated the applicability in biological research and drug discov-
+ery. From a citation network, we found interesting patterns indicating successful
+collaborative works.
+
+The problem of ﬁnding ISS sets is quite general and applicable to other
+itemset-associated graphs, and we are going to extend the applications to the
+others such as marketing in social networks and text analyses with Web links.
+
+Acknowledgement
+
+This work was partially supported by KAKENHI (Grant-in-Aid for Scientiﬁc
+Research) on Priority Areas “Systems Genomics” from the Ministry of Educa-
+tion, Culture, Sports, Science and Technology of Japan. We thank Dr. Tsuyoshi
+Kato for fruitful discussions.
+
+References
+
+1. Agrawal, R., Srikant, R.: Fast algorithms for mining association rules. In: Proc.
+
+20th Int. Conf. Very Large Data Bases, VLDB, pp. 487–499 (1994)
+
+2. Han, J., Pei, J., Yin, Y.: Mining frequent patterns without candidate generation.
+
+In: SIGMOD ’00, pp. 1–12 (2000)
+
+3. Mannila, H., Toivonen, H., Verkamo, A.I.: Discovery of frequent episodes in event
+
+sequences. Data Min. Knowl. Discov. 1(3), 259–289 (1997)
+
+4. Inokuchi, A., Washio, T., Motoda, H.: An Apriori-based algorithm for mining fre-
+quent substructures from graph data. In: Zighed, D.A., Komorowski, J., ˙Zytkow,
+J.M. (eds.) PKDD 2000. LNCS (LNAI), vol. 1910, pp. 13–23. Springer, Heidelberg
+(2000)
+
+5. Kuramochi, M., Karypis, G.: Frequent subgraph discovery. In: ICDM 2001,
+
+pp. 313–320 (2001)
+
+6. Yan, X., Han, J.: gspan: Graph-based substructure pattern mining. In: ICDM ’02,
+
+pp. 721 (2002)
+
+7. Basu, S., Bilenko, M., Mooney, R.J.: A probabilistic framework for semi-supervised
+
+clustering. In: KDD ’04, pp. 59–68 (2004)
+
+8. Hashimoto, K., Takigawa, I., Shiga, M., Kanehisa, M., Mamitsuka, H.: Incorporat-
+ing gene functions as priors in model-based clustering of microarray gene expression
+data. Bioinformatics 24(16), i167–i173 (2008)
+
+Finding Itemset-Sharing Patterns in a Large Itemset-Associated Graph
+
+159
+
+9. Shiga, M., Takigawa, I., Mamitsuka, H.: A spectral clustering approach to
+optimally combining numerical vectors with a modular network. In: KDD ’07,
+pp. 647–656 (2007)
+
+10. Bayardo, R.: Eﬃciently mining long patterns from databases. In: SIGMOD ’98,
+
+pp. 85–93 (1998)
+
+11. Gasch, A.P., et al.: Genomic expression programs in the response of yeast cells to
+
+environmental changes. Mol. Biol. Cell 11(12), 4241–4257 (2000)
+
+12. Knowledge Discovery Laboratory, University of Massachusetts Amherst: The Prox-
+
+imity DBLP database, http://kdl.cs.umass.edu/data/dblp/dblp-info.html
+
+13. Huan, J., Wang, W., Prins, J., Yang, J.: Spin: mining maximal frequent subgraphs
+
+from graph databases. In: KDD ’04, pp. 581–586 (2004)
+
+14. Agrawal, R., Mannila, H., Srikant, R., Toivonen, H., Verkamo, A.I.: Fast discov-
+ery of association rules. In: Advances in knowledge discovery and data mining,
+pp. 307–328 (1996)
+
+15. Zaki, M.J., Hsiao, C.J.: Eﬃcient algorithms for mining closed itemsets and their
+
+lattice structure. IEEE TKDE 17(4), 462–478 (2005)
+
+16. Ulitsky, I., Shamir, R.: Identiﬁcation of functional modules using network topology
+
+and high throughput data. BMC Systems Biology 1 (2007)
+
+17. Moser, F., Colak, R., Raﬁey, A., Ester, M.: Mining cohesive patterns from graphs
+
+with feature vectors. In: SDM ’09 (2009)
+
+18. Seki, M., Sese, J.: Identiﬁcation of active biological networks and common expres-
+
+sion conditions. In: BIBE ’08 (2008)
+
+

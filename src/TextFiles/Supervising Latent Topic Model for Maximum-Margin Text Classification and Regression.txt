@@ -1,0 +1,1343 @@
+Supervising Latent Topic Model for
+
+Maximum-Margin Text Classiﬁcation and Regression
+
+Wanhong Xu
+
+Carnegie Mellon University
+
+5000 Forbes Ave., Pittsburgh PA 15213
+
+wanhong@cmu.edu
+
+Abstract. In this paper, we investigate the text classiﬁcation and regression prob-
+lems: given a corpus of text documents as training, each of which has a response
+label, the task is to train a predictor for predicting its response of any given docu-
+ment. In previous work, many researchers decompose this task into two separate
+steps: they ﬁrst use a generative latent topic model to learn low-dimensional se-
+mantic representations of documents; and then train a max-margin predictor using
+them as features. In this work we demonstrate that it is beneﬁcial to combine both
+steps of learning low-dimensional representations and training a predictor into
+one step of minimizing a singe learning objective. We present a novel step-wise
+convex optimization algorithm which solves this objective properly via a tight
+variational upper bound. We conduct an extensive experimental study on public
+available movie review and 20 Newsgroups datasets. Experimental results show
+that compared with state of art results in the literature, our one step approach
+can train noticeably better predictors and discover much lower-dimensional rep-
+resentations: a 2% relative accuracy improvement and a 95% relative number of
+dimensions reduction in the classiﬁcation task on the Newsgroups dataset; and a
+5.7% relative predictive R2 improvement and a 55% relative number of dimen-
+sions reduction in the regression task on the movie review dataset.
+
+1 Introduction
+
+With tremendous text information made available online, there is a growing demand
+to analyze and manage large corpuses of electronic text. Learning low-dimensional se-
+mantic representations of text documents is a common and often necessary step for
+various applications and text analyses. For example, this low-dimensional semantic rep-
+resentation has been used for structurally browsing a text corpus and categorizing and
+clustering text documents in information retrieval domain.
+
+A recent trend in learning low-dimensional semantic representations focuses on gen-
+erative latent probabilistic models based on so-called topics. The belief behind those
+latent topic models is that a document consisting of a large number of words might be
+concisely described as a smaller number of semantic themes. A topic is a probability
+distribution over words of a vocabulary, and is used to statistically describe a semantic
+theme. Then, a document is semantically represented as a mixture of topics.
+
+In the literature, most popular latent topic models are Latent Dirichlet Allocation
+(LDA) [2] and Probabilistic Latent Semantic Analysis (pLSA) [5]. Particularly, LDA
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part I, LNAI 6118, pp. 403–414, 2010.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2010
+
+404
+
+W. Xu
+
+is a Bayesian version of pLSA. Both models are unsupervised to simultaneously dis-
+cover topics and low-dimensional topic representations of documents, and have been
+successfully used in various applications [7,3].
+
+Unfortunately, semantic representations produced in this unsupervised manner may
+not necessarily be good features for classiﬁcation and regression tasks. The reason is
+that topics are learned without considering document labels to be predicted, for exam-
+ple the categories of news postings. Those unsupervised learned topics describe seman-
+tic themes that generally happen in all documents and don’t describe semantic themes
+discriminative across document categories. Therefore, semantic representations of doc-
+uments based on general topics are not well distinctive against document categories and
+those two-step approaches of building predictors subsequently on them would result in
+sub-optimal performance. We believe that topics should contain as much discriminative
+information as possible from document labels such that semantic representations based
+on them are suitable for prediction.
+
+In this paper, we propose an approach to integrate the latent topic model for learning
+low-dimensional semantic representations and support vector machine or regression for
+training max-margin predictors into one single learning objective. By coupling them
+together, we are able to supervise the latent topic model with beneﬁts of the maximum
+margin principle, and guide it to discover topics describing discriminative information
+and generate semantic representations more suitable for prediction tasks. Due to the op-
+timization hardness of the single learning objective, we propose a tight variational upper
+bound for the single learning objective and develop a novel step-wise convex algorithm
+for optimizing the upper bound. For both classiﬁcation and regression tasks, we present
+experiments showing that our approach can achieve better predictive power and is able
+to discover much lower dimensional representations than two-step approaches and also
+three state of art methods.
+
+2 Preliminaries
+
+We ﬁrst introduce notations that will be used throughout the paper; then review latent
+topic models and max-margin classiﬁer and regressor.
+
+A text document d is a sequence of N words <w1w2 . . . wN>, where each word is from
+a ﬁxed vocabulary with totally V words. Following a common bag-of-word assumption,
+we represent this document as a bag of words. The document could have a response
+label y, which is either a categorical class, or a continuous real number. Let D be a
+corpus of M labeled documents. The problem in this work is to learn a good predictor
+using D as training data for predicting the response label of a new document.
+
+2.1 Latent Topic Model
+
+To represent a document by semantic topics, we deﬁne a K-topic vocabulary T . Each
+topic t of T is a multinomial distribution of all words in the vocabulary, i.e. {p(w|t)}w=1..V ,
+simply denoted as βt,:. We also let β be the set of all topics, i.e., {βt,:}t=1..K. Then, we
+can represent the document by a topic mixture proportion θ = {p(t)}t=1..K.
+
+This topic representation implies a generative process to documents. For each word
+
+wn in a document d, we
+
+Supervising Latent Topic Model
+
+405
+
+1. draw a topic assignment zn|θ ∼ M ult(θ), where zn has the 1-of-K representation;
+2. draw the word wm|zn, β ∼ M ult(βzn,:).
+Both LDA and pLSA are based on the above generative process. The difference is that
+LDA introduces a Dirichlet prior to θ for alleviating the potential overﬁtting problem
+of pLSA. For classiﬁcation and regression tasks, both models show no difference in
+prediction performance. Therefore, to keep our approach simple, we recruit pLSA as
+the topic model in our approach.
+
+Given a corpus D with M documents, pLSA minimizes the following negative log
+
+likelihood to learn topics β and also estimate topic proportion θ for each document:
+
+−L(D; Θ, β) = − M(cid:2)
+
+Nm(cid:2)
+
+log
+
+K(cid:2)
+
+p(zm,n|θm)p(wm,n|βzm,n,:),
+
+m=1
+
+n=1
+
+zm,n=1
+
+min
+Θ,β
+
+(cid:3)Nm
+
+where Θ = {θm}m=1..M denotes the collection of all topic proportions. We let ¯zm =
+n=1 zm,n, which is the empirical topic proportion of document m, and let ¯Z =
+{¯zm}m=1..M denote the set of all empirical topic proportions of D.
+
+1
+
+Nm
+
+2.2 Max-margin Classiﬁcation and Regression
+
+The empirical topic proportion ¯zm from the latent topic model and the document label
+ym are used to build max-margin predictors, for example support vector machine (SVM)
+[4] for classiﬁcation and support vector regressor (SVR) [10] for regression.
+For example, if ym ∈ {−1, 1} is a binary categorical label, we can learn a SVM <ω, b>
+
+from the corpus D for classiﬁcation by minimizing the following loss function:
+
+C(ω, b, ¯Z) =
+
+min
+ω,b
+
+M(cid:2)
+
+m=1
+
+1
+M
+
+max{0, 1 − ym(ωT ¯zm + b)} + λ||ω||2,
+
+where the ﬁrst term measures the classiﬁcation error of < ω, b > and the second is a
+penalty term on ω to avoid over-ﬁtting. Similarly, if ym is continous, we can learn a
+SVR <ω, b> with a pre-deﬁned precision  from Corpus D for regression by minimizing
+the following loss function:
+
+R(ω, b, ¯Z) =
+
+min
+ω,b
+
+1
+M
+
+M(cid:2)
+
+{max{0,ym−−ωT ¯zm−b} + max{0,ωT ¯zm +b−ym−}}+λ||ω||2,
+
+m=1
+
+where the ﬁrst term measures the prediction error of <ω, b> on the  precision, and the
+second is a penalty term on ω too.
+
+Because ¯zm is a hidden variable, we need to minimize the expected two loss functions
+E ¯Z (C(ω, b, ¯Z)) and E ¯Z (R(ω, b, ¯Z)). But, it is hard to compute them because of the non-
+integrable max function in two loss functions. To circumvent this difﬁculty, two-step
+approaches minimize C(ω, b, E( ¯Z)) and R(ω, b, E( ¯Z)) instead. Because E( ¯Z) has a closed
+form Θ, this alternative makes possible using standard SVM and SVR solver.
+
+However, we ﬁnd that both R(ω, b, ¯Z) and C(ω, b, ¯Z) are convex on ¯Z. Therefore,
+C(ω, b, E( ¯Z)) and R(ω, b, E( ¯Z)) are lower bounds of E ¯Z (C(ω, b, ¯Z)) and E ¯Z (R(ω, b, ¯Z)) re-
+spectively according to Jensen’s inequality. It is obvious that minimizing lower bounds
+of E ¯Z (C(ω, b, ¯Z)) and E ¯Z (R(ω, b, ¯Z)) in two-step approaches are problematic and doesn’t
+guarantee E ¯Z (C(ω, b, ¯Z)) and E ¯Z (R(ω, b, ¯Z)) themselves to be minimized too.
+
+406
+
+W. Xu
+
+3 Framework of Supervising Latent Topic Model
+
+As discussed in the introduction, the goal is to learn semantic topics β describing dis-
+criminative themes among documents in the corpus D such that representations of doc-
+uments by those discriminative topics could be suitable for prediction purpose.
+
+To achieve this goal, two requirements should be satisﬁed together. On one hand,
+topics β should be common to make possible a to-be-predicted document be well de-
+scribed by them too. This suggests that the negative log likelihood of the latent topic
+model −L(D; Θ, β), which measures how data ﬁts those topics β, should be minimized.
+On the other hand, the empirical topic proportions ¯Z can be used to build good pre-
+dictors. It implies that the expected loss functions E ¯Z (C(ω, b, ¯Z)) and E ¯Z (R(ω, b, ¯Z)) of
+SVM and SVR, which measure how well they are used for prediction, should be mini-
+mized too.
+
+To satisfy both requirements together, we intuitively couple them linearly by a posi-
+tive tradeoff η to a single learning objective. For classiﬁcation and regression tasks, we
+need to minimize the following single learning objectives respectively:
+
+−L(D; Θ, β) + ηE ¯Z (C(ω, b, ¯Z))
+−L(D; Θ, β) + ηE ¯Z (R(ω, b, ¯Z))
+
+min
+
+Θ,β,ω,b
+
+min
+
+Θ,β,ω,b
+
+(1)
+
+(2)
+
+Therefore, in the single learning objectives, the expected losses of max-margin predic-
+tors are used to penalize or supervise the latent topic model to generate discriminative
+topics suitable for prediction. We name this framework maximum margin latent topic
+model, shortly denoted as MMpLSA.
+
+To solve those two learning problems, we have to remove or integrate out hidden
+
+variables zm,n so that convex optimization could be applied to them.
+
+In the log likelihood function, it is easy to remove hidden variables zm,n by utiltizing
+the multinomial distribution of zm,n. We have the following alternative form of the log
+likelihood function:
+−L(D; Θ,β) =− M(cid:2)
+
+p(zm,n|θm)p(wm,n|βzm,n,:) =− M(cid:2)
+
+log θTmβ:,wm,n ,
+
+Nm(cid:2)
+
+Nm(cid:2)
+
+K(cid:2)
+
+log
+
+m=1
+
+n=1
+
+zm,n=1
+
+m=1
+
+n=1
+
+where β:,wm,n={βk,wm,n
+respectively.
+
+}k=1..K is the vector of probabilities of word wm,n in all topics
+
+However, no closed forms exist for E ¯Z (C(ω, b, ¯Z)) and E ¯Z (R(ω, b, ¯Z)) because of
+non-integrable max functions involved in them. One way to circumvent this closed
+form trouble as two-step approaches is using C(ω, b, E( ¯Z)) and R(ω, b, E( ¯Z)) to replace
+E ¯Z (C(ω, b, ¯Z)) and E ¯Z (R(ω, b, ¯Z)) in the learning objectives. But, this way will have the
+same problem as two step approaches: minimizing lower bounds of single learning ob-
+jectives doesn’t guarantee they will be small too.
+
+Instead, in this work, we propose tight closed form upper bounds of E ¯Z (C(ω, b, ¯Z))
+and E ¯Z (R(ω, b, ¯Z)) such that when tight upper bounds are minimized, single learning
+objectives are approximately minimized too.
+
+Supervising Latent Topic Model
+
+407
+
+3.1 Variational Upper Bounds for Expected Max-margin Loss Functions
+We ﬁrst propose a variational upper bound for the max function max{0, x}, and then give
+upper bounds of E ¯Z (C(ω, b, ¯Z) and E ¯Z (R(ω, b, ¯Z)).
+
+The function max{0, x} has an upper bound gγ (x) [12], which is deﬁned as below:
+
+gγ (x) =
+
+x
+2
+
++
+
+1
+γ
+
+log(exp(− γx
+2
+
+)+exp(
+
+γx
+2
+
+)).
+
+(3)
+
+It is easy to show that max{0,x} < gγ (x) when γ > 0. This upper bound is tight because
+for any x, limγ→∞(gγ (x)−max{0,x}) = 0. Let fγ (x) =
+γx
+2 ))). It is
+a concave function to the variable x2 [6], and thus its ﬁrst order Taylor expansion at the
+variable x2 is a global upper bound,
+
+γ log((exp(− γx
+
+2 ) + exp(
+
+1
+
+fγ (x) ≤ fγ (ψ) +
+
+1
+
+4γψ
+
+tanh(
+
+γψ
+2
+
+2 − ψ
+
+2
+
+).
+
+)(x
+
+(4)
+
+Note that this upper bound is exact whenever ψ
+desired variational upper bound of max{0, x},
+
+2
+
+= x
+
+2. Combining Eq.3 and 4 yields the
+
+max{0, x} <
+
+x
+2
+
++ fγ (ψ) +
+
+1
+
+4γψ
+
+tanh(
+
+γψ
+2
+
+2 − ψ
+
+2
+
+),
+
+)(x
+
+(5)
+
+where ψ is a variational variable which gives the upper bound one degree of freedom to
+tightly approximate the max function.
+
+Based on the variational upper bound of max function, we then give the variational
+upper bound of E ¯Z (C(ω, b, ¯Z)). For a document m and its empirical topic proportion ¯zm,
+we have E(¯zm) = θm and E(¯zm ¯zTm) = (Nm−1)/Nm · θmθTm + 1/Nm diag(θm), denoted as
+2
+Ωm. Putting them with Eq. 5 and knowledge of y
+m = 1 together leads to an expected
+upper bound of max{0,1−ym(ωT ¯zm +b)}:
+
+E(max{0,1−ym(ωT ¯zm +b)})
+<E{ 1−ym(ωT ¯zm +b)
+1−ym(ωTθm+b)
+=
+
++fγ (ψm)+
+
+2
+
++fγ (ψm)+
+
+2
+
+4γψm
+tanh(γψm/2)
+
+4γψm
+
+tanh(γψm/2)
+
+[(1−ym(ωT ¯zm +b))
+
+m]}
+[ωTΩmω+2ωTθm(b−ym)+(b−ym)
+
+2−ψ
+
+2
+
+2−ψ
+
+2
+m].
+
+We deﬁne this upper bound as Bγ (θm, ω, b, ψm), and then the variational upper bound of
+E ¯Z (C(ω, b, ¯Z)) is 1
+M
+Similarly, for regression, we have an expected upper bound max{0,ym−−ωT ¯zm−b} +
+max{0,ωT ¯zm +b−ym−}:
+
+m=1 Bγ (θm, ω, b, ψm) + λ||ω||2.
+
+(cid:3)M
+
+E(max{0,ym−−ωT ¯zm−b} + max{0,ωT ¯zm +b−ym−})
+< −+fγ (ψm)+
+
+[ωTΩmω+2ωTθm(b−ym +)+(b−ym +)
+
+tanh(γψm/2)
+
++ fγ (ψ
+
+∗
+m)+
+
+4γψm
+
+∗
+m/2)
+tanh(γψ
+∗
+4γψ
+m
+
+[ωTΩmω+2ωTθm(b−ym−)+(b−ym−)
+
+2−ψ
+
+2
+m]
+
+2−ψ
+∗2
+m ].
+
+We deﬁne this upper bound as Uγ (θm, ω, b, ψm, ψ
+bound of E ¯Z (R(ω, b, ¯Z)) is 1
+M
+
+m=1 Uγ (θm, ω, b, ψm, ψ
+
+(cid:3)M
+
+∗
+m) + λ||ω||2.
+
+∗
+m), and then the variational upper
+
+408
+
+W. Xu
+
+4 Optimization Procedure for Classiﬁcation
+
+Armed with the variational upper bound of the expected classiﬁcation loss function
+proposed in the previous section, we can approximately minimize the single learning
+objective for classiﬁcation (Eq. 1) by minimizing its following upper bound:
+
+min
+
+Θ,β,ω,b,Ψ
+
+− M(cid:2)
+
+Nm(cid:2)
+
+m=1
+
+n=1
+
+log θTmβ:,wm,n + λ1
+
+M(cid:2)
+
+m=1
+
+Bγ (θm, ω, b, ψm) + λ2||ω||2
+
+subject to : θm,k > 0,
+
+m = 1 . . . M, k = 1 . . . K;
+
+βk,v > 0,
+
+K
+k=1θm,k = 1,
+V
+v=1βk,v = 1,
+
+Σ
+
+Σ
+
+k = 1 . . . K, v = 1 . . . V ;
+
+m = 1 . . . M ;
+
+k = 1 . . . K;
+
+where λ1 and λ2 are absorbed terms of the objective tradeoff η and constant 1/M and
+parameter λ in the variational upper bound of the expected classiﬁcation loss. Because
+Θ and β are parameters of multinomial distributions, self-explained constraints as above
+must be satisﬁed in this minimization.
+
+It could be proved that this objective upper bound is variable-wise convex1. There-
+fore, we could iteratively minimize it with respect to one of variables with the rest of
+variables ﬁxed. Because every iteration reduces its overall value, this iterative mini-
+mization procedure will cause the value of objective upper bound to converge to a local
+minimum. Next, we describe this iterative procedure below starting from the simplest
+iterating step:
+
+OPTIMIZE Ψ: Because variational variables are uncoupled to each other in the objec-
+tive upper bound, we can divide the optimization for Ψ into M subproblems, one per
+variational variable. There is only one term involving the variational variables in the
+objective upper bound. Therefore, the objective upper bound is simpliﬁed to the below
+for optimizing each variational variable:
+
+Bγ (θm, ω, b, ψm),
+
+min
+ψm
+
+which turns out to have a closed form solution ψm =
+
+ωTΩmω+2ωTθm(b−ym)+(b−ym)2.
+OPTIMIZE ω AND b: The ﬁrst term of the objective upper bound doesn’t involve ω
+and b and also all constraints don’t. With them dropped, the optimization for <ω,b> is
+simpliﬁed to the following unconstrained optimization problem:
+
+(cid:4)
+
+min
+ω,b
+
+λ1
+
+M(cid:2)
+
+m=1
+
+Bγ (θm, ω, b, ψm) + λ2||ω||2,
+
+which tries to choose <ω,b> for good prediction. The Hessian matrix of < ω,b > is:
+
+H(<ω,b>) = λ1
+
+(cid:5)
+
+M(cid:2)
+
+tanh(γψm/2)
+
+m=1
+
+2γψm
+
+(cid:6)
+
+(cid:7)(cid:8)
+
+(cid:6)
+
+Ωm θm
+θTm 1
+
++ 2λ2
+
+IK×K 0K×1
+01×K
+
+0
+
+(cid:7)
+
+,
+
+1 Due to the space limitation, we skip the proof in this writing. Please refer to [11] for details.
+
+Supervising Latent Topic Model
+
+409
+
+where IK×K is the identity matrix and 0K×1 and 01×K are vectors with only 0s. This
+Hessian matrix involves γ, which is supposed to be large enough for well approximating
+the max function as shown in Sec 3.1. But when γ is big, the Hessian matrix could be ill-
+conditioned, which will lead to the instability of our algorithm solving this optimization
+problem. Our stable solution is that we ﬁrst solve the minimization problem for a small
+γ to get optimal ω and b, and based on them we solve this problem again for a bigger γ
+to update optimal ω and b, and so on. In implementation, we start γ from 10 and increase
+it by 20 until it reaches 200.
+
+OPTIMIZE Θ: Topic proportion θms are uncoupled to each other. Therefore, we can di-
+vide the optimization for Θ into M subproblems, one per topic proportion. By dropping
+the third term of objective upper bound without involving Θ and constraints on β, the
+optimization for Θ is simpliﬁed to the following constrained optimization problem:
+
+− Nm(cid:2)
+
+n=1
+
+min
+θm
+
+log θTmβ:,wm,n +λ1Bγ (θm, ω, b, ψm)
+
+subject to : θm,k > 0,
+
+k = 1 . . . K;
+
+K
+k=1θm,k = 1.
+
+Σ
+
+The Hessian of θm is:
+
+H(θm) =
+
+Nm(cid:2)
+
+n=1
+
+β:,wm,n βT:,wm,n
+(θTmβ:,wm,n )2 + λ1
+
+tanh(γψm/2)
+
+2γψm
+
+· Nm − 1
+
+Nm
+
+· ωωT,
+
+which involves γ too and has the same ill-conditioned problem when γ is large as the
+Hessian Matrix of <ω,b>. We use the same solution for stability as optimizing <ω,b>.
+
+OPTIMIZE β: Only the ﬁrst term of objective upper bound involves β. By keeping it and
+also constraints on β, we simplify the optimization for β to the following constrained
+optimization problem:
+
+− M(cid:2)
+
+Nm(cid:2)
+
+m=1
+
+n=1
+
+min
+
+β
+
+log θTmβ:,wm,n
+
+subject to : βk,v > 0,
+
+k = 1 . . . K, v = 1 . . . V
+
+V
+v=1βk,v = 1,
+
+Σ
+
+k = 1 . . . K.
+
+Based on those optimization steps, the iterative optimization procedure for classiﬁ-
+cation is given in Algorithm 1. We discuss the implementation detail in the next section.
+
+4.1 Implementation
+
+In the beginning of the optimization procedure, for each topic t, we initialize its multino-
+mial word distribution βt,: by sampling a dirichlet distribution with parameter (1, . . . , 1);
+we also initialize each value of ω and b by sampling a standard normal distribution.
+
+Every time when the optimization procedure optimizes β and ω and b, we do cross
+validation to check whether currently learned β are good topics for prediction and <ω, b>
+is a good classiﬁer. In the cross validation of β, topic proportion θc of a document c
+
+410
+
+W. Xu
+
+repeat
+
+Optimize Θ; Optimize Ψ;
+
+until convergence
+
+for γ = 10; γ < 200; γ = γ + 20 do
+
+Alg1: Optimization Procedure for Classiﬁcation
+Input: corpus D, model parameters λ1 and λ2,
+and topic number K.
+Output: β, ω and b.
+1: Initialize β, ω and b;
+2: repeat
+3:
+4:
+5:
+6:
+7:
+8:
+9:
+10:
+11:
+12:
+13:
+14:
+15: until convergence
+
+end for
+Optimize β;
+for γ = 10; γ < 200; γ = γ + 20 do
+
+end for
+Cross Validation on β.
+
+Optimize ω and b; Optimize Ψ;
+
+until convergence
+
+repeat
+
+ 
+
+MMpLSA
+pLSA+SVM (baseline)
+
+0.9
+
+0.85
+
+0.8
+
+0.75
+
+0.7
+
+0.65
+
+0.6
+
+0.55
+
+y
+c
+a
+r
+u
+c
+c
+A
+
+0.5
+
+ 
+
+2
+
+3
+
+4
+
+5
+7
+Num of Topics
+
+6
+
+8
+
+9
+
+10
+
+Fig. 1. Experimental results of text classiﬁca-
+tion: Mean and variance of accuracies of the
+proposed approach MMpLSA and the two-
+step approach pLSA+SVM. MMpLSA per-
+forms signiﬁcantly better than pLSA+SVM.
+
+preselected for cross validation is estimated by minimizing the negative log likelihood
+with β ﬁxed:
+
+− Nc(cid:2)
+
+n=1
+
+min
+θc
+
+log θTcβ:,wc,n
+
+subject to : θc,k > 0,
+
+k = 1 . . . K;
+
+K
+k=1θc,k = 1.
+
+Σ
+
+Let ¯zc be its empirical topic proportion. We predict its label by sign(E(ωT ¯zc + b)), i.e.,
+sign(ωTθc + b).
+
+5 Optimization Procedure for Text Regression
+
+Similar to classiﬁcation, by utilizing the variational upper bound of the expected re-
+gression loss function, we can approximately minimize the single learning objective for
+regression (Eq. 2) by minimizing its following upper bound:
+
+Θ,β,ω,b,Ψ,Ψ∗ − M(cid:2)
+
+min
+
+Nm(cid:2)
+
+log θTmβ:,wm,n + λ1
+
+m=1
+
+n=1
+
+M(cid:2)
+
+m=1
+
+Uγ (θm, ω, b, ψm, ψ
+
+∗
+m) + λ2||ω||2
+
+subject to : θm,k > 0,
+
+m = 1 . . . M, k = 1 . . . K;
+
+βk,v > 0,
+
+K
+k=1θm,k = 1,
+V
+v=1βk,v = 1,
+
+Σ
+
+Σ
+
+k = 1 . . . K, v = 1 . . . V ;
+
+m = 1 . . . M ;
+
+k = 1 . . . K.
+
+Due to space limitation, please refer to [11] for the detail of the optimization procedure,
+which shares many commons with the optimization procedure for classiﬁcation.
+
+ 
+
+MMpLSA(best)
+DiscLDA(60 topics)
+MMpLSA(mean)
+
+0.85
+
+0.845
+
+0.84
+
+0.835
+
+0.83
+
+0.825
+
+0.82
+
+0.815
+
+0.81
+
+0.805
+
+y
+c
+a
+r
+u
+c
+c
+A
+
+Supervising Latent Topic Model
+
+411
+
+ 
+
+MMpLSA
+MedLDA
+pLSA+SVM (baseline)
+
+0.4
+
+0.35
+
+0.3
+
+0.25
+
+0.2
+
+0.15
+
+0.1
+
+0.05
+
+0
+
+ 
+
+o
+i
+t
+a
+R
+e
+v
+i
+t
+a
+e
+R
+
+l
+
+0.8
+
+ 
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+Num of Topics
+
+8
+
+9
+
+10
+
+−0.05
+
+ 
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+Num of Topics
+
+8
+
+9
+
+10
+
+Fig. 2. Experimental results of text classiﬁcation: (Left) Accuracy mean of ﬁve runs of MMpLSA
+and the accuracy of the run with best cross validation at different numbers of topics v.s. the best
+result 0.830 of state of art model DiscLDA achieved at 60 topics; MMpLSA achieved the best
+accuracy 84.7% with 3 topics, a 2% percent relative accuracy improvement and a 95% relative
+number of topics reduction; (Right) Relative improvement ratio of accuracy mean of MMpLSA
+against pLSA+SVM v.s. best relative ratio achieved by MedLDA
+
+6 Experiments
+
+In this section, we conducted experiments to evaluate our apporach MMpLSA with state
+of art methods and also a baseline from two-step approaches; we report extensive per-
+formance results on both text classiﬁcation and regression. Our experiments are able
+to demonstrate the advantages of applying the max-margin principle to supervise la-
+tent topic models. MMpLSA can learn from data a compacter latent representation that
+contains more plentiful information for prediction.
+
+6.1 State of Art Approaches
+
+There have been moderate efforts on supervising latent topic models for classiﬁcation
+and regression in the literature. The most earliest work is sLDA [1], which supervises
+LDA for regression by assuming a normal distribution of the response y of a document
+and also assuming y linearly dependent on its empirical topic proportion ¯z, i.e., y ∼
+N (μT ¯z, σ2). But this normality assumption doesn’t hold for many real datasets. DiscLDA
+[8] is a discriminative variant for classiﬁcation. It assumes that topic proportions of each
+class after a linear transformation should be nearby to each other. Parameters of linear
+transformations are learned by maximizing the conditional likelihood of the response
+classes. But DiscLDA can’t guarantee that topic proportions of different classes after
+linear transformations are well separated, which is critical for classiﬁcation.
+
+Applying the max-margin principle to supervise latent topic models could avoid
+drawbacks of sLDA and DiscLDA. For example, SVR doesn’t require document la-
+bels to be normally distributed and SVM could help forcing topic proportions of dif-
+ferent classes to be well separated by a good margin. The most recent MedLDA [13]
+is an approach utilizing the max-margin principle. However, MedLDA uses the lower
+
+412
+
+W. Xu
+
+bounds of expected SVM and SVR loss functions to supervise latent topic models. It ex-
+tremely simpliﬁes inference algorithms, but it is problematic as we discuss in Section 3.
+Our approach MMpLSA also recruits the max-margin principle to supervise latent topic
+models. But different to MedLDA, we propose tight variational upper bounds of ex-
+pected loss functions. Based on upper bounds, we develop a stepwise convex algorithm
+for optimization, totally different to EM algorithms used by those existing approaches.
+
+6.2 Text Classiﬁcation
+
+To be able to compare MMpLSA with DiscLDA and MedLDA, we also evaluated MM-
+pLSA on the 20 Newsgroups dataset containing postings to Usenet newsgroups. As Dis-
+cLDA and MedLDA, we formulated the same classiﬁcation problem for distinguishing
+postings from two newsgroups: alt.atheism and talk.relgion.misc, a hard task due to the
+content similarity between them. We also used the training/testing split provided in the
+20 Newsgroups dataset to make possible a fair comparison among them.
+
+To obtain a baseline from two-step approaches, we ﬁrst ﬁt all the data to pLSA
+model, and then used empirical topic proportions as features to train a linear SVM for
+prediction. This baseline is denoted as pLSA+SVM for the rest of section.
+
+For both pLSA+SVM and MMpLSA, 30% of training postings were randomly chosen
+for cross validation. For the number of topics from 2 to 10, we ran the experiment
+ﬁve times and report accuracies in the Fig. 1. We can observe that MMpLSA performs
+much better than unsupervised pLSA+SVM. In other words, supervising the latent topic
+model can discover discriminative topics for better classiﬁcation.
+
+We further compared MMpLSA with MedLDA and DiscLDA. Lacoste-Julien et al.[8]
+reported that DiscLDA achieves best accuracy 83.0% at 60 topics. Zhu et al. [13]
+didn’t report the accuracy of MedLDA, but reported the relative improvement ratio of
+MedLDA against a two-step approach. The best relative improvement ratio is around
+0.2, achieved at 20 topics. We show results of comparison between MMpLSA and them
+in the Fig. 2.
+
+Fig. 2 (Left) reports both the accuracy mean of ﬁve runs of MMpLSA and the accu-
+racy of the run with best cross validation against the best accuracy of DiscLDA. We
+can see that when the number of topics is small, MMpLSA is noticeably better than Dis-
+cLDA. MMpLSA achieved the best accuracy 84.7% with 3 topics, a 2% relative accuracy
+improvement and a 95% relative number of topics reduction. Therefore, compared with
+DiscLDA, the max-margin principle used by MMpLSA helps in discovering much fewer
+topics but with more discriminative information. However, when the number of topics
+increased, the performance of MMpLSA downgraded. The possible reason is that dis-
+criminative information is limited and using more than necessary topics to describe it
+could cause over-ﬁtting.
+
+Fig. 2 (Right) illustrates relative improvement ratio of accuracy mean of MMpLSA
+against pLSA+SVM v.s. best relative improvement ratio of MedLDA achieved at 20
+topics. MMpLSA is better than MedLDA in all cases. It suggests that MMpLSA has ad-
+vantages of learning more discriminative topics by using the upper bound of expected
+classiﬁcation loss in optimization not the lower bound as MedLDA.
+
+0.6
+
+0.5
+
+0.4
+
+0.3
+
+0.2
+
+0.1
+
+2
+R
+ 
+e
+v
+i
+t
+c
+i
+d
+e
+r
+P
+
+0
+
+ 
+
+5
+
+10
+
+15
+
+Num of Topics
+
+MMpLSA
+pLSA+SVR (baseline)
+
+20
+
+25
+
+Supervising Latent Topic Model
+
+413
+
+ 
+
+2
+R
+ 
+e
+v
+i
+t
+c
+i
+d
+e
+r
+P
+
+0.53
+
+0.525
+
+0.52
+
+0.515
+
+0.51
+
+0.505
+
+0.5
+
+0.495
+
+0.49
+
+ 
+5
+
+ 
+
+MMpLSA
+sLDA(20 topics)
+
+10
+
+15
+
+Num of Topics
+
+20
+
+25
+
+Fig. 3. Experimental results of text regression: (Left) Mean and variance of Predictive R2s from an
+5-fold experiment of the proposed approach MMpLSA and the two-step approach pLSA+SVR;
+(Right) Predictive R2 mean of MMpLSA at different numbers of topics v.s. the best result 0.50 of
+state of art approach sLDA achieved at 20 topics. MMpLSA achieved the best pR2 0.5285 with 9
+topics, a 5.7% relative pR2 improvement and a 55% relative number of topics reduction.
+
+6.3 Text Regression
+
+To compare MMpLSA with sLDA and MedLDA on regression, we evaluated MMpLSA
+on the public available movie review dataset [9], in which each review is paired with a
+rating within [0, 1]. The regression task is to predict the rating of a movie review.
+
+To obtain a baseline from two-step approaches, we ﬁrst ﬁt training reviews to pLSA
+model, and then used empirical topic proportions as features to train a linear SVR . We
+denote this baseline as pLSA+SVR.
+
+Following sLDA and MedLDA, we also ran an 5-fold experiment on the same dataset
+to evaluate pLSA+SVR and MMpLSA, and assessed the quality of predictions by Pre-
+dictive R2 (pR2) as sLDA and MedLDA. In this 5-fold experiment, when one fold was
+for test, the rest were for training with 25% of reviews randomly chosen for tuning
+parameters.
+
+Fig. 3 (Left) shows the results. We can see that the supervised MMpLSA can get
+much better results than the unsupervised two-step approach pLSA+SVR. Moreover,
+the performance of MMpLSA is consistent for numbers of topics ranging from 5 to 25.
+It suggests that MMpLSA can discover most discriminative information with few topics
+and simply increasing number of topics won’t improve performance.
+
+We further compared MMpLSA with sLDA and MedLDA. Zhu et al. [13] showed
+that sLDA and MedLDA have similar performance and MedLDA is only better than
+sLDA when the number of topics is small. For the 5-fold experiment, the best pR2 mean
+was 0.50, achieved by sLDA with 20 topics. Fig. 3 (Right) compares the pR2 mean of
+MMpLSA to this best result in the literature. MMpLSA is noticeably better than this best
+result for all numbers of topics. MMpLSA achieved the best pR2 mean 0.5285 with 9
+topics, a 5.7% relative pR2 improvement and a 55% relative number of topics reduction.
+The experimental result shows again that applying the max-margin principle to su-
+pervise latent topic models helps in discovering a much compacter semantic represen-
+tation with more discriminative information for prediction than state of art approaches.
+
+414
+
+W. Xu
+
+7 Conclusions and Future Work
+
+We have proposed MMpLSA that applies the max-margin principle to supervise latent
+topic models for both classiﬁcation and regression. MMpLSA integrates learning latent
+topic representations and training a max-margin predictor into one single learning ob-
+jective. This integration generates topics describing discriminative themes in the corpus
+so that topic representations of documents are more suitable for prediction. Due to the
+optimization hardness of single learning objectives, we proposed tight variational upper
+bounds for them and developed step-wise convex procedures for optimizing those upper
+bounds. We studied the predictive power of MMpLSA on movie review and 20 News-
+groups data sets, and found that MMpLSA performed noticeably better in prediction with
+signiﬁcantly fewer topics than state of art models. These results illustrate the beneﬁts
+of the max-margin supervised latent topic model when dimension reduction and predic-
+tion are the ultimate goals. However, discriminative information in documents is always
+limited. MMpLSA could possibly over-ﬁt documents if it is asked to discover more dis-
+criminative topics than real discriminative topics existing in documents. Therefore, one
+of future work could be introducing priors to topics in the MMpLSA for alleviating pos-
+sible over-ﬁtting.
+
+References
+
+1. Blei, D.M., McAuliffe, J.D.: Supervised topic models. In: NIPS, pp. 121–128 (2007)
+2. Blei, D.M., Ng, A.Y., Jordan, M.I.: Latent dirichlet allocation. Journal of Machine Learning
+
+Research 3, 993–1022 (2003)
+
+3. Bosch, A., Zisserman, A., Munoz, X.: Scene classiﬁcation via plsa. In: Leonardis, A.,
+Bischof, H., Pinz, A. (eds.) ECCV 2006. LNCS, vol. 3954, pp. 517–530. Springer, Hei-
+delberg (2006)
+
+4. Burges, C.J.C.: A tutorial on support vector machine for pattern recognition. Data Mining
+
+and Knowledge Discovery 2, 121–167 (1998)
+
+5. Hofmann, T.: Probabilistic latent semantic indexing. In: Proceedings of SIGIR, pp. 491–501
+
+(1999)
+
+6. Jaakkola, T., Jordan, M.: A variational approach to bayesian logistic regression models and
+their extensions. In: Proceedings of the 1997 Conference on Artiﬁcial Intelligence and Statis-
+tics (1997)
+
+7. Klie, S.: An application of latent
+
+topic document analysis to large-scale proteomics
+
+databases. In: German Bioinformatics Conference (2007)
+
+8. Lacoste-Julien, S., Sha, F., Jordan, M.I.: Disclda: Discriminative learning for dimensionality
+
+reduction and classiﬁcation. In: NIPS, pp. 897–904 (2008)
+
+9. Pang, B., Lee, L.: Seeing stars: Exploiting class relationships for sentiment categorization
+
+with respect to rating scales. In: ACL (2005)
+
+10. Smola, A., Scholkopf, B.: A tutorial on support vector regression. Statistics and Computing,
+
+199–222 (2003)
+
+11. Xu, W.: Supervising latent topic model for maximum-margin text classiﬁcation and regres-
+
+sion. CMU Technical Report (2009)
+
+12. Zhang, T., Oles, F.: Text categorization based on regularized linear classiﬁcation methods.
+
+Information Retrieval, 5–31 (2001)
+
+13. Zhu, J., Ahmed, A., Xing, E.P.: Medlda: Maximum margin supervised topic models for re-
+
+gression and classiﬁcation. In: ICML, pp. 1257–1264 (2009)
+
+

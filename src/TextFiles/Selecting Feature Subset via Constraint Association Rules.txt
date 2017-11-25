@@ -1,0 +1,2731 @@
+Selecting Feature Subset via Constraint
+
+Association Rules(cid:2)
+
+Guangtao Wang and Qinbao Song
+
+Dept. of Computer Science and Technology
+
+Xi’an Jiaotong University, China
+
+Abstract. In this paper, a novel feature selection algorithm FEAST is
+proposed based on association rule mining. The proposed algorithm ﬁrst
+mines association rules from a data set; then, it identiﬁes the relevant
+and interactive feature values with the constraint association rules whose
+consequent is the target concept, and detects the redundant feature val-
+ues with constraint association rules whose consequent and antecedent
+are both single feature value. After that, it eliminates the redundant
+feature values, and obtains the feature subset by mapping the relevant
+feature values to corresponding features. The eﬃciency and eﬀectiveness
+of FEAST are tested upon both synthetic and real world data sets, and
+the classiﬁcation results of the three diﬀerent types of classiﬁers (includ-
+ing Naive Bayes, C4.5 and PART) with the other four representative
+feature subset selection algorithms (including CFS, FCBF, INTERACT
+and associative-based FSBAR) were compared. The results on synthetic
+data sets show that FEAST can eﬀectively identify irrelevant and re-
+dundant features while reserving interactive ones. The results on the
+real world data sets show that FEAST outperformed other feature sub-
+set selection algorithms in terms of average classiﬁcation accuracy and
+Win/Draw/Loss record.
+
+Keywords: Feature
+interaction.
+
+subset
+
+selection,
+
+association
+
+rule,
+
+feature
+
+1
+
+Introduction
+
+Feature subset selection is an important research issue in the domains of machine
+learning and data mining. Its purpose is to help the learning algorithm focus
+on those aspects of the data most useful for analysis and future prediction.
+Generally, feature subset selection is the process of identifying and removing
+as many irrelevant and redundant features as possible. As irrelevant features
+do not contribute to the predictive accuracy [13], and redundant features do
+not contribute to getting a better predictor for that the most information they
+provide is already present in other feature(s) [28], thus many feature subset
+
+(cid:2) This work is supported by the National Natural Science Foundation of China under
+
+grant 61070006.
+
+P.-N. Tan et al. (Eds.): PAKDD 2012, Part II, LNAI 7302, pp. 304–321, 2012.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2012
+
+Selecting Feature Subset via Constraint Association Rules
+
+305
+
+selection algorithms have been proposed to handle the irrelevant features or/and
+redundant features.
+
+However, feature interaction is not a negligible issue in practice [12]. For ex-
+
+ample, suppose F1 ⊕ F2 = Y , where F1 and F2 are two boolean variables, Y
+represents the target concept, and ⊕ represents the xor operation. F1 and F2
+are irrelevant with Y when we consider their discrimination abilities for Y sep-
+arately, but they become very relevant when we combine them together. There-
+fore, removing the interactive features will lead to poor predictive accuracy. Thus
+a feature subset selection algorithm should consist of eliminating the irrelevant
+and redundant features while taking the feature interaction into consideration.
+Unfortunately, to our knowledge, only a few algorithms can deal with this situ-
+ation [12,29].
+
+Association rule mining can discover interesting associations among data
+items [15], it has been used to build classiﬁers which show better classiﬁca-
+tion accuracy compared with the other types of classiﬁers [2,10,19]. Especially,
+it also has been employed for feature selection recently by Xie et al. [26]. How-
+ever, Xie et al. only focus on relevant features and do not consider redundant
+and interactive features.
+An association rule is an expression of A ⇒ C, where A (Antecedent) and
+C (Consequent) are itemsets. If we view A as the feature(s) and C as the fea-
+ture(s)/the target concept, association rules can reveal the dependencies between
+either feature(s) and feature(s) or feature(s) and the target concept. Therefore,
+it is reasonable and desirable to devise an association rule mining based method
+to choose feature subset.
+
+In this paper, we propose a Feature subset sElection Algorithm based on
+aSsociaTion rule mining (FEAST), which can eliminate the irrelevant and re-
+dundant features while taking the feature interaction into consideration. More-
+over, FEAST uses association as the measure to evaluate the relativity between
+feature(s) and the target concept, which is quite diﬀerent from the traditional
+measures, such as the consistency measure [4,20,29], the dependence measure
+[9,27], the distance measure [18,21] and the information theory measure [17,23].
+The association measure evaluates irrelevant, redundant and interactive features
+in a uniform way, it is at least a potential alternatives for feature subset selec-
+tion. The experimental results on the synthetic and real world data sets show
+the eﬀectiveness of the proposed algorithm.
+
+The rest of the paper is organized as follows: In Section 2, we introduce
+the related work. In Section 3 we describe some preliminaries. In Section 4, we
+present the new feature subset selection algorithm FEAST. In Section 5, we
+provide the experimental results. Finally, in Section 6, we summarize our work
+and draw some conclusions.
+
+2 Related Work
+
+Feature subset selection has been an active research topic since 1970’s, and a
+great deal of research has been published.
+
+306
+
+G. Wang and Q. Song
+
+Of the existing research work, most feature selection algorithms can eﬀectively
+identify the irrelevant features based on diﬀerent evaluation functions. But not
+all of them can eliminate the redundant features and take the feature interaction
+into consideration [3]. Thus, the existing feature selection algorithms can gen-
+erally be grouped into several categories according to whether or not they can
+deal with irrelevant features, redundant features and the feature interaction.
+
+Traditionally, feature subset selection research has focused on searching for
+relevant features. Feature weighting/ranking algorithms [8] weigh features indi-
+vidually and rank them based on their relevance to the target concept. Unfortu-
+nately, they are incapable of removing redundant features. Such as well-known
+Relief and its extension Relief-F [18].
+
+Moreover, along with irrelevant features, redundant features also aﬀect the
+speed and accuracy of learning algorithms and thus should be eliminated as well
+[16]. CFS [9], FCBF [27] and CMIM [5] are examples that take into consideration
+the redundant features. However, they do not handle the feature interaction [29].
+Feature interaction has been drawing more attention in recent years. There
+can be two-way, three-way or complex multi-way interactions among features
+[7]. Jakulin and Bratko [12] use interaction gain as a heuristic to detect feature
+interaction. Their algorithms can detect 2-way (one feature and the class) and
+3-way (two features and the class) interactions. Zhao and Liu [29] demonstrate
+that feature interactions can be implicitly handled by a carefully designed feature
+evaluation metric and a search strategy with a specially designed data structure.
+Recently, association rules have been used for feature selection. Xie et al. [26]
+propose an association rule-based feature selection algorithm FSBAR. Unfor-
+tunately, it just detects relevant features and does not handle redundant and
+interactive features. In contrast, our algorithm aims to eliminate the irrelevant
+and redundant features, and takes the multi-way feature interactions into con-
+sideration, hence it is quite diﬀerent from these algorithms above.
+
+3 Preliminaries
+
+3.1 Strong, Classiﬁcation and Atomic Association Rules
+
+Association rule mining searches for interesting relationships among items in a
+data set D. Let I = {i1, i2,··· , ik} be a set of items, an association rule is an
+implication of form A ⇒ B, where A ⊂ I, B ⊂ I, and A ∩ B = φ.
+
+The support and conﬁdence are two important measures of a rule’s interest-
+
+ingness.
+1. The support of rule A ⇒ B is the percentage of instances in D that contain
+both A and B, denoted as Support(A ⇒ B) = P (A ∪ B); this measure
+reﬂects the rule’s usefulness whose value range is (0, 100%].
+2. The conﬁdence of rule A ⇒ B is the percentage value that shows how fre-
+quently B occurs among all the instances containing A. It is denoted as
+Conﬁdence(A ⇒ B) = P (B|A); this measure reﬂects the rule’s certainty
+whose value range is (0, 100%].
+
+Selecting Feature Subset via Constraint Association Rules
+
+307
+
+Typically, association rules are considered interesting if they satisfy minimum
+support threshold (minSupp) and minimum conﬁdence threshold (minConf ).
+The minSupp and minConf can be set by users or domain experts. Based on
+these two thresholds, strong association rule (SAR) can be deﬁned as follow.
+Deﬁnition 1. Strong association rule ( SAR). A rule r of form A ⇒ C is a
+strong association rule if and only if:
+
+Supp(r) > minSupp ∧ Conf (r) > minConf.
+
+(1)
+
+Where Supp(r) and Conf(r) represent the support and conﬁdence of the associ-
+ation rule r, respectively.
+
+For the sake of introducing classiﬁcation association rule (CAR) and atomic
+association rule (AAR), we ﬁrst give the concepts of feature value itemset (FVIS)
+and target value itemset (TVIS).
+
+Let D = {d1, d2,··· , dn} be a data set of n instances, F = {F1, F2,··· , Fm}
+be the feature space of D with m features, where Fi is the domain of ith feature
+and Y be the target concept. The instance di of D can be denoted as a tuple
+(Xi, yi), where Xi ∈ F1 × F2 × ··· × Fm, and yi ∈ Y . Then the feature value
+Fi containing all possible feature values, and the target
+
+itemset FVIS =
+value item set TVIS = Y .
+
+(cid:2)m
+i=1
+
+With the deﬁnitions of FVIS and TVIS, classiﬁcation association rule (CAR)
+
+and atomic association rule (AAR) are deﬁned as follows.
+Deﬁnition 2. Classiﬁcation association rule ( CAR). A rule r of form A ⇒ C
+is a classiﬁcation association rule if and only if:
+
+r is a SAR ∧ A ⊆ FVIS ∧ C ⊆ TVIS ∧ | C |= 1.
+
+(2)
+Here, |X| denotes the cardinality of set X. All CARs constitute classiﬁcation
+association rule set (CARset).
+Deﬁnition 3. Atomic association rule ( AAR). A rule r of form A ⇒ C is an
+atomic association rule if and only if:
+
+r is a SAR ∧ | A |= 1 ∧ | C |= 1.
+
+(3)
+
+All AARs excluding atomic classiﬁcation rules constitute atomic association rule
+set (AARset). Here, an atomic classiﬁcation rule is an AAR whose consequent
+is the target concept value.
+
+3.2 Deﬁnitions of Relevant, Redundant and Interactive Features
+
+To deﬁne the relevant, redundant features and feature interaction based on con-
+straint association rules (i.e., classiﬁcation and atomic association rules), we
+ﬁrstly give the deﬁnitions of relevant feature value, redundant feature value and
+feature value interaction based on association rules.
+
+308
+
+G. Wang and Q. Song
+
+Deﬁnition 4. Relevant feature value ( RelFV). A speciﬁc value fij of feature
+Fi is relevant to the target concept Y if and only if:
+∃r ∈ CARset, fij ∈ r.Ante.
+
+(4)
+
+Otherwise, fij is an irrelevant feature value ( iRelFV).
+
+Where fij denotes the jth (1 ≤ j ≤ |Fi|) value of feature Fi, and r.Ante repre-
+sents the antecedent of rule r. The same notations are employed in the following
+deﬁnitions.
+From Deﬁnition 4 we can know that, the feature values appeared in the an-
+tecedent of a rule r ∈ CARset are relevant feature values; on the other hand,
+the feature values never appeared in the antecedent of any rule r ∈ CARset are
+irrelevant feature values.
+
+We know that classiﬁcation association rules have been extensively employed
+in classiﬁcation [2,10,19], and these classiﬁers usually possess preferable classi-
+ﬁcation accuracy. This indicates that the rules in CARset can be used to eﬀec-
+tively explore the relationship between features and target concept. The feature
+values appeared in the antecedents of CARs are necessary and related to the
+target concept. Thus, it is reasonable to identify the relevant feature values by
+Deﬁnition 4.
+
+However, the feature values appeared in a rule’s antecedent maybe redundant.
+That is, two closely-correlated feature values will be simultaneously appearing
+in the rule’s antecedent. This is because that the association rules are gener-
+ated based on frequent itemset mining (FIM) [24], but FIM cannot detect the
+redundant items (i.e., feature values) since that, for a given feature value, if it is
+frequent and selected into a frequent itemset, then the value being redundant to
+it will be frequent and selected into an itemset as well. To handle this problem,
+the redundant feature value is deﬁned as follow.
+
+Deﬁnition 5. Redundant feature value ( RedFV). A speciﬁc value f of a feature
+value set ( FVset) is redundant if and only if:
+
+∃r ∈ AARset, ({f} = r.Cons) ∧ (r.Ante ⊆ FVset).
+
+(5)
+
+Where r.Ante and r.Cons represent the antecedent and consequent of rule r,
+respectively.
+
+From Deﬁnition 5 we can know that, of a given feature value set, a feature
+value is redundant when it appeared in the consequent of a rule in AARset and
+the rule’s antecedent is in the given feature value set as well.
+
+As we known, for a redundant feature value, the information it provides is
+already present in other feature value. This indicates that it is closely related
+to and can be replaced by other feature value. What’s more, atomic association
+rule can be used to explore the correlation between two feature values. Thus,
+Deﬁnition 5 based on AAR can be used to detect redundant value.
+
+It is noticed that Deﬁnition 5 only shows the two-way value redundancy (the
+redundancy between two values). Of course, there might exist multi-way feature
+
+Selecting Feature Subset via Constraint Association Rules
+
+309
+
+value redundancy (the redundancy among multiple feature values). However,
+detecting all the multi-way value redundancy is a combination explosion problem
+since we need to list all possible combinations. This is impracticable even when
+the feature space is of a middle size. Therefore, we just focus on the two-way
+redundancy in this paper.
+
+Suppose FVset = {f1, f2,··· , fk} is a feature value set with k feature values.
+It is a value-assignment set of a feature set Fset with k features, that is, each
+member of FVset corresponds to exactly a value of the feature of Fset. Let (A ⊂
+FVset) (cid:12)= φ and B = FVset −A, y be a value of the target Y , Conf (r) be the
+conﬁdence of an association rule r, and rF , rA and rB be the CARs of FVset
+⇒ {Y = y}, A ⇒ {Y = y} and B ⇒ {Y = y}, respectively. Then, the interactive
+feature value can be deﬁned as follow.
+
+Deﬁnition 6. k-th feature value interaction. The k feature values in FVset are
+said to interact with each other if and only if:
+
+Conf (rF ) > Conf (rA) ∧ Conf (rF ) > Conf (rB).
+
+(6)
+
+The conﬁdence of an association rule shows how well the rule’s antecedent de-
+scribes its consequent. The higher conﬁdence means the stronger description
+ability. In Deﬁnition 6, the conﬁdence of rule rF is greater than those of rules rA
+and rB. This means that although either feature value set A or B is not helpful
+in describing the target concept, FVset = A ∪ B works well in describing the
+target concept. In this case, feature value sets A and B are said to interact with
+each other.
+
+According to Deﬁnition 2, the classiﬁcation association rules usually have
+high conﬁdence since their conﬁdence should be at least greater than minConf.
+This implies that all the rules with high conﬁdence are included in CARset. In
+Deﬁnition 6, it is impossible that rA or rB is a CAR but rF is not a CAR,
+since Conf (rF ) is greater than both Conf (rA) and Conf (rB). Therefore, the
+antecedents of rules in CARset will contain all possible feature value interactions
+according to Deﬁnition 6. That is, the feature value interaction can be reserved
+by the rules in CARset.
+
+Based on the deﬁnitions of relevant feature value (RelFV), redundant feature
+value (RedFV) and feature value interaction, relevant feature, redundant feature
+and feature interaction are deﬁned as follows.
+
+Deﬁnition 7. Relevant feature ( RelFea). Feature Fi is relevant to the target
+concept Y if and only if:
+
+∃fij ∈ Fi,{fij | fij is a RelFV} (cid:12)= φ.
+
+(7)
+
+Otherwise, Fi is an irrelevant feature ( iRelFea).
+
+Deﬁnition 7 shows that a feature is relevant when at least one of its values is a
+relevant feature value. On the other hand, for an irrelevant feature, all its values
+are irrelevant.
+
+310
+
+G. Wang and Q. Song
+
+Deﬁnition 8. Redundant Feature ( RedFea). Feature Fi is redundant if and only
+if:
+
+∀fij ∈ Fi,{fij | fij is a RedFV or an iRelFV} (cid:12)= φ.
+
+(8)
+
+Deﬁnition 8 indicates that a feature is redundant due to two reasons: (i) each
+value of this feature is a redundant feature value; (ii) some values of this feature
+are redundant while others are irrelevant. As irrelevant values provide no infor-
+mation about the target concept and redundant values provide the information
+which is present by the other values, they are all useless in describing the tar-
+get concept. This is consistent with the property of the classical deﬁnition of
+redundant feature [28].
+
+Deﬁnition 9. Feature interaction. Let Fset = {F1, F2, ···, Fk} be a feature
+subset with k features, and VAset be its value-assignment sets. Features F1, F2,
+···, Fk are said to interact with each other if and only if:
+∃fset ∈ VAset,{fset is a FVset with k-th f eature value interaction} (cid:12)= φ. (9)
+
+As we known, there is an intrinsic relationship between a feature and its values,
+and the properties of a feature subset can be studied by its value-assignment.
+Thus, for a given feature subset, it is reasonable that the feature interaction
+among this feature subset could be implied and studied by that among its value-
+assignment. Inspired by this, Deﬁnition 9 based on feature value interaction is
+proposed to identify feature interaction.
+
+4 Feature Subset Selection Algorithm
+
+Based on the deﬁnitions of relevant feature, redundant feature and feature in-
+teraction, we propose a novel feature subset selection algorithm FEAST, which
+searches for relevant features while taking into consideration redundant features
+and feature interaction.
+
+4.1 FEAST Algorithm
+
+The algorithm FEAST consists of four steps: i) Association rule mining, ii)
+Relevant feature value set discovery, iii) Redundant feature value elimination
+and iv) Feature subset identiﬁcation.
+
+1) Association rule mining
+
+Constraint association rules are mined from the given data set based on
+the predetermined thresholds minSupp and minConf. These rules include
+classiﬁcation association rules and atomic association rules. After this step,
+classiﬁcation association rule set (CARset) and atomic association rule set
+(AARset) are obtained.
+
+2) Relevant feature value set discovery
+
+By collecting the antecedents of rules in CARset together, initial relevant
+feature value set (RFVset), which reserves the feature value interactions, is
+achieved according to Deﬁnition 4 and Deﬁnition 6.
+
+Selecting Feature Subset via Constraint Association Rules
+
+311
+
+3) Redundant feature value elimination
+
+A feature value is redundant means that the information it provides is already
+present in another feature value. This indicates the redundant value is implied
+by another value. In this paper, atomic association rule is employed to identify
+this kind of implication relation. The higher the conﬁdence of an atomic
+association rule is, the stronger the implication. This means that the AARs
+with higher conﬁdence could be used to identify and eliminate redundant
+values ﬁrstly.
+For a given AAR r ∈ AARset with the highest conﬁdence, the feature value
+in r’s consequent is identiﬁed redundant and eliminated from current RFVset.
+Meanwhile, according to Deﬁnition 5, a feature value in the consequent of an
+AAR is redundant iﬀ the feature value of the AAR’s antecedent is in the
+current RFVset. Therefore, after eliminating r’s consequent from RFVset,
+AARset should be updated by removing r and the rules whose antecedents
+are equal to r’s consequent.
+4) Feature subset identiﬁcation
+
+After eliminating redundant feature values, there are no irrelevant and re-
+dundant values in RFVset. Meanwhile, step 2 shows that RFVset includes
+all feature value interactions based on which the feature interactions are de-
+ﬁned (see details in Deﬁnition 9). Thus, according to Deﬁnition 7, by map-
+ping the feature values in RFVset to the corresponding features, the ﬁnal
+feature subset is identiﬁed, which not only retains relevant features and ex-
+cludes irrelevant and redundant features, but also takes feature interaction
+into consideration.
+
+Algorithm 1 shows the pseudo-code description of FEAST. Of the input param-
+eters, minSupp and minConf are used as the constraint conditions to achieve
+strong association rule SAR (Deﬁnition 1).
+
+The pseudo-code of FEAST includes four parts, in part 1 (lines 1-2), classiﬁ-
+cation association rule set CARset and atomic association rule set AARset are
+mined by function FP growth [11] on the given data set D according to minSupp
+and minConf. In part 2 (lines 3-4), the union of the antecedents of the associa-
+tion rules in CARset constitutes the relevant feature value set RFVset. Part 3
+(lines 5-13) is used to eliminate the redundant feature values in RFVset, where
+function Sort sorts the rules in AARset in descending order of rule’s conﬁdence.
+Firstly, the ﬁrst rule (i.e. the rule with the highest conﬁdence) r is chosen and
+removed from AARset. Then if its antecedent is a subset of the current RFVset,
+the value in r’s consequent is eliminated from RFVset; meanwhile, the rules
+whose antecedents are equal to its consequent are removed from AARset. This
+process repeats until that AARset is empty. Part 4 (lines 14-17) achieves the
+selected feature subset S according to the feature values in RFVset.
+Time Complexity Analysis. In part 1, the CARset and AARset are mined by
+function FP growth. Since the time consumption of FP-growth is closely related
+to the value of minSupp [11], the time complexity of this part can be represented
+as O(f(minSupp, D)), where f(minSupp, D) is a function of minSupp and D
+which increases with the decrease of minSupp/increase of the size of D. For part
+
+312
+
+G. Wang and Q. Song
+
+Algorithm 1. FEAST
+
+inputs : D - the given data set;
+
+minSupp - the support threshold;
+minConf - the conﬁdence threshold.
+
+output: S - selected feature subset.
+
+//– Part 1 : Association rule mining –
+S = φ; RFVset = φ;//RFVset- relevant feature value set;
+[CARset, AARset ] = FP growth (D, minSupp, minConf );
+for each r ∈ CARset do
+//– Part 2 : Relevant feature value set discovery –
+
+RFVset = RFVset ∪ r.Antecedent;
+
+1
+2
+
+3
+4
+
+//– Part 3: Redundant feature value elimination –
+Sort (AARset); //sort rules in descending order of rule’s conﬁdence
+while AARset (cid:4)= φ do
+
+r = the ﬁrst rule in AARset;
+AARset = AARset − {r};
+if r.Antecedent ⊂ RFVset then
+
+RFVset = RFVset − r.Consequent;
+for each r(cid:2) ∈ AARset do
+
+if r(cid:2).Antecedent == r.Consequent then
+
+5
+6
+7
+8
+9
+10
+
+11
+12
+13
+
+14
+15
+16
+17
+
+AARset = AARset − {r(cid:2)};
+for each feature value val ∈ RFVset do
+if val ∈ value set of feature F then
+
+//– Part 4: Feature subset identiﬁcation –
+
+S = S ∪ {F};
+
+return S
+
+2, once a CAR is generated by FP-growth, its antecedent could be merged into
+RFVset meanwhile, so the consumed time of this part can be ignored. For part 3,
+since its main time consummation is the process of sorting the rules in AARset,
+the time complexity of this part is O(V · log V ) (by quick sort), where V is the
+number of rules in AARset. The time complexity of part 4 is O(K) where K is
+the number of feature values in the ﬁnal RFVset whose maximum value is the
+number of all possible feature values in D.
+Consequently, the time complexity of FEAST is O(f(minSupp, D) + O(V ·
+log V ) + O(K). Since part 1 is the major time consumer in the worst case, the
+eﬃciency of FEAST depends largely on that of association rule mining.
+
+5 Experimental Results and Analysis
+
+In this section, we empirically evaluate the performance of FEAST, and present
+the experimental results compared with the other four representative feature
+selection algorithms upon both synthetic and real world data sets.
+
+5.1 Benchmark Data Sets
+
+Synthetic Data Sets. In order to directly evaluate how well FEAST deals
+with irrelevant, redundant features and feature interaction, ﬁve synthetic data
+sets with all the irrelevant, redundant and interactive features being known are
+employed.
+
+Selecting Feature Subset via Constraint Association Rules
+
+313
+
+The ﬁrst two data sets synData1 and synData2 are generated by the data
+generation tool RDG1 of the data mining toolkit WEKA1. The other three
+data sets about MONK’s problems are available from UCI Machine Learning
+Repository [1]. The ﬁve data sets are described as follows.
+
+1) synData1. There are 100 instances and 10 boolean features a0, a1,··· , a9. The
+target concept c is deﬁned by c = (a0 ∧ a1 ∧ a5) ∨ (a0 ∧ a1 ∧ a6 ∧ a8) ∨ (a0 ∧
+a1 ∧ a5 ∧ a8) ∨ (a0 ∧ a1 ∧ a5 ∧ a8) ∨ (a5 ∧ a6 ∧ a8) ∨ (a0 ∧ a1).
+2) synData2. There are 100 instances, 11 boolean features denoted as a0, a1,··· ,
+a9 and a redundant feature r that is the copy of a5. The target concept c is
+deﬁned by c = a5 ∨ (a1 ∧ a6 ∧ a8).
+3) MONK1. There are 432 instances and 6 features a1, a2,··· , a6. The target
+concept c is deﬁned by c = (a1 = a2) ∨ (a5 = 1).
+4) MONK2. There are 432 instances and 6 features a1, a2,··· , a6. The target
+concept c is deﬁned by exactly two of {a1 = 1, a2 = 1,··· , a6 = 1}.
+5) MONK3. There are 432 instances and 6 features a1, a2,··· , a6. The target
+concept c is deﬁned by c = (a5 = 3 ∧ a4 = 1) ∨ (a5 (cid:12)= 4 ∧ a2 (cid:12)= 3). 5% class
+
+noise was added to the training set.
+
+For each data set, the features appearing in the deﬁnition of the target concept
+are all relevant, while the absent features are either redundant or irrelevant. The
+conjunctive terms in the target concept’s deﬁnition imply feature interactions.
+
+Real World Data Sets. 14 extensively used real world data sets, which are
+available from from UC Irvine Machine Learning Repository [1], are employed.
+Table 1 summarizes the 14 data sets in terms of number of features (denoted as
+F), the number of instances (denoted as I), the number of target concept values
+(denoted as T). The sizes of data sets vary from 57 to 20,000 instances, and
+the total number of original features is up to 240. Note that for the data sets
+containing continuous-value features, if needed, we apply the MDL discretization
+method (available in WEKA).
+
+Table 1. Summary of the 14 real world data sets
+
+Data set
+heart-c
+cleve
+austra
+labor
+letter
+primary-tumor 17 339 22 splice
+lymph
+
+F
+11 303
+12 303
+14 690
+14
+57
+15 20000 26 molecular
+
+18 148
+
+I
+
+F
+I T
+T Data set
+5 autos
+22 205 7
+2 mushroom 22 8124 2
+2 colic-orig
+23 368 2
+2 ﬂags
+26 194 6
+57 106 2
+60 3190 3
+4 mfeat-pixel 240 2000 10
+
+5.2 Experimental Setup
+
+1) Four representative feature selection algorithms were selected to be compared
+with FEAST.
+
+These algorithms include two well-known and frequently-used CFS [9] and
+FCBF [27]. They can eﬀectively identify irrelevant features while taking consid-
+eration of the redundant features.
+1 http://www.cs.waikato.ac.nz/ml/weka/
+
+314
+
+G. Wang and Q. Song
+
+To further study the performance of FEAST in terms of handling feature
+interaction, an algorithm INTERACT [29], which is speciﬁcally proposed to
+address the feature interaction, is selected as one benchmark algorithm.
+
+Moreover, since our proposed FEAST is an association-rule-based feature se-
+lection algorithm, a latest association-rule-based feature selection algorithm FS-
+BAR [26] is selected as well.
+
+The parameters of these algorithms (including FEAST) were determined by
+
+the cross-validation strategy.
+
+2) Classiﬁcation accuracy over selected feature subset is extensively used as a
+measure to evaluate the performance of the feature selection algorithm in feature
+selection literature. This is due to the fact that the relevant features of real world
+data sets are usually not known in advance, and we can not directly evaluate
+how good a feature selection algorithm is by the features selected.
+
+However, diﬀerent classiﬁcation algorithms have diﬀerent biases, and a fea-
+ture subset selection algorithm may be more suitable for some classiﬁcation
+algorithms than others. With this in mind, three diﬀerent types of well-known
+classiﬁcation algorithms including probability-based Naive Bayes [14], decision
+tree-based C4.5 [22] and rule-based PART [6] were selected.
+In order to make best use of the data set and get stable results, the classiﬁca-
+tion accuracies before and after feature selection were obtained by a 5×10-fold
+cross-validation procedure. That is, for a given data set, each feature selection
+algorithm and each classiﬁer were repeatedly performed on the data set with
+10-fold cross-validation by ﬁve times.
+
+3) All the experiments were conducted in the WEKA environment [25].
+
+5.3 Results on the Synthetic Data Sets
+
+Table 2 shows the feature subsets selected by the ﬁve feature subset selection
+algorithms on the ﬁve synthetic data sets. In this table, ‘ ’ indicates a missing
+relevant feature, and the letter in bold type indicates an irrelevant or a redundant
+feature selected by mistake. The last row “Relevant features” reports the actual
+relevant features of each data set.
+
+Table 2. Features selected by the ﬁve algorithms on the synthetic data sets
+
+FSS algorithm
+CFS
+FCBF
+FSBAR
+INTERACT
+FEAST
+Relevant features
+
+synData2
+
+MONK2
+
+, , , , a5,
+
+synData1
+a0, , a5, a6, a8
+a0, , a5, a6, a8
+a0, a1, a3, a5, a6, a8
+
+MONK3
+MONK1
+, , a5
+a2, ,
+, , a5 a1, a2, a3, a4, a5, a6 a2, a4, a5
+, , a5
+a2, , a5
+a0, a1, a5, a6, a8 a1, a3, a4, a5, a6, a7, a1, a2, a5 a1, a2, a3, a4, a5, a6 a2, a4, a5
+a1, a5, a6, a8 a1, a2, a5 a1, a2, a3, a4, a5, a6 a2, a4, a5
+a0, a1, a5, a6, a8
+a0, a1, a5, a6, a8
+a1, a5, a6, a8 a1, a2, a5 a1, a2, a3, a4, a5, a6 a2, a4, a5
+
+a1, , , , ,
+
+a0, a1, a5, , a7, , r
+
+a0, a1, a5, , a7,
+a0, a1, a5, a6, a8
+
+From Table 2, we observe that: (i) Only algorithm FEAST removes all ir-
+relevant features while reserving all relevant features for all the ﬁve data sets.
+The other algorithms identify the irrelevant on some but not all data sets. (ii)
+Except algorithm CFS, all other four algorithms can identify and remove the
+redundant feature r in the data set “synData2”. (iii) Only algorithm FEAST
+
+Selecting Feature Subset via Constraint Association Rules
+
+315
+
+reserves all the interactive features on all the ﬁve data sets. INTERACT works
+well on all the data sets except for “synData2”. The other algorithms identify
+all the interactive features on some but not all the data sets.
+
+5.4 Results on the Real World Data Sets
+
+In this section, we present the comparison results of FEAST with other fea-
+ture subset selection algorithms in terms of (i) the classiﬁcation accuracies after
+feature subset selection; (ii) the proportion of selected features; and (iii) the
+runtime.
+
+Here, the proportion of selected features is the ratio of the number of features
+selected by a feature selection algorithm to the original number of features of a
+data set.
+
+What’s more, we also provide the sensitivity analysis results of the support
+
+and conﬁdence thresholds on the proposed algorithm FEAST.
+
+Classiﬁcation Accuracy Comparison. Table 3 records the classiﬁcation ac-
+curacies of Naive Bayes, C4.5 and PART with the ﬁve feature subset selection
+algorithms, and the Win/Draw/Loss records, which are the numbers of data sets
+where the classiﬁcation accuracy of the given classiﬁer obtained with FEAST is
+greater than/equal to/lower than that with the compared feature selection al-
+gorithm.
+
+Table 3. Accuracies of Naive Bayes, C4.5 and PART with diﬀerent feature selection
+algorithms
+
+Naive Bayes
+
+C4.5
+
+PART
+
+Data Set
+
+83.46
+heart-c
+84.22
+cleve
+austra
+87.68
+labor
+90.00
+letter
+74.48
+primary-tumor 47.48
+lymph
+83.62
+autos
+77.95
+mushroom
+95.59
+83.95
+colic-orig
+ﬂags
+79.89
+97.18
+molecular
+splice
+96.24
+mfeat-pixel
+90.95
+Average
+83.76
+W/D/L
+∗
+
+-
+
+82.90
+83.50
+87.48
+90.18
+74.55
+49.68
+83.24
+78.15
+98.92
+70.22
+70.82
+94.53
+96.13
+90.45
+82.20
+9/0/5
+
+FEAST CFS FCBF INTERACT FSBAR ORG FEAST CFS FCBF INTERACT FSBAR ORG FEAST CFS FCBF INTERACT FSBAR ORG
+78.85
+82.84
+79.57
+78.88
+85.80
+86.23
+80.67
+85.96
+80.69
+NA
+40.70
+43.07
+79.67
+75.00
+74.63
+78.00
+100.00 100.00
+64.11
+84.24
+64.92
+67.53
+82.82
+86.79
+92.51
+92.57
+82.00
+NA
+79.81
+77.88
+9/1/2 13/1/0
+
+82.13 81.12 81.12
+80.86
+83.19 80.58 80.58
+78.22
+86.38 85.51 85.07
+87.10
+88.00 80.67 84.00
+85.96
+81.45 81.41 80.90
+NA
+43.35 45.39 40.12
+42.18
+81.71 77.14 78.90
+74.32
+73.17
+78.95 79.45 67.29
+100.00 100.00 100.00 98.52 99.02
+85.03
+85.84 81.52 81.24
+85.33
+71.18
+70.16 70.58
+69.59
+72.1
+80.82
+85.82 86.73 84.82
+83.96
+94.36
+92.76 92.07 93.39
+92.95
+83.00 84.15 80.95
+78.65
+NA
+81.62 80.35 79.25
+79.47
+79.22
+7/1/4 9/1/4
+9/0/5 12/0/2
+
+84.43 84.43
+84.86 84.86
+85.51 87.10
+89.33 89.33
+73.03 74.48
+45.70 46.00
+81.67 80.24
+77.40 69.21
+98.52 98.52
+81.52 84.25
+73.13 75.18
+93.27 95.27
+92.48 96.14
+93.00 91.15
+82.42 82.58
+10/0/4 8/1/5
+
+84.44 79.80 79.80 79.80
+82.18
+83.85 79.60 79.20 79.20
+82.51
+85.22 86.46 85.51 86.52
+86.52
+89.47
+91.67 84.33 80.67 80.67
+NA 74.04 78.98 79.17 79.14
+50.13 43.65 41.56 42.47
+43.95
+83.67 77.62 75.71 70.81
+83.78
+71.64 77.98 75.55 67.31
+59.51
+98.92
+95.83 100.00 98.52 99.02
+70.40 85.84 81.52 81.52
+83.15
+73.21 71.74 72.24 71.63
+70.1
+90.27 80.91 83.82 82.82
+92.45
+91.85
+95.36 94.54 92.70 94.48
+NA 93.30 77.40 79.60 77.80
+81.64 79.92 78.97 78.08
+80.37
+10/0/2 8/0/6
+9/1/4 9/1/4
+
+-
+
+79.80
+81.72
+86.00
+85.96
+81.05
+40.53
+76.08
+75.90
+100.00
+66.30
+66.19
+86.98
+92.93
+82.25
+78.69
+11/0/2
+
+78.88
+78.75
+86.46
+91.58
+79.08
+41.12
+73.51
+76.98
+100.00
+66.30
+70.72
+81.70
+94.31
+80.20
+78.54
+8/2/4
+
+78.79
+77.90
+86.70
+73.68
+78.82
+41.00
+78.33
+83.81
+
+-
+
+In this table, “ORG” denotes original data sets, “W/D/L” represents “Win/Draw/Loss”, and “NA” means the algorithm is not available.
+
+From Table 3 we observe that:
+
+1) For Naive Bayes, (i) compared to the original data set, the average accuracy
+of Naive Bayes is improved by all the algorithms except FSBAR; (ii) FEAST
+outperforms other algorithms in terms of average accuracy, it improves the
+average accuracy by 2.29% averagely; (iii) FEAST outperforms other algo-
+rithms in terms of Win/Draw/Loss record, it wins other algorithms for 9.25
+out of 14 data sets on average, while losses only 4 out of 14 on average.
+
+2) For C4.5, (i) compared to the original data set, the average accuracy of C4.5 is
+improved only by the FEAST and FSBAR, but FSBAR were not available on
+two data sets due to its high time complexity; (ii) FEAST outperforms other
+algorithms in terms of average accuracy, it improves the average accuracy
+
+316
+
+G. Wang and Q. Song
+
+by 1.47% averagely; (iii) FEAST outperforms other algorithms in terms of
+Win/Draw/Loss record, it wins other algorithms for 8.25 out of 14 data sets
+on average, while losses only 4 out of 14 on average.
+
+3) For PART, (i) compared to the original data set, the average accuracy of
+PART is improved by all algorithms; (ii) FEAST outperforms other algo-
+rithms in terms of average accuracy, it improves the average accuracy by
+2.64% averagely; (iii) FEAST outperforms other algorithms in terms of Win/
+Draw/Loss record, it wins other algorithms for 10.25 out of 14 data sets on
+average, while losses only 2.75 out of 14 on average.
+
+Table 4. Proportion (%) of selected
+features for diﬀerent feature selection
+algorithms
+
+Table 5. Runtime (ms) for diﬀerent fea-
+ture selection algorithms
+
+FEAST CFS FCBF INTERACT FSBAR
+
+FEAST CFS FCBF INTERACT FSBAR
+
+Data set
+heart-c
+81.82 54.55 54.55
+cleve
+83.33 50.00 50.00
+austra
+50.00 50.00 50.00
+labor
+57.14 50.00 42.86
+letter
+80.00 73.33 73.33
+primary-tumor 47.06 70.59 64.71
+44.44 55.56 44.44
+lymph
+27.27 22.73 18.18
+autos
+36.36 18.18 18.18
+mushroom
+26.09
+colic-orig
+8.70
+26.92 11.54 15.38
+ﬂags
+molecular
+22.81 10.53 10.53
+31.67 10.00 36.67
+splice
+48.75 42.92 11.25
+mfeat-pixel
+Average
+47.40 37.76 35.63
+
+8.70
+
+90.91
+83.33
+92.86
+50.00
+80.00
+94.12
+55.56
+27.27
+27.27
+21.74
+38.46
+10.53
+38.33
+14.58
+51.78
+
+90.91
+83.33
+64.29
+50.00
+NA
+52.94
+55.56
+54.55
+36.36
+30.43
+57.69
+12.28
+11.67
+NA
+50.00
+
+Data set
+heart-c
+cleve
+austra
+labor
+letter
+primary-tumor
+lymph
+autos
+mushroom
+colic-orig
+ﬂags
+molecular
+splice
+mfeat-pixel
+Average
+
+20
+20
+45
+16
+
+1190
+624
+51
+
+2216
+223
+31
+319
+79
+
+22
+76
+80
+62
+678
+74
+74
+78
+238
+74
+22
+82
+126
+7287
+
+20
+72
+83
+60
+558
+81
+69
+72
+215
+81
+42
+77
+42
+
+144
+63
+74
+62
+
+5333
+
+64
+89
+82
+405
+88
+58
+66
+889
+4514
+852.21
+
+215
+412
+1432
+
+18
+NA
+228
+6786
+29206
+242803
+
+582
+2649
+631
+
+57435
+
+NA
+
+28533.08
+
+1890
+4250
+1696
+783.86 640.93 226.29
+
+Proportion of Selected Features Comparison. The reduction on the num-
+ber of features is an important metric used to evaluate feature subset selection
+algorithms. This can be measured through the proportion of features selected
+by the feature selection algorithms.
+
+Table 4 presents the proportion of features selected by each of the ﬁve feature
+selection algorithms over the 14 data sets. From this table we observe that: i) All
+the feature subset selection algorithms could signiﬁcantly reduce the number of
+features on average. FCBF ranks 1 with proportion of selected features 35.63%,
+and INTERACT ranks last with 51.78%. ii) FEAST outperforms algorithms
+INTERACT and FSBAR in reducing the number of features.
+
+Runtime Comparison. Table 5 records the runtime of each feature subset
+selection algorithm upon the 14 data sets. From it we observe that (i) the average
+runtime of diﬀerent algorithms is varying greatly, FCBF ranks 1 with 226.29 ms,
+and FSBAR ranks last with 28533.08 ms. (ii) FEAST is faster than INTERACT
+and FSBAR. Compared with the associative-based algorithm FSBAR, FEAST is
+much more eﬃcient since it generates association rules by FP-growth algorithm
+which is more eﬃcient than the Apriori algorithm used in FSBAR.
+
+To summarize, the proposed algorithm FEAST outperformed other feature
+subset selection algorithms on the 14 UCI data sets in terms of average classiﬁ-
+cation accuracy and Win/Draw/Loss record, and the runtime and the reduction
+rate are acceptable.
+
+Selecting Feature Subset via Constraint Association Rules
+
+317
+
+Sensitivity Analysis of the Support and Conﬁdence Thresholds. Sup-
+port threshold and conﬁdence threshold are two important parameters in the pro-
+posed algorithm FEAST. To study how they aﬀect the performance of FEAST,
+in this part, we give the sensitivity analysis of these two parameters on FEAST
+in terms of classiﬁcation accuracy, proportion of selected features and runtime,
+respectively.
+
+Classiﬁcation Accuracy. Fig. 1 shows sensitivity analysis results of the support
+and conﬁdence thresholds on the classiﬁcation accuracies of the three classiﬁers
+with respect to our proposed algorithm FEAST.
+
+)
+
+%
+
+(
+ 
+y
+c
+a
+r
+u
+c
+c
+a
+
+ 
+
+n
+o
+
+i
+t
+
+a
+c
+i
+f
+i
+s
+s
+a
+C
+
+l
+
+85
+
+80
+
+75
+
+50
+
+40
+
+30
+
+10 20 30
+heart-c
+
+20
+
+5
+
+10
+primary-tumor
+
+80
+
+70
+
+60
+
+50
+
+8
+
+12
+
+10
+flags
+
+85
+
+80
+
+75
+
+90
+
+85
+
+80
+
+75
+
+70
+
+95
+
+90
+
+85
+
+80
+
+75
+
+88
+
+86
+
+84
+
+82
+
+80
+
+80
+
+70
+
+60
+
+50
+
+100
+
+90
+
+80
+
+70
+
+60
+
+10 20 30
+
+cleve
+
+40
+
+20
+lymph
+
+20
+
+10
+30
+molecular
+
+100
+
+90
+
+80
+
+70
+
+60
+
+105
+
+100
+
+95
+
+90
+
+100
+
+50
+
+40
+
+20
+austra
+
+8
+
+12
+
+autos
+
+16
+
+0
+
+5
+
+20
+
+5
+
+10
+15
+splice
+
+Support threshold (%)
+
+90
+
+80
+
+70
+
+60
+
+0.5
+
+1.5
+
+1
+
+letter
+
+15 30 45
+
+labor
+
+20
+
+40
+
+mushroom
+
+75
+
+70
+
+65
+
+60
+
+5 10 15 20 25
+colic-orig
+
+Naive Bayes
+C4.5
+PART
+
+10
+
+15
+
+20
+
+mfeat-pixel
+
+)
+
+%
+
+(
+ 
+y
+c
+a
+r
+u
+c
+c
+a
+
+ 
+
+n
+o
+
+i
+t
+
+a
+c
+i
+f
+i
+s
+s
+a
+C
+
+l
+
+86
+
+84
+
+82
+
+80
+
+78
+
+50
+
+45
+
+40
+
+35
+
+70 80 90 100
+
+heart-c
+
+30
+
+70 80 90 100
+primary-tumor
+
+80
+
+70
+
+60
+
+50
+
+70 80 90 100
+
+flags
+
+84
+
+82
+
+80
+
+78
+
+76
+
+85
+
+80
+
+75
+
+95
+
+90
+
+85
+
+80
+
+75
+
+70 80 90 100
+
+cleve
+
+70 80 90 100
+
+lymph
+
+87
+
+86
+
+85
+
+84
+
+90
+
+80
+
+70
+
+60
+
+100
+
+90
+
+80
+
+70
+
+70 80 90 100
+
+austra
+
+70 80 90 100
+
+autos
+
+85
+
+80
+
+75
+
+70
+
+72
+
+70
+
+68
+
+66
+
+64
+
+70 80 90 100
+
+labor
+
+70 80 90 100
+mushroom
+
+85
+
+80
+
+75
+
+70
+
+100
+
+98
+
+96
+
+94
+
+38
+
+36
+
+34
+
+32
+
+60
+
+80
+
+mfeat-pixel
+
+70 80 90 100
+
+letter
+
+70 80 90 100
+colic-orig
+
+Naive Bayes
+C4.5
+PART
+
+70 80 90 100
+molecular
+
+70 80 90 100
+
+splice
+
+Confidence threshold (%)
+
+(a) Accuracies vs. Support threshold
+
+(b) Accuracies vs. Conﬁdence threshold
+
+Fig. 1. Classiﬁcation accuracies of the three classiﬁers with FEAST vs. diﬀerent
+thresholds
+
+From Fig. 1(a) and 1(b) we observe that (i) for a given data set, the clas-
+siﬁcation accuracy varying trends of the three classiﬁers w.r.t FEAST are very
+similar for either the given support thresholds or the given conﬁdence thresholds.
+This reveals that the FEAST has no bias for a special classiﬁer, i.e. the results
+obtained by FEAST are generally suitable. (ii) The classiﬁcation accuracy varies
+with both the support and conﬁdence thresholds, and the thresholds correspond-
+ing to the highest classiﬁcation accuracy are diﬀerent for diﬀerent data sets. For
+example, in Fig. 1(a), the support threshold corresponding to the highest classi-
+ﬁcation accuracy is about 10% for “austra”, while less than 5% for “colic-orig”.
+In Fig. 1(b), the conﬁdence threshold corresponding to the highest classiﬁcation
+accuracy is greater than 95% for “autos”, while about 70% for “splice”. This
+implies that both support and conﬁdence thresholds aﬀect the feature subset
+selected by FEAST, and the best thresholds are diﬀerent for diﬀerent data sets.
+
+Proportion of Selected Features. Fig. 2 shows sensitivity analysis results of the
+support and conﬁdence thresholds on the proportion of features selected by the
+proposed algorithm FEAST.
+
+From Fig. 2(a) we observe that for all the 14 data sets, with the increment
+of the support threshold, the proportion of the selected features decreases. The
+
+318
+
+G. Wang and Q. Song
+
+)
+
+%
+
+(
+ 
+s
+e
+r
+u
+
+t
+
+a
+e
+
+f
+ 
+
+d
+e
+
+l
+
+t
+c
+e
+e
+s
+ 
+f
+
+o
+
+ 
+
+n
+o
+
+i
+t
+r
+o
+p
+o
+r
+P
+
+80
+60
+40
+20
+0
+
+10 20 30
+heart-c
+
+80
+60
+40
+20
+0
+10
+primary-tumor
+
+5
+
+30
+
+20
+
+10
+
+0
+
+8
+
+12
+
+10
+flags
+
+80
+60
+40
+20
+0
+
+60
+
+40
+
+20
+
+0
+
+100
+
+50
+
+0
+
+10 20 30
+
+cleve
+
+40
+
+20
+lymph
+
+20
+
+10
+30
+molecular
+
+80
+60
+40
+20
+0
+
+40
+
+30
+
+20
+
+10
+
+0
+
+80
+60
+40
+20
+0
+
+40
+
+20
+austra
+
+8
+
+12
+
+autos
+
+16
+
+80
+60
+40
+20
+0
+
+60
+
+40
+
+20
+
+0
+
+30
+
+20
+
+10
+
+0
+
+5
+
+20
+
+5
+
+10
+15
+splice
+
+Support threshold (%)
+
+80
+60
+40
+20
+0
+0.5
+
+50
+
+25
+labor
+
+1.5
+
+1
+
+letter
+
+15
+
+10
+
+5
+
+0
+
+5 10 15 20 25
+
+colic-orig
+
+20
+
+40
+
+mushroom
+
+10
+
+15
+
+20
+
+mfeat-pxiel
+
+)
+
+%
+
+(
+ 
+s
+e
+r
+u
+
+t
+
+a
+e
+
+f
+ 
+
+d
+e
+
+l
+
+t
+c
+e
+e
+s
+ 
+f
+
+o
+
+ 
+
+n
+o
+
+i
+t
+r
+o
+p
+o
+r
+P
+
+80
+60
+40
+20
+0
+
+80
+
+60
+
+40
+
+20
+
+70 80 90 100
+
+heart-c
+
+0
+70 80 90 100
+primary-tumor
+
+30
+
+20
+
+10
+
+0
+
+70 80 90 100
+
+flags
+
+80
+60
+40
+20
+0
+
+60
+
+40
+
+20
+
+0
+
+40
+30
+20
+10
+0
+
+60
+
+40
+
+20
+
+0
+
+40
+
+20
+
+0
+
+20
+
+10
+
+0
+
+70 80 90 100
+
+cleve
+
+70 80 90 100
+
+lymph
+
+70 80 90 100
+molecular
+
+70 80 90 100
+
+austra
+
+70 80 90 100
+
+autos
+
+70 80 90 100
+
+splice
+
+80
+
+60
+
+40
+
+20
+
+0
+
+40
+
+30
+
+20
+
+10
+0
+
+70 80 90 100
+
+labor
+
+70 80 90 100
+mushroom
+
+70 80 90 100
+
+letter
+
+70 80 90 100
+colic-orig
+
+40
+
+20
+
+0
+
+40
+30
+20
+10
+0
+
+15
+
+10
+
+5
+
+0
+60
+
+80
+
+mfeat-pxiel
+
+Confidence threshold (%)
+
+(a) Proportion of selected features vs.
+Support threshold
+
+(b) Proportion of selected features vs.
+Conﬁdence threshold
+
+Fig. 2. Proportion of features selected by FEAST vs. diﬀerent thresholds
+
+reason is that with the increment of the support threshold, the number of the
+frequent itemsets decreases. At the same time, FEAST chooses feature subset
+from itemsets that are at least frequent, thus the number of the selected features
+deceases, and the proportion of the selected features decreases as well. We also
+observe that although the proportion of the selected features deceases with the
+increment of the support threshold, for the diﬀerent data sets, the decrement
+extents are varying. Therefore, we should choose diﬀerent support thresholds for
+the diﬀerent data sets.
+
+From Fig. 2(b) we observe that with the increment of the conﬁdence thresh-
+old, the proportion of selected features either increases or decreases. The rea-
+son is that for a given conﬁdence threshold, there are many support thresholds
+with varying values. Further, for the diﬀerent conﬁdence thresholds, the varying
+ranges of the support thresholds are diﬀerent. This means the corresponding
+numbers of the frequent itemsets and further the proportions of selected fea-
+tures are diﬀerent as well. This reveals that both the support and conﬁdence
+thresholds are aﬀected by data set characteristics and we should select diﬀerent
+thresholds for diﬀerent data sets.
+
+Runtime Fig. 3 shows the sensitivity analysis results of the support and conﬁ-
+dence thresholds on the runtime of our proposed algorithm FEAST.
+
+From Fig. 3(a) we observe that for all the data sets, the runtime of FEAST
+decreases when the support threshold increases. This is because with the incre-
+ment of the support threshold, the number of the frequent itemsets is decreased.
+So the time spending on mining the frequent itemsets is decreased as well. At
+the same time, FEAST chooses the feature subset from the itemsets that are at
+least frequent, thus the time consumed in the feature subset identiﬁcation is also
+deceased.
+
+From Fig. 3(b) we observe that the runtime of FEAST can increase, decrease
+and ﬂuctuate when the conﬁdence threshold increases. The reason is that for
+a given conﬁdence threshold, there are many support thresholds with varying
+
+Selecting Feature Subset via Constraint Association Rules
+
+319
+
+0.4
+0.3
+0.2
+0.1
+0
+
+10 20 30
+heart-c
+
+)
+d
+n
+o
+c
+e
+s
+(
+ 
+e
+m
+
+i
+t
+n
+u
+R
+
+4
+3
+2
+1
+0
+10
+primary-tumor
+
+5
+
+15
+
+10
+
+5
+
+0
+
+8
+
+12
+
+10
+flags
+
+0.6
+
+0.4
+
+0.2
+
+0
+
+3
+
+2
+
+1
+
+0
+
+10
+
+5
+
+0
+
+10 20 30
+cleve
+
+40
+
+20
+lymph
+
+20
+
+10
+30
+molecular
+
+3
+
+2
+
+1
+
+0
+
+4
+
+2
+
+0
+
+15
+
+10
+
+5
+
+0
+
+5
+
+0.2
+
+0.1
+
+0
+
+4
+3
+2
+1
+0
+
+3000
+
+2000
+
+1000
+
+0
+
+40
+
+20
+austra
+
+8
+
+12 16
+
+autos
+
+10 15 20
+splice
+
+2
+
+1
+
+0
+0.5
+
+1.5
+
+1
+
+letter
+
+50
+
+25
+labor
+
+4
+3
+2
+1
+0
+
+5 10 15 20 25
+colic-orig
+
+)
+d
+n
+o
+c
+e
+s
+(
+ 
+e
+m
+
+i
+t
+n
+u
+R
+
+20
+
+40
+mushroom
+
+5
+10 15 20
+mfeat-pixel
+
+0.08
+
+0.06
+
+0.04
+
+0.02
+
+70 80 90 100
+heart-c
+
+0
+
+2
+
+1.5
+
+1
+
+0.5
+
+0
+70 80 90 100
+primary-tumor
+
+4
+3
+2
+1
+0
+
+70 80 90 100
+
+flags
+
+0.1
+
+0.05
+
+0
+
+0.4
+0.3
+0.2
+0.1
+0
+
+0.6
+
+0.4
+
+0.2
+
+0
+
+70 80 90 100
+
+cleve
+
+70 80 90 100
+
+lymph
+
+70 80 90 100
+molecular
+
+0.4
+0.3
+0.2
+0.1
+0
+
+3
+
+2
+
+1
+
+0
+
+10
+
+5
+
+0
+
+1.5
+
+1
+
+0.5
+
+0
+
+0.2
+
+0.1
+
+0
+
+70 80 90 100
+
+letter
+
+70 80 90 100
+colic-orig
+
+70 80 90 100
+
+labor
+
+70 80 90 100
+mushroom
+
+70 80 90 100
+
+austra
+
+70 80 90 100
+
+autos
+
+0.01
+
+0.005
+
+0
+
+0.6
+
+0.4
+
+0.2
+
+0
+
+4000
+
+2000
+
+70 80 90 100
+
+splice
+
+0
+60
+mfeat-pixel
+
+80
+
+Support threshold (%)
+
+Confidence threshold (%)
+
+(a) Runtime vs. Support threshold
+
+(b) Runtime vs. Conﬁdence threshold
+
+Fig. 3. Runtime of FEAST vs. diﬀerent thresholds
+
+values. Further, for the diﬀerent conﬁdence thresholds, the varying ranges of the
+support thresholds are diﬀerent. This means that the corresponding numbers of
+the frequent itemsets, and further the numbers of selected features are diﬀerent
+as well. Thus, the time used to mine frequent itemsets and to identify feature
+subset is varying.
+
+To summarize, the performance of the proposed algorithm FEAST is directly
+aﬀected by the selection of these two input-parameters: support and conﬁdence
+thresholds. However, the appropriate thresholds for diﬀerent data sets would be
+diﬀerent. That is, there are no speciﬁc support and conﬁdence thresholds which
+are the best choice for all the data sets. We should pick up diﬀerent thresholds
+for diﬀerent data sets.
+
+6 Conclusion
+
+In this paper, we have presented a novel constraint association rule based feature
+selection algorithm FEAST. We have also compared FEAST with the other four
+representative feature selection algorithms, including two well-known algorithms
+CFS and FCBF, the algorithm INTERACT aiming at solving feature interaction,
+and an associative-rule-based algorithm FSBAR, upon both the ﬁve synthetic
+data sets and the 14 UCI data sets. The results on the synthetic data sets
+show that FEAST can identify relevant features and remove redundant ones
+while reserving feature interaction. The results on the real world data sets show
+that our proposed algorithm FEAST can reduce the number of features and
+outperforms all the other four feature selection algorithms in terms of the average
+accuracy improvement and the Win/Draw/Loss records of all the three diﬀerent
+types of classiﬁers Naive Bayes, C4.5 and PART.
+
+We have also conducted a sensitivity analysis of support and conﬁdence thresh-
+olds to FEAST. The results show that the support and conﬁdence thresholds play
+a fundamental role in the proposed algorithm. Moreover, for diﬀerent data sets,
+
+320
+
+G. Wang and Q. Song
+
+the appropriate thresholds could be diﬀerent. Therefore, for further research, we
+plan to explore how to recommend the support and conﬁdence thresholds for
+FEAST according to data set characteristics.
+
+References
+
+1. Asuncion, A., Newman, D.J.: UCI machine learning repository (2007),
+
+http://archive.ics.uci.edu/ml/
+
+2. Chen, G., Liu, H., Yu, L., Wei, Q., Zhang, X.: A new approach to classiﬁcation
+based on association rule mining. Decision Support Systems 42(2), 674–689 (2006)
+3. Dash, M., Liu, H.: Feature selection for classiﬁcation. Intelligent Data Analy-
+
+sis 1(3), 131–156 (1997)
+
+4. Dash, M., Liu, H.: Consistency-based search in feature selection. Artiﬁcial Intelli-
+
+gence 151(1-2), 155–176 (2003)
+
+5. Fleuret, F.: Fast binary feature selection with conditional mutual information.
+
+Journal of Machine Learning Research 5, 1531–1555 (2004)
+
+6. Frank, E., Witten, I.H.: Generating accurate rule sets without global optimization.
+In: Proceedings of the Fifteenth International Conference on Machine Learning,
+pp. 144–151. Morgan Kaufmann Publishers Inc. (1998)
+
+7. Gheyas, I.A., Smith, L.S.: Feature subset selection in large dimensionality domains.
+
+Pattern Recognition 43(1), 5–13 (2010)
+
+8. Guyon, I., Elisseeﬀ, A.: An introduction to variable and feature selection. Journal
+
+of Machine Learning Research 3, 1157–1182 (2003)
+
+9. Hall, M.A.: Correlation-based feature selection for discrete and numeric class ma-
+chine learning. In: Proceedings of the Seventeenth International Conference on
+Machine Learning, pp. 359–366. Morgan Kaufmann Publishers Inc. (2000)
+
+10. Han, J.: CPAR: Classiﬁcation based on predictive association rules. In: Proceedings
+of the Third SIAM International Conference on Data Mining, vol. 3, pp. 331–335.
+Society for Industrial & Applied (2003)
+
+11. Han, J., Pei, J., Yin, Y., Mao, R.: Mining frequent patterns without candidate
+generation: A frequent-pattern tree approach. Data Mining and Knowledge Dis-
+covery 8(1), 53–87 (2004)
+
+12. Jakulin, A., Bratko, I.: Testing the signiﬁcance of attribute interactions. In: Pro-
+ceedings of the 21st International Conference on Machine learning, pp. 409–416.
+ACM (2004)
+
+13. John, G.H., Kohavi, R., Pﬂeger, K.: Irrelevant features and the subset selection
+problem. In: Proceedings of the 11th International Conference on Machine Learn-
+ing, vol. 129, pp. 121–129. Citeseer (1994)
+
+14. John, G.H., Langley, P.: Estimating continuous distributions in bayesian classiﬁers.
+In: Proceedings of the 11th Conference on Uncertainty in Artiﬁcial Intelligence,
+vol. 1, pp. 338–345. Citeseer (1995)
+
+15. Klemettinen, M., Mannila, H., Ronkainen, P., Toivonen, H., Verkamo, A.I.: Finding
+interesting rules from large sets of discovered association rules. In: Proceedings of
+the 3rd International Conference on Information and Knowledge Management, pp.
+401–407. ACM (1994)
+
+16. Kohavi, R., John, G.H.: Wrappers for feature subset selection. Artiﬁcial Intelli-
+
+gence 97(1-2), 273–324 (1997)
+
+17. Koller, D., Sahami, M.: Toward optimal feature selection. In: Proceedings of Inter-
+
+national Conference on Machine Learning, pp. 284–292. Citeseer (1996)
+
+Selecting Feature Subset via Constraint Association Rules
+
+321
+
+18. Kononenko, I.: Estimating Attributes: Analysis and Extensions of RELIEF. In:
+Bergadano, F., De Raedt, L. (eds.) ECML 1994. LNCS, vol. 784, pp. 171–182.
+Springer, Heidelberg (1994)
+
+19. Li, W., Han, J., Pei, J.: CMAR: Accurate and eﬃcient classiﬁcation based on
+multiple class-association rules. In: Proceedings of IEEE International Conference
+on Data Mining, pp. 369–376. IEEE Computer Society (2001)
+
+20. Liu, H., Setiono, R.: A probabilistic approach to feature selection-a ﬁlter solution.
+In: Proceedings of the 13rd International Conference of Machine learning. Morgan
+Kaufmann Pub. (1996)
+
+21. Park, H., Kwon, H.C.: Extended relief algorithms in instance-based feature ﬁlter-
+ing. In: Proceedings of the 6th International Conference on Advanced Language
+Processing and Web Information Technology (ALPIT 2007), pp. 123–128. IEEE
+Computer Society (2007)
+
+22. Quinlan, J.R.: C4.5: programs for machine learning. Morgan Kaufmann Publishers
+
+Inc., San Francisco (1993)
+
+23. Scanlon, P., Potamianos, G., Libal, V., Chu, S.M.: Mutual information based visual
+feature selection for lipreading. In: Processings of the 8th International Conference
+on Spoken Language, pp. 857–860. Citeseer (2004)
+
+24. Tan, P.N., Steinbach, M., Kumar, V.: Introduction to data mining. Pearson Addi-
+
+son Wesley, Boston (2006)
+
+25. Witten, I.H., Frank, E.: Data Mining: Practical machine learning tools and tech-
+
+niques. Morgan Kaufmann Pub. (2005)
+
+26. Xie, J., Wu, J., Qian, Q.: Feature selection algorithm based on association rules
+mining method. In: Proceedings of 8th IEEE/ACIS International Conference on
+Computer and Information Science, pp. 357–362. IEEE (2009)
+
+27. Yu, L., Liu, H.: Feature selection for high-dimensional data: A fast correlation-
+based ﬁlter solution. In: Proceedings of 20th International Conference on Machine
+Leaning, vol. 20, pp. 856–863 (2003)
+
+28. Yu, L., Liu, H.: Eﬃcient feature selection via analysis of relevance and redundancy.
+
+Journal of Machine Learning Research 5, 1205–1224 (2004)
+
+29. Zhao, Z., Liu, H.: Searching for interacting features in subset selection. Intelligent
+
+Data Analysis 13(2), 207–228 (2009)
+
+

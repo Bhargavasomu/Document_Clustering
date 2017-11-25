@@ -1,0 +1,1202 @@
+Gaussian Processes Autoencoder
+
+for Dimensionality Reduction
+
+Xinwei Jiang1, Junbin Gao2, Xia Hong3, and Zhihua Cai1
+
+1 School of Computer Science,
+
+China University of Geosciences, Wuhan, 430074, China
+
+ysjxw@hotmail.com, zhcai@cug.edu.cn
+2 School of Computing and Mathematics,
+
+Charles Sturt University, Bathurst, NSW 2795, Australia
+
+jbgao@csu.edu.au
+
+3 School of Systems Engineering,
+
+University of Reading, Reading, RG6 6AY, UK
+
+x.hong@reading.ac.uk
+
+Abstract. Learning low dimensional manifold from highly nonlinear
+data of high dimensionality has become increasingly important for dis-
+covering intrinsic representation that can be utilized for data visual-
+ization and preprocessing. The autoencoder is a powerful dimensionality
+reduction technique based on minimizing reconstruction error, and it has
+regained popularity because it has been eﬃciently used for greedy pre-
+training of deep neural networks. Compared to Neural Network (NN),
+the superiority of Gaussian Process (GP) has been shown in model infer-
+ence, optimization and performance. GP has been successfully applied
+in nonlinear Dimensionality Reduction (DR) algorithms, such as Gaus-
+sian Process Latent Variable Model (GPLVM). In this paper we propose
+the Gaussian Processes Autoencoder Model (GPAM) for dimensionality
+reduction by extending the classic NN based autoencoder to GP based
+autoencoder. More interestingly, the novel model can also be viewed
+as back constrained GPLVM (BC-GPLVM) where the back constraint
+smooth function is represented by a GP. Experiments verify the perfor-
+mance of the newly proposed model.
+
+Keywords: Dimensionality Reduction, Autoencoder, Gaussian Process,
+Latent Variable Model, Neural Networks.
+
+1
+
+Introduction
+
+Dimensionality Reduction (DR) aims to ﬁnd the corresponding low dimensional
+representation of data in a high-dimensional space without incurring signiﬁcant
+information loss and has been widely utilized as one of the most crucial pre-
+processing steps in data analysis such as applications in computer vision [15].
+Theoretically the commonly-faced tasks in data analysis such as regression, clas-
+siﬁcation and clustering can be viewed as DR. For example, in regression, one
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part II, LNAI 8444, pp. 62–73, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+Gaussian Processes Autoencoder for Dimensionality Reduction
+
+63
+
+tries to estimate a mapping function from an input (normally with high dimen-
+sions) to an output space (normally with low dimensions).
+
+Motivated by the ample applications, DR techniques have been extensively
+studied in the last two decades. Linear DR models such as Principal Compo-
+nent Analysis (PCA) and Linear Discriminant Analysis (LDA) may be the most
+well-known DR techniques used in the settings of unsupervised and supervised
+learning [2]. These methods aim to learn a linear mapping from high dimensional
+observation to the lower dimension space (also called latent space). However, in
+practical applications the high dimensional observed data often contain highly
+nonlinear structures which violates the basic assumption of the linear DR models,
+hence various non-linear DR models have been developed, such as Multidimen-
+sional Scaling (MDS) [11], Isometric Mapping (ISOMAP) [19], Locally Linear
+Embedding (LLE) [16], Kernel PCA (KPCA) [17], Gaussian Process Latent Vari-
+able Model (GPLVM) [9], Relevance Units Latent Variable Model (RULVM) [6],
+and Thin Plate Spline Latent Variable Model (TPSLVM) [7].
+
+Among the above mentioned nonlinear DR approaches, the Latent Variable
+Model (LVM) based DR models attract considerable attention due to their in-
+tuitive explanation. LVM explicitly models the relationship between the high-
+dimensional observation space and the low-dimensional latent space, thus it is
+able to overcome the out-of-sample problems (projecting a new high-dimensional
+sample into its low-dimensional representation) or pre-image problems (project-
+ing back from the low-dimensional space to the observed data space). The linear
+Probabilistic PCA (PPCA) [20] and GPLVM [9] may be the most well-known
+LVM based DR techniques, where the mapping from the low dimensional latent
+space (latent variables) to the high dimensional observation space (observed vari-
+ables) is represented by a linear model and a nonlinear Gaussian Process (GP),
+respectively. Since the nonlinear DR technique GPLVM performs very well in
+many real-world data sets, this model has become popular in many applications,
+such as movement modelling and generating [9]. Meanwhile, many GPLVM ex-
+tensions have been developed to further improve performance. For instance, the
+Gaussian Process Dynamical Model (GPDM) [22] allows modelling dynamics
+in the latent space. The back constraint GPLVM (BC-GPLVM) was proposed
+in [10] to maintain a smooth function from observed data points to the cor-
+responding latent points thus enforcing the close observed data to be close in
+latent space. Other extensions, such as Bayesian GPLVM, shared GPLVM and
+supervised GPLVM which further extend the classical GPLVM to unsupervised
+and supervised settings, can be referred to [4,21,8].
+
+The autoencoder [3] can be regarded as an interesting DR model, although
+originally it is a neural network (NN) architecture used to determine latent rep-
+resentation for observed data. The idea of autoencoder is to resolve the latent
+embedding within the hidden layer by training the NN to reproduce the input
+observed data as its output. Intuitively this model consists of two parts: the
+encoder which maps the input observed data to a latent representation, and the
+decoder which reconstructs the input through a map from the latent represen-
+tation to the observed input (also called output). Basically, the two mappings
+
+64
+
+X. Jiang et al.
+
+in the encoder and decoder are modelled by neural network (NN). Recently, au-
+toencoder has regained popularity because it has been eﬃciently used for greedy
+pre-training of deep neural network (DNN) [1].
+
+The relationship between GP and NN was established by Neal [12], who
+demonstrated that NN could become GP in the limit of inﬁnite hidden units
+and the model inference may be simpler. With speciﬁc covariance function (NN
+covariance) [14], the back constraint GPLVM (BC-GPLVM) can be seen as
+autoencoders[18], where the encoder is NN and the decoder is GP. The superi-
+ority of GP over NN lies in small-scale model parameters, easy model inference
+and training [12,14], and in many real-world applications GP outperforms NN.
+Motivated by the comparison, we propose the Gaussian Processes Autoencoder
+Model (GPAM), which can be viewed as BC-GPLVM where GP represents the
+smooth mapping from latent space to observation space, and also as an au-
+toencoder where both the encoder and decoder are GPs. It is expected that the
+proposed GPAM will outperform typical GPLVM, BC-GPLVM and autoencoder
+models.
+
+The rest of the paper is organized as follows. In Section 2 we brieﬂy review
+the GP, GPLVM, and autoencoder models. The proposed Gaussian Processes
+Autoencoder Model (GPAM) will be introduced in Section 3. Then, real-world
+data sets are used to verify and evaluate the performance of the newly proposed
+algorithm in Section 4. Finally, the concluding remarks and comments are given
+in Section 5.
+
+2 Related Works
+
+In this and following section, we use the following notations: X = [x1, ..., xN ]T
+are observed (inputs) data in a high dimensional space RD, i.e., xn ∈ RD;
+Y = [y1, ..., yN ]T are observed (outputs or labels) data with each yn ∈ Rq; and
+Z = [z1, ..., zN ]T are the so-called latent variables in a low dimensional space Rp
+with p (cid:3) D where each zn is associated with xn. For the sake of convenience,
+we also consider X as an N × D matrix, Y an N × q and Z an N × p matrix.
+We call D = {(xn, yn)}N
+n=1 if no labels (outputs) given) the
+observed dataset. Data items are assumed to be i.i.d. Let N (μ, Σ) denote the
+Gaussian distribution with mean μ and covariance Σ.
+
+n=1 (or D = {xn}N
+
+2.1 Gaussian Process
+
+Given a dataset D = {(x1, y1),··· , (xN , yN )} as deﬁned above, the classical
+Gaussian Process Regression (GPR) is concerned with the case when q = 1. It
+aims to estimate the predictive distribution p(y|x
+. In the
+classical GPR model, each sample yn is generated from the corresponding latent
+functional variable g with independent Gaussian noise
+
+∗
+) for any test data x
+
+∗
+
+y = g(x) + 
+
+Gaussian Processes Autoencoder for Dimensionality Reduction
+
+65
+
+where g is drawn from a (zero-mean) GP which only depends on the covari-
+ance/kernel function k(·,·) deﬁned on input space and  is the additive Gaussian
+noise with zero mean and covariance σ2.
+
+Given a new test observation x
+
+, it is easy to prove that the predictive distri-
+
+∗
+
+bution conditioned on the given observation is
+
+∗
+
+∗|x
+
+g
+
+, X, Y ∼N (Kx∗X (KXX + σ2I)
+
+−1Y,
+Kx∗x∗ − Kx∗X (KXX + σ2I)
+
+−1KXx∗ )
+
+(2.1)
+
+where Ks are the matrices of the covariance/kernel function values at the cor-
+responding points X and/or x
+
+∗
+
+.
+
+2.2 Gaussian Process Latent Variable Model (GPLVM)
+
+Lawrence introduced GPLVM in [9], including the motivation of proposing the
+GPLVM and the relationship between PPCA and GPLVM. Here we just review
+GPLVM from the view of GP straightforwardly.
+Given a high dimensional dataset D = {x1, ..., xN} ⊂ RD without any given
+labels or output data. We aim to obtain the latent/unknown variables zn ∈ Rp
+corresponding to each data item xn (n = 1, 2, ..., N ). GPLVM [9] deﬁnes a
+generative mapping from the latent variables zn to its corresponding observed
+variables xn which is governed by a group of GPs xn = g(zn) +  where g =
+[g1, ..., gD]T is assumed to be a group of D GPs, and  is an independent Gaussian
+noise with zero mean and covariance σ2I, which means the likelihood of the
+observations is Gaussian
+
+P (X|g, Z) =
+
+N(cid:2)
+
+n=1
+
+N (xn|g(zn), σ2I)
+
+(2.2)
+
+Suppose that each GP gi (i = 1, ..., D) has the same covariance function
+k(·,·), then the data likelihood deﬁned by equation (2.2) can be marginalized
+with respect to the given GP priors over all gds, giving rise to the following
+overall marginalized likelihood of the observations X
+
+P (X|Z) =
+
+1
+
+(2π)DN/2|K|D/2 exp
+
+− 1
+tr(K
+2
+
+(2.3)
+
+(cid:3)
+
+(cid:4)
+−1XX T )
+
+where K = KZZ + σ2I is the kernel matrix over latent variables Z.
+
+The model learning is implemented by maximizing the above marginalized
+data likelihood with respect to the latent variables Z and the parameters of the
+kernel function k.
+
+Although GPLVM provides a smooth mapping from latent space to the ob-
+servation space, it does not ensure smoothness in the inverse mapping. This can
+be undesirable because it only guarantees that samples close in latent space will
+be close in data space, while points close in data space may be not close in
+latent space. Besides, due to the lack of direct mapping from observation space
+
+66
+
+X. Jiang et al.
+
+to latent space the out-of-sample problem becomes complicated, meaning that
+the latent representations of testing data must be optimized conditioned on the
+latent embedding of the training examples [9]. In order to address this issue, the
+back constraint GPLVM (BC-GPLVM) was proposed in [10]. The idea behind
+this model is to constrain latent points to be a smooth function of the corre-
+sponding data points, which forces points which are close in data space to be
+close in latent space. The back constraint smooth function can be written by
+
+zmn = fm(xn, α)
+
+(2.4)
+
+where α are parameters of the smooth function. Typically, we can use a linear
+model, a kernel based regression (KBR) model or a multi-layer perception (MLP)
+model to represent this function. As the function fm is fully parameterized in
+terms of a set of new parameters α, the learning process becomes an optimization
+process aiming at maximizing the likelihood (2.3) w.r.t. the latent variables X
+and parameters α.
+
+2.3 Autoencoder
+
+The autoencoder[3] is based on NN, which will be termed NNAM (NN Autoen-
+coder Model) for short throughout the paper. Basically it is a three-layer NN
+with one hidden layer where the input and output layers are the observation
+data. Our goal is to ﬁnd the latent representation over the hidden layer of the
+model through minimizing reconstruction errors. The autoencoder model can be
+separated into two parts: an encoder (mapping the input into latent represen-
+tation) and a decoder (reproducing the input through a map from the latent
+representation to input).
+
+With the above notations, let’s deﬁne the encoder as a function z = f (x, θ,
+and the decoder as a function x = g(z, γ). Given a high dimensional dataset
+
+D = {x1, ..., xN} ⊂ RD, we jointly optimize the parameters of the encoder θ
+
+and decoder γ by minimizing the least-squares reconstruction cost:
+
+{θ, γ} = argmax
+{θ,γ}
+
+N(cid:5)
+
+D(cid:5)
+
+n=1
+
+d=1
+
+(cid:6)
+(cid:7)2
+n − gd(f (xn, θ), γ)
+xd
+
+(2.5)
+
+where gd(·) is the dth output dimension of g(·). When f and g are linear
+transformations, this model is equivalent to PCA. However, nonlinear projec-
+tions show a more powerful performance. This function is also called the ac-
+tive function in NN framework. In this paper we use the sigmoidal function
+f (x, θ) = (1 + exp(−xT θ))
+−1 as the active function. The model can be opti-
+mized by gradient-based algorithms, such as scaled conjugate gradient (SCG).
+
+3 Gaussian Processes Autoencoder Model
+
+Based on the relationship between GP and NN, we introduce the detailed model
+inference of Gaussian Processes Autoencoder Model (GPAM). The fundamental
+
+Gaussian Processes Autoencoder for Dimensionality Reduction
+
+67
+
+idea of this novel model is to use Gaussian Process (GP) to replace Neural
+Networks (NN) that was originally used in autoencoder.
+
+Given a high dimensional dataset D = {x1, ..., xN} ⊂ RD without any labels
+or output data, where each sample xn is assumed to be associated with the la-
+tent/unknown variables zn ∈ Rp (n = 1, 2, ..., N ). Our goal is to ﬁnd these latent
+variables which should clearly show the intrinsic structures of the observation
+data for data visualization or preprocessing.
+
+The idea behind GPAM is to deﬁne a mapping from the observation variables
+xn to the corresponding latent variables zn (encoder) and a mapping from the
+latent variables zn to the corresponding observation variables xn (decoder) by
+using Gaussian Processes Regressions (GPRs) deﬁned as follows
+
+z = f (x, θ) + 1; x = g(z, γ) + 2
+
+(3.1)
+
+where f = [f 1, ..., f p]T and g = [g1, ..., gD]T are assumed to be two groups of p
+and D GPs with hyperparameters θ and γ, respectively, and both 1 and 2 are
+the independent Gaussian noises with zero mean and covariance σ2I. Thus it is
+easy to see that the likelihood of the observations is Gaussian,
+
+P (Z|f , X, θ) =
+
+N(cid:2)
+
+n=1
+
+N (zn|f (xn), σ2
+
+1I); P (X|g, Z, γ) =
+
+N(cid:2)
+
+n=1
+
+N (xn|g(zn), σ2
+
+2I)
+
+Let’s further assume that both functions f and g are nonlinearly modelled
+
+by GPs
+
+P (f|X, θ) = N (f|0, KX,X); P (g|Z, γ) = N (g|0, KZ,Z)
+
+(3.2)
+
+By marginalizing over the unknown functions f and g, we have
+
+(3.3)
+
+(cid:9)
+
+P (Z|X, θ) =
+
+1
+
+(2π)pN/2|KX|p/2
+
+exp
+
+P (X|Z, γ) =
+
+1
+
+(2π)DN/2|KZ|D/2 exp
+
+(cid:8)
+
+− 1
+tr(K
+2
+(cid:8)
+− 1
+tr(K
+2
+
+(cid:9)
+
+−1
+X ZZ T )
+
+−1
+Z XX T )
+
+with KX = KX,X + σ2
+2I where KX,X and KZ,Z are the
+covariance matrices deﬁned over the input data X, and the latent variables Z,
+respectively.
+
+1I and KZ = KZ,Z + σ2
+
+Furthermore, in order to do model inference let’s assume that the input X
+of encoder function f is diﬀerent from the output X of decoder function g,
+which is rewritten by Xc. Thus the notation of marginal likelihood P (X|Z, γ)
+can be changed to P (Xc|Z, γ). Based on the conditional independence prop-
+erty of graphical model the posterior distribution over latent variables Z given
+observation (X, Xc) can be derived as follows
+
+P (Z|X, Xc, θ, γ) = P (Z|X, θ)P (Xc|Z, γ)/P (Xc|X, γ, θ)
+
+(3.4)
+
+68
+
+X. Jiang et al.
+
+In order to learn the unknown variables (Z, θ, γ), we maximize the log poste-
+
+rior distribution P (Z|X, Xc, θ, γ) (3.4) w.r.t. (Z, θ, γ)
+
+(cid:10)
+
+(cid:11)
+log P (Z|X, θ) + log P (Xc|Z, γ) − log P (Xc|X, θ, γ)
+
+max
+Z,θ,γ
+
+For the sake of convenience, we simply denote the negative log posterior dis-
+
+tribution P (Z|Y, X, θ, γ) by
+
+(3.5)
+
+(3.6)
+
+L = Lr + Ll = − log P (Z|X, θ) − log P (Xc|Z, γ)
+(cid:11)
+
+(cid:10)
+pN log 2π + p log|KX| + tr(K
+1
+2
+(cid:10)
+DN log 2π + D log|KZ| + tr(K
+
++
+
+−1
+X ZZ T )
+
+=
+
+−1
+Z XcX T
+c )
+
+(cid:11)
+
+1
+2
+
+where P (Xc|X, θ, γ) has been omitted because it is irrelevant to Z.
+The process of model training is equal to simultaneously optimizing a GPR
+(corresponding to the encoder distribution P (Z|X, θ)) and a GPLVM (corre-
+sponding to the decoder distribution P (Xc|Z, γ)). To apply a gradient based op-
+timization algorithm like SCG algorithm to learn the parameters of the model,
+we need to ﬁnd out the gradient of L w.r.t. the latent variables Z, and the kernel
+parameter (θ, γ).
+Firstly for the part of GPR corresponding to P (Z|X, θ) we can simply obtain
+
+the following gradients
+
+∂Lr
+∂Z
+
+−1
+X Z
+
+= K
+
+(3.7)
+
+As for the parameter θ in kernel KX , since we consider the output of the
+mapping z = f (x, θ) as the known quantity in the GPR model, the optimization
+process is identical to the procedure of determining parameters for a typical
+GPR model from training data. Thus we can derive the partial derivative of the
+
+hyperparameter θ by chain rule (refer to Chapter 5 in [14])
+
+∂KX
+.
+∂θ
+Subsequently for the second part of GPLVM corresponding to P (Xc|Z, γ) it
+
+=
+
+∂Lr
+∂KX
+
+∂Lr
+∂θ
+
+is easy to evaluate the gradients of Ll w.r.t. the latent variables Z
+
+∂Ll
+∂Z
+
+=
+
+∂Ll
+∂KZ
+
+∂KZ
+∂Z
+
+(3.8)
+
+where the gradients of log likelihood w.r.t. kernel matrix KZ is evaluated by
+
+∂Ll
+∂KZ
+
+Z − K
+−1
+
+−1
+Z Y Y T K
+
+−1
+Z .
+
+= K
+
+(3.9)
+
+Similarly the gradient of Ll w.r.t. the hyperparameter γ can be calculated by
+
+∂Ll
+∂γ
+
+=
+
+∂Ll
+∂KZ
+
+∂KZ
+∂γ
+
+(3.10)
+
+Gaussian Processes Autoencoder for Dimensionality Reduction
+
+69
+
+and the computation of the derivative of the kernel matrix w.r.t. the latent
+variable Z and hyperparameter depend on a speciﬁc kernel function.
+
+By combining equations (3.7) with equation (3.8) and (3.9), it is quite simple
+to get the complete gradients of L w.r.t. the latent variables Z (∂L/∂Z). Once
+we get all the derivative ready, the derivative based algorithms like SCG can
+be utilized to iteratively optimize these parameters. However, when we perform
+experiments, we ﬁnd that the value of Lr (corresponding to the encoder distri-
+bution P (Z|X, θ)) is much smaller than that of Ll (corresponding to the decoder
+distribution P (Xc|Z, γ)), leading to very little performance improvement com-
+pared to GPLVM. Thus we propose a novel algorithm to train the model based
+on two-stage optimization; this is to say, we try to asynchronously optimize the
+model consisting of GPR and GPLVM rather than simultaneously learn it. The
+algorithm is detailed in Algorithm 1.
+
+,θ,γ}.
+
+p, number of training iterations T and testing inputs X∗ ⊂ RD×M .
+
+Algorithm 1. Train and Test GPAM
+Input: High dimensional training inputs X ⊂ RD×N , pre-ﬁxed latent dimensionality
+Output: s = {Z,Z∗
+1. Initialize Z = PPCA(X, p), θ and γ (depending on speciﬁc kernel function);
+2. For i = 1:T{
+3. Optimize {Zt, γ} = argmaxZ,γ log P (X|Zt−1, γ);
+4. Optimize {Zt+1, θ} = argmaxZ,θ log P (Zt|X, θ);
+5. Check converges: break if Error(Z) = ||Zt+1(:) − Zt(:)||2 (cid:2) η}; //end loop
+6. Compute latent variables Z∗
+
+X Z with learnt hyperparameters θ for
+
+testing data X∗
+
+;
+
+= Kx∗X K−1
+
+7. return s
+
+To sum up, there are two ways to view the proposed GPAM. Firstly, it can
+be seen as the generalization of classic NNAM. While GPAM makes use of GPR
+model to encode and decode the data, NN is utilized to do encoding and decoding
+in classic NNAM. Based on the superiority of GP over NN, we believe that the
+proposed GPAM will outperform typical NNAM. Secondly, the proposed GPAM
+can also be considered as the BC-GPLVM where the back constrain function is
+modelled by GPR. Compared to classic BC-GPLVM, such as the KBR or MLP
+based models, the smooth mapping from the observation space to the latent space
+in the proposed GPAM is modelled by GPR, which results in better performance
+than typical KBR and MLP based BC-GPLVM.
+
+4 Experiments
+
+In this section, we compare the proposed GPAM with original GPLVM [9], BC-
+GPLVM [10] and NNAM [3], in two real-world tasks to show the better perfor-
+mance that GPAM provides. In order to assess the performance of these models
+in visualizing high dimensional data sets, we perform dimensionality reduction
+
+70
+
+X. Jiang et al.
+
+by using a 2D latent space for visualization. Moreover, the nearest neighbour
+classiﬁcation error is tested in the low dimensional latent space to objectively
+evaluate the quality of visualization for training data. After the DR models are
+learnt, we further use them as feature extraction, followed by a k-Nearest Neigh-
+bour (kNN) classiﬁer for testing data. Of course we can use other classiﬁer such
+as GP Classiﬁer (GPC) rather than a simple kNN to classify the testing data,
+but the ﬁnal goal is to reduce the dimensionality of the observation, and the
+learnt low-dimensional data would be utilized for other proposes, such as data
+visualization and compression, so the simple kNN classiﬁer is better to evaluate
+the quality of DR models. By comparing the classiﬁcation accuracies in low di-
+mensional latent space for testing data, we demonstrate the improvement of the
+proposed model again. The experimental results verify that the proposed GPAM
+is an eﬃcient DR model and outperforms GPLVM, BC-GPLVM and NNAM.
+
+For a fair comparison, we ran 500 iterations for all the models, and the co-
+variance used for GPLVM, BC-GPLVM and GPAM was optimally selected from
+RBF(ARD), POLY(ARD), and MLP(ARD) in Neil D. Lawrence’s MATLAB
+packages Kern. The back constraint function of BC-GPLVM is manually picked
+from KBR and MLP. The code GPLVM/BC-GPLVM and NNAM are based
+on Neil D. Lawrence’s MATLAB packages FGPLVM1, and R. B. Palm’s Deep
+Learning Toolbox2 [13], respectively. Since the learning rate of NNAM needs
+to be selected manually, we varied it between 0.1 and 10 optimally with sigmoidal
+active function.
+
+4.1 Oil Flow Data
+
+The oil ﬂow data set [17] consists of 12 dimensional measurements of oil ﬂow
+within a pipeline. There are 3 phases of ﬂow associated with the data and 1000
+samples in the data set. For all four models, we use 600 samples (200 points
+from each class) to learn the corresponding 2D latent data for the purpose of
+data visualization, and the remaining 400 samples are the testing data. RBF
+covariance function is used for GPLVM/BC-GPLVM (MLP back-constraint) and
+GPAM (RBF covariance for both GPR and GPLVM in the model). As can be
+seen from Figure 1, the proposed GPAM is superior to GPLVM/BC-GPLVM
+and NNAM remarkably because the novel model makes the points in the latent
+space which belong to the same class in the original feature space much closer
+than the rest of three models.
+
+Furthermore, in order to objectively evaluate the new DR technique we com-
+pare the nearest neighbour errors and the classiﬁcation accuracies based on kNN
+classiﬁer in the learnt 2D latent space provided by the four models on this data
+set, respectively. All the four DR models are ﬁrstly learnt from training data
+with the 2D latent space corresponding to the training data where the nearest
+neighbour errors are evaluated, and then based on the trained four DR models
+the testing data will be projected to the low dimensional latent/feature space
+
+1
+
+2
+
+http://ml.sheffield.ac.uk/~neil/fgplvm
+https://github.com/areslp/matlab/tree/master/DeepLearnToolbox-master
+
+Gaussian Processes Autoencoder for Dimensionality Reduction
+
+71
+
+(2D in our experiments) where kNN is performed to compare the testing accu-
+racies (K = 10 in kNN). Table I tells us that the proposed GPAM outperforms
+GPLVM/BC-GPLVM and NNAM in terms of nearest neighbour errors and clas-
+siﬁcation accuracies for training and testing data respectively, which veriﬁes that
+the novel DR model is better than the other three techniques.
+
+1.5
+
+1
+
+0.5
+
+0
+
+−0.5
+
+−1
+
+−1.5
+−2
+
+Z
+
+−1.5
+
+−1
+
+−0.5
+
+0
+
+0.5
+
+1
+
+1.5
+
+0.6
+
+0.4
+
+0.2
+
+0
+
+−0.2
+
+−0.4
+
+−0.6
+
+−0.8
+
+−0.8
+
+Z
+
+−0.6
+
+−0.4
+
+−0.2
+
+0
+
+0.2
+
+0.4
+
+0.6
+
+1
+
+0.9
+
+0.8
+
+0.7
+
+0.6
+
+0.5
+
+0.4
+
+0.3
+
+0.2
+
+0.1
+
+0
+
+0
+
+Z
+
+Z
+
+0.6
+
+0.4
+
+0.2
+
+0
+
+−0.2
+
+−0.4
+
+−0.6
+
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+0.6
+
+0.7
+
+0.8
+
+0.9
+
+1
+
+−0.8
+
+−0.6
+
+−0.5
+
+−0.4
+
+−0.3
+
+−0.2
+
+−0.1
+
+0
+
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+(a) GPLVM
+
+(b) BC-GPLVM
+
+(c) NNAM
+
+(d) GPAM
+
+Fig. 1. Oil data set is visualized by GPLVM, BC-GPLVM, NNAM and GPAM
+
+Table 1. The comparisons of nearest neighbor classiﬁcation errors for training data
+and kNN classiﬁcation accuracies for testing data in oil ﬂow data
+
+GPLVM BC-GPLVM NNAM GPAM
+
+NN Error
+
+8
+
+16
+
+108
+
+5
+
+kNN Accuracy
+
+96.75%
+
+97.00%
+
+90.50% 99.25%
+
+4.2 Iris Data
+
+The Iris data set [5] contains three classes of 50 instances each, where each
+class refers to a type of iris plant. There are four features for each instance.
+All 150 data points are utilized to learn the 2D latent space. POLY covariance
+achieves the best results than the other two covariance functions (RBF and MLP)
+for GPLVM/BC-GPLVM (MLP back-constraint) and GPAM (POLYARD and
+POLY covariances for GPR and GPLVM respectively). Figure 2 and Table II
+show the same conclusion as stated for the oil ﬂow data set. Since there is no
+more testing data for this data set, the classiﬁcation comparison for testing is
+not given.
+
+0.4
+
+0.3
+
+0.2
+
+0.1
+
+0
+
+−0.1
+
+−0.2
+
+−0.3
+
+−0.4
+
+−0.3
+
+Z
+
+Z
+
+0.15
+
+0.1
+
+0.05
+
+0
+
+−0.05
+
+−0.1
+
+−0.15
+
+−0.2
+
+−0.1
+
+0
+
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+−0.2
+
+−0.25
+
+−0.2
+
+−0.15
+
+−0.1
+
+−0.05
+
+0
+
+0.05
+
+0.1
+
+0.15
+
+0.2
+
+0.25
+
+1.005
+
+1
+
+0.995
+
+0.99
+
+0.985
+
+0.98
+
+0.975
+
+0
+
+Z
+
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+0.6
+
+0.7
+
+0.8
+
+0.9
+
+1
+
+0.2
+
+0.15
+
+0.1
+
+0.05
+
+0
+
+−0.05
+
+−0.1
+
+−0.15
+
+−0.2
+
+Z
+
+−0.15
+
+−0.1
+
+−0.05
+
+0
+
+0.05
+
+0.1
+
+0.15
+
+0.2
+
+(a) GPLVM
+
+(b) BC-GPLVM
+
+(c) NNAM
+
+(d) GPAM
+
+Fig. 2. Iris data set is visualized by GPLVM, BC-GPLVM, NNAM and GPAM
+
+72
+
+X. Jiang et al.
+
+Table 2. The comparisons of nearest neighbour classiﬁcation errors for training data
+in iris data
+
+GPLVM BC-GPLVM NNAM GPAM
+
+NN Error
+
+4
+
+5
+
+17
+
+3
+
+As for the model complexity, we have to admit that the training algorithm of
+GPAM is time-consuming compared to GPLVM, BC-GPLVM and NNAM due
+to the two-stage optimization. However, in the testing step GPAM is as fast as
+BC-GPLVM and NNAM without iterative optimization like classical GPLVM.
+
+5 Conclusion
+
+In this paper a novel LVM-based DR technique, termed Gaussian Processes
+Autoencoder Model (GPAM), has been introduced. It can be seen as the gen-
+eralization of classic Neural Network Autoencoder Model (NNAM) model by
+replacing the NNs with GPs, leading to simpler model inference and better per-
+formance. Also, we can view the new model as the back constraint GPLVM
+where the smooth back constraint function is represented by GP, and the model
+is trained by minimizing the reconstruction error. The experimental results have
+demonstrated the performance of the newly developed model.
+
+For the future work, inspired by recent works in deep learning [1] we will ex-
+tend the GP Autoencoder to sparse and denoising GP Autoencoder models, and
+then we also want to study the deep GP model by stacking the GP Autoencoder.
+
+Acknowledgments. Xinwei Jiang’ work is supported by the Fundamental
+Research Funds for the Central Universities, China University of Geosciences
+(Wuhan). Junbin Gao and Xia Hong’s work is supported by the Australian Re-
+search Council (ARC) through the grant DP130100364.
+
+References
+
+1. Bengio, Y., Lamblin, P., Popovici, D., Larochelle, H.: Greedy layer-wise training
+of deep networks. In: Advances in Neural Information Processing Systems (2007)
+
+2. Bishop, C.M.: Pattern Recognition and Machine Learning. Springer (2006)
+3. Cottrell, G.W., Munro, P., Zipser, D.: Learning internal representations from
+grayscale images: An example of extensional programming. In: Conference of the
+Cognitive Science Society (1987)
+
+4. Ek, C.H.: Shared Gaussian Process Latent Variables Models. Ph.D. thesis, Oxford
+
+Brookes University (2009)
+
+5. Frank, A., Asuncion, A.: UCI machine learning repository (2010)
+6. Gao, J., Zhang, J., Tien, D.: Relevance units latent variable model and nonlin-
+ear dimensionality reduction. IEEE Transactions on Neural Networks 21, 123–135
+(2010)
+
+Gaussian Processes Autoencoder for Dimensionality Reduction
+
+73
+
+7. Jiang, X., Gao, J., Wang, T., Shi, D.: Tpslvm: A dimensionality reduction algo-
+rithm based on thin plate splines. IEEE Transactions on Cybernetics (to appear,
+2014)
+
+8. Jiang, X., Gao, J., Wang, T., Zheng, L.: Supervised latent linear gaussian process
+latent variable model for dimensionality reduction. IEEE Transactions on Systems,
+Man, and Cybernetics - Part B: Cybernetics 42(6), 1620–1632 (2012)
+
+9. Lawrence, N.: Probabilistic non-linear principal component analysis with gaussian
+process latent variable models. Journal of Machine Learning Research 6, 1783–1816
+(2005)
+
+10. Lawrence, N.D., Quinonero-Candela, J.: Local distance preservation in the gp-
+lvm through back constraints. In: International Conference on Machine Learning
+(ICML), pp. 513–520. ACM Press (2006)
+
+11. Mardia, K.V., Kent, J.T., Bibby, J.M.: Multivariate analysis. Academic Press,
+
+London (1979)
+
+12. Neal, R.: Bayesian learning for neural networks. Lecture Notes in Statistics 118
+
+(1996)
+
+13. Palm, R.B.: Prediction as a candidate for learning deep hierarchical models of data.
+
+Master’s thesis, Technical University of Denmark (2012)
+
+14. Rasmussen, C.E., Williams, C.K.I.: Gaussian Processes for Machine Learning. The
+
+MIT Press (2006)
+
+15. Rosman, G., Bronstein, M.M., Bronstein, A.M., Kimmel, R.: Nonlinear dimen-
+sionality reduction by topologically constrained isometric embedding. International
+Journal of Computer Vision 89, 56–68 (2010)
+
+16. Roweis, S.T., Saul, L.K.: Nonlinear dimensionality reduction by locally linear em-
+
+bedding. Science 290, 2323–2326 (2000)
+
+17. Scholkopf, B., Smola, A., Muller, K.R.: Nonlinear component analysis as a kernel
+
+eigenvalue problem. Neural Computation 10(5), 1299–1319 (1998)
+
+18. Snoek, J., Adams, R.P., Larochelle, H.: Nonparametric guidance of autoencoder
+representations using label information. Journal of Machine Learning Research 13,
+2567–2588 (2012)
+
+19. Tenenbaum, J.B., de Silva, V., Langford, J.C.: A global geometric framework for
+
+nonlinear dimensionality reduction. Science 290, 2319–2323 (2000)
+
+20. Tipping, M.E., Bishop, C.M.: Probabilistic principal component analysis. Journal
+
+of the Royal Statistical Society, Series B 61, 611–622 (1999)
+
+21. Titsias, M.K., Lawrence, N.D.: Bayesian gaussian process latent variable model.
+
+In: International Conference on Artiﬁcial Intelligence and Statistics (2010)
+
+22. Wang, J.M., Fleet, D.J., Hertzmann, A.: Gaussian process dynamical models. In:
+Advances in Neural Information Processing Systems (NIPS), pp. 1441–1448 (2005)
+
+

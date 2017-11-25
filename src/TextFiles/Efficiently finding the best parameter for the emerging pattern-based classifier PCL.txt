@@ -1,0 +1,905 @@
+Eﬃciently Finding the Best Parameter
+
+for the Emerging Pattern-Based Classiﬁer PCL(cid:2)
+
+Thanh-Son Ngo1, Mengling Feng2 Guimei Liu1, and Limsoon Wong1
+
+1 National University of Singapore
+
+{ngothanh,liugm,wongls}@comp.nus.edu.sg
+
+2 Institute for Infocomm Research
+
+mfeng@i2r.a-star.edu.sg
+
+Abstract. Emerging patterns are itemsets whose frequencies change
+sharply from one class to the other. PCL is an example of eﬃcient clas-
+siﬁcation algorithms that leverage the prediction power of emerging pat-
+terns. It ﬁrst selects the top-K emerging patterns of each class that match
+a testing instance, and then uses these selected patterns to decide the
+class label of the testing instance. We study the impact of the parameter
+K on the accuracy of PCL. We have observed that in many cases, the
+value of K is critical to the performance of PCL. This motivates us to de-
+velop an algorithm to ﬁnd the best value of K for PCL. Our results show
+that ﬁnding the best K can improve the accuracy of PCL greatly, and
+employing incremental frequent itemset maintenance techniques reduces
+the running time of our algorithm signiﬁcantly.
+
+1 Introduction
+
+Classiﬁcation is the task of learning from one data set and making predictions
+in another data set. The learning data is called training data which consists of
+entities with their labels. The other data set is called testing data which consists
+of entities without labels, and the classifying task is to make prediction of their
+labels based on what we learn from the training data. Many classiﬁers have been
+proposed in the literature. Here, we focus on pattern-based classiﬁers.
+
+Frequent patterns are patterns that appear frequently in the dataset. Fre-
+quent patterns whose supports in the training data set change signiﬁcantly from
+one class to the other are used to construct the classiﬁers. These patterns are
+called emerging patterns (EP) [9,10,16] and these patterns are applied to test-
+ing instances to predict their class memberships. As a classiﬁer may generate
+many rules for the same class, aggregating their discrimination power gives bet-
+ter prediction results [4,8,10,20]. Using EPs has the advantage that they not
+only predict the class labels but also provide explanation for the decision.
+
+Jumping emerging patterns (JEP) are a special type of EPs that have non-zero
+occurrence in one class and zero occurrence in all other classes [10,11]. PCL [9,10]
+is a classiﬁer based on aggregating the prediction power of frequent JEPs. Given
+
+(cid:2) Supported by A*STAR grant (SERC 072 101 0016).
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part I, LNAI 6118, pp. 121–133, 2010.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2010
+
+122
+
+T.-S. Ngo et al.
+
+a test instance t, PCL selects the top-K JEPs with the highest supports that
+are contained in t from each class and then computes the score for each class
+using these selected patterns. PCL assigns the class label with the highest score
+to the testing instance. The choice of a good value for K is tricky and its optimal
+value varies on diﬀerent datasets, as shown in Fig. 1. Remarkably, the problem
+of choosing the best value of K has not been investigated previously.
+
+Fig. 1. Accuracy of PCL on four datasets with diﬀerent values of K. X-axis shows
+diﬀerent values of K and Y-axis shows the accuracy. When K increases, the accuracy
+does not always increase.
+
+Here, to avoid overﬁtting K to the data, we sample many subsets of the train-
+ing data to get the value of K that appears the best on average. By this method,
+we maximize the likelihood that the chosen K will produce the best results in the
+whole dataset. Our main contributions are summarized as follows: (i) We revisit
+the PCL algorithm [9,10] and propose a method to ﬁnd the most appropriate
+parameters to improve the performance of PCL. (ii) We introduce a method
+to speed up the proposed algorithm as well as cross-validation methodology for
+frequent-pattern-based classiﬁcation algorithms in general.
+
+2 Related Work
+
+Emerging patterns are a special type of frequent patterns. They occur frequently
+in one class but rarely in other classes. Emerging pattern-based classiﬁcation ben-
+eﬁts enormously from the advancement of frequent pattern mining algorithms
+and better understanding of the patterns space. Many methods have been pro-
+posed to select a good set of patterns for constructing classiﬁers [15]. Most of
+these algorithms ﬁrst generate frequent patterns satisfying a certain minimum
+support constraint, and then select patterns based on some criteria and make
+
+Finding Best Parameter for PCL
+
+123
+
+predictions based on the selected patterns. These algorithms mainly diﬀer in
+how patterns are selected and how class labels are determined.
+
+The ﬁrst class of methods pick the best pattern to classify testing instances,
+like CBA [14] and MMAC [18]. CBA ﬁrst derives classiﬁcation rules from fre-
+quent patterns, and then ranks the rules in descending order of their conﬁdence.
+A very small set of rules is then selected to maximize the classiﬁcation accuracy
+on the training data. The class label of a new instance is decided by the ﬁrst rule
+that matches the instance. MMAC extends CBA to multiple classes and labels.
+Only a small set of patterns are selected for classiﬁcation. So it is possible that
+a new testing instance does not contain any EP that is selected.
+
+The second class of methods treats frequent patterns as additional features
+and then use classical algorithms to classify the data [2,3]. Cheng et al. [2,3]
+build a connection between pattern frequency and discriminative measures such
+as information gain score, and develop a strategy to set minimum support in
+frequent pattern mining for generating useful patterns for classiﬁcation. Based
+on this strategy, coupled with a proposed feature selection algorithm, selected
+EPs are used as additional features to build high quality classiﬁers. The results
+show that using EPs as additional features can improve the accuracy of C4.5
+and SVM. The main drawback of this approach is that the intuitiveness of the
+pattern-based classiﬁers may be lost.
+
+The last class of methods selects the top-K patterns and aggregates the pre-
+dictive power of the selected patterns. They include CAEP [4], iCAEP [20],
+PCL [9,10], CEP [1], CPAR [17], CMAR [8] and HARMONY [19]. CAEP uses
+EPs with high growth rate to do classiﬁcation. iCAEP aggregates the prediction
+power of EPs based on information theory. PCL uses only JEPs. JEPs occur in
+one and only one class, which may be too restrictive in some cases. CEP relaxes
+this constraint by putting an upper bound on the number of occurrences of the
+EPs in other classes. CPAR uses the expected accuracy to select classiﬁcation
+rules. It compares the average expected accuracy of the best K rules of each class
+and chooses the class with the highest expected accuracy as the predicted class.
+CMAR uses a weighted measure to select rules, and the score of a class is also
+calculated using this weighted measure. HARMONY directly mines the ﬁnal set
+of classiﬁcation rules by using an instance-centric rule generation approach.
+
+The aggregation-based algorithms generally show better performance than
+other algorithms. However, the value of K is critical to their performance in many
+cases. Here, we use PCL as an example to study how to select proper values for
+parameter K to maximize the accuracy of the aggregation-based algorithms.
+
+3 Preliminaries
+Let I = {i1, i2, .., in} be a set of distinct literals called items. An itemset or
+a pattern is a subset of I. A transaction is a non-empty set of items. Let
+C = {C1, C2, .., Ck} be a set of distinct labels called class labels. A transac-
+tional database consists of a set of transactions associated with their labels. A
+classiﬁcation task involves two phases: training and testing. In training, the class
+
+124
+
+T.-S. Ngo et al.
+
+labels are revealed and in testing, class labels are hidden. The classiﬁer builds a
+model based on the training set and uses this model to predict the class labels
+of transactions in the testing set. The accuracy of a classiﬁer A is the proportion
+of test-instances which are correctly classiﬁed by A.
+A pattern P covers a transaction t if P ⊆ t. The support of P is the number
+of transactions that are covered by P . We use sup(P, D) to indicate the support
+of P in the dataset D. We use P|D to indicate the set of transactions in D
+that contain P . Given a 2-class dataset, jumping emerging patterns (JEP) are
+patterns whose frequency in one class is non-zero and in other class is zero. An
+EPi is called a JEP from class A to class B if its support in class A is zero. A
+pattern P is a generator if and only if for every P (cid:3) ⊂ P , sup(P (cid:3), D) > sup(P, D).
+A JEP generator is both a generator and a JEP.
+
+4 Algorithms
+
+4.1 PCL
+
+, EP +
+t2
+
+, .., EP +
+
+, .., EP −
+
+We present here an overview of PCL [9,10]. The dataset D is divided into
+positive and negative classes. Given a test-instance t, two sets of JEPs that
+cover t are used: EP +
+tn from negative to positive classes and
+EP −
+t1
+tn from positive to negative classes. The K most frequent
+t1
+JEPs that cover t are sorted in descending order of their supports. Suppose
+the set of JEPs (based on the training set) from negative to positive classes
+in descending order of their supports. Similarly,
+are EP +
+EP −
+, EP −
+1
+n is the set of JEPs from positive to negative. It is hypoth-
+esized that if t belongs to one class, it should contain more JEPs of this class
+than the other class. So Li and Wong [9] formulated the scores of t with respect
+to the two classes as below.
+
+, EP +
+, .., EP −
+2
+
+, .., EP +
+n
+
+, EP −
+t2
+
+1
+
+2
+
+Score(t, +) =
+
+(cid:2)k
+(cid:2)k
+
+i=1
+
+i=1
+
+sup(EP +
+sup(EP +
+
+ti , D)
+i , D)
+
+Score(t,−) =
+
+(cid:2)k
+(cid:2)k
+
+i=1
+
+i=1
+
+sup(EP −
+sup(EP −
+
+ti , D)
+i , D)
+
+4.2 PSM
+
+Maintenance of EPs was ﬁrst introduced in [11], though a complete solution
+for insertion and deletion was not discussed. Here, we describe a more eﬃcient
+method called PSM for complete maintenance introduced recently in [5].
+
+PSM is a maintenance algorithm for frequent pattern space. It is based on the
+GE-tree, an eﬀective data structure described in [6,7] for enumerating genera-
+tors. Frequent generators are stored in the GE-tree and the tree is incrementally
+adjusted when new transactions are added or existing transactions are removed.
+Each node in the tree represents a generator. To ﬁnd EPs, we modify the GE-tree
+so that each node stores both positive and negative supports of the correspond-
+ing generator. In addition to frequent generators, GE-tree maintains a negative
+border which comprises infrequent generators whose immediate subsets are all
+
+Finding Best Parameter for PCL
+
+125
+
+frequent [5,6]. The negative border helps generate new frequent generators and
+equivalence classes eﬃciently when transactions are added or removed.
+
+Computating frequent generators is expensive. The beneﬁt of PSM is that a
+new set of frequent generators does not need to be computed from scratch when
+the data is modiﬁed. As a small change in dataset seldom causes a big change
+in the set of frequent patterns, PSM is eﬀective for pattern space maintenance.
+
+4.3 rPCL and ePCL
+
+A good choice of K has a big impact on prediction results in PCL. We propose a
+method to tackle this problem as follows. According to the Central Limit The-
+orem, the distribution of accuracy will behave like normal distribution. Indeed,
+Fig. 2 suggests the convergence of average classiﬁcation accuracy in training data
+to the real value of accuracy in the whole dataset. So we simulate the actual pro-
+cess of classiﬁcation in training set and choose the value of K that maximizes
+the mean accuracy. The simulation is run repeatedly to determine which value
+of K appears as the best on average. By the Central Limit Theorem, the average
+accuracy of each K approaches the true accuracy of that value of K, given suf-
+ﬁcient number of simulation runs. Thus, the value of K that has the best mean
+accuracy in the simulation runs will also perform well in the whole set of data.
+
+Fig. 2. Distribution of accuracies across 100 runs given a ﬁxed K=10 over training set.
+The vertical red line indicates the actual value of accuracy when we evaluate the same
+K in the whole dataset. The means are shown to be close to the actual accuracy.
+
+We describe two algorithms rPCL and ePCL. Algorithm rPCL is a direct but
+naive solution for the method above. We use it as a benchmark to understand
+where ineﬃciencies might be and to assess the improvement of a more eﬃcient
+method using maintenance. ePCL is the fast version where PSM is used. It
+produces the same results as rPCL but runs many times faster.
+
+126
+
+T.-S. Ngo et al.
+
+Fig. 3. The rPCL algorithm
+
+In rPCL (Fig. 3) we use a technique called repeated random sub-sampling
+validation as a framework to assess the best parameter for PCL. It involves
+several rounds, in each round the training set is randomly divided into new
+complementary testing and training set. For each K, we perform this procedure
+to determine the expected accuracy of the classiﬁer wrt this K. The chosen K is
+the one which returns the best average accuracy over these runs. 10-fold cross
+validation is popular for accessing classiﬁer performance. So, we subsample 10%
+of training set as testing subsample and 90% as training subsample.
+In rPCL, makeDecision simply decides if the classiﬁer with ScoreK[t, +] and
+ScoreK[t,−] correctly predicts the class of t, wrt to the current K. At step 9, we
+can compute ScoreK[t, +] from Score(K − 1)[t, +] in constant time. To achieve
+this, we use a vector to store ScoreK[t, +] and ScoreK[t,−] for all t ∈ Dt. To
+determine a good value of K, a signiﬁcantly large number of iterations maxtime
+is performed and all values of K in the range 1..maxK are considered.
+
+Constructing a set of frequent EPs from the training set (step 4) is compu-
+tationally very expensive. It involves frequent pattern mining. And this step is
+repeated many times with diﬀerent Dt and Dn. Because the testing-training sep-
+arations are largely similar among all the runs, we should not need to construct
+the set of EPs from scratch in such a naive fashion. PSM [5,6] is used to achieve
+this purpose. PSM allows us to adjust the set of frequent patterns when the
+training fold is changed. We only need to construct the frequent patterns space
+at the beginning and repeatedly use PSM to maintain the set of rules when the
+sub-sampling folds are changed. That is, we only need to mine frequent patterns
+once at the beginning. With this innovation, we present an improved algorithm
+called ePCL (Fig. 4) which stands for enhanced PCL.
+
+Finding Best Parameter for PCL
+
+127
+
+Fig. 4. ePCL algorithms. The highlighted codes indicate the involvement of PSM.
+
+Fig. 5. Workﬂow for rPCL and ePCL. EP set indicates the set of EPs used to construct
+PCL.
+
+128
+
+T.-S. Ngo et al.
+
+The set of frequent generators are incrementally maintained. Line 5 and 17
+show the execution of PSM: PSM.delete is invoked when a fold is removed from
+the training set and PSM.add is invoked to add this fold into original set. That
+eliminates building a new set of frequent patterns when we run the simulation
+with a new testing-training separation. Fig. 5 is the workﬂow of rPCL and ePCL.
+
+4.4 Complexity Analysis
+
+We compare the theoretical improvement of ePCL from rPCL. In rPCL, the
+outer loop repeats maxtime, which is the number of runs needed to ﬁnd the
+best K. In each loop, we need to run PCL classiﬁer which involves a frequent
+pattern mining step (F P M) and evaluation for all K from 1 to maxK. The
+total time is maxtime ∗ (F P M + P CL(maxK)). P CL(maxK) is the time to
+compute scores for K = 1..maxK. This step evolves visiting entire frequent pat-
+tern set to get the top K patterns and compute scores accordingly for each test
+instance. In ePCL, we only need to build frequent patterns once and incremen-
+tally adjust the pattern space. The total time is F P M + maxtime ∗ (|D|/10 ∗
+maintenance+ P CL(maxK)), where maintenance is the running time for main-
+taining one transaction, |D| is the size of the dataset. According to [5], PSM is
+much more eﬃcient than mining-from-scratch algorithms. At 10% of the data
+size, the speed-up is at least 3 times faster for incremental and 5 times faster for
+decremental maintenance than mining from scratch.
+
+5 Experimental Studies
+
+5.1 Experiment Setup
+
+Experiments are conducted using 18 data sets of various sizes from UCI reposi-
+tory. Continuous attributes are discretized by the entropy method. Table 1 gives
+details of these data sets. We evaluate the performance on two-class datasets. For
+multi-class datasets, we select one class as positive and the remaining as negative.
+The process is done for all classes. PCL can be extended to handle multiple-class
+datasets; however, the method of choosing parameter is still applicable. 10-fold
+cross validation is used to assess the eﬃciency and average accuracies are re-
+ported. The datasets are separated in such a way that the proportion of each
+class is consistent in both testing and training.
+
+For the original PCL, we use the frequent pattern mining algorithm provided
+by [13]. The experiments are done in Windows machine with 2.6 GHz processor
+and 1G memory. We assess the accuracy improvement of rPCL over PCL and
+running time comparison of ePCL and rPCL. Time is measured in seconds.
+
+When we compute the score of an instance in two classes, it is possible that
+the scores are both zero. Such a test-instance is not covered by any pattern
+and therefore unclassiﬁable by both PCL and ePCL. The average percentage of
+unclassiﬁed data is 11% and there is no dataset with more than 20%. We do not
+include these cases in our accuracy computation. The purpose is to evaluate the
+improvement of rPCL over the original PCL only.
+
+Finding Best Parameter for PCL
+
+129
+
+Table 1. Datasets information
+
+Dataset
+mushroom
+iris
+Glass
+zoo
+Promoter
+Vote
+Splice
+Hepatitis
+Pima
+Hypothyroid
+Breast
+Cleve
+German
+Lymph
+Vehicle
+Waveform
+Wine
+Tic-tac-toe
+
+4
+8
+22
+16
+18
+10
+19
+59
+61
+25
+16
+10
+12
+19
+19
+20
+14
+10
+
+# attributes # instances # continuous attributes # nomial attributes
+0
+0
+22
+16
+18
+0
+19
+59
+61
+18
+16
+10
+12
+19
+19
+20
+14
+10
+
+8124
+150
+214
+101
+106
+435
+3190
+155
+768
+3163
+3190
+2727
+2700
+1332
+3809
+9000
+178
+4312
+
+4
+8
+0
+0
+0
+10
+0
+0
+0
+7
+0
+0
+0
+0
+0
+0
+0
+0
+
+5.2 Parameters Setting
+
+All the patterns used in PCL and its improved versions are JEP generators [10].
+The exception is an early paper [8]; it uses the “boundary” JEPs, which are
+deﬁned in [9] as those JEPs where none of their proper subsets are JEPs. Here,
+we use JEP generators as discriminative patterns because:
+
+– It is known that the JEP space is partitioned into disjoint equivalence
+classes [9,10]. So the set of JEP generators (which correspond to the most
+general patterns in each equivalence class) adequately characterizes the data.
+In contrast, boundary JEPs are insuﬃcient to capture all equivalence classes.
+– The minimum description length principle is a well-accepted general solution
+for model selection problems. The choice of JEP generators is in accord with
+this principle [12]. Also, our experiments show that JEP generators are less
+noise-sensitive than boundary JEPs.
+
+– JEP generators are eﬃcient to compute. We can make use of many eﬃcient
+
+frequent patterns mining algorithms [12].
+
+For rPCL and ePCL, we set maxtime to 50 and we run K in a range from 1
+to 50. We limit the range to 50 because small-frequency patterns have minimal
+prediction power over the top ones. Patterns ranked higher than 50 generally
+have low support. As shown in Fig. 1, the predictions stabilize after K = 50,
+so no need to consider K > 50. For original PCL, we use K = 10 as suggested
+in [9]. Minimum support is set to make sure enough EPs are found.
+
+130
+
+T.-S. Ngo et al.
+
+5.3 Eﬃciency
+PCL with generators and boundary EPs. For PCL, we have choices over
+which type of frequent patterns are used to make predictions. We have done
+experiments to justify our choice of JEP generators, as suggested in [9], rather
+than boundary JEPs. We want to test the robustness of PCL in the case of noise
+with these two types of patterns. When a part of the original dataset is missing,
+the noisy dataset reduces the accuracy of the classiﬁer. Fig. 6 shows accuracy
+of PCL with generators (gen PCL) and boundary JEPs (boundary PCL) for
+diﬀerent levels of missing rate (We assume items in the dataset are missing with
+certain rate): 0%, 10%, 20%, 30%, 40% and 50%. The accuracies are average
+over 18 datasets. Gen PCL is less noise-sensitive than boundary PCL.
+
+Fig. 6. Accuracy of gen PCL and boundary PCL in the presence of missing information
+
+PCL and ePCL. We compare the accuracy of the original PCL and ePCL.
+Since rPCL and ePCL give the same results, we do not show the accuracy of
+rPCL here. Table 2 shows accuracy of ePCL and the original PCL in 18 datasets.
+Overall, the improvement is 3.19%. In some datasets like Promoters, Wine and
+Hepatitis, we get improvement of 26%, 11% and 15% respectively.
+
+Table 2. Accuracy comparison of ePCL and PCL
+
+ePCL PCL Improve (%) Datasets
+
+Datasets
+Mushroom
+Glass
+Promoter
+Splice
+Pima
+Breast
+German
+Vehicle
+Wine
+
+1
+
+1
+
+0.9714 0.9675
+0.8216 0.6525
+0.6667 0.6667
+0.8192 0.8331
+0.9912 0.9907
+0.9644 0.994
+0.9569 0.9437
+0.97892 0.8789
+
+0 Hepatitis
+
+0 Iris
+0.404967 Zoo
+25.92549 Vote
+
+ePCL PCL Improve (%)
+3.534591
+0.9999 0.9658
+4.925911
+0.9997 0.9528
+-0.55892
+0.9439 0.9492
+0.8872 0.7716
+14.98068
+1.017527
+-1.67043 Hypothyroid 0.9962 0.9861
+-3.16567
+0.050572 Cleve
+0.9644 0.9959
+-2.97462 Lymph
+0
+3.643507
+1.390222 Waveform 0.8347 0.8053
+-1.42591
+0.9512 0.965
+
+11.3941 Tic-tac-toe
+
+1
+
+1
+
+Finding Best Parameter for PCL
+
+131
+
+Table 3. Accuracy comparison of ePCL and PCL in diﬃcult cases
+
+Datasets Diﬃcult PCL ePCL Datasets
+
+cases (%)
+
+Diﬃcult PCL ePCL
+cases (%)
+
+mushroom
+Glass
+Promoter
+Splice
+Pima
+Breast
+German
+Vehicle
+Wine
+
+0
+
+33.94
+49.02
+100
+12.10
+10.90
+10.60
+3.7453
+
+31
+
+-
+
+- Iris
+0.9071 0.9183 zoo
+0.3123 0.647 Vote
+0.6667 0.6667 Hepatitis
+
+0
+
+0 Hypothyroid
+
+0.917 0.9214 Cleve
+0.9449 0.6745 Lymph
+
+0
+
+0 Waveform
+0.8788 0.9789 Tic-tac-toe
+
+0
+
+26.53
+16.31
+100
+20
+¡1
+0
+¡2
+
+30.2
+
+-
+
+-
+0.8274 0.9989
+0.6978 0.6663
+0.7716 0.8872
+0.9327 0.9813
+-
+-
+-
+0.578
+
+0.553
+
+-
+-
+-
+
+Recall in PCL, to classify one test instance, one score is computed for each
+class. Some instances received zero score in one class and non-zero score in the
+other class; thus the association rules vote unanimously to one class. We call these
+the easy cases and the rest are diﬃcult cases. The value of K has a much greater
+impact on the diﬃcult cases. Table 3 shows the accuracy of original PCL and
+ePCL in diﬃcult cases. Although we do not show statistics for easy cases here,
+the accuracy is close to 100% for most easy cases. We do not show datasets with
+too few diﬃcult cases since there are not enough samples to evaluate accurately.
+
+Performance. We compare the running time of rPCL, ePCL and original PCL.
+The performance of ePCL compared to rPCL is good, demonstrating the supe-
+riority of using pattern maintenance. Table 4 shows that ePCL is an order of
+magnitude faster in many cases. In one case (vehicle.dat), rPCL could not com-
+plete after more than one day, but ePCL completed within 4 hours. Nevertheless,
+ePCL takes more time than PCL due to the repeating part; fortunately, this is
+compensated by the much better accuracy of ePCL.
+
+Table 4. Performance comparison
+
+Datasets PCL rPCL ePCL Speed up Datasets
+
+(rPCL/
+ePCL)
+
+mushroom 2.75
+glass
+8.5
+promoters
+1
+2.5
+splice
+0.75
+pima
+breast
+2.5
+german
+11
+vehicle
+wine
+
+35
+2
+7
+4
+9
+60
+611
+2518 too long 6966
+3.25
+
+84
+120
+51
+129
+42
+109
+513
+
+188
+
+17
+
+2
+5
+
+PCL rPCL ePCL Speed up
+(rPCL/
+ePCL)
+33
+41.5
+4.2
+12.6
+2.4
+1.4
+2.3
+2.3
+2
+
+3
+99
+7
+291
+11
+47
+3
+38
+43
+105
+123
+4.25 181
+27.5 1224
+512
+117 5738 2507
+13
+
+88
+
+43
+
+2.4 Iris
+60 zoo
+7.2 Vote
+
+32.2 hepatitis
+
+0.75
+0.5
+4.6 hypothyroid 2
+1.8 cleve
+0.8 lymph
+
+A lot waveform
+11.1 tictactoe
+
+132
+
+T.-S. Ngo et al.
+
+6 Discussion and Conclusion
+
+Cross-validation is a technique to assess the performance of classiﬁcation algo-
+rithms. Typically the testing set is much smaller than the training set and a
+classiﬁer is built from the training set which is largely similar between runs. Our
+framework of maintenance can be applied to eﬃciently perform cross-validation
+for pattern-based classiﬁcation. Recall PSM allows us to maintain the set of
+frequent generators while adding or deleting a relatively small portion of the
+dataset. We only need to maintain a single frequent pattern set and incremen-
+tally adjust using PSM. In addition, for more eﬃcient computation, PSM can be
+extended to handle multiple additions/deletions at the same time by organizing
+transactions in a preﬁx tree.
+
+We showed the importance of ﬁnding the top K patterns for PCL. We intro-
+duced a method to perform the task eﬃciently, making use of the PSM main-
+tenance algorithm [5]. The maintenance framework can be applied to general
+cross-validation tasks which involve frequent update of the pattern space. Our
+experiments showed improvement in accuracy. However, we compromised on
+complexity. We hope to get a better implementation for ePCL, thus minimiz-
+ing the running time to close to original PCL and implement the mentioned
+extensions.
+
+References
+
+1. Bailey, J., Manoukian, T., Ramamohanarao, K.: Classiﬁcation using constrained
+emerging patterns. In: Dong, G., Tang, C., Wang, W. (eds.) WAIM 2003. LNCS,
+vol. 2762, pp. 226–237. Springer, Heidelberg (2003)
+
+2. Cheng, H., et al.: Discriminative frequent pattern analysis for eﬀective classiﬁca-
+
+tion. In: Proc 23th ICDE, pp. 716–725 (2007)
+
+3. Cheng, H., et al.: Direct discriminative pattern mining for eﬀective classiﬁcation.
+
+In: Proc 24th ICDE, pp. 169–178 (2008)
+
+4. Dong, G., et al.: CAEP: Classiﬁcation by Aggregating Emerging Patterns. In: Proc.
+
+2nd Intl. Conf. on Discovery Science, pp. 30–42 (1999)
+
+5. Feng, M.: Frequent Pattern Maintenance: Theories and Algorithms. PhD thesis,
+
+Nanyang Technological University (2009)
+
+6. Feng, M., et al.: Negative generator border for eﬀective pattern maintenance. In:
+Proc 4th Intl. Conf. on Advanced Data Mining and Applications, pp. 217–228
+(2008)
+
+7. Feng, M., et al.: Evolution and maintenance of frequent pattern space when trans-
+actions are removed. In: Zhou, Z.-H., Li, H., Yang, Q. (eds.) PAKDD 2007. LNCS
+(LNAI), vol. 4426, pp. 489–497. Springer, Heidelberg (2007)
+
+8. Li, W., Han, J., Pei, J.: CMAR: Accurate and eﬃcient classiﬁcation based on
+
+multiple class-association rules. In: Proc 1st ICDM, pp. 369–376 (2001)
+
+9. Li, J., Wong, L.: Solving the fragmentation problem of decision trees by discovering
+
+boundary emerging patterns. In: Proc. 2nd ICDM, pp. 653–656 (2002)
+
+10. Li, J., Wong, L.: Structural geography of the space of emerging patterns. Intelligent
+
+Data Analysis 9(6), 567–588 (2005)
+
+Finding Best Parameter for PCL
+
+133
+
+11. Li, J., Ramamohanarao, K., Dong, G.: The space of jumping emerging patterns
+and its incremental maintenance algorithms. In: Proc. of 17th ICML, pp. 551–558
+(2000)
+
+12. Li, J., et al.: Minimum description length principle: Generators are preferable to
+closed patterns. In: Proc. 21st Natl. Conf. on Artiﬁcial Intelligence, pp. 409–415
+(2006)
+
+13. Li, H., et al.: Relative risk and odds ratio: A data mining perspective. In: Proc
+
+24th PODS, pp. 368–377 (2005)
+
+14. Liu, B., Hsu, W., Ma, Y.: Integrating classiﬁcation and association rule mining.
+
+In: Proc. 4th KDD, pp. 80–86 (1998)
+
+15. Ramamohanarao, K., Fan, H.: Patterns based classiﬁers. In: Proc. 16th WWW,
+
+pp. 71–83 (2007)
+
+16. Ramamohanarao, K., Bailey, J.: Discovery of emerging patterns and their use in
+classiﬁcation. In: Gedeon, T(T.) D., Fung, L.C.C. (eds.) AI 2003. LNCS (LNAI),
+vol. 2903, pp. 1–12. Springer, Heidelberg (2003)
+
+17. Thabtah, F.A., Cowling, P., Peng, Y.: MMAC: A new Multi-class Multi-label As-
+
+sociative Classiﬁcation approach. In: Proc. 4th ICDM, pp. 217–224 (2004)
+
+18. Yin, X., Han, J.: CPAR: Classiﬁcation based on Predictive Association Rules. In:
+
+Proc. 3rd SDM, pp. 331–335 (2003)
+
+19. Wang, J., Karypis, G.: HARMONY: Eﬃciently mining the best rules for classiﬁ-
+
+cation. In: Proc. 5th SDM, pp. 205–216 (2005)
+
+20. Zhang, X., Dong, G., Ramamohanarao, K.: Information-based classiﬁcation by
+aggregating emerging patterns. In: Proc. 2nd Intl. Conf. on Intelligent Data Engi-
+neering and Automated Learning, pp. 48–53 (2000)
+
+

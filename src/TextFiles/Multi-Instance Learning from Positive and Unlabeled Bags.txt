@@ -1,0 +1,1175 @@
+Multi-Instance Learning
+
+from Positive and Unlabeled Bags
+
+Jia Wu1,3, Xingquan Zhu2, Chengqi Zhang1, and Zhihua Cai3
+
+1 Centre for Quantum Computation & Intelligent Systems, FEIT,
+
+University of Technology Sydney, NSW 2007, Australia
+
+2 Dept. of Computer & Electrical Engineering and Computer Science,
+
+Florida Atlantic University, Boca Raton, FL 33431, USA
+
+3 Dept. of Computer Science, China University of Geosciences, Wuhan, China
+
+jia.wu@student.uts.edu.au, chengqi.zhang@uts.edu.au,
+
+xzhu3@fau.edu, zhcai@cug.edu.cn
+
+Abstract. Many methods exist to solve multi-instance learning by us-
+ing diﬀerent mechanisms, but all these methods require that both posi-
+tive and negative bags are provided for learning. In reality, applications
+may only have positive samples to describe users learning interests and
+remaining samples are unlabeled (which may be positive, negative, or
+irrelevant to the underlying learning task). In this paper, we formulate
+this problem as positive and unlabeled multi-instance learning (puMIL).
+The main challenge of puMIL is to accurately identify negative bags for
+training discriminative classiﬁcation models. To solve the challenge, we
+assign a weight value to each bag, and use an Artiﬁcial Immune System
+based self-adaptive process to select most reliable negative bags in each
+iteration. For each bag, a most positive instance (for a positive bag) or
+a least negative instance (for an identiﬁed negative bag) is selected to
+form a positive margin pool (PMP). A weighted kernel function is used
+to calculate pairwise distances between instances in the PMP, with the
+distance matrix being used to learn a support vector machines classiﬁer.
+A test bag is classiﬁed as positive if one or multiple instances inside the
+bag are classiﬁed as positive, and negative otherwise. Experiments on
+real-world data demonstrate the algorithm performance.
+
+Keywords: Multi-instance learning, unlabeled bags, classiﬁcation.
+
+1
+
+Introduction
+
+Multi-instance learning (MIL) [1] is a special type of learning task where each ob-
+servation contains a bag of instances. A bag is labeled positive if one or multiple
+instances inside the bag are positive, and negative otherwise. The uniqueness
+of not requiring labels for individual instances makes multi-instance learning
+very suitable for applications without label information for individual instances.
+Because the genuine positive instance(s) inside each positive bag is unknown,
+the main challenge of multi-instance learning is to leverage bag labels and con-
+straints to derive accurate classiﬁcation models. Roughly, existing MIL methods
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part I, LNAI 8443, pp. 237–248, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+238
+
+J. Wu et al.
+
+[2] can be separated into the following three categories: (1) instance-based mod-
+eling, which ﬁnds most positive and most negative instances from bags to derive
+MIL models; (2) bag-based modeling, which directly builds classiﬁcation models
+at the bag level; and (3) hybrid approaches, which use instances and bags to
+conﬁne the learning space to build classiﬁcation models.
+
+For all existing MIL methods, one prerequisite is that training data must
+contain both positive and negative bags to derive discriminative models. In re-
+ality, many applications may only have positive bags to indicate users learning
+interests and the remaining bags are unlabeled (which may be positive, nega-
+tive, or irrelevant to the learning task). For example, during an image retrieval
+process [3], users may click one or multiple images which are interesting to them
+(the clicked images can be regarded as positive bags), but majority images re-
+main unchecked, so we do not know whether those images do not contain users
+retrieval concepts (i.e. negative bags) or users simply overlook the images. In this
+case, there is no negative bag but only positive and unlabeled bags are available.
+When only positive and unlabeled bags are available, a straightforward solu-
+tion for MIL is to propagate a bag’s label to each instance inside the bag, so the
+problem can be solved by using standard Positive-Unlabeled learning [4]. Indeed,
+this simple solution is ineﬀective because not all instances inside a positive bag
+are positive, so some instances will be mislabeled and deteriorate the classiﬁca-
+tion accuracy. A slightly more intelligent way is to use Positive and Unlabeled
+learning strategy [5] to ﬁrst treat all unlabeled bags as negative bags and train
+an MIL classiﬁer, and then iteratively reﬁne identiﬁed negative bags by using
+trained MIL classiﬁers. This solution is still ineﬀective mainly because the iden-
+tiﬁcation of negative bags only relies on the MIL classiﬁers but does not take
+the unique MI bag constraints into consideration, so directly training MIL clas-
+siﬁers using positive bags and identiﬁed negative bags will severely deteriorate
+the classiﬁcation accuracy.
+
+The above observations motivate a very practical learning task where only
+positive and unlabeled bags are available for multi-instance learning. In this pa-
+per, we formulate this problem as positive and unlabeled multi-instance learning
+(puMIL), where the key challenge is twofold: (1) MIL learning with unreli-
+able bag labels: Although it is always possible to identify some unlabeled bags
+as negative bags, the labels of identiﬁed negative bags are unreliable. Directly
+building MIL classiﬁers from positive and identiﬁed negative bags may result in
+low classiﬁcation accuracy. This reality calls for new MIL learning frameworks
+capable of handling unreliable bag labels; and (2) Tacking uncertainty in-
+side positive bags: For MIL, the genuine labels of instances inside a positive
+bag are unknown, although at least one instance has to be positive. Finding
+“most positive instances” plays a signiﬁcant role for multi-instance learning. In
+a puMIL setting, this process is further complicated because no negative bags
+are available to help identify positive instance(s) in a positive bag.
+
+In this paper, we propose a self-adaptive learning framework to tackle the
+above challenges for puMIL. More speciﬁcally, we assign a weight value to each
+bag, and use an Artiﬁcial Immune System based search process to update bag
+
+Multi-Instance Learning from Positive and Unlabeled Bags
+
+239
+
+(cid:2)1 (cid:2)2
+
+(cid:1)(cid:1)(cid:1)
+
+:Instance
+
+Positive Bags
+
++
+
++
+
++
+
+Reliable 
+
+Negative Bags
+
+Unlabeled Bags
+
+(a)
+
+-
+
+-
+
+-
+
+(d) most positive pattern
+
+n
+o
+i
+t
+u
+b
+i
+r
+t
+s
+D
+d
+e
+t
+h
+g
+e
+W
+
+ 
+
+i
+
+i
+
+(c)
+
+(b)
+
+(e) least negative pattern
+
+PMP
+
+Optimal 
+Classi(cid:25)er
+
+(f) Self-adaptively update the con(cid:32)dence weights 
+
+Fig. 1. A conceptual view of the proposed puMIL framework: Given a number of
+positive and unlabeled bags, puMIL starts from assigning a weight value for each bag.
+(a): the weight values help identify some unlabeled bags as reliable negative bags. (b):
+the obtained reliable negative bags help build a weighted distribution, which is used to
+measure instances in positive and reliable negative bags, respectively, (c). After that,
+the “most positive pattern” (d) for positive bags and the “least negative pattern” (e)
+for reliable negative bags are selected to form a Positive Margin Pool (PMP), which
+helps build a weighted SVM classiﬁer for classiﬁcation. Based on the constructed PMP,
+a self-adaptive strategy (discussed in Section 4.3) is used to update weight value of each
+bag (f). The iteration process continues, with the objective of improving the quality of
+reliable negative bags and the quality of PMP, and achieving optimal accuracy.
+
+weight values and identify the most reliable negative bags in each iteration. For
+each bag, a “most positive instance” (for a positive bag) or a “least negative
+instance” (for an identiﬁed negative bag) is selected to form a positive margin
+pool (PMP). A weighted kernel function is used to calculate pairwise distances
+between instances in the PMP, with the distance matrix being used to learn a
+weighted support vector machines classiﬁer. Experiments on real-world positive
+and unlabeled bags conﬁrm the eﬀectiveness of the proposed design.
+
+The remainder of the paper is structured as follows. Preliminary and prob-
+lem statement are addressed in Section 2, followed by the overall framework in
+Section 3. Section 4 introduces detailed algorithms, followed by experiments in
+Section 5. We conclude the paper in Section 6.
+
+2 Preliminaries and Problem Statement
+Denote B = {B1,··· , Bn} a bag set with n bags, and Bi is the ith bag in the set.
+The bag set contains both positive and unlabeled bags, with B+
+j indi-
+cating a positive and an unlabeled bag, respectively (for ease of representation,
+we also use Bi to denote a bag). Let Y = [y1,··· , yn] where yi is the label of
+Bi. In generic MIL settings, a positive and a negative bag’s label can be denoted
+by yi = +1 and yi = −1, respectively. In a puMIL setting, an unlabeled bag
+Bu
+j ’s label is denoted by yj = 0. The collections of positive and unlabeled bag
+sets can be denoted by B+ and Bu, respectively. During the learning process,
+
+i and Bu
+
+240
+
+J. Wu et al.
+
+contains bags which are “identiﬁed” as negative bags.
+
+the algorithm may identify a set of unlabeled bags as a negative bag set, which
+is denoted by B−
+. It is worth noting that B+ contains bags which are genuinely
+positive, whereas B−
+For each bag Bi, the number of instances inside the bag is denoted by ni, and
+xi,j, j = 1, 2,··· , ni represents the jth instance in Bi. Each instance xi,j also
+has a label but cannot be directly observed, because of the bag constraint. In
+order to tackle unreliable bag labels in puMIL setting (challenge # 1), we use a
+weight value wi to indicate the label conﬁdence of each bag Bi. So for a positive
+i , its weight value wi is 1 (because it is genuinely positive), whereas for
+bag B+
+an identiﬁed negative bag Bj, its weight value wj ∈ (0, 1], with a higher wj value
+indicating that Bj is more likely being a negative bag.
+Given a training set B containing a handful of positive B+ bags and many
+unlabeled Bu bags, puMIL learning aims to build a prediction model from B to
+accurately predict previously unseen bags with maximum F-score.
+
+3 Overall Framework
+
+Figure 1 illustrates the conceptual view of the proposed puMIL framework, which
+includes two major steps to solve key challenges identiﬁed in Section 1.
+
+Positive Margin Pool (PMP): In order to carry out multi-instance learning
+with positive and unlabeled bags only, we propose to use maximum margin
+idea [6] to build a positive margin pool (PMP) by modeling the distributions of
+the positive and unlabeled bags. More speciﬁcally, we utilize bag weight values to
+identify some unlabeled bags as most reliable negative bags. After that, we select
+“most positive patterns” from positive bags and “least negative patterns” from
+identiﬁed negative bags to form a positive margin pool. Because PMP contains
+signature patterns with respect to positive and identiﬁed negative bags, it will
+help diﬀerentiate decision boundaries to separate positive bags.
+
+Self-Adaptive Bag Weight Updating: In order to properly identify most
+negative bags from unlabeled bags, we assign a weight value to each bag and
+will employ a self-adaptive iterative process to update bag weight values to ﬁnd
+reliable negative bags. The proposed iterative bag weight updating process is
+based on clonal selection theory [7] in Artiﬁcial Immune Systems. It iteratively
+searches diﬀerent weight values, including mutations and clones of weight values
+from the previous iteration, to ﬁnd the one which optimizes the object function
+(i.e. the F-score in our case). As a result, the self-adaptive weight updating can
+ensure high quality negative bags are identiﬁed to form positive margin pool
+(PMP) for multi-instance learning without negative bags. The weight updating
+is detailed in Section 4.3.
+
+4 Positive and Unlabeled Multi-Instance Learning
+
+4.1 Optimization Framework with Unreliable Bag Labels
+
+To handle unreliable bag labels from identiﬁed negative bags, we propose to build
+a Positive Margin Pool (PMP) which contains “most positive patterns” from
+
+Multi-Instance Learning from Positive and Unlabeled Bags
+
+241
+
+positive bags and “least negative patterns” from identiﬁed negative bags. Our
+multi-instance learning is then achieved by building an optimization framework
+based on the PMP, under the condition that negative bags are unreliable and
+therefore need to be carefully handled. In Eq. (1), we propose our objective
+function in handling unreliable bag labels.
+
+min
+ω,xB
+
+||ω||2 + C
+1
+2
+s.t. (cid:2)(xB
+
+(cid:2)m
+i=1
+
+(cid:2)(xB
+
+i , wiyi; ω)
+
+i , wiyi; ω) = max(0, 1 − wiyiω(cid:3)
+
+(1)
+
+xB
+i )
+
+where xB
+i denotes a “most positive pattern” or a “least negative pattern” in
+PMP with m denoting the number of instances in PMP. wi denotes weight
+conﬁdence of the ith instance in PMP. In our design, because only one instance
+is selected from each bag, the weight conﬁdence of the instance is equal to the
+weight conﬁdence value of the bag. More speciﬁcally, if the instance is from a
+positive bag, its weight conﬁdence wi = 1. For instances from identiﬁed negative
+bags, their weight values are wj ∈ (0, 1], with a higher wj value indicating that
+Bj is more likely being a negative bag.
+
+The cost function in Eq. (1) is the linear SVM in the primal formulation,
+i , wiyi; ω) is the hinge loss function used by the SVM classiﬁer. The
+
+where (cid:2)(xB
+above primal form can be formulated into a dual version as
+
+(cid:2)
+
+max
+α,xB
+
+i
+
+s.t.
+
+(cid:2)
+
+αi − 1
+αiwiyi(xB
+i )
+2
+(cid:2)
+αi = 1 and αi ≥ 0
+
+i,j
+
+(cid:3)
+
+i
+
+xB
+j αjwj yj
+
+(2)
+
+where αi is the Lagrangian multiplier. Indeed, the above optimization problem
+deﬁnes a nonlinearly constrained nonconvex optimization task. It contains two
+sub-problems: (1) learning continuous variables α which is equivalent to ﬁnding
+hyper-plane ω, and (2) selection of instances xB for PMP which is equivalent
+to ﬁnding optimal weight values w. To the best of our knowledge, no direct
+solution exists to ﬁnd its global optimal. In this paper, we derive an self-adaptive
+approach to ﬁnd optimal bag weights for unlabeled bags, and then use generic
+SVM optimization to solve the above optimization problem.
+
+In the following, we ﬁrst explain the construction of the PMP, and then in-
+
+troduce detailed self-adaptive process for ﬁnding optimal bag weight values.
+
+4.2 PMP: Positive Margin Pool
+
+The main purpose of building a Positive Margin Pool is to identify some “most
+positive patterns” (for positive bags) and “least negative patterns” (for possible
+negative bags), so PMP can help build classiﬁers to diﬀerentiate positive vs.
+negative instances for multi-instance classiﬁcation. This also provides solutions
+to tackle unreliable bag labels obtained from unlabeled bags.
+
+The construction of the PMP is motivated by the margin principle, which
+states that samples close to the decision boundary play critical roles in improv-
+ing the performance of the underlying classiﬁer. In our puMIL setting, we assign
+
+242
+
+J. Wu et al.
+
+a weight conﬁdence value wi to each bag, so it can help identify unlabeled bags
+which are most likely being negative as “reliable negative bags” and then ex-
+tract most positive patterns from positive bags and least negative patterns from
+identiﬁed negative bags to form PMP.
+
+According to MIL deﬁnition, a negative bag does not contain positive in-
+stances, and negative instances in negative bags can have very general distribu-
+tions, we use a Weighted Kernel Density Estimator [8] (WKDE) to model the
+distributions of negative instances in reliable negative bags as follows.
+
+K(wxx, wjx
+
+i,j
+
+−
+i,j)
+
+(3)
+
+p(x|B−
+
+) =
+
+1(cid:3)
+
+i n−
+
+i
+
+(cid:2)
+
+−
+where wx denotes weight of the bag to which the instance x belongs to. x
+i,j
+denotes the jth instance of the ith reliable negative bag with its size to be n−
+i ,
+and we use an isotropic Gaussian kernel K. Depending on whether the underlying
+bag is positive or is identiﬁed as negative, the “most positive pattern” or “least
+negative pattern” xB
+denoting the
+i
+set of all identiﬁed reliable negative bags.
+
+in PMP can be obtained by Eq.(4), with B−
+
+xB
+i =
+
+arg min
+
+xi,j∈Bi,j=1,··· ,ni
+
+p(xi,j|B−
+
+)
+
+(4)
+
+After that, the optimization problem in Eq. (2) can be solved through stan-
+dard linear SVM. In other words, once weight values are ﬁxed, a weighted SVM
+classiﬁer can be trained from PMP for classiﬁcation.
+
+4.3 Self-Adaptive Bag Weight Optimization
+
+In the proposed puMIL learning framework, a weight conﬁdence value wi is
+assigned to each bag to determine whether an unlabeled bag is likely being a
+reliable negative bag or not. In this section, we propose a self-adaptive process
+to search optimal bag weight values. Because the aim of puMIL is to propose
+a learning framework to maximize the performance measure (F-score), a good
+weight combination should corresponds to a high F-score, which trades oﬀ the
+precision P and the recall R: F-score= 2× P × R/(P + R). Accordingly, we drive
+a self-adaptive strategy to obtain optimal weights based on a clone selection
+theory in Artiﬁcial Immune Systems.
+
+When pathogens invade the body, antibodies that are produced from B-cells
+will respond for the detection of a foreign antigen. This response process can be
+explained by clonal selection theory. More speciﬁcally, immune individuals with
+high aﬃnity will gradually increase during the clone and mutation process. Mean-
+while, some immune individuals will polarize into memory individuals, which will
+be evolved towards ﬁnal optimal. In our solution, antigen is simulated as train-
+ing bag set B, while the antibody, presented by conﬁdence weight vector ˆw will
+experience a form of clone and mutation. The evolving optimization process will
+help discover optimal bag weight values w
+which will lead to the best aﬃnity
+(i.e. F-score). The details of the optimal weight search process are described as:
+
+∗
+
+Multi-Instance Learning from Positive and Unlabeled Bags
+
+243
+
+Algorithm 1. puMIL: Positive and Unlabeled Multi-Instance Learning
+Input:
+
+Antibody Population (weight vectors): ˆW = { ˆw1, · · · , ˆwL};
+Antigen Population (bags): B = B+ ∪ Bu;
+Clone Factor c; Threshold T ; Maximum Evolution Iterations M;
+
+Output:
+
+The target class label ys of a test bag Bs;
+
+i to ﬁnd unlabeled bags with the largest weight values to form reliable negative
+
+i )t and obtain positive margin pool via Eq. (4).
+
+i )t via Eq. (3).
+
+i ] to ˆW t and ﬁnd weight vector ˆwt
+c to ˆW t via Steps (2-4) in Section 4.3 and update weight population.
+
+c with the highest aﬃnity score.
+
+i via Eq. (2).
+
+// Training Phase:
+
+] − f [ ˆw
+
+t
+
+t+1
+c
+
+c] ≥ T ) OR (t =1)} do
+
+i )t to B+ and (B−
+i to Bu and calculate the aﬃnity score for ˆwt
+
+1: ˆW ← Initialize L weight vectors (Step (1) in Section 4.3).
+2: t ← 1;
+3: while {(t ≤ M and f [ ˆw
+(B−
+i )t ← Use ˆwt
+4:
+bag set (which has the same number of bags as B+).
+(D−
+i )t ← Generate a weighted distribution from the (B−
+5:
+i ← Apply (D−
+P MP t
+6:
+i ] ← Apply P MP t
+f [ ˆwt
+7:
+c ← Apply f [ ˆwt
+ˆwt
+8:
+ˆW t+1 ← Apply ˆwt
+9:
+c ← Apply f [ ˆw
+ˆwt+1
+10:
+t ← t + 1.
+11:
+12: end while
+c ← ˆwt
+∗
+13: w
+14: H ← Apply the global optimal w
+15: ys ← Apply H to each instance in test bag Bs to predict its bag label.
+
+// Testing Phase:
+SVM classier H(xB ) = ω(cid:3)
+
+] to ˆW t+1 and update the best weight vector.
+
+// The ﬁnal optimal weight vector
+
+xB + b with ω =
+
+i αiw∗
+
+c,iyixB
+i .
+
+t+1
+i
+
+c
+
+∗
+c to all instances in the underlying PMP to build a weighted
+
+(cid:2)
+
+1) Initialization: Given an MI set B with n bags, a set of weight vec-
+tors ˆW = { ˆw1,··· , ˆwL} are randomly generated, with each vector ˆwi =<
+ˆwi,1,··· , ˆwi,k,··· , ˆwi,n > where ˆwi,k represents a weight value of bag Bk ∈ B. If
+Bk is a positive bag, ˆwi,k is set to 1. If Bk is an unlabeled bag, ˆwi,k is a random
+value within range (0, 1]. It is worth noting that each weight vector ˆwi contains
+initial weight value for all bags. Because there are L weight vectors, each bag
+will have L initial weight values.
+
+2) Antibody Clone: For each weight vector ˆwt
+
+i in the tth generation, if
+we use their weight values as the bag weights as deﬁned in Eq. (1), each ˆwt
+i
+will correspond to an SVM classiﬁer with an aﬃnity score (i.e. F-score) on the
+unlabeled bag set Bu. This score allows us to assess the quality of weight vectors
+and use clone selection to ﬁnd optimal weight vector. During antibody clone
+c ∈ ˆW t with the best aﬃnity score will be selected as
+process, the individual ˆwt
+the memory antibody to be further cloned. To ensure a ﬁxed population size in
+every generation, ˆwt
+c will be cloned under the clone factor c to replace weight
+vectors ˆwt
+
+j ∈ ˆW t with low aﬃnity under the same rate c.
+
+3) Antibody Mutation: In order to maintain the diversity of the weight
+i from
+can be generated as follows:
+c − ˆwt
+i)
+
+vectors, the mutation operation should be applied. Speciﬁcally, for any ˆwt
+the tth generation, the new variation individual vt+1
+i + F ∗ N (0, 1) ∗ ( ˆwt
+
+vt+1
+i = ˆwt
+
+(5)
+
+i
+
+Among them, N(0,1) is a normally distributed random variable within [0,1].
+F = 1 − f [ ˆwt
+i], as the variation factor, can be adaptively obtained according to
+diﬀerent clones [9] where f [ ˆwt
+
+i] denotes the aﬃnity of ˆwt
+i.
+
+244
+
+J. Wu et al.
+
+4) Antibody Update: This process determines whether the variation of
+weight vectors (from above steps (2) and (3)) can be used to replace a target
+weight vector in the next generation. In our algorithm, we adopt a greedy search
+strategy. Only if the aﬃnity of vt+1
+is better than that of the target weight
+vector ˆwt
+
+i, the new weight vector is then selected as the oﬀspring.
+
+i
+
+4.4 puMIL Framework
+
+Algorithm 1 reports the detailed process of the proposed puMIL framework,
+which combines the (1) PMP construction (Section 4.2); and (2) adaptive weight
+optimization (Section 4.3), to iteratively reﬁne unlabeled bags for learning.
+During the initial process, puMIL will initialize the bag weight vectors ˆW (line
+1). During each while loop, puMIL will ﬁrst select the “reliable negative bags”
+(B−
+i )t (this set has the same size as the number of positive bags B+) for each
+i in ˆW t. So (B−
+weight vector ˆwt
+i )t consists of unlabeled bags with the largest
+weight values in ˆwt
+i (line 4). After that, puMIL will form a positive margin pool
+for each weight vector (lines 5-6). The clone selection theory will be employed
+to update the weight vectors in order to ﬁnd a better weight value in the next
+iteration (lines 7-10). The evolutionary process will repeat until (1) the algorithm
+surpasses the pre-set maximum number M , or (2) the same result is obtained
+for a number (e.g. T ) of consecutive iterations.
+∗
+c , puMIL uses the discovered optimal
+weight values to obtain PMP, and then builds a weighted SVM classiﬁer H. A
+test bag is classiﬁed as positive if one or multiple instances inside the bag are
+classiﬁed as positive, and negative otherwise.
+
+After obtaining the best weight vector w
+
+5 Experiments
+
+To evaluate the eﬀectiveness of our puMIL framework, we use F-score as the
+evaluation metric (its deﬁnition is given in Section 4.3). For benchmark data
+sets used in the experiments, 30% of bags are randomly selected as testing set in
+each run, with the remaining bags being used as training set. All results are based
+on the average performance over 10 repetitions. Besides, the two parameters M
+and T in Algorithm 1 are set to 50 and 0.001, respectively.
+
+Because there is no existing method for positive and unlabeled multi-instance
+learning, for comparison purposes we implement following baseline approaches
+from bag- and instance-level perspectives. The former directly employs Positive-
+Unlabeled learning [5] at the bag level, and the latter propagates bag label to
+instances and transfer MIL as a generic Positive-Unlabeled learning problem.
+
+Bag-Level Approaches: (a) MILR+MISVM-MI: This method ﬁrst labels all
+unlabeled bags as negative bags, and then uses MI learning approach MILR [10],
+which outputs probability estimation, to obtain a set of identiﬁed negative bags.
+After that, it runs MISVM [6] iteratively on the positive set and reﬁned nega-
+tive set until converges; and (b) Spy+MISVM-MI: The diﬀerence between Spy
+based PU learning [5] on bag-level and MILR+MISVM-MI is in its initialization.
+
+Multi-Instance Learning from Positive and Unlabeled Bags
+
+245
+
+Spy+MISVM-MI randomly samples a set of positive bags as “spies”, and marks
+them as unlabeled bags. Because spies are genuinely positive and behave similarly
+to unknown positive samples the unlabeled set, adding spies allows algorithm to
+infer characteristics of unknown positive bags in the unlabeled set. Previous stud-
+ies [5] on text documents have demonstrated good performance of this PU learning
+strategy.
+
+Instance-Level Approaches: (a) NB+SVM-MI. The variation of traditional
+PU setting in [5,11] is used for comparison. Speciﬁcally, a Naive Bayes classiﬁer
+[12] is used to obtain identiﬁed negative instance set from unlabeled instance
+set. After that, an iterative process is used to train SVM classiﬁer from positive
+instances and identiﬁed negative instances; and (b) Spy+SVM-MI Similar to
+the approaches used in [5,11], during the initialization process, Spy+SVM-MI
+randomly selects a set of positive instances as “spies”, and adds them into the
+unlabeled set. After that it follows the same procedure as NB+SVM-MI.
+
+For ease of understanding, we also refer to MILR+MISVM-MI and NB+SVM-
+MI as “no-spy” based approaches, and Spy+MISVM-MI and Spy+SVM-MI are
+called “spy” based approaches.
+
+5.1 Drug Activity Prediction
+
+The objective of drug activity prediction is to predict whether a drug molecule
+can bind well to a target protein related to certain disease states, which are
+primarily determined by the shape of the molecule. Our drug activity predic-
+tion data set, MUSK1 [1], is a benchmark used for MI learning. It contains 476
+instances grouped into 92 bags (45 inactive and 47 active), with each instance
+being described by a 166-dimensional feature vector. In our experiments, we
+use r × 100% active bags as positive bags, and the remaining active bags and all
+inactive bags are treated as unlabeled bags. The results for the two types of base-
+lines (bag-level and instance-level) and proposed puMIL with diﬀerent r values,
+varying from 0.1 to 0.7, are reported in Figures 2(A) and 2(B), respectively.
+
+Overall, “no-spy” based approaches achieve competitive F-score as “spy”
+based methods, which demonstrates that simply adding “spy” to unlabeled bags
+may not help diﬀerentiate positive vs. negative bags. Meanwhile, the proposed
+puMIL achieves better performances compared to other methods, especially for
+bag-level baselines. For small r values, such as r = 0.2 or less, puMIL demon-
+strates very signiﬁcant performance gain, compared to other baselines. This fur-
+ther assets that when the number of positive bags is very limited, leveraging
+useful information from unlabeled bags, like puMIL does, can be very useful for
+positive and unlabeled multi-instance learning.
+
+5.2 Scientiﬁc Publication Retrieval
+
+The DBLP data set consists of bibliography data in computer science1. Each
+record in DBLP contains a number of attributes such as abstract, authors, ti-
+tle, and references [13]. To build a puMIL task, we select papers published in
+
+1
+
+http://dblp.uni-trier.de/xml/
+
+246
+
+J. Wu et al.
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+e
+r
+o
+c
+S
+−
+F
+
+ 
+
+0
+0.1
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+e
+r
+o
+c
+S
+−
+F
+
+ 
+
+0
+0.1
+
+(A) MUSK: Bag−level
+
+ 
+
+puMIL
+MILR+MISVM−MI
+Spy+MISVM−MI
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+0.6
+
+The percentage of positive bags r
+
+(D) DBLP: Instance−level
+
+0.7
+
+ 
+
+puMIL
+NB+SVM−MI
+Spy+SVM−MI
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+0.6
+
+The percentage of positive bags r
+
+0.7
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+e
+r
+o
+c
+S
+−
+F
+
+0.2
+
+ 
+
+0.1
+
+0.9
+
+0.8
+
+0.7
+
+0.6
+
+e
+r
+o
+c
+S
+−
+F
+
+0.5
+
+ 
+
+0.1
+
+(B) MUSK: Instance−level
+
+ 
+
+puMIL
+NB+SVM−MI
+Spy+SVM−MI
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+0.6
+
+The percentage of positive bags r
+
+(E) Corel Image: Bag−level
+
+0.7
+
+ 
+
+puMIL
+MILR+MISVM−MI
+Spy+MISVM−MI
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+0.6
+
+0.7
+
+The percentage of positive bags r
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+e
+r
+o
+c
+S
+−
+F
+
+ 
+
+0
+0.1
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+e
+r
+o
+c
+S
+−
+F
+
+0.2
+
+ 
+
+0.1
+
+(C) DBLP: Bag−level
+
+ 
+
+puMIL
+MILR+MISVM−MI
+Spy+MISVM−MI
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+0.6
+
+The percentage of positive bags r
+
+(F) Corel Image: Instance−level
+
+0.7
+
+ 
+
+puMIL
+NB+SVM−MI
+Spy+SVM−MI
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+0.6
+
+0.7
+
+The percentage of positive bags r
+
+Fig. 2. F-score comparisons on MUSK, DBLP, and Corel Image data sets with
+respect to diﬀerent r values. Where (A) and (B) represent MUSK data, (C) and (D)
+represent DBLP data, and (E) and (F) represent Corel Image data.
+
+Artiﬁcial Intelligence ﬁeld (AI: IJCAI, AAAI ,NIPS, UAI, COLT, ACL, KR,
+ICML, ECML and IJCNN) as positive bags and randomly select papers from
+other ﬁelds, such as computer vision, multimedia, pattern recognition as unla-
+beled bags. A “bag-of-words” representation based on TFIDF [14] is adopted to
+convert the abstract of a paper to an instance. So each paper is a bag and each
+instance inside the bag denotes either the paper’s abstract or the abstract of a
+reference cited in the paper.
+
+In our experiments, we choose 200 papers in total (which correspond to 200
+bags), with each paper containing 1 to 10 references. For all 200 papers, the total
+number of references cited (i.e. instances) is 1136. Each instance is described by
+a 4497-dimensional feature vector. To vary the number of positive bags, we
+randomly select r × 100% of AI bags (varying from 0.1 to 0.7) as positive bag
+set, and the remaining AI bags and all other bags are used as unlabeled bags. In
+Figures 2(C) and 2(D), we report the results with respect to diﬀerent r values.
+The results show that “spy” based approaches can achieve a slightly better
+performance than ‘no-spy” versions when r is greater than 0.4. This is possibly
+because that when a large number of positive bags are used, the “spies” selected
+from the positive bags will not reduce the role of positive bags. Meanwhile,
+puMIL clearly outperforms all baselines, especially when only a small portion of
+positive bags are labeled (i.e. r=0.1). This suggests that puMIL is eﬀective over
+a wide range of percentage of labeled positive bags.
+
+5.3 Region-Based Image Annotation
+
+In the third experiment, we report puMIL’s performance for automatic image
+annotation tasks. The original data are color images from the Corel data set
+[15] that have been preprocessed and segmented using Blobworld system [16].
+
+Multi-Instance Learning from Positive and Unlabeled Bags
+
+247
+
+Fig. 3. Example images from the Corel image database used in the experiment. The
+ﬁrst and the second rows show positive and negative objects, respectively. Each image
+is considered as a bag with each region denoting an instance.
+
+An image contains a set of segments (or blobs), each characterized by color,
+texture, and shape descriptors. In this case, each image is considered as a bag,
+and each region inside the image denotes an instance. Some example images from
+the database are shown in Figure 3. In our experiment, we use category “tiger”
+as positive bags (100 bags with 544 instances) and randomly draw 100 photos
+of other animals to form unlabeled bags with 676 instances. Each instance is
+described by a 230-dimensional feature vector which represent color, texture,
+and shape of the region. To validate the performance of puMIL with respect to
+diﬀerent number of positive bags, we randomly select r × 100% “tiger” images
+(varying from 0.1 to 0.7) as positive bags, and combine remaining “tiger” images
+and all other images as unlabeled bag set.
+
+In Figures 2(E) and 2(F), we compare the performance of puMIL with two
+types of baselines by using diﬀerent portions of positive bags. The results show
+that bag-level baselines can have a high F-score than instance-level methods
+when the percentage of positive bag is very small (e.g. r < 0.2). Because instance-
+level approaches directly assign bag labels to all instances in positive bags, for a
+small number of positive bags, the mislabeled instances in positive bags will have
+severe impact on the classiﬁers trained from labeled data. As a result, the clas-
+siﬁer may not be able to accurately diﬀerentiate positive vs. negative instances.
+However, as the r values become suﬃciently large, instance-level methods demon-
+strate better performance than bag-level approaches. By properly utilizing in-
+formation in unlabeled bags, puMIL consistently outperforms all baselines for
+diﬀerent percentages of positive bags.
+
+6 Conclusions
+
+In this paper, we formulated a unique multi-instance learning task, which only
+has positive and unlabeled bags available for multi-instance learning. This prob-
+lem setting is more general but signiﬁcantly more challenging than traditional
+multi-instance learning because no negative bags exist for deriving discriminative
+classiﬁcation models. To address the challenge, we proposed a puMIL framework
+which self-adaptively selects some reliable negative bags (from unlabeled bags)
+and further selects some representative patterns from the positive bags and iden-
+tiﬁed negative bags to help train SVM classiﬁers. The classiﬁers will further help
+
+248
+
+J. Wu et al.
+
+reﬁne the selection of negative bags and iteratively lead to updated classiﬁers for
+classiﬁcation. Our main technical contribution, compared to existing research,
+is threefold: (1) a general framework to handle multi-instance learning with
+only positive and unlabeled bags; (2) an eﬀective algorithm to identify reliable
+negative bags from unlabeled bags; and (3) an eﬀective approach for utilizing
+unreliable labels derived for unlabeled bags.
+
+Acknowledgments. The work was supported by the Key Project of the Natu-
+ral Science Foundation of Hubei Province, China (Grant No. 2013CFA004), and
+the National Scholarship for Building High Level Universities, China Scholarship
+Council (No. 201206410056).
+
+References
+
+1. Dietterich, T., Lathrop, R., Lozano-P´erez, T.: Solving the multiple instance prob-
+
+lem with axis-parallel rectangles. Artif. Intell. 89, 31–71 (1997)
+
+2. Zhou, Z., Zhang, M., Huang, S., Li, Y.: Multi-instance multi-label learning. Arti-
+
+ﬁcial Intelligence 176, 2291–2320 (2012)
+
+3. Qi, X., Han, Y.: Incorporating multiple SVMs for automatic image annotation.
+
+Pattern Recogn. 40, 728–741 (2007)
+
+4. Zhang, B., Zuo, W.: Learning from positive and unlabeled examples: A survey. In:
+
+ISIP, pp. 650–654 (2008)
+
+5. Liu, B., Dai, Y., Li, X., Lee, W.S., Yu, P.S.: Building text classiﬁers using positive
+
+and unlabeled examples. In: ICDM, Washington, DC, USA, p. 179 (2003)
+
+6. Andrews, S., Tsochantaridis, I., Hofmann, T.: Support vector machines for
+
+multiple-instance learning. In: NIPS, pp. 561–568 (2003)
+
+7. Shang, R., Jiao, L., Liu, F., Ma, W.: A novel immune clonal algorithm for mo
+
+problems. IEEE Trans. Evol. Comput. 16(1), 35–50 (2012)
+
+8. Fu, Z., Robles-Kelly, A., Zhou, J.: Milis: Multiple instance learning with instance
+
+selection. IEEE Trans. Pattern Anal. Mach. Intell. 33(5), 958–977 (2011)
+
+9. Zhong, Y., Zhang, L.: An adaptive artiﬁcial immune network for supervised clas-
+siﬁcation of multi-/hyperspectral remote sensing imagery. IEEE Trans. Geosci.
+Remote Sens. 50(3), 894–909 (2012)
+
+10. Ray, S., Craven, M.: Supervised versus multiple instance learning: an empirical
+
+comparison. In: ICML, New York, NY, USA, pp. 697–704 (2005)
+
+11. Zhao, Y., Kong, X., Yu, P.S.: Positive and unlabeled learning for graph classiﬁca-
+
+tion. In: ICDM, pp. 962–971 (2011)
+
+12. Friedman, N., Geiger, D., Goldszmidt, M.: Bayesian network classiﬁers. Mach.
+
+Learn. 29(2-3), 131–163 (1997)
+
+13. Tang, J., Zhang, J., Yao, L., Li, J., Zhang, L., Su, Z.: Arnetminer: extraction and
+
+mining of academic social networks. In: KDD, pp. 990–998 (2008)
+
+14. He, J., Gu, H., Wang, Z.: Bayesian multi-instance multi-label learning using gaus-
+
+sian process prior. Mach. Learn. 88(1-2), 273–295 (2012)
+
+15. Li, J., Wang, J.Z.: Real-time computerized annotation of pictures. IEEE Trans.
+
+Pattern Anal. Mach. Intell. 30(6), 985–1002 (2008)
+
+16. Carson, C., Thomas, M., Belongie, S., Hellerstein, J.M., Malik, J.: Blobworld: A
+system for region-based image indexing and retrieval. In: Huijsmans, D.P., Smeul-
+ders, A.W.M. (eds.) VISUAL 1999. LNCS, vol. 1614, pp. 509–517. Springer, Hei-
+delberg (1999)
+
+

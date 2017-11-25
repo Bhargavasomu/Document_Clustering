@@ -1,0 +1,2155 @@
+Multi-View Visual Classiﬁcation via a Mixed-Norm
+
+Regularizer
+
+Xiaofeng Zhu1, Zi Huang1, and Xindong Wu2,3
+
+1 School of Information Technology & Electrical Engineering, The University of Queensland,
+
+Brisbane, QLD4072, Australia
+
+{zhux,huang}@itee.uq.edu.au
+
+2 School of Computer Science and Information Engineering,
+
+3 Department of Computer Science, University of Vermont, Burlington, Vermont 05405, USA
+
+Hefei University of Technology, China
+
+xwu@uvm.edu
+
+Abstract. In data mining and machine learning, we often represent instances by
+multiple views for better descriptions and effective learning. However, such com-
+prehensive representations can introduce redundancy and noise. Learning with
+these multi-view data without any preprocessing may affect the effectiveness of
+visual classiﬁcation. In this paper, we propose a novel mixed-norm joint sparse
+learning model to effectively eliminate the negative effect of redundant views
+and noisy attributes (or dimensions) for multi-view multi-label (MVML) clas-
+siﬁcation. In particular, a mixed-norm regularizer, integrating a Frobenius norm
+and an (cid:2)2,1-norm, is embedded into the framework of joint sparse learning to
+achieve the design goals, which include selecting signiﬁcant views, preserving
+the intrinsic view structure and removing noisy attributes from the selected views.
+Moreover, we devise an iterative algorithm to solve the derived objective function
+of the proposed mixed-norm joint sparse learning model. We theoretically prove
+that the objective function converges to its global optimum via the algorithm.
+Experimental results on challenging real-life datasets show the superiority of the
+proposed learning model over state-of-the-art methods.
+
+Keywords: Feature selection, Joint sparse learning, Manifold learning.
+
+1 Introduction
+
+In many real-world applications in data mining and machine learning, data are naturally
+described by multiple views [7]. For example, in document analysis, web pages can be
+represented by their content or the content of the pages pointing to them; In bioinfor-
+matics, genes can be described with the feature space (corresponding to the genetic
+activity under the biological conditions) as well as the term space (corresponding to
+the text information related to the genes); Images are represented by different kinds of
+low-level visual features, such as color histograms, bags of visual words, and so on.
+
+Actually, different views describe different aspects of data. No one among them is
+absolutely better than others for describing the data [10]. Thus, a good alternative is to
+simultaneously employ multiple views to learn the data. This is well known as multi-
+view learning [2]. Multi-view learning has been shown to be more effective than single-
+view learning, particularly in the scenario where the weaknesses of a single view can be
+
+J. Pei et al. (Eds.): PAKDD 2013, Part I, LNAI 7818, pp. 520–531, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+Multi-View Visual Classiﬁcation via a Mixed-Norm Regularizer
+
+521
+
+strengthened by others [14]. For example, in content analysis, color features have been
+shown to be sensitive to scaling, while SIFT features are robust to scaling. Combining
+color and SIFT features to perform multi-view learning can boost the performance by
+complementing each other’s robustness on different aspects of the data.
+
+Meanwhile, existing multi-view learning methods have several limitations. First, not
+all views of data are useful for some speciﬁc learning tasks since some of them may
+be redundant. However, existing methods are often designed to learn from all views
+of the data, without taking the redundancy issue into account. For example, canonical
+correlation analysis (CCA) and its kernel edition KCCA (e.g., [4,16]) were designed
+to learn a common latent feature space by learning from all views of the data. Second,
+multi-view data often contain noise, which easily affects the effectiveness of learning
+tasks while learning from all views of the data. Third, the intrinsic group structure of
+each individual view (i.e., view structure) in the data should also be preserved. Given
+multi-view data, each view of the data is a natural group to describe an aspect of the
+data. For example, a color histogram feature naturally forms a group for describing the
+color characteristics of image data.
+
+Given that data are often represented by multiple views and associated with multiple
+object categories, this paper focuses on the problem of visual classiﬁcation with multi-
+view multi-label (MVML) learning. In this paper, we propose a novel mixed-norm joint
+sparse learning model, which aims to select representative views and remove noisy at-
+tributes for MVML classiﬁcation. More speciﬁcally, we ﬁrst employ a least square loss
+function measured via a Frobenius norm (or F -norm in short) in each view to pursue
+a minimal regression error across all the views. We then introduce a new mixed-norm
+regularizer (i.e., combining an F -norm with an (cid:2)2,1-norm) to avoid redundant views
+and preserve the intrinsic view structure via the F -norm regularizer, and remove noisy
+attributes via the (cid:2)2,1-norm regularizer. We further devise a novel iterative algorithm to
+efﬁciently solve the objective function of the proposed mixed-norm joint sparse learning
+model, and then theoretically prove that the proposed algorithm enables the objective
+function to converge to its global optimum. After performing the iterative algorithm,
+the derived regression coefﬁcient matrix only contains a few non-zero rows in a few
+selected views due to the mixed-norm regularizer. This makes the test process more
+efﬁcient. Finally, we conduct an extensive experimental study on real-life datasets to
+compare the effectiveness of the proposed learning model with state-of-the-art methods
+for MVML classiﬁcation.
+
+We summarize the contributions of this paper as follows:
+
+– We identify limitations in traditional multi-view learning, mainly caused by re-
+dundant visual features and noisy attributes. In this paper, we devise an effective
+solution to tackle the limitations via the proposed mixed-norm joint sparse learn-
+ing model, which can be applied to many real-world applications, such as MVML
+visual classiﬁcation.
+
+– The proposed model focuses on embedding a mixed-norm regularizer into the ex-
+isting joint sparse learning framework. We solve the derived objective function by a
+simple yet efﬁcient optimization algorithm, which theoretically guarantees that the
+object ive function converges to its global optimum.
+
+522
+
+X. Zhu, Z. Huang, and X. Wu
+
+– To perform MVML classiﬁcation,
+
+the proposed model can be regarded as
+simultaneously performing two types of feature selection, i.e., view-selection and
+attribute-selection respectively. View-selection aims to discard redundant views and
+preserve the intrinsic view structure via the F -norm regularizer, while attribute-
+selection aims to select useful attributes in the selected views of the data via the
+(cid:2)2,1-norm regularizer. These two types of feature selection lead to a new mixed
+joint sparsity, i.e., the view sparsity and the row sparsity simultaneously. To the
+best of our knowledge, no research efforts have been proposed on performing two
+types of feature selection in the joint sparse learning framework. Moreover, exten-
+sive experimental results on the public datasets show that the proposed model is
+more effective than state-of-the-art methods.
+
+2 Approach
+
+(cid:4) 1
+
+p
+
+(cid:2)
+
+n(cid:3)
+
+i=1
+
+(cid:7)
+
+m(cid:3)
+
+(cid:8) p
+
+In this paper, (cid:2)p-norm of a vector v ∈ Rn is deﬁned as (cid:3)v(cid:3)p =
+, where
+vi is the ith element of v. (cid:2)r,p-norm over a matrix M ∈ Rn×m is deﬁned as (cid:3)M(cid:3)r,p =
+⎛
+⎝ n(cid:3)
+, where mij is the element of the ith row and jth column.
+The transpose of X is denoted as XT , the inverse of X is X−1, and the trace operator
+of a matrix is denoted by the symbol “tr”.
+
+(cid:3)mij(cid:3)r
+
+⎞
+⎠ 1
+
+|vi|p
+
+i=1
+
+j=1
+
+p
+
+r
+
+2.1 Loss Function
+
+Given the g-th view Xg of the training data X, we need to obtain its regression coefﬁ-
+cients Wg. In MVML learning, we wish to obtain the minimal difference between the
+G(cid:3)
+]T and the summation of all G views on the multiplica-
+training label Y = [YT
+
+1 , ..., YT
+n
+tion between Xg and Wg, i.e.,
+
+XgWg. Therefore, a least square loss function can
+
+be deﬁned as follows:
+
+g=1
+
+(cid:3)Y − XW(cid:3)2
+
+F
+
+min
+W
+
+(1)
+
+where X = [X1, ..., Xg, ..., XG]. Obviously, Eq.1 meets our goal of minimizing the
+regression error across all views.
+
+2.2 Mixed-Norm Regularizer
+
+Given a loss function (such as in Eq.1), during the optimization process we also de-
+sign a mixed-norm regularizer, aiming to meet other goals, such as removing redun-
+dant views and noisy attributes. In this paper, we achieve these goals by performing
+two types of feature selection, i.e., view-selection for removing redundant views and
+attribute-selection for deleting noisy attributes. To this end, we propose a new mixed-
+norm regularizer by integrating an F -norm regularizer with an (cid:2)2,1-norm regularizer.
+
+Multi-View Visual Classiﬁcation via a Mixed-Norm Regularizer
+
+523
+
+More concretely, in the proposed joint sparse learning model, the F -norm regularizer
+generates the codes of redundant views as zeros and the others as non-zeros; the (cid:2)2,1-
+norm regularizer generates the codes of noisy attributes as zeros and the others as non-
+zeros. Then with the impact of sparse views and attributes, MVML classiﬁcation can
+be effectively and efﬁciently performed. Moreover, the mixed-norm regularizer enables
+us to avoid the issue of over-ﬁtting.
+
+In this paper, the (cid:2)2,1-norm regularizer is deﬁned as:
+
+m(cid:11)
+
+(cid:3)W(cid:3)2,1 =
+
+(cid:3)(W)i(cid:3)2 =
+
+m(cid:11)
+
+(cid:12)(cid:13)(cid:13)(cid:14) c(cid:11)
+
+i=1
+
+i=1
+
+j=1
+
+m2
+ij
+
+(2)
+
+where (W)j is the j-th row of matrix W, and indicates the effect of the j-th attribute to
+all data points. As mentioned by existing literatures, e.g., [12], the (cid:2)2,1-norm regularizer
+was designed to measure the distance of the attributes via the (cid:2)2-norm, while performing
+summation over all data points via the (cid:2)1-norm. Thus the (cid:2)2,1-norm regularizer leads to
+the row sparsity as well as to consider the correlations of all attributes.
+
+The F -norm regularizer is deﬁnes as:
+
+(cid:12)(cid:13)(cid:13)(cid:14) mg(cid:11)
+
+(cid:3)W(cid:3)F =
+
+(cid:3)Wg(cid:3)2
+
+2 =
+
+(cid:12)(cid:13)(cid:13)(cid:14) mg(cid:11)
+
+c(cid:11)
+
+w2
+g,j
+
+(3)
+
+g=1
+
+g=1
+
+j=1
+
+where Wg is the g-th block of matrix W (or the submatrix formed by all the rows
+belonging to the g-th view), and indicates the effect of the g-th block (i.e., there are
+sequential mg rows in the g-th view) to all data points.
+
+G(cid:3)
+
+g=1
+
+2.3 Objective Function
+By considering three equations together, i.e., Eq.1, Eq.2 and Eq.3, we obtain the ob-
+jective function of the proposed mixed-norm joint sparse learning model as follows:
+
+1
+
+2(cid:3)Y − XW(cid:3)2
+
+F
+
++ λ1(cid:3)W(cid:3)2,1 + λ2
+
+min
+W
+
+(cid:3)Wg(cid:3)F
+
+(4)
+
+where both λ1 (λ1 > 0) and λ2 (λ2 > 0) are tuning parameters.
+
+Similar to the mixed sparsity using the (cid:2)1-norm regularizer and the (cid:2)2,1-norm reg-
+ularizer together in separable sparse learning, the proposed mixed regularizer leads to
+the mixed joint sparsity. That is, it ﬁrst discriminates redundant views via the F -norm
+regularizer, and then detects noisy attributes in the selected views via the (cid:2)2,1-norm
+regularizer.
+
+Actually, some literatures have focused on the mixed sparsity, such as elastic net [19]
+and sparse group lasso [11] in separable sparse learning, adaptive multi-task lasso [8] in
+joint sparse learning, and so on. For example, an elastic net combines the (cid:2)1-norm regu-
+larizer with the (cid:2)2-norm regularizer for achieving the element sparsity (via the (cid:2)1-norm
+regularizer) and impact group effect (via the (cid:2)2-norm regularizer). Sparse group lasso
+achieves the mixed sparsity, i.e., the element sparsity via the (cid:2)1-norm regularizer as well
+as the group sparsity via the (cid:2)2,1-norm regularizer. As mentioned in Section 2, neither
+
+524
+
+X. Zhu, Z. Huang, and X. Wu
+
+elastic net nor sparse group lasso beneﬁts for feature selection. Recently, adaptive multi-
+task lasso combines the (cid:2)1-norm regularizer with the (cid:2)2,1-norm regularizer in multi-task
+learning to achieve feature selection (via the (cid:2)2,1-norm regularizer) and deletes noisy
+elements (via the (cid:2)1-norm regularizer). Obviously, existing literatures mentioned above
+were not designed to delete redundancy views and to perform feature selection at the
+same time, as the proposed method in this paper does.
+
+Next we explain why the proposed mixed-norm regularizer leads to the mixed joint
+sparsity, i.e., simultaneously obtaining two types of sparsity. While the value of λ2 is
+larger, the minimization process in Eq.4 drives the value of the F -norm (i.e., the third
+term in Eq.4) smaller. This tends to force the values of some blocks (e.g., the value of
+the g-th block is (cid:3)Wg(cid:3)F ) with small values to be smaller. After several iterations, the
+values of these blocks in W are close to zero. Thus we obtain a sparse W with zero
+value in some blocks, e.g., the g-th block. This indicates that the corresponding views
+(e.g., the g-th view) of X are redundant views since the sparsity appears in those blocks
+(e.g., the g-th block) of W. The sparse blocks of W remove the corresponding views
+of X from the test process. Meanwhile, we also notice that the larger the value of λ2,
+the more the block sparsity. With the same principle, while the value of λ1 is larger,
+the minimization process in Eq.4 forces some rows in W to be zero, i.e., the attributes
+corresponding to the sparse rows in W are not involved the test process. Hence, the
+proposed mixed-norm regularizer leads to the mixed joint sparsity, which achieves the
+block sparsity as well as the row sparsity.
+
+According to above analysis, Eq.4 can be used to select a few useful attributes from
+a few representative (or signiﬁcant) views of the data for the visual classiﬁcation. This
+has the following advantages. First, it beneﬁts for improving the efﬁciency of the test
+process due to the sparse W. Second, these two kinds of feature selection help to avoid
+the impact of redundant views and noisy attributes in the test process, thus beneﬁt for
+effectively performing the MVML classiﬁcation. Third, it induces the mixed joint spar-
+sity as well as leads to a hierarchical coding model (i.e., non-sparse attributes generated
+from non-sparse views), which plays an important role in many applications where a
+feature hierarchy exists. Last but not the least, views-selection via the F -norm regu-
+larizer also preserves the individual view structures of the non-sparse views since each
+view is regarded as a block.
+
+2.4 Classiﬁcation
+
+By solving Eq.4, we obtain the optimal W. Given a test dataset Xtest, we obtain the
+corresponding label set Ytest by Ytest = XtestW in the test process. Due to inducing
+by the proposed mixed-norm regularizer, only a few blocks in the derived W are non-
+zeros, and also only a few rows in these non-zero blocks are non-zeros. This makes the
+test process more efﬁcient to be performed.
+
+After ranking Ytest according to the label values, the top-k labels are assigned to the
+test data as the predicted labels. This rule is the same to existing multi-label methods,
+e.g., [18].
+
+Multi-View Visual Classiﬁcation via a Mixed-Norm Regularizer
+
+525
+
+3 Optimization
+
+Eq.4 is obviously convex since it consists of three norms, which have been shown to be
+convex [6]. Therefore, Eq.4 has the global optimum. However, its optimization is very
+challenging because both the (cid:3)W(cid:3)F -norm and the (cid:3)W(cid:3)2,1-norm in Eq.4 are convex
+but non-smooth. In this section we solve this problem by calculating sub-gradients of
+the mixed-norm regularizer, i.e., the (cid:3)W(cid:3)F -norm and the (cid:3)W(cid:3)2,1-norm respectively.
+
+3.1 The Proposed Solver
+
+By setting the derivative of Eq.4 with respect to W as zero, we obtain:
+
+(XT X + λ1C + λ2D)W = XT Y
+
+where C is a diagonal matrix with the i-th diagonal element:
+
+Ci,i =
+
+1
+
+2(cid:3)(W)i(cid:3)2
+
+(5)
+
+(6)
+
+where (W)i denotes the i-th row of W, i = 1, ..., n. D = diag(D1, ..., DG), where
+the symbol ‘diag’ is the diagonal operator and each Dg (g = 1, ..., G) is also a diagonal
+matrix with the i-th diagonal element as:
+
+Dj,j =
+
+1
+
+2(cid:3)Wg(cid:3)F
+
+(7)
+
+where j = 1, ..., mg.
+
+By observing Eq.5, we ﬁnd that both the matrix C and the matrix D depend on
+the value of matrix W. In this paper we design a novel iterative algorithm to optimize
+Eq.5 by alternatively computing the W and the C (with the D). We ﬁrst summarize the
+details in Algorithm 1, and then prove that in each iteration the updated W and the C
+(with the D) make the value of Eq.4 decrease.
+
+n×c, X ∈ R
+
+D×c;
+
+n×D, λ1 and λ2;
+
+Algorithm 1. The proposed method for solving Eq.4
+Input: Y ∈ R
+Output: W ∈ R
+1 Initialize t = 0;
+2 Initialize C0 as a D × D identity matrix;
+3 Initialize D0 as a D × D identity matrix;
+4 repeat
+5 W[t+1] = (XT X + λ1C[t] + λ2D[t])
+6
+
+−1XT Y;
+
+7
+
+Update C[t+1] via Eq.6;
+Update D[t+1] via Eq.7;
+t = t+1;
+
+8
+9 until No change on the objective function value in Eq.4;
+
+526
+
+X. Zhu, Z. Huang, and X. Wu
+
+With Algorithm 1, at each iteration, given the ﬁxed C and D, the W is updated by
+Eq.5. Then the C and the D can be updated with the ﬁxed W. The iteration process is
+repeated until there is no change on the value of Eq.4.
+
+3.2 Convergence
+
+In this subsection we introduce Theorem 1 to guarantee that Eq.4 monotonically de-
+creases in each iteration of Algorithm 1. Following the literature in [9,17], we ﬁrst give
+a lemma as follows:
+Lemma 1. For any positive values ai and bi, i = 1, ..., m, the following holds:
+
+b2
+i
+ai
+
+⇐⇒ m(cid:3)
+
+≤ m(cid:3)
+m(cid:3)
+(bi − ai) ≤ 0 ⇐⇒ m(cid:3)
+⇐⇒ m(cid:3)
+
+a2
+i
+ai
+
+i=1
+
+i=1
+
+i=1
+
+(bi+ai)(bi−ai)
+
+ai
+
+≤ 0
+bi ≤ m(cid:3)
+
+ai
+
+i=1
+
+i=1
+
+i=1
+
+(8)
+
+Theorem 1. In each iteration, Algorithm 1 monotonically decreases the objective func-
+tion value in Eq.4.
+Proof. According to the ﬁfth line of Algorithm 1, we denote the W[t+1] as the results
+of the (t + 1)-th iteration of Algorithm 1, then we have:
+
+W[t+1] = min
+W
+
+1
+2
+
+(cid:3)Y − XW(cid:3)2
+G(cid:11)
+
+F
+
++ λ1tr(WT C[t]W)
+
+Then we can get:
+1
+2
+
+(cid:3)Y − X(W[t+1])T(cid:3)2
+
+F
+
++λ2
+
+tr((Wg)T (Dg)[t]Wg)
+
+g=1
+
++ λ1tr((W[t+1])T C[t]W[t+1])
+
++ λ2
+
+tr(((Wg)[t+1])T (Dg)[t](Wg)[t+1])
+
+≤ 1
+2
+
+(cid:3)Y − X(W[t])T(cid:3)2
+
+F
+
++ λ1tr((W[t])T C[t]W[t])
+
++ λ2
+
+tr(((Wg )[t])T (Dg)[t](Wg)[t])
+
+G(cid:11)
+
+g=1
+
+G(cid:11)
+
+g=1
+
+which indicates that:
+
+(cid:3)Y − X(W[t+1])T(cid:3)2
+
+F
+
++
+
+1
+2
+
+≤ 1
+2
+
+(cid:3)Y − X(W[t])T(cid:3)2
+
+F
+
++
+
+n(cid:11)
+
+i=1
+
+n(cid:11)
+
+i=1
+
+2
+
+(cid:3)(W[t+1])i(cid:3)2
+2(cid:3)(W[t])i(cid:3)2
+(cid:3)(W[t])i(cid:3)2
+2(cid:3)(W[t])i(cid:3)2
+
+2
+
+) +
+
+) +
+
+G(cid:11)
+
+g=1
+
+G(cid:11)
+
+g=1
+
+F
+
+(cid:3)(Wg)[t+1](cid:3)2
+2(cid:3)(Wg)[t](cid:3)F
+(cid:3)(Wg)[t](cid:3)2
+2(cid:3)(Wg)[t](cid:3)F
+
+F
+
+)
+
+(9)
+
+(10)
+
+)
+
+(11)
+
+Multi-View Visual Classiﬁcation via a Mixed-Norm Regularizer
+
+527
+
+(cid:15)(cid:15)
+2 (or (cid:3)(Wg)[t+1](cid:3)F ) and
+
+(cid:15)(cid:15)(W[t])i
+
+(cid:15)(cid:15)
+
+2 (or
+
+Substituting bi and ai with
+
+(cid:15)(cid:15)(W[t+1])i
+(cid:3)(Wg)[t](cid:3)F ) in Lemma 1, we have:
+n(cid:11)
+
+(cid:3)Y − X(W[t+1])T(cid:3)2
+
++ λ1
+
+F
+
+1
+2
+
+≤ 1
+2
+
+(cid:3)Y − X(W[t])T(cid:3)2
+
+F
+
++ λ1
+
+G(cid:11)
+
+g=1
+
+(cid:3)(W[t+1])i(cid:3)2 + λ2
+G(cid:11)
+
+(cid:3)(W[t])i(cid:3)2 + λ2
+
+i=1
+
+n(cid:11)
+
+i=1
+
+g=1
+
+(cid:3)(Wg)[t+1](cid:3)F
+
+(cid:3)(Wg)[t](cid:3)F
+
+(12)
+
+This indicates that the objective function value in Eq.4 monotonically decreases in each
+iteration of Algorithm 1. Therefore, due to the convexity of Eq.4, Algorithm 1 enables
+Eq.4 to converge to its global optimum.
+
+4 Experimental Analysis
+
+In order to evaluate the performance of the proposed mixed-norm joint sparse learning
+(denoted as F 2L21F 1 for short from its objective function), we compare it with several
+state-of-the-art methods on public datasets (e.g., MIRFLICKR [5] and NUS-WIDE [3])
+for MVML classiﬁcation, by evaluating the average precision and Hamming loss.
+
+4.1 Experiment Setup
+We use four datasets, including MIRFlickr, NUS-WIDE, SCENE and OBJECT in our
+experiments for MVML classiﬁcation. The comparison methods include the method in
+[15] (denoted as F2F from its objective function, for simplicity) which only considers
+the block sparsity, the method in [12] (denoted as F2L21) which only considers the row
+sparsity, the MKCCA method in [1] which does not consider the feature redundancy
+and noise, and the single view method WorstS (or BestS) which has the worst (or best)
+classiﬁcation performance from the data represented by a single view via ridge regres-
+sion (i.e., all single views are tested). We use two popular evaluation metrics (i.e., the
+average precision (AP) and Hamming loss (HL)) in multi-label learning [13] to evaluate
+the effectiveness of all the methods in our experiments.
+Given the ground true label matrix Y 1 ∈ {0, 1}n×c (where n is the number of in-
+stances and c is the number of labels) and the predicted one Y 2 ∈ {0, 1}n×c obtained
+by the algorithm for performing MVML learning, average precision (AP) is deﬁned as:
+
+AP =
+
+1
+n × c
+
+n(cid:11)
+
+i=1
+
+card(Y 1i ∩ Y 2i)
+card(Y 1i ∪ Y 2i)
+
+(13)
+
+where the symbol “Card” means the cardinality operation.
+
+HL measuring the recovery error rate is deﬁned as:
+
+n(cid:11)
+
+c(cid:11)
+
+HL =
+
+Y 1i,j ⊕ Y 2i,j
+where ⊕ is an XOR operation, a.k.a. exclusive disjunction.
+1 F 2 means the least square loss function, L21 means the (cid:2)2,1-norm regularizer, and F means
+
+1
+n × c
+
+(14)
+
+i=1
+
+j=1
+
+the F -norm regularizer.
+
+528
+
+X. Zhu, Z. Huang, and X. Wu
+
+According to the literatures, e.g., [13,18], the larger (or smaller) the performance on
+
+AP (or HL) is, the better the method.
+
+4.2 Experimental Results
+
+In this subsection, we report the results on MVML classiﬁcation. First, we evaluate
+the convergence rate of the proposed F2L21F on all four datasets, for evaluating the
+efﬁciency of our optimization algorithm, in terms of the objective function value in
+each iteration. Second, we test the parameters’ sensitivity of the proposed model on
+λ1 and λ2, aiming at obtaining the best performance of the proposed F2L21F. Finally,
+we compare F2L21F with the comparison algorithms in terms of average precision and
+Hamming loss.
+
+Convergence Rate. We solve Eq.4 by the proposed Algorithm 1. In this experiment,
+we want to know the convergence rate of Algorithm 1. Here we report some of the
+results in Fig.1 and Fig.2 due to the page limit. Fig.1 shows the results on the objective
+function value while ﬁxing the value of λ1 (i.e., λ1 = 1) and varying λ2. Fig.2 shows
+the results on the objective function value while ﬁxing the value of λ2 (i.e., λ2 = 1)
+and varying λ1. In both Fig.1 and Fig.2, the x-axis and y-axis denote the number of
+iterations and the objective function value respectively.
+
+λ
+ = 0.01
+2
+λ
+ = 0.1
+2
+λ
+ = 1
+2
+λ
+ = 10
+2
+λ
+ = 100
+2
+λ
+ = 1000
+2
+
+x 104
+
+1.006
+
+e
+u
+l
+a
+v
+
+ 
+
+n
+o
+i
+t
+c
+n
+u
+f
+ 
+e
+v
+i
+t
+c
+e
+j
+b
+O
+
+1.0055
+
+1.005
+
+1.0045
+
+1.004
+
+1.0035
+
+1.003
+
+1.0025
+
+1.002
+
+1.0015
+
+ 
+
+x 104
+
+2.22
+
+ 
+
+x 104
+
+1.65
+
+ 
+
+3900
+
+ 
+
+e
+u
+l
+a
+v
+
+ 
+
+n
+o
+i
+t
+c
+n
+u
+f
+ 
+e
+v
+i
+t
+c
+e
+j
+b
+O
+
+2.2
+
+2.18
+
+2.16
+
+2.14
+
+2.12
+
+2.1
+
+2.08
+
+λ
+ = 0.01
+2
+λ
+ = 0.1
+2
+λ
+ = 1
+2
+λ
+ = 10
+2
+λ
+ = 100
+2
+λ
+ = 1000
+2
+
+e
+u
+l
+a
+v
+
+ 
+
+n
+o
+i
+t
+c
+n
+u
+f
+ 
+e
+v
+i
+t
+c
+e
+j
+b
+O
+
+1.6
+
+1.55
+
+1.5
+
+λ
+ = 0.01
+2
+λ
+ = 0.1
+2
+λ
+ = 1
+2
+λ
+ = 10
+2
+λ
+ = 100
+2
+λ
+ = 1000
+2
+
+e
+u
+l
+a
+v
+
+ 
+
+n
+o
+i
+t
+c
+n
+u
+f
+ 
+e
+v
+i
+t
+c
+e
+j
+b
+O
+
+3800
+
+3700
+
+3600
+
+3500
+
+3400
+
+λ
+ = 0.01
+2
+λ
+ = 0.1
+2
+λ
+ = 1
+2
+λ
+ = 10
+2
+λ
+ = 100
+2
+λ
+ = 1000
+2
+
+1.001
+ 
+5
+
+10
+
+15
+
+20
+
+25
+Iteration
+
+30
+
+35
+
+40
+
+45
+
+50
+
+2.06
+ 
+5
+
+10
+
+15
+
+20
+
+25
+Iteration
+
+30
+
+35
+
+40
+
+45
+
+50
+
+1.45
+ 
+5
+
+10
+
+15
+
+20
+
+25
+Iteration
+
+30
+
+35
+
+40
+
+45
+
+50
+
+3300
+ 
+5
+
+10
+
+15
+
+20
+
+25
+Iteration
+
+30
+
+35
+
+40
+
+45
+
+50
+
+(a) MIRFlickr
+
+(b) NUS-WIDE
+
+(c) SCENE
+
+(d) OBJECT
+
+Fig. 1. An illustration on convergence rate of Algorithm 1 for solving the proposed objective
+function with ﬁxed λ1, i.e., λ1 = 1
+
+We can observe from both Fig.1 and Fig.2 that: 1) the objective function value rapidly
+decreases at the ﬁrst few iterations; and 2) the objective function value becomes stable
+after about 30 iterations (or even less than 20 in many cases) on all datasets. This con-
+ﬁrms a fast convergence rate of Algorithm 1 to solve the proposed optimization problem
+in Eq.4. Similar results are observed for other λ1 and λ2 values.
+
+Parameters’ Sensitivity. In this experiment, we test different settings on parameters
+λ1 and λ2 in the proposed F2L21F, by varying them as {0.01, 0.1, 1, 10, 100, 1000}.
+The results on average prediction and Hamming are illustrated in Fig.3.
+
+It is clear that the proposed F2L21F is sensitive to the parameters’ setting, similar
+to other sparse learning methods [11,18]. However, we ﬁnd the worst performance is
+
+Multi-View Visual Classiﬁcation via a Mixed-Norm Regularizer
+
+529
+
+x 104
+
+1.03
+
+e
+u
+l
+a
+v
+
+ 
+
+n
+o
+i
+t
+c
+n
+u
+f
+ 
+e
+v
+i
+t
+c
+e
+j
+b
+O
+
+1.025
+
+1.02
+
+1.015
+
+1.01
+
+1.005
+
+1
+
+ 
+
+λ
+ = 0.01
+1
+λ
+ = 0.1
+1
+λ
+ = 1
+1
+λ
+ = 10
+1
+λ
+ = 100
+1
+λ
+ = 1000
+1
+
+x 104
+
+2.7
+
+2.6
+
+2.5
+
+2.4
+
+2.3
+
+2.2
+
+2.1
+
+2
+
+1.9
+
+1.8
+
+e
+u
+l
+a
+v
+
+ 
+
+n
+o
+i
+t
+c
+n
+u
+f
+ 
+e
+v
+i
+t
+c
+e
+j
+b
+O
+
+ 
+
+x 104
+
+2.4
+
+λ
+ = 0.01
+1
+λ
+ = 0.1
+1
+λ
+ = 1
+1
+λ
+ = 10
+1
+λ
+ = 100
+1
+λ
+ = 1000
+1
+
+e
+u
+l
+a
+v
+
+ 
+
+n
+o
+i
+t
+c
+n
+u
+f
+ 
+e
+v
+i
+t
+c
+e
+j
+b
+O
+
+2.2
+
+2
+
+1.8
+
+1.6
+
+1.4
+
+ 
+
+4200
+
+ 
+
+λ
+ = 0.01
+1
+λ
+ = 0.1
+1
+λ
+ = 1
+1
+λ
+ = 10
+1
+λ
+ = 100
+1
+λ
+ = 1000
+1
+
+e
+u
+l
+a
+v
+
+ 
+
+n
+o
+i
+t
+c
+n
+u
+f
+ 
+e
+v
+i
+t
+c
+e
+j
+b
+O
+
+4000
+
+3800
+
+3600
+
+3400
+
+3200
+
+3000
+
+2800
+
+2600
+
+λ
+ = 0.01
+1
+λ
+ = 0.1
+1
+λ
+ = 1
+1
+λ
+ = 10
+1
+λ
+ = 100
+1
+λ
+ = 1000
+1
+
+0.995
+
+ 
+
+5
+
+10
+
+15
+
+20
+
+25
+Iteration
+
+30
+
+35
+
+40
+
+45
+
+50
+
+1.7
+ 
+5
+
+10
+
+15
+
+20
+
+25
+Iteration
+
+30
+
+35
+
+40
+
+45
+
+50
+
+1.2
+ 
+5
+
+10
+
+15
+
+20
+
+25
+Iteration
+
+30
+
+35
+
+40
+
+45
+
+50
+
+2400
+ 
+5
+
+10
+
+15
+
+20
+
+25
+Iteration
+
+30
+
+35
+
+40
+
+45
+
+50
+
+(a) MIRFlickr
+
+(b) NUS-WIDE
+
+(c) SCENE
+
+(d) OBJECT
+
+Fig. 2. An illustration on convergence rate of Algorithm 1 for solving the proposed objective
+function with ﬁxed λ2, i.e., λ2 = 1
+
+i
+
+i
+
+n
+o
+s
+c
+e
+r
+p
+
+ 
+
+e
+g
+a
+r
+e
+v
+A
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+0
+
+0.01
+
+0.1
+
+1
+
+10
+
+100
+
+1000
+
+λ
+2
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+0
+
+i
+
+i
+
+n
+o
+s
+c
+e
+r
+p
+
+ 
+
+e
+g
+a
+r
+e
+v
+A
+
+0.01
+
+0.1
+
+1
+
+1000
+
+100
+
+10
+
+1
+
+0.1
+
+0.01
+
+λ
+1
+
+10
+
+100
+
+1000
+
+λ
+2
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+0
+
+i
+
+i
+
+n
+o
+s
+c
+e
+r
+p
+
+ 
+
+e
+g
+a
+r
+e
+v
+A
+
+0.01
+
+0.1
+
+1
+
+1000
+
+100
+
+10
+
+1
+
+0.1
+
+0.01
+
+λ
+1
+
+10
+
+100
+
+1000
+
+λ
+2
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+0
+
+i
+
+i
+
+n
+o
+s
+c
+e
+r
+p
+
+ 
+
+e
+g
+a
+r
+e
+v
+A
+
+0.01
+
+0.1
+
+1
+
+1000
+
+100
+
+10
+
+1
+
+0.1
+
+0.01
+
+λ
+1
+
+10
+
+100
+
+1000
+
+λ
+2
+
+1000
+
+100
+
+10
+
+1
+
+0.1
+
+0.01
+
+λ
+1
+
+(a) MIRFlickr
+
+(b) NUS-WIDE
+
+(c) SCENE
+
+(d) OBJECT
+
+0.25
+
+0.2
+
+0.15
+
+0.1
+
+0.05
+
+0
+
+s
+s
+o
+
+l
+ 
+
+i
+
+g
+n
+m
+m
+a
+H
+
+0.01
+
+0.1
+
+1
+
+10
+
+100
+
+1000
+
+λ
+2
+
+0.1
+
+0.08
+
+0.06
+
+0.04
+
+0.02
+
+0
+
+s
+s
+o
+
+l
+ 
+
+i
+
+g
+n
+m
+m
+a
+H
+
+0.01
+
+0.1
+
+1
+
+1000
+
+100
+
+10
+
+1
+
+0.1
+
+0.01
+
+λ
+1
+
+10
+
+100
+
+1000
+
+λ
+2
+
+0.2
+
+0.15
+
+0.1
+
+0.05
+
+0
+
+s
+s
+o
+
+l
+ 
+
+i
+
+g
+n
+m
+m
+a
+H
+
+0.01
+
+0.1
+
+1
+
+1000
+
+100
+
+10
+
+1
+
+0.1
+
+0.01
+
+λ
+1
+
+10
+
+100
+
+1000
+
+λ
+2
+
+0.2
+
+0.15
+
+0.1
+
+0.05
+
+0
+
+s
+s
+o
+
+l
+ 
+
+i
+
+g
+n
+m
+m
+a
+H
+
+0.01
+
+0.1
+
+1
+
+1000
+
+100
+
+10
+
+1
+
+0.1
+
+0.01
+
+λ
+1
+
+10
+
+100
+
+1000
+
+λ
+2
+
+1000
+
+100
+
+10
+
+1
+
+0.1
+
+0.01
+
+λ
+1
+
+(e) MIRFlickr
+
+(f) NUS-WIDE
+
+(g) SCENE
+
+(h) OBJECT
+
+Fig. 3. The results of average precision (ﬁrst row) and Hamming loss (second low) on various
+parameters’ settings on different datasets
+
+always obtained when both λ1 and λ2 have extremely large values. For example, when
+the values of parameters pair (λ1, λ2) are around (10,10), F2L21F achieves the best
+performance. Actually, in our experiments such a setting simultaneously leads to both
+the row sparsity (via the λ1) and the block sparsity (via the λ2).
+
+Comparison. In this experiment, we compare our proposed method with state-of-the-
+art methods for MVML classiﬁcation. We set the values of parameters for the compari-
+son methods by following the instructions in their original papers. For all the methods,
+we randomly sample 60% of the original data as the training data, and leave the rest
+as the test data. We randomly generate ten runs, and report the average result and the
+standard deviation on the average precision and Hamming loss, as shown in Fig.4. Note
+that we do not use dataset MIRFlickr since it has only two views.
+
+From Fig.4, we have the following observations: 1) The proposed F2L21F always
+achieves the best performance. Among six views in NUS-WIDE and ﬁve views in
+SCENE and OBJECT, the 64-D color histogram is detected as a redundant view in
+F2L21F. F2L21 and MKCCA use all the views to perform MVML classiﬁcation and
+obtain worse performance than F2L21F. This conﬁrms that some views (e.g., the color
+histogram in the tested datasets) are not helpful in the learning process and may even
+
+530
+
+X. Zhu, Z. Huang, and X. Wu
+
+Fig. 4. Comparison on average precision (left) and Hamming loss (right) for all methods on differ-
+ent datasets. Note that the range shown at the top of the bar represents the performance standard
+deviation.
+
+degrade the performance, especially when many views are available. F2L21F is able
+to identify those redundant views and avoid their negative impact on the classiﬁcation.
+Although F2F can also discover those redundant views, it is not able to remove noisy at-
+tributes from the selected views, leading to worse performance than F2L21F. This result
+proves the effectiveness of F2L21F in removing redundant views and noisy attributes by
+employing the proposed mixed-norm regularizer in MVML classiﬁcation. 2) The per-
+formance of single view learning methods (i.e., BestS and WorstS) is always worse than
+those multi-view learning methods. This again conﬁrms the advantages of using multi-
+views in visual classiﬁcation. 3) The sparse learning methods (i.e., F2L21F, F2F, and
+F2L21) consistently outperform MKCCA. This shows the superiority of sparse learn-
+ing which encodes negligible elements as zeros and only selects important elements
+to perform MVML classiﬁcation. Moreover, in our implementation the computational
+cost of F2L21F is about tens times faster than that of MKCCA, indicating much higher
+efﬁciency than MKCCA.
+
+In sum, more views can help improve the performance of visual classiﬁcation since
+more information can be utilized in the learning process. On the other hand, more views
+may also potentially introduce higher redundancy and more noise which compromise the
+performance. The proposed F2L21F is able to identify those redundant views and noisy
+attributes so that MVML classiﬁcation can be performed for more effective performance.
+
+5 Conclusion
+
+In this paper we proposed a mixed-norm joint sparse learning model for multi-view
+multi-label (MVML) classiﬁcation. The proposed method, powered by a mixed-norm
+regularizer, can effectively avoid the negative impact of redundant views and noisy
+attributes from the multi-view representation of a large amount of data. Extensive ex-
+perimental results have shown that the proposed method outperforms state-of-the-art
+learning methods for MVML classiﬁcation. In the future, we will extend the proposed
+method into its kernel edition to project noise more clearly, and involve other learning
+models, such as semi-supervised MVML classiﬁcation and transfer MVML classiﬁca-
+tion, to leverage the widely available unlabeled data and heterogenous data.
+
+Multi-View Visual Classiﬁcation via a Mixed-Norm Regularizer
+
+531
+
+References
+
+1. Blaschko, M.B., Lampert, C.H., Gretton, A.: Semi-supervised laplacian regularization of ker-
+nel canonical correlation analysis. In: Daelemans, W., Goethals, B., Morik, K. (eds.) ECML
+PKDD 2008, Part I. LNCS (LNAI), vol. 5211, pp. 133–145. Springer, Heidelberg (2008)
+
+2. Blum, A., Mitchell, T.: Combining labeled and unlabeled data with co-training. In: Annual
+
+Conference on Computational Learning Theory, pp. 92–100 (1998)
+
+3. Chua, T.-S., Tang, J., Hong, R., Li, H., Luo, Z., Zheng, Y.: Nus-wide: A real-world web
+image database from national university of singapore. In: ACM International Conference on
+Image and Video Retrieval, p. 48 (2009)
+
+4. Dhillon, P.S., Foster, D., Ungar, L.: Multi-view learning of word embeddings via cca. In:
+
+Neural Information Processing Systems, pp. 9–16 (2011)
+
+5. Huiskes, M.J., Lew, M.S.: The mir ﬂickr retrieval evaluation. In: ACM International Confer-
+
+ence on Multimedia Information Retrieval, pp. 39–43 (2008)
+
+6. Jenatton, R., Audibert, J.-Y., Bach, F.: Structured variable selection with sparsity-inducing
+
+norms. Journal of Machine Learning Research 12, 2777 (2011)
+
+7. Kumar, A., Daum´eIII, H.: A co-training approach for multi-view spectral clustering. In: In-
+
+ternational Conference on Machine Learning, pp. 393–400 (2011)
+
+8. Lee, S., Zhu, J., Xing, E.P.: Adaptive multi-task lasso: with application to eqtl detection. In:
+
+Neural Information Processing Systems, pp. 1306–1314 (2010)
+
+9. Nie, F., Huang, H., Cai, X., Ding, C.: Efﬁcient and robust feature selection via joint l2,
+
+1-norms minimization. In: Neural Information Processing Systems, pp. 1813–1821 (2010)
+
+10. Owens, T., Saenko, K., Chakrabarti, A., Xiong, Y., Zickler, T., Darrell, T.: Learning object
+color models from multi-view constraints. In: IEEE Conference on Computer Vision and
+Pattern Recognition, pp. 169–176 (2011)
+
+11. Peng, J., Zhu, J., Bergamaschi, A., Han, W., Noh, D.-Y., Pollack, J.R., Wang, P.: Regular-
+ized multivariate regression for identifying master predictors with application to integrative
+genomics study of breast cancer. The Annals of Applied Statistics 4(1), 53–77 (2010)
+
+12. Sun, L., Liu, J., Chen, J., Ye, J.: Efﬁcient recovery of jointly sparse vectors. In: Neural Infor-
+
+mation Processing Systems, pp. 1812–1820 (2009)
+
+13. Tsoumakas, G., Katakis, I., Vlahavas, I.: Mining Multi-label Data (2009)
+14. Xie, B., Mu, Y., Tao, D., Huang, K.: m-sne: Multiview stochastic neighbor embed-
+ding. IEEE Transactions on Systems, Man, and Cybernetics, Part B: Cybernetics 41(4),
+1088–1096 (2011)
+
+15. Yuan, X., Yan, S.: Visual classiﬁcation with multi-task joint sparse representation. In: IEEE
+
+Conference on Computer Vision and Pattern Recognition, pp. 3493–3500 (2010)
+
+16. Zhu, X., Huang, Z., Shen, H.T., Cheng, J., Xu, C.: Dimensionality reduction by mixed kernel
+
+canonical correlation analysis. Pattern Recognition (2012)
+
+17. Zhu, X., Huang, Z., Yang, Y., Shen, H.T., Xu, C., Luo, J.: Self-taught dimensionality reduc-
+
+tion on the high-dimensional small-sized data. Pattern Recognition 46(1), 215–229 (2013)
+
+18. Zhu, X., Shen, H.T., Huang, Z.: Video-to-shot tag allocation by weighted sparse group lasso.
+
+In: ACM Multimedia, pp. 1501–1504 (2011)
+
+19. Zou, H., Hastie, T.: Regularization and variable selection via the elastic net. Journal of the
+
+Royal Statistical Society Series B 67(2), 301–320 (2005)
+
+

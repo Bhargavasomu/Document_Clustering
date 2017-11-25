@@ -1,0 +1,1347 @@
+Mining Contrast Subspaces⋆
+
+Lei Duan1,6, Guanting Tang2, Jian Pei2, James Bailey3, Guozhu Dong4,
+
+Akiko Campbell5, and Changjie Tang1
+
+1 School of Computer Science, Sichuan University, China
+
+2 School of Computing Science, Simon Fraser University, Canada
+
+3 Dept. of Computing and Information Systems, University of Melbourne, Australia
+
+4 Dept. of Computer Sci & Engr, Wright State University, USA
+
+5 Paciﬁc Blue Cross, Canada
+
+6 State Key Laboratory of Software Engineering, Wuhan University, China
+
+fleiduan, cjtangg@scu.edu.cn, fgta9, jpeig@cs.sfu.ca,
+
+baileyj@unimelb.edu.au, guozhu.dong@wright.edu,
+
+acampbell@pac.bluecross.ca
+
+Abstract. In this paper, we tackle a novel problem of mining contrast
+subspaces. Given a set of multidimensional objects in two classes C+ and
+C(cid:0) and a query object o, we want to ﬁnd top-k subspaces S that maxi-
+mize the ratio of likelihood of o in C+ against that in C(cid:0). We demonstrate
+that this problem has important applications, and at the same time, is
+very challenging. It even does not allow polynomial time approximation.
+We present CSMiner, a mining method with various pruning techniques.
+CSMiner is substantially faster than the baseline method. Our experi-
+mental results on real data sets verify the eﬀectiveness and eﬃciency of
+our method.
+
+1
+
+Introduction
+
+Imagine you are a medical doctor facing a patient having symptoms of being
+overweight, short of breath, and some others. You want to check the patient
+on two speciﬁc possible diseases: coronary artery disease and adiposity. Please
+note that clogged arteries are among the top-5 most commonly misdiagnosed
+diseases. You have a set of reference samples of both diseases. Then, you may
+naturally ask “In what aspect is this patient most similar to cases of coronary
+artery disease and, at the same time, dissimilar to adiposity?”
+
+The above motivation scenario cannot be addressed well using existing data
+mining methods, and thus suggests a novel data mining problem. In a multidi-
+mensional data set of two classes, given a query object and a target class, we
+
+⋆ This work was supported in part by an NSERC Discovery grant, a BCIC NRAS
+Team Project, NSFC 61103042, SRFDP 20100181120029, and SKLSE2012-09-32.
+Work by Lei Duan and Guozhu Dong at Simon Fraser University was supported
+by an Ebco/Eppich visiting professorship. All opinions, ﬁndings, conclusions and
+recommendations in this paper are those of the authors and do not necessarily reﬂect
+the views of the funding agencies.
+
+want to ﬁnd the subspace where the query object is most likely to belong to the
+target class against the other class. We call such a subspace a contrast subspace
+since it contrasts the likelihood of the query object in the target class against
+the other class. Mining contrast subspaces is an interesting problem with many
+important applications. As another example, when an analyst in an insurance
+company is investigating a suspicious claim, she may want to compare the sus-
+picious case against the samples of frauds and normal claims. A useful question
+to ask is in what aspects the suspicious case is most similar to fraudulent cases
+and diﬀerent from normal claims. In other words, ﬁnding the contrast subspace
+for the suspicious claim is informative for the analyst.
+
+While there are many existing studies on outlier detection and contrast min-
+ing, they focus on collective patterns that are shared by many cases of the target
+class. The contrast subspace mining problem addressed here is diﬀerent. It fo-
+cuses on one query object and ﬁnds the customized contrast subspace. This
+critical diﬀerence makes the problem formulation, the suitable applications, and
+the mining methods dramatically diﬀerent. We will review the related work and
+explain the diﬀerences systematically in Section 2.
+
+To tackle the problem of mining contrast subspaces, we need to address
+several technical issues. First, we need to have a simple yet informative contrast
+measure to quantify the similarity between the query object and the target class
+and the diﬀerence between the query object and the other class. In this paper,
+we use the ratio of the likelihood of the query object in the target class against
+that in the other class as the measure. This is essentially the Bayes factor on the
+query object, and comes with a well recognized explanation [1].
+
+Second, the problem of mining contrast subspaces is computational chal-
+lenging. We show that the problem is MAX SNP-hard, and thus does not allow
+polynomial time approximation methods unless P=NP. Therefore, the only hope
+is to develop heuristics that may work well in practice.
+
+Third, one could use a brute-force method to tackle the contrast mining
+problem, which enumerates every non-empty subspace and computes the con-
+trast measure. This method, however, is very costly on data sets with a non-
+trivial dimensionality. One major obstacle preventing eﬀective pruning is that the
+contrast measure does not have any monotonicity with respect to the subspace-
+superspace relationship. To tackle the problem, we develop pruning techniques
+based on bounds of likelihood and contrast ratio. Our experimental results on
+real data sets clearly verify the eﬀectiveness and eﬃciency of our method.
+
+The rest of the paper is organized as follows. We review the related work in
+Section 2. In Section 3, we formalize the problem, and analyze it theoretically.
+We present a heuristic method in Section 4, and evaluate our method empirically
+using real data sets in Section 5. We conclude the paper in Section 6.
+
+2 Related Work
+
+Our study is related to the existing work on contrast mining, subspace outlier
+detection and typicality queries. We review the related work brieﬂy here.
+
+Contrast mining discovers patterns and models that manifest drastic diﬀer-
+ences between datasets. Dong and Bailey [2] presented a comprehensive review.
+The most renowned contrast patterns include emerging patterns [3], contrast
+sets [4] and subgroups [5]. Although their deﬁnitions vary, the mining methods
+share heavy similarity [6].
+
+Contrast pattern mining identiﬁes patterns by considering all objects of all
+classes in the complete pattern space. Orthogonally, contrast subspace mining
+focuses on one object, and identiﬁes subspaces where a query object demon-
+strates the strongest overall similarity to one class against the other. These two
+mining problems are fundamentally diﬀerent. To the best of our knowledge, the
+contrast subspace mining problem has not been systematically explored in the
+data mining literature.
+
+Subspace outlier detection discovers objects that signiﬁcantly deviate from
+the majority in some subspaces. It is very diﬀerent from our study. In contrast
+subspace mining, the query object may or may not be an outlier. Some recent
+studies ﬁnd subspaces that may contain substantial outliers. Nguyen et al. [7]
+and Keller et al. [8] proposed statistical approaches HiCS and CMI to select sub-
+spaces for a multidimensional database, where there may exist outliers with high
+deviations. Both HiCS and CMI are fundamentally diﬀerent from our method.
+Technically, they choose subspaces for all outliers in a given database, while our
+method chooses the most contrasting subspaces for a query object.
+
+Our method uses probability density to estimate the likelihood of a query
+object belonging to diﬀerent classes. There are a few density-based outlier de-
+tection methods, such as [9–12]. Our method is inherently diﬀerent from those,
+since we do not target at outlier objects at all.
+
+Hua et al. [13] introduced a novel top-k typicality query, which ranks ob-
+jects according to their typicality in a data set or a class of objects. Although
+both [13] and our work use density estimation methods to calculate the typical-
+ity/likelihood of a query object with respect to a set of data objects, typicality
+queries [13] do not consider subspaces at all.
+
+3 Problem Formulation and Analysis
+
+In this section, we ﬁrst formulate the problem. Then, we recall the basics of
+kernel density estimation, which can estimate the probability density of objects.
+Last, we investigate the complexity of the problem.
+
+3.1 Problem Deﬁnition
+
+Let D = {D1, . . . , Dd} be a d-dimensional space, where the domain of Di is R,
+the set of real numbers. A subspace S ⊆ D (S ̸= ∅) is a subset of D. We also
+call D the full space.
+
+sion Di (1 ≤ i ≤ d). For a subspace S = {Di1, . . . , Dil
+
+Consider an object o in space D. We denote by o.Di the value of o in dimen-
+} ⊆ D, the projection of
+
+j
+
+| oj ∈ O, 1 ≤ j ≤ n}.
+
+o in S is oS = (o.Di1 , . . . , o.Dil ). For a set of objects O = {oj | 1 ≤ j ≤ n}, the
+projection of O in S is OS = {oS
+Given a set of objects O, we assume a latent distribution Z that generates the
+objects in O. For a query object q, denote by LD(q | Z) the likelihood of q being
+generated by Z in full space D. The posterior probability of q given O, denoted
+by LD(q | O), can be estimated by LD(q | Z). For a non-empty subspace S
+(S ⊆ D, S ̸= ∅), denote by Z S the projection of Z in S. The subspace likelihood
+of object q with respect to Z in S, denoted by LS(q | Z), can be estimated by
+the posterior probability of object q given O in S, denoted by LS(q | O).
+In this paper, we assume that the objects in O belong to two classes, C+
+and C−, exclusively. Thus, O = O+ ∪ O− and O+ ∩ O− = ∅, where O+ and O−
+are the subsets of objects belonging to C+ and C−, respectively. Given a query
+object q, we are interested in how likely q belongs to C+ and does not belong
+to C−. To measure these two factors comprehensively, we deﬁne the likelihood
+contrast as LC(q) = L(q|O+)
+L(q|O−) .
+
+Likelihood contrast is essentially the Bayes factor7 of object q as the obser-
+vation. In other words, we can regard O+ and O− as representing two models,
+and we need to choose one of them based on query object q. Consequently, the
+ratio of likelihoods indicates the plausibility of model represented by O+ against
+that by O−. Jeﬀreys [1] gave a scale for interpretation of Bayes factor. When
+LC(q) is in the ranges of < 1, 1 to 3, 3 to 10, 10 to 30, 30 to 100, and over 100,
+respectively, the strength of the evidence is negative, barely worth mentioning,
+substantial, strong, very strong, and decisive.
+
+We can extend likelihood contrast to subspaces. For a non-empty subspace
+S ⊆ D, we deﬁne the likelihood contrast in the subspace as LCS(q) = LS (q|O+)
+LS (q|O−) .
+To avoid triviality in subspaces where LS(q | O+) is very small, we introduce a
+LS(q | O+) ≥ δ.
+
+minimum likelihood threshold δ > 0, and consider only the subspaces S where
+
+Given a multidimensional data set O in full space D, a query object q, and
+a minimum likelihood threshold δ > 0, and a parameter k > 0, the problem
+of mining contrast subspaces is to ﬁnd the top-k subspaces S ordered by the
+
+subspace likelihood contrast LCS(q) subject to LS(q | O+) ≥ δ.
+
+3.2 Kernel Density Estimation
+
+We can use kernel density estimation [14] to estimate likelihood LS(q | O). In
+
+this paper, we adopt the Gaussian kernel, which is natural and widely used in
+density estimation. Given a set of objects O, the density of a query object q in
+subspace S, denoted by ˆfS(q, O), can be estimated as
+
+∑
+
+e
+
+o∈O
+
+ˆfS(q, O) = ˆfS(qS, O) =
+
+|O|√
+
+1
+2πhS
+
+−distS (q,o)2
+
+2h2
+S
+
+7 Generally, given a set of observations Q, the plausibility of two models M1 and M2
+can be assessed by the Bayes factor K = P r(QjM1)
+P r(QjM2) .
+
+where distS(q, o)2 =
+
+∑
+
+Di∈S
+
+(q.Di − o.Di)2 and hS is a bandwidth parameter.
+
+Silverman [15] suggested that the optimal bandwidth value for smoothing nor-
+mally distributed data with unit variance is hS opt = A(K)|O|−1/(|S|+4), where
+A(K) = {4/(|S| + 2)}1/(|S|+4).
+
+As the kernel is radially symmetric and the data is not normalized in sub-
+spaces, we can use a single scale parameter σS in subspace S and set hS =
+σS · hS opt. As Silverman suggested [15], a possible choice of σS is the root of
+
+the average marginal variance in S.
+
+Using kernel density estimation, we can estimate LS(q | O) as
+−distS (q,o)2
+
+∑
+
+LS(q | O) = ˆfS(q, O) =
+
+|O|√
+
+1
+2πhS
+
+e
+
+o∈O
+
+2h2
+S
+
+(1)
+
+Correspondingly, the likelihood contrast of object q in subspace S is given by
+
+LCS(q, O+, O−) =
+
+ˆfS(q, O+)
+ˆfS(q, O−)
+
+=
+
+|O−|hS−
+|O+|hS+
+
+·
+
+∑
+∑
+
+o∈O+
+
+o∈O−
+
+−distS (q,o)2
+
+2h2
+
+S+
+
+−distS (q,o)2
+
+2h2
+
+S−
+
+(2)
+
+e
+
+e
+
+We often omit O+ and O− and write LCS(q) if O+ and O− are clear from
+context.
+
+3.3 Complexity Analysis
+
+We have the following theoretical result. It can be proved by a reduction from
+the emerging pattern mining problem [3], which is MAX SNP-hard [16]. Limited
+by space, we omit the details here.
+
+Theorem 1 (Complexity). The problem of mining contrast subspaces is MAX
+SNP-hard.
+
+The above theoretical result indicates that the problem of mining contrast
+subspaces is even hard to approximate – it is impossible to design a good ap-
+proximation algorithm. In the rest of the paper, we turn to practical heuristic
+methods.
+
+4 Mining Methods
+
+In this section, we ﬁrst describe a baseline method that examines every possible
+non-empty subspace. Then, we present a bounding-pruning-reﬁning method that
+expedites the search substantially.
+
+4.1 A Baseline Method
+
+A baseline method enumerates all possible non-empty spaces S and calculates
+
+the exact values of both LS(q | O+) and LS(q | O−). Then, it returns the
+top-k subspaces S with the largest LCS(q) values. To ensure the completeness
+and eﬃciency of subspace enumeration, the baseline method traverses the set
+enumeration tree [17] of subspaces in a depth-ﬁrst manner.
+
+LS(q | O+) is not monotonic in subspaces. To prune subspaces using the min-
+imum likelihood threshold δ, we develop an upper bound of LS(q | O+). We sort
+all the dimensions in their standard deviation descending order. Let S be the set
+of children of S in the subspace set enumeration tree using the standard deviation
+
+∑
+S(q | O+) =
+∗
+|O+|√
+descending order. Deﬁne L
+o∈O+
+opt min = min{hS′ opt | S
+| S
+′ ∈ S}, h
+′
+where σ
+′ ∈ S}. We have the following result.
+opt max = max{hS′ opt | S
+′
+h
+
+′
+opt max)2 ,
+2(σS h
+′ ∈ S}, and
+
+min = min{σS′
+′
+
+1
+′
+′
+minh
+opt min
+
+−distS (q,o)2
+
+2πσ
+
+e
+
+Theorem 2 (Monotonic density bound). For a query object q, a set of
+objects O, and subspaces S1, S2 such that S1 is an ancestor of S2 in the sub-
+space set enumeration tree using the standard deviation descending order in O+,
+∗
+L
+S1
+
+(q | O+) ≥ LS2(q | O+).
+Using Theorem 2, in addition to LS(q | O+) and LS(q | O−), we also compute
+S(q | O+) for each subspace S. Once L
+S(q | O+) < δ in a subspace S, all super-
+∗
+∗
+L
+spaces of S can be pruned.
+
+Using Equations 1 and 2, the baseline algorithm computes the likelihood con-
+
+trast for every subspace where LS(q | O+) ≥ δ, and returns the top-k subspaces.
+
+The time complexity is O(2
+
+|D| · (|O+| + |O−|)).
+
+4.2 A Bounding-Pruning-Reﬁning Method
+
+For a query object q and a set of objects O, the ϵ-neighborhood (ϵ > 0) of q
+S(q) = {o ∈ O | distS(q, o) ≤ ϵ}. We can divide LS(q | O)
+in subspace S is N ϵ
+(q | O). The ﬁrst part
+into two parts, that is, LS(q | O) = LN ϵ
+(q | O) =
+is contributed by the objects in the ϵ-neighborhood, that is, LN ϵ
+|O|√
+
+, and the second part is by the objects outside the
+
+−distS (q,o)2
+
+∑
+
+2h2
+S
+
+1
+2πhS
+
+e
+
+S
+
+S
+
+S
+
+(q | O) + Lrest
+∑
+
+o∈N ϵ
+
+S (q)
+
+ϵ-neighborhood, that is, Lrest
+
+S
+
+(q | O) =
+
+|O|√
+
+1
+2πhS
+
+Let distS(q | O) be the maximum distance between q and all objects in O in
+
+−distS (q,o)2
+
+2h2
+S
+
+.
+
+e
+
+o∈O\N ϵ
+
+S (q)
+
+subspace S. We have,
+· e
+
+|O| − |N ϵ
+S(q)|
+|O|√
+2πhS
+
+using ϵ-neighborhood.
+
+− distS (q,O)2
+
+2h2
+S
+
+≤ Lrest
+
+S
+
+(q | O) ≤ |O| − |N ϵ
+|O|√
+
+S(q)|
+2πhS
+
+− ϵ2
+2h2
+S
+
+· e
+
+Using the above, we have the following upper and lower bounds of LS(q | O)
+
+Theorem 3 (Bounds). For a query object q, a set of objects O and ϵ ≥ 0,
+
+S(q | O) ≤ LS(q | O) ≤ U Lϵ
+
+S(q | O)
+
+LLϵ
+
+where
+
+S(q | O) =
+
+LLϵ
+
+|O|√
+
+1
+2πhS
+
+and
+
+S(q | O) =
+
+U Lϵ
+
+|O|√
+
+1
+2πhS
+
+o∈N ϵ
+
+S (q)
+
+ ∑
+ ∑
+
+o∈N ϵ
+
+S (q)
+
+−distϵ
+S (q,o)2
+2h2
+S
+
++ (|O| − |N ϵ
+
+S(q)|)e
+
+− distS (q,O)2
+
+2h2
+S
+
+e
+
+−distϵ
+S (q,o)2
+2h2
+S
+
+e
+
++ (|O| − |N ϵ
+
+S(q)|)e
+
+− ϵ2
+2h2
+S
+
+
+
+
+
+∑
+
+We obtain an upper bound of LCS(q) based on Theorem 3 and Equation 2.
+
+Corollary 1 (Likelihood Contrast Upper Bound). For a query object q, a
+
+set of objects O+, a set of objects O−, and ϵ ≥ 0, LCS(q) ≤ U Lϵ
+
+S (q|O+)
+S (q|O−) .
+
+LLϵ
+
+Using Corollary 1, for a subspace S, if there are at least k subspaces whose
+ϵ (q|O+)
+ϵ (q|O−) , then S cannot be a top-k sub-
+
+likelihood contrast are greater than U LS
+LLS
+spaces of the largest likelihood contrast.
+
+S(q | O+) is computed by
+∗
+Using the ϵ-neighborhood, L
+
+S(q | O+) =
+∗
+L
+
+o∈N ϵ
+
+S (q)
+
+−distϵ
+
+′
+2(σS h
+
+e
+
+S (q,o)2
+
+opt max )2 + (|O+| − |N ϵ
+
+S(q)|)e
+
+−
+
+ϵ2
+′
+opt max )2
+2(σS h
+
+|O+|√
+
+2πσ
+
+′
+′
+minh
+opt min
+
+Our bounding-pruning-reﬁning method, CSMiner (for Contrast Subspace
+Miner), conducts a depth-ﬁrst search on the subspace set enumeration tree.
+For a candidate subspace S, CSMiner calculates U Lϵ
+using the ϵ-neighborhood. If U Lϵ
+threshold, S cannot be a contrast subspace. Otherwise, CSMiner checks whether
+the likelihood contrasts of the current top-k subspaces are larger than the up-
+
+S(q | O+) and LLS(q | O−)
+S(q | O+) is less than the minimum likelihood
+
+per bound of LCS(q). If not, CSMiner reﬁnes LS(q | O+) and LS(q | O−) by
+
+involving objects that are out of the ϵ-neighborhood. S will be added into the
+current top-k list if its likelihood contrast is larger than one of the current top-k
+ones. Algorithm 1 gives the pseudo-code of CSMiner. Due to the hardness of
+the problem shown in Theorem 1 and the heuristic nature of this method, the
+time complexity of CSMiner is O(2
+tive baseline method. However, as shown by our empirical study, CSMiner is
+substantially faster than the baseline method.
+
+|D| · (|O+| + |O−|)), the same as the exhaus-
+
+Computing ϵ-neighborhood is critical in CSMiner. The distance between ob-
+jects increases when dimensionality increases. Thus, the value of ϵ should not be
+
+Algorithm 1 CSM iner(q, O+, O−, δ, k)
+Input: q: a query object, O+: the set of objects belonging to C+, O−: the set of objects belonging
+
+to C−, δ: a likelihood threshold, k: positive integer
+
+Output: k subspaces with the highest likelihood contrast
+1: let Ans be the current top-k list of subspaces, initialize Ans as k null subspaces associated with
+
+likelihood contrast 0
+
+2: for each subspace S in the subspace set enumeration tree, searched in the depth-(cid:12)rst manner
+
+S (q | O+) ≥ δ and ∃S
+calculate LS (q | O+), LS (q | O−) and LCS (q); // re(cid:12)ning
+if LS (q | O+) ≥ δ and ∃S
+
+′ ∈ Ans s.t.
+′ ∈ Ans s.t. LCS (q) > LCS′ (q) then
+
+S (q|O+ )
+(q|O−) > LCS′ (q) then
+
+U Lϵ
+LLϵ
+S
+
+insert S into the top-k list
+
+do
+
+if U Lϵ
+
+3:
+4:
+5:
+6:
+7:
+8:
+9:
+10:
+11:
+end if
+12: end for
+13: return Ans;
+
+end if
+
+end if
+S (q | O+) < δ then
+∗
+if L
+
+prune all super-spaces of S;
+
+Table 1. Data set characteristics
+
+Data set
+
+# objects # attributes
+
+Breast Cancer Wisconsin (BCW)
+
+Climate Model Simulation Crashes (CMSC)
+
+Glass Identiﬁcation (Glass)
+Pima Indians Diabetes (PID)
+
+Waveform
+
+Wine
+
+683
+540
+214
+768
+5000
+178
+
+9
+18
+9
+8
+21
+13
+
+√
+r · ∑
+
+Di∈S
+
+ﬁxed. The standard deviation expresses the variability of a set of data. For sub-
+− are
+space S, we set ϵ =
+
+−) (r ≥ 0), where σ2
+
++ and σ2
+Di
+
+Di
+
+(σ2
+Di
+
++ + σ2
+Di
+
+the marginal variances of O+ and O−, respectively, on dimension Di (Di ∈ S),
+and r is a system deﬁned parameter. Our experiments show that r can be set in
+the range of 0.3 ∼ 0.6, and is not sensitive.
+
+5 Empirical Evaluation
+
+In this section, we report a systematic empirical study using real data sets to
+verify the eﬀectiveness and eﬃciency of our method. All experiments were con-
+ducted on a PC computer with an Intel Core i7-3770 3.40 GHz CPU, and 8
+GB main memory, running Windows 7 operating system. All algorithms were
+implemented in Java and compiled by JDK 7.
+
+5.1 Eﬀectiveness
+
+We use 6 real data sets from the UCI machine learning repository [18]. We
+remove non-numerical attributes and all instances containing missing values.
+Table 1 shows the data characteristics.
+
+For each data set, we take each record as a query object q, and all records
+except q belonging to the same class as q forming the set O1, and records belong-
+ing to the other classes forming the set O2. Using CSMiner, we compute for each
+record (1) the inlying contrast subspace taking O1 as O+ and O2 as O−, and (2)
+the outlying contrast subspace taking O2 as O+ and O1 as O−. In this experi-
+ment, we only compute the top-1 subspace. For clarity, we denote the likelihood
+contrasts of inlying contrast subspace by LC in
+S (q) and those of outlying contrast
+subspace by LC out
+
+S (q). The minimum likelihood threshold is set to 0.001.
+
+Tables 2 ∼ 7 list the joint distributions of LC in
+
+S (q) and LC out
+
+S (q) in each data
+set. As expected, for most objects LC in
+S (q). However,
+interestingly a good portion of objects have strong outlying contrast subspaces.
+For example, in CMSC, more than 50% of the objects have outlying contrast
+subspaces satisfying LC out
+a non-trivial number of objects in each data set have both strong inlying and
+outlying contrast subspaces (e.g., LC in
+
+S (q) ≥ 103. Moreover, we can see that, except PID,
+
+S (q) are larger than LC out
+
+S (q) ≥ 104 and LC out
+
+S (q) ≥ 102).
+
+Figures 1, 2 show the distributions of dimensionality of inlying and outlying
+contrast subspaces, respectively. The dimensionality distribution is an interesting
+feature characterizing a data set. For example, in most cases the dimensionali-
+ty of contrast subspaces follows a two-side bell-shape distribution. However, in
+BCW and PID, the outlying contrast subspaces tend to have low dimensionality.
+
+5.2 Eﬃciency
+
+To the best of our knowledge, there is no previous method tackling the exact
+same mining problem. Therefore, we evaluate the eﬃciency of only CSMiner and
+the baseline method. Limited by space, we report the results on the Waveform
+data set only, since it is the largest one with the highest dimensionality. We
+randomly select 100 records from Waveform as query objects, and report the
+average runtime. The results on the other data sets follow similar trends.
+
+Figure 3(a) shows the runtime (in logarithmic scale) with respect to the min-
+imum likelihood threshold δ. As δ decreases, the runtime increases exponentially.
+However, the heuristic pruning techniques in CSMiner expedites the search sub-
+stantially in practice. Figures 3(b) and 3(c) show the scalability on data set size
+and dimensionality. CSMiner is substantially faster than the baseline method.
+
+CSMiner uses a user deﬁned parameter r to deﬁne ϵ-neighborhood. Figure 4
+shows the relative runtime with respect to r. The runtime of CSMiner is not very
+sensitive to r in general. Experimentally, the shortest runtime of CSMiner hap-
+pens when r is in [0.3, 0.6]. Figure 5 illustrates the relative runtime of CSMiner
+with respect to k, showing that CSMiner is linearly scalable with respect to k.
+
+6 Conclusions
+
+In this paper, we studied a novel and interesting problem of mining contrast
+subspaces to discover the aspects that a query object most similar to a class
+and dissimilar to the other class. We showed theoretically that the problem
+
+S (q)
+
+LCout
+
+) < 102
+
+Table 2. Distribution of LCS(q) in BCW
+< 1 [1,3) [3,10) [10, 102) ≥ 102 Total
+23
+0
+0
+[102, 103) 6
+37
+7
+[103, 104) 176 37
+264
+[104, 105) 99
+121
+7
+≥ 105
+38
+25
+238
+683
+319 76
+Total
+
+2
+8
+15
+4
+82
+111
+
+0
+5
+18
+6
+87
+116
+
+21
+11
+18
+5
+6
+61
+
+S
+C
+L
+
+q
+(
+n
+i
+
+S (q)
+
+LCout
+
+Table 4. Distribution of LCS(q) in PID
+< 1 [1,3) [3,10) [10, 102) ≥ 102 Total
+) < 1
+0
+q
+[1, 3)
+0
+124
+(
+n
+[3, 10)
+17 241
+i
+[10, 102) 28 146
+≥ 102
+8
+Total
+
+1
+46 519
+
+1
+19
+4
+4
+0
+28
+
+1
+99
+54
+19
+0
+
+244
+316
+197
+
+0
+2
+0
+0
+0
+2
+
+S
+C
+L
+
+768
+
+173
+
+2
+
+9
+
+0
+
+S (q)
+
+LCout
+
+Table 3. Distribution of LCS(q) in Glass
+< 1 [1,3) [3,10) [10, 102) ≥ 102 Total
+10
+0
+4
+[10, 102) 11
+117
+70
+[102, 103) 2
+36
+24
+[103, 104) 0
+5
+0
+≥ 104
+0
+46
+23
+214
+13 121
+Total
+
+) < 10
+q
+(
+n
+i
+
+4
+4
+2
+1
+3
+14
+
+2
+6
+3
+0
+6
+17
+
+0
+26
+5
+4
+14
+49
+
+S
+C
+L
+
+LCout
+
+S (q)
+
+) < 103
+
+Table 5. Distribution of LCS(q) in Wine
+< 1 [1,3) [3,10) [10, 102) ≥ 102 Total
+56
+2
+[103, 104) 0
+36
+[104, 105) 0
+18
+[105, 106) 0
+12
+≥ 106
+56
+4
+Total
+6
+178
+
+13
+6
+2
+2
+12
+35
+
+9
+2
+2
+0
+4
+17
+
+10
+11
+4
+5
+15
+45
+
+22
+17
+10
+5
+21
+75
+
+S
+C
+L
+
+q
+(
+n
+i
+
+Table 6. Distribution of LCS(q) in CMSC
+
+LCout
+
+S (q)
+
+[10, 102) [102, 103) [103, 104) [104, 105) ≥ 105 Total
+64
+100
+113
+80
+183
+540
+
+41
+47
+44
+36
+75
+243
+
+6
+28
+38
+30
+82
+184
+
+0
+4
+7
+3
+6
+20
+
+15
+17
+17
+10
+16
+75
+
+2
+4
+7
+1
+4
+18
+
+) < 103
+
+q
+(
+n
+i
+
+S
+C
+L
+
+[103, 104)
+[104, 105)
+[105, 106)
+≥ 106
+Total
+
+Table 7. Distribution of LCS(q) in Waveform
+
+LCout
+
+S (q)
+
+8
+
+) < 10
+q
+(
+n
+i
+
+[1, 3) [3,10) [10, 102) [102, 103) ≥ 103 Total
+0
+49
+[10, 102)
+88
+[102, 103) 235
+[103, 104) 151
+≥ 104
+36
+Total
+510 1548
+
+1565
+2280
+974
+132
+5000
+
+10
+222
+299
+71
+5
+
+7
+98
+104
+23
+0
+
+24
+695
+956
+383
+45
+
+462
+686
+346
+46
+
+2103
+
+607
+
+232
+
+S
+C
+L
+
+is very challenging, and cannot even be approximated in polynomial time. We
+presented a heuristic method based on upper and lower bounds of likelihood
+and likelihood contrast. Our experiments on real data sets clearly show that
+our method expedites contrast subspace mining substantially comparing to the
+baseline method.
+
+References
+
+1. Jeﬀreys, H.: The Theory of Probability. 3rd edn. Oxford (1961)
+2. Dong, G., Bailey, J., eds.: Contrast Data Mining: Concepts, Algorithms, and Ap-
+
+plications. CRC Press (2013)
+
+3. Dong, G., Li, J.: Eﬃcient mining of emerging patterns: discovering trends and
+
+diﬀerences. In KDD (1999) 43–52
+
+4. Bay, S.D., Pazzani, M.J.: Detecting group diﬀerences: Mining contrast sets. Data
+
+Mining and Knowledge Discovery 5(3) (2001) 213–246
+
+(a) BCW
+
+(b) CMSC
+
+(c) Glass
+
+(d) PID
+
+(e) Waveform
+
+(f) Wine
+
+Fig. 1. Dimensionality distributions of inlying contrast subspaces
+
+(a) BCW
+
+(b) CMSC
+
+(c) Glass
+
+(d) PID
+
+(e) Waveform
+
+(f) Wine
+
+Fig. 2. Dimensionality distributions of outlying contrast subspaces
+
+5. Wrobel, S.: An algorithm for multi-relational discovery of subgroups. In PKDD
+
+(1997) 78–87
+
+6. Novak, P.K., Lavrac, N., Webb, G.I.: Supervised descriptive rule discovery: A
+unifying survey of contrast set, emerging pattern and subgroup mining. Journal of
+Machine Learning Research 10 (2009) 377–403
+
+12345678050100150200250Subspace dimensionality# of contrast subspaces23456789101112131415020406080Subspace dimensionality# of contrast subspaces123456789020406080Subspace dimensionality# of contrast subspaces  12345678050100150200250Subspace dimensionality# of contrast subspaces1234567891011050010001500Subspace dimensionality# of contrast subspaces2345678910111213051015202530Subspace dimensionality# of contrast subspaces12345670100200300400500Subspace dimensionality# of contrast subspaces26789101112131415050100150Subspace dimensionality# of contrast subspaces12345678020406080100Subspace dimensionality# of contrast subspaces12345678050100150200Subspace dimensionality# of contrast subspaces123456789050010001500Subspace dimensionality# of contrast subspaces12345678910111213010203040Subspace dimensionality# of contrast subspaces(a) w.r.t (cid:14) (k = 10; r = 0:4) (b) w.r.t data set size (k =
+
+10; (cid:14) = 0:01; r = 0:4)
+
+(c) w.r.t
+(k = 10; (cid:14) = 0:01; r = 0:4)
+
+dimensionality
+
+Fig. 3. Scalability test
+
+Fig. 4. Relative runtime w.r.t r (k =
+10; (cid:14) = 0:01)
+
+Fig. 5. Relative runtime w.r.t k ((cid:14) =
+0:01)
+
+7. Nguyen, H.V., M¨uller, E., Vreeken, J., et al.: CMI: An information-theoretic con-
+trast measure for enhancing subspace cluster and outlier detection. In SDM (2013)
+198–206
+
+8. Keller, F., M¨uller, E., B¨ohm, K.: HiCS: High contrast subspaces for density-based
+
+outlier ranking. In ICDE (2012) 1037–1048
+
+9. Breunig, M.M., Kriegel, H.P., Ng, R.T., Sander, J.: LOF: identifying density-based
+
+local outliers. In SIGMOD (2000) 93–104
+
+10. Kriegel, H.P., S hubert, M., Zimek, A.: Angle-based outlier detection in high-
+
+dimensional data. In KDD (2008) 444–452
+
+11. He, Z., Xu, X., Huang, Z.J., Deng, S.: FP-outlier: Frequent pattern based outlier
+
+detection. Computer Science and Information Systems 2(1) (2005) 103–118
+
+12. Aggarwal, C.C., Yu, P.S.: Outlier detection for high dimensional data. In: ACM
+
+Sigmod Record. Volume 30. (2001) 37–46
+
+13. Hua, M., Pei, J., Fu, A.W., et al.: Top-k typicality queries and eﬃcient query
+answering methods on large databases. The VLDB Journal 18(3) (2009) 809–835
+14. Breiman, L., Meisel, W., Purcell, E.: Variable kernel estimates of multivariate
+
+densities. Technometrics 19(2) (1977) 135–144
+
+15. Silverman, B.W.: Density Estimation for Statistics and Data Analysis. Chapman
+
+and Hall/CRC, London (1986)
+
+16. Wang, L., Zhao, H., Dong, G., Li, J.: On the complexity of ﬁnding emerging
+
+patterns. Theor. Comput. Sci. 335(1) (2005) 15–27
+
+17. Rymon, R.: Search through systematic set enumeration. In: Proc. of the 3rd Int’l
+Conf. on Principles of Knowledge Representation and Reasoning. (1992) 539–550
+
+18. Bache, K., Lichman, M.: UCI machine learning repository (2013)
+
+0.010.040.070.10.13100101δRuntime (sec)  BaselineCSMiner150025004000500051015202530Data set sizeRuntime (sec)  BaselineCSMiner510152110−210−1100101102DimensionalityRuntime (sec)  BaselineCSMiner0.20.30.40.50.60.711.051.11.15rRelative runtime  BCWCMSCGlassPIDWaveformWine10205010011.021.041.061.081.1kRelative runtime  BCWCMSCGlassPIDWaveformWine

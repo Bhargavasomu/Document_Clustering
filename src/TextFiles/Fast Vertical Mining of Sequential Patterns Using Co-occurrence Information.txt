@@ -1,0 +1,1062 @@
+Fast Vertical Mining of Sequential Patterns
+
+Using Co-occurrence Information
+
+Philippe Fournier-Viger1, Antonio Gomariz2,
+
+Manuel Campos2, and Rincy Thomas3
+
+1 Dept. of Computer Science, University of Moncton, Canada
+
+2 Dept. of Information and Communication Engineering, University of Murcia, Spain
+
+philippe.fournier-viger@umoncton.ca, {agomariz,manuelcampos}@um.es,
+
+3 Dept. of Computer Science, SCT, Bhopal, India
+
+rinc thomas@rediffmail.com
+
+Abstract. Sequential pattern mining algorithms using a vertical repre-
+sentation are the most eﬃcient for mining sequential patterns in dense
+or long sequences, and have excellent overall performance. The vertical
+representation allows generating patterns and calculating their supports
+without performing costly database scans. However, a crucial performance
+bottleneck of vertical algorithms is that they use a generate-candidate-
+and-test approach that can generate a large amount of infrequent candi-
+dates.To address this issue, we propose pruning candidates based on the
+study of item co-occurrences. We present a new structure named CMAP
+(Co-occurence MAP) for storing co-occurrence information. We explain
+how CMAP can be used to prune candidates in three state-of-the-art ver-
+tical algorithms, namely SPADE, SPAM and ClaSP. An extensive experi-
+mental study with six real-life datasets shows that (1) co-occurrence-based
+pruning is eﬀective, (2) CMAP is very compact and that (3) the result-
+ing algorithms outperform state-of-the-art algorithms for mining sequen-
+tial patterns (GSP, PreﬁxSpan, SPADE and SPAM) and closed sequential
+patterns (ClaSP and CloSpan).
+
+Keywords: sequential pattern mining, vertical database format, candi-
+date pruning.
+
+1
+
+Introduction
+
+Mining useful patterns in sequential data is a challenging task. Many studies have
+been proposed for mining interesting patterns in sequence databases [9]. Sequen-
+tial pattern mining is probably the most popular research topic among them.
+A subsequence is called sequential pattern or frequent sequence if it frequently
+appears in a sequence database, and its frequency is no less than a user-speciﬁed
+minimum support threshold minsup [1]. Sequential pattern mining plays an im-
+portant role in data mining and is essential to a wide range of applications such
+as the analysis of web click-streams, program executions, medical data, biologi-
+cal data and e-learning data [9]. Several eﬃcient algorithms have been proposed
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part I, LNAI 8443, pp. 40–52, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+Fast Vertical Mining of Sequential Patterns
+
+41
+
+for sequential pattern mining such as ClaSP [7], CloSpan [12], GSP [11], PreﬁxS-
+pan [10], SPADE [13] and SPAM [3]. Sequential pattern mining algorithms can
+be categorized as using a horizontal database format (e.g. CloSpan, GSP and
+PreﬁxSpan) or a vertical database format (e.g. ClaSP, SPADE, SPAM). Using
+the vertical format provides the advantage of generating patterns and calculat-
+ing their supports without performing costly database scans [3,7,13]. This allows
+vertical algorithms to perform better on datasets having dense or long sequences
+than algorithms using the horizontal format, and to have excellent overall perfor-
+mance [2,3,7]. However, a crucial performance bottleneck of vertical algorithms
+is that they use a generate-candidate-and-test approach, which can generate a
+large amount of patterns that do not appear in the input database or are in-
+frequent. An important research questions that arises is: Could we design an
+eﬀective candidate pruning method for vertical mining algorithms to improve
+mining performance? Answering this question is challenging. It requires design-
+ing a candidate pruning mechanism (1) that is eﬀective at pruning candidates
+and (2) that has a small runtime and memory cost. Moreover, the mechanism
+should preferably be generic. i.e. applicable to any vertical mining algorithms.
+
+In this paper, we present a solution to this issue based on the study of item
+co-occurrences. Our contribution is threefold. First, to store item co-occurrence
+information, we introduce a new data structure named Co-occurrence MAP
+(CMAP). CMAP is a small and compact structure, which can be built with
+a single database scan.
+
+Second, we propose a generic candidate pruning mechanism for vertical se-
+quential pattern mining algorithms based on the CMAP data structure. We
+describe how the pruning mechanism is integrated in three state-of-the-art algo-
+rithms ClaSP, SPADE and SPAM. We name the resulting algorithms CM-ClaSP,
+CM-SPADE and CM-SPAM.
+
+Third, we perform a wide experimental evaluation on six real-life datasets. We
+compare the performance of CM-ClaSP, CM-SPADE and CM-SPAM with state-
+of-the-art algorithms for mining sequential patterns (GSP, PreﬁxSpan, SPADE
+and SPAM) and closed sequential patterns (ClaSP and CloSpan). Results show
+that the modiﬁed algorithms (1) prune a large amount of candidates, (2) and
+are up to eight times faster than the corresponding original algorithms and (3)
+that CM-ClaSP and CM-SPADE have respectively the best performance for
+sequential pattern mining and closed sequential pattern mining.
+
+The rest of the paper is organized as follows. Section 2 deﬁnes the problem of
+sequential pattern mining and reviews the main characteristics of ClaSP, SPADE
+and SPAM. Section 3 describes the CMAP structure, the pruning mechanism,
+and how it is integrated in ClaSP, SPADE and SPAM. Section 4 presents the
+experimental study. Finally, Section 5 presents the conclusion.
+
+2 Problem Deﬁnition and Related Work
+Deﬁnition 1 (sequence database). Let I = {i1, i2, ..., il} be a set of items
+(symbols). An itemset Ix = {i1, i2, ..., im} ⊆ I is an unordered set of distinct
+
+42
+
+P. Fournier-Viger et al.
+
+items. The lexicographical order (cid:3)lex is deﬁned as any total order on I. Without
+loss of generality, it is assumed in the following that all itemsets are ordered
+according to (cid:3)lex. A sequence is an ordered list of itemsets s = (cid:4)I1, I2, ..., In (cid:5)
+such that Ik ⊆ I (1 ≤ k ≤ n). A sequence database SDB is a list of sequences
+SDB = (cid:4)s1, s2, ..., sp(cid:5) having sequence identiﬁers (SIDs) 1, 2...p. Example. A
+
+sequence database is shown in Fig. 1 (left). It contains four sequences having
+the SIDs 1, 2, 3 and 4. Each single letter represents an item. Items between
+curly brackets represent an itemset. The ﬁrst sequence (cid:4){a, b},{c},{f, g},{g},
+{e}(cid:5) contains ﬁve itemsets. It indicates that items a and b occurred at the same
+time, were followed by c, then f, g and lastly e.
+
+SID 
+1 
+2 
+3 
+4 
+ 
+
+Sequences 
+(cid:1731){a, b},{c},{f, g},{g},{e}(cid:1732) 
+(cid:1731){a, d},{c},{b},{a, b, e, f}(cid:1732) 
+(cid:1731){a},{b},{f},{e}(cid:1732) 
+(cid:1731){b},{f, g}(cid:1732) 
+ 
+
+ 
+ 
+
+ID 
+p1 
+p2 
+p3 
+p4 
+p5 
+p6… 
+
+Pattern 
+(cid:1731){a},{f}(cid:1732) 
+(cid:1731){a},{c}{f}(cid:1732) 
+(cid:1731){b},{f,g}(cid:1732) 
+(cid:1731){g},{e}(cid:1732) 
+(cid:1731){c},{f}(cid:1732) 
+(cid:1731){b}(cid:1732) 
+
+Support 
+3 
+2  
+2 
+2 
+2 
+4 
+
+Fig. 1. A sequence database (left) and some sequential patterns found (right)
+
+Deﬁnition 2 (sequence containment). A sequence sa = (cid:4)A1, A2, ..., An(cid:5) is
+said to be contained in a sequence sb = (cid:4)B1, B2, ..., Bm(cid:5) iﬀ there exist integers
+1 ≤ i1 < i2 < ... < in ≤ m such that A1 ⊆ Bi1, A2 ⊆ Bi2, ..., An ⊆ Bin (denoted
+as sa (cid:7) sb). Example. Sequence 4 in Fig. 1 (left) is contained in Sequence 1.
+Deﬁnition 3 (preﬁx). A sequence sa = (cid:4)A1, A2, ..., An(cid:5) is a preﬁx of a se-
+quence sb = (cid:4)B1, B2, ..., Bm(cid:5), ∀n < m, iﬀ A1 = B1, A2 = B2, ..., An−1 = Bn−1
+and the ﬁrst |An| items of Bn according to (cid:3)lex are equal to An.
+Deﬁnition 4 (support). The support of a sequence sa in a sequence database
+SDB is deﬁned as the number of sequences s ∈ SDB such that sa (cid:7) s and is
+denoted by supSDB(sa).
+
+Deﬁnition 5 (sequential pattern mining). Let minsup be a threshold set
+by the user and SDB be a sequence database. A sequence s is a sequential
+pattern and is deemed frequent iﬀ supSDB(s) ≥ minsup. The problem of mining
+sequential patterns is to discover all sequential patterns [11]. Example. Fig. 1
+(right) shows 6 of the 29 sequential patterns found in the database of Fig. 1
+(left) for minsup = 2.
+
+Deﬁnition 6 (closed sequential pattern mining). A sequential pattern sa
+is said to be closed if there is no other sequential pattern sb, such that sb is a
+superpattern of sa, sa (cid:7) sb, and their supports are equal. The problem of closed
+sequential patterns is to discover the set of closed sequential patterns, which is
+a compact summarization of all sequential patterns [7,12].
+
+Fast Vertical Mining of Sequential Patterns
+
+43
+
+Deﬁnition 7 (horizontal database format). A sequence database in hori-
+zontal format is a database where each entry is a sequence. Example. Fig. 1
+(left) shows an horizontal sequence database.
+
+Deﬁnition 8 (vertical database format). A sequence database in vertical
+format is a database where each entry represents an item and indicates the list
+of sequences where the item appears and the position(s) where it appears [13].
+Example. Fig. 2 shows the vertical representation of the database of Fig. 1
+(left).
+
+From the vertical representation, a structure named IdList [13] can be as-
+sociated with each pattern. IdLists allow calculating the support of a pattern
+quickly by making join operations with IdLists of smaller patterns. To discover
+sequential patterns using IdLists, a single database scan is required to create
+IdLists of patterns containing a single items, since IdList of larger patterns are
+obtained by performing the aforementioned join operation (see [13] for details).
+Several works proposed alternative representations for IdLists to save time in
+join operations, being the bitset representation the most eﬃcient one [3,2].
+
+Fig. 2. The vertical representation of the example database shown in Figure 1(left)
+
+The horizontal format is used by Apriori-based algorithms (e.g. GSP) and
+pattern-growth algorithms (e.g. CloSpan and PreﬁxSpan). The two main algo-
+rithms using the vertical database format are SPADE and SPAM. Other algo-
+rithms are variations such as bitSPADE [2] and ClaSP [7]. SPADE and SPAM
+diﬀer mainly by their candidate generation process, which we review thereafter.
+
+Candidate Generation in SPAM. The pseudocode of SPAM is shown in
+Fig. 3. SPAM take as input a sequence database SDB and the minsup thresh-
+old. SPAM ﬁrst scans the input database SDB once to construct the vertical
+representation of the database V (SDB) and the set of frequent items F1. For
+each frequent item s ∈ F1, SPAM calls the SEARCH procedure with (cid:4)s(cid:5), F1,
+{e ∈ F1|e (cid:3)lex s}, and minsup. The SEARCH procedure outputs the pattern
+(cid:4){s}(cid:5) and recursively explore candidate patterns starting with the preﬁx (cid:4){s}(cid:5).
+The SEARCH procedure takes as parameters a sequential pattern pat and two
+
+44
+
+P. Fournier-Viger et al.
+
+sets of items to be appended to pat to generate candidates. The ﬁrst set Sn repre-
+sents items to be appended to pat by s-extension. The s-extension of a sequential
+
+pattern (cid:4)I1, I2, ...Ih(cid:5) with an item x is deﬁned as (cid:4)I1, I2, ...Ih,{x}(cid:5). The second
+a sequential pattern (cid:4)I1, I2, ...Ih(cid:5) with an item x is deﬁned as (cid:4)I1, I2, ...Ih ∪{x}(cid:5).
+
+set Si represents items to be appended to pat by i-extension. The i-extension of
+
+For each candidate pat generated by an extension, SPAM calculate its support
+to determine if it is frequent. This is done by making a join operation (see [3] for
+details) and counting the number of sequences where the pattern appears. The
+IdList representation used by SPAM is based on bitmaps to get faster operations
+[3]. If the pattern pat is frequent, it is then used in a recursive call to SEARCH
+to generate patterns starting with the preﬁx pat. Note that in the recursive call,
+only items that resulted in a frequent pattern by extension of pat are considered
+for extending pat. SPAM prunes the search space by not extending infrequent
+patterns. This can be done due to the property that an infrequent sequential
+pattern cannot be extended to form a frequent pattern [1].
+
+ 
+
+ 
+
+SEARCH((cid:1731)s(cid:1732), F1, {e (cid:1488) F1 | e (cid:1592)lex  s}, minsup). 
+
+SPAM(SDB, minsup) 
+1.  Scan SDB to create V(SDB) and identify F1, the list of frequent items. 
+2.  FOR each item s (cid:1488) F1, 
+3. 
+ 
+SEARCH(pat, Sn, In, minsup) 
+1.  Output pattern pat. 
+2.  Stemp := Itemp := (cid:1486) 
+3.  FOR each item j (cid:1488) Sn, 
+4. 
+5.  FOR each item j(cid:1488) Stemp,  
+6. 
+7.  FOR each item j (cid:1488) In, 
+8. 
+9.  FOR each item j (cid:1488) Itemp,  
+10.    
+
+IF the s-extension of pat is frequent THEN Stemp := Stemp (cid:1515){i}. 
+
+IF the i-extension of pat is frequent THEN Itemp := Itemp (cid:1515){i}. 
+
+  
+
+  
+
+  
+
+SEARCH(the s-extension of pat with j, Stemp , {e (cid:1488) Stemp | e (cid:1592)lex  j}, minsup). 
+
+SEARCH(i-extension of pat with j, Stemp , {e (cid:1488) Itemp | e (cid:1592)lex  j}, minsup). 
+
+Fig. 3. The pseudocode of SPAM
+
+Candidate Generation in SPADE. The pseudocode of SPADE is shown in
+Fig. 4. The SPADE procedure takes as input a sequence database SDB and the
+minsup threshold. SPADE ﬁrst constructs the vertical database V (SDB) and
+identiﬁes the set of frequent sequential patterns F1 containing frequent items.
+Then, SPADE calls the ENUMERATE procedure with the equivalence class
+of size 0. An equivalence class of size k is deﬁned as the set of all frequent
+patterns containing k items sharing the same preﬁx of k − 1 items. There is
+only an equivalence class of size 0 and it is composed of F1. The ENUMERATE
+procedure receives an equivalence class F as parameter. Each member Ai of
+the equivalence class is output as a frequent sequential pattern. Then, a set Ti,
+representing the equivalence class of all frequent extensions of Ai is initialized to
+the empty set. Then, for each pattern Aj ∈ F such that i (cid:3)lex j, the pattern Ai
+is merged with Aj to form larger pattern(s). For each such pattern r, the support
+
+Fast Vertical Mining of Sequential Patterns
+
+45
+
+of r is calculated by performing a join operation between IdLists of Ai and Aj .
+If the cardinality of the resulting IdList is no less than minsup, it means that r
+is a frequent sequential pattern. It is thus added to Ti. Finally, after all pattern
+Aj have been compared with Ai, the set Ti contains the whole equivalence class
+of patterns starting with the preﬁx Ai. The procedure ENUMERATE is then
+called with Ti to discover larger sequential patterns having Ai as preﬁx. When
+all loops terminate, all frequent sequential patterns have been output (see [13]
+for the proof that this procedure is correct and complete).
+
+SPADE and SPAM are very eﬃcient for datasets having dense or long sequences
+and have excellent overall performance since performing join operations to cal-
+culate the support of candidates does not require scanning the original database
+unlike algorithms using the horizontal format. For example, the well-known Pre-
+ﬁxSpan algorithm, which uses the horizontal format, performs a database projec-
+tion for each item of each frequent sequential pattern, in the worst case, which is
+extremely costly. The main performance bottleneck of vertical mining algorithms
+is that they use a generate-candidate-and-test approach and therefore spend lot
+of time evaluating patterns that do not appear in the input database or are in-
+frequent. In the next section, we present a novel method based on the study of
+item co-occurrence information to prune candidates generated by vertical mining
+algorithms to increase their performance.
+
+SPADE(SDB, minsup) 
+1.
+2. ENUMERATE(F1). 
+
+Scan SDB to create V(SDB) and identify F1 the list of frequent  items. 
+
+Output Ai.
+
+FOR each pattern Ai(cid:1488) F
+Ti  := (cid:1486).
+FOR each pattern Aj(cid:1488) F, with j (cid:149) i  
+FOR each  pattern r (cid:1488) R
+Ti  := Ti  (cid:1515){R};    
+
+ENUMERATE(an equivalence class F) 
+1.
+2.
+3.
+4.
+5.
+6.
+7.
+8.
+9.
+
+IF sup(R) (cid:149) minsup THEN
+ 
+
+R = MergePatterns(Ai , Aj)
+
+ 
+ 
+ 
+ 
+ENUMERATE(Ti)
+
+ 
+ 
+
+  
+  
+  
+  
+  
+  
+  
+  
+
+Fig. 4. The pseudocode of SPADE
+
+3 Co-occurrence Pruning
+
+In this section, we introduce our approach, consisting of a data structure for
+storing co-occurrence information, and its properties for candidate pruning for
+vertical sequential pattern mining. Then, we describe how the data structure is
+integrated in three state-of-the-art vertical mining algorithms, namely ClaSP,
+SPADE and SPAM.
+
+46
+
+P. Fournier-Viger et al.
+
+3.1 The Co-occurrence Map
+
+Deﬁnition 9. An item k is said to succeed by i-extension to an item j in a
+sequence (cid:4)I1, I2, ..., In(cid:5) iﬀ j, k ∈ Ix for an integer x such that 1 ≤ x ≤ n and
+k (cid:3)lex j.
+Deﬁnition 10. An item k is said to succeed by s-extension to an item j in a
+sequence (cid:4)I1, I2, ..., In(cid:5) iﬀ j ∈ Iv and k ∈ Iw for some integers v and w such that
+1 ≤ v < w ≤ n.
+Deﬁnition 11. A Co-occurrence MAP (CMAP) is a structure mapping each
+item k ∈ I to a set of items succeeding it. We deﬁne two CMAPs named CM APi
+and CM APs. CM APi maps each item k to the set cmi(k) of all items j ∈ I
+succeeding k by i-extension in no less than minsup sequences of SDB. CM APs
+maps each item k to the set cms(k) of all items j ∈ I succeedings k by s-
+extension in no less than minsup sequences of SDB. Example. The CMAP
+structures built for the sequence database of Fig. 1(left) are shown in Table 1,
+being CM APi on the left part and CM APs on the right part. Both tables have
+been created considering a minsup of two sequences. For instance, for the item f ,
+we can see that it is associated with an item, cmi(f ) = {g}, in CM APi, whereas
+it is associated with two items, cms(f ) = {e, g}, in CM APs. This indicates that
+both items e and g succeed to f by s-extension and only item g does the same
+for i-extension, being all of them in no less than minsup sequences.
+
+Table 1. CM APi and CM APs for the database of Fig. 1 and minsup = 2
+
+item is succeeded by (i-extension)
+
+item is succeeded by (s-extension)
+
+CM APi
+{b}
+∅
+∅
+∅
+{g}
+∅
+
+a
+b
+c
+e
+f
+g
+
+CM APs
+{b, c, e, f}
+{e, f, g}
+{e, f}
+{e, g}
+
+∅
+∅
+
+a
+b
+c
+e
+f
+g
+
+Size Optimization. Let n = |I| be the number of items in SDB. To implement
+a CMAP, a simple solution is to use an n× n matrix (two-dimensional array) M
+where each row (column) correspond to a distinct item and such that each entry
+mj,k ∈ M represents the number of sequences where the item k succeed to the
+item i by i-extension or s-extension. The size of a CMAP would then be O(n2).
+However, the size of CMAP can be reduced using the following strategy. It can be
+observed that each item is succeeded by only a small subset of all items for most
+datasets. Thus, few items succeed another one by extension, and thus, a CMAP
+may potentially waste large amount of memory for empty entries if we consider
+them by means of a n × n matrix. For this reason, in our implementations we
+instead implemented each CMAP as a hash table of hash sets, where an hashset
+corresponding to an item k only contains the items that succeed to k in at least
+minsup sequences.
+
+Fast Vertical Mining of Sequential Patterns
+
+47
+
+3.2 Co-occurrence-Based Pruning
+
+The CMAP structure can be used for pruning candidates generated by vertical
+sequential pattern mining algorithms based on the following properties.
+
+Property 1 (pruning an i-extension). Let be a frequent sequential pattern
+A and an item k. If there exists an item j in the last itemset of A such that
+k belongs to cmi(j), then the i-extension of A with k is infrequent. Proof. If
+an item k does not appear in cmi(j), then k succeed to j by i-extension in less
+than minsup sequences in the database SDB. It is thus clear that appending k
+by i-extension to a pattern A containing j in its last itemset will not result in a
+frequent pattern. (cid:12)(cid:13)
+Property 2 (pruning an s-extension). Let be a frequent sequential pattern A
+and an item k. If there exists an item j ∈ A such that the item k belongs to cms(j),
+then the s-extension of A with k is infrequent. Proof. If an item k does not appear
+in cms(j), then k succeeds to j by s-extension in less than minsup sequences from
+the sequence database SDB. It is thus clear that appending j by s-extension to a
+(cid:12)(cid:13)
+pattern A containing k will not result in a frequent pattern.
+
+Property 3 (pruning a preﬁx). The previous properties can be generalized
+to prune all patterns starting with a given preﬁx. Let be a frequent sequential
+pattern A and an item k. If there exists an item j ∈ A (equivalently j in the last
+itemset of A) such that there is an item k ∈ cms(j) (equivalently in cmi(j)), then
+all supersequences B having A as preﬁx and where k succeeds j by s-extension
+(equivalently i-extension to the last itemset) in A in B are infrequent. Proof. If
+an item k does not appear in cms(j) (equivalently cmi(j)), therefore k succeeds
+to j in less than minsup sequences by s-extension (equivalently i-extension to
+the last itemset) in the database SDB. It is thus clear that no frequent pattern
+containing j (equivalently j in the last itemset) can be formed such that k is
+appended by s-extension (equivalently by i-extension to the last itemset). (cid:12)(cid:13)
+
+3.3 Integrating Co-occurrence Pruning in Vertical Mining
+
+Integration in SPADE. The integration in SPADE is done as follows. In the
+ENUMERATE procedure, consider a pattern r obtained by merging two patterns
+Ai = P ∪ x and Aj = P ∪ y, being P a common preﬁx for Ai and Aj. Let y be
+the item that is appended to Ai to generate r. If r is an i-extension, we use the
+CM APi structure, otherwise, if r is an s-extension, we use CM APs. If the last
+item a of r does not have an item x ∈ cmi(a) (equivalently in cms(a)), then the
+pattern r is infrequent and r can be immediately discarded, avoiding the join
+operation to calculate the support of r. This pruning strategy is correct based
+on Properties 1, 2 and 3.
+Note that to perform the pruning in SPADE, we do not have to check if items
+of the preﬁx P are succeeded by the item y ∈ Aj . This is because the items of
+P are also in Aj. Therefore, checking the extension of P by y was already done,
+and it is not necessary to do it again.
+
+48
+
+P. Fournier-Viger et al.
+
+Integration in SPAM. The CMAP structures are used in the SEARCH pro-
+cedure as follows. Let a sequential pattern pat being considered for s-extension
+(x ∈ Sn) or i-extension (x ∈ Si) with an item x (line 3). If the last item a in pat
+does not have an item x ∈ cms(a) (equivalently cmi), then the pattern resulting
+from the extension of pat with x will be infrequent and thus the join operation
+of x with pat to count the support of the resulting pattern does not need to
+be performed (by Property 1 and 2). Furthermore, the item x should not be
+considered for generating any pattern by s-extension (i-extension) having pat as
+preﬁx (by Property 3). Therefore x should not be added to the variable Stemp
+(Itemp) that is passed to the recursive call to the SEARCH procedure.
+
+Note that to perform the pruning in SPAM, we do not have to check for
+extensions of pat with x for all the items since such items, except for the last
+one, have already been checked for extension in previous steps.
+
+Integration in ClaSP. We have also integrated co-occurrence pruning in
+ClaSP [7], a state of the art algorithm for closed sequential pattern mining. The
+integration in ClaSP is not described here since it is done as in SPAM since
+ClaSP is based on SPAM.
+
+4 Experimental Evaluation
+
+We performed experiments to assess the performance of the proposed algorithms.
+Experiments were performed on a computer with a third generation Core i5 pro-
+cessor running Windows 7 and 5 GB of free RAM. We compared the performance
+of the modiﬁed algorithms (CM-ClaSP, CM-SPADE, CM-SPAM) with state-of-
+the-art algorithms for sequential pattern mining (GSP, PreﬁxSpan, SPADE and
+SPAM) and closed sequential pattern mining (ClaSP and CloSpan). All algo-
+rithms were implemented in Java. Note that for SPADE algorithms, we use the
+version proposed in [2] that implement IdLists by means of bitmaps. All mem-
+ory measurements were done using the Java API. Experiments were carried on
+six real-life datasets having varied characteristics and representing four diﬀer-
+ent types of data (web click stream, text from books, sign language utterances
+and protein sequences). Those datasets are Leviathan, Sign, Snake, FIFA, BMS
+and Kosarak10k. Table 2 summarizes their characteristics. The source code of
+all algorithms and datasets used in our experiments can be downloaded from
+http://goo.gl/hDtdt.
+
+The experiments consisted of running all the algorithms on each dataset while
+decreasing the minsup threshold until algorithms became too long to execute,
+ran out of memory or a clear winner was observed. For each dataset, we recorded
+the execution time, the percentage of candidate pruned by the proposed algo-
+rithms and the total size of CMAPs. The comparison of execution times is shown
+in Fig. 5. The percentage of candidates pruned by the proposed algorithms is
+shown in Table 3.
+
+Eﬀectiveness of Candidate Pruning. CM-ClaSP, CM-SPADE and CM-
+SPAM are generally from about 2 to 8 times faster than the corresponding
+original algorithms (ClaSP, SPADE and SPAM). This shows that co-occurrence
+
+Fast Vertical Mining of Sequential Patterns
+
+49
+
+Table 2. Dataset characteristics
+
+dataset
+
+sequence count distinct item avg. seq. length
+
+type of data
+
+Leviathan 5834
+730
+Sign
+163
+Snake
+20450
+FIFA
+BMS
+59601
+Kosarak10k 10000
+
+count
+
+9025
+267
+20
+2990
+497
+10094
+
+(items)
+
+book
+33.81 (std= 18.6)
+language utterances
+51.99 (std = 12.3)
+60 (std = 0.59)
+protein sequences
+34.74 (std = 24.08) web click stream
+2.51 (std = 4.85) web click stream
+8.14 (std = 22)
+web click stream
+
+45
+40
+35
+30
+25
+20
+15
+10
+5
+
+ 
+)
+s
+(
+ 
+e
+m
+
+i
+t
+n
+u
+R
+
+BMS 
+
+Kosarak 
+
+60
+
+50
+
+40
+
+30
+
+20
+
+10
+
+ 
+)
+s
+(
+ 
+e
+m
+
+i
+t
+n
+u
+R
+
+15 16 17 18 19 20 21 22 23 24 25 26 27 28
+
+minsup 
+
+38
+
+40
+
+42
+
+44
+
+minsup 
+
+46
+
+48
+
+80
+70
+60
+50
+40
+30
+20
+10
+
+ 
+)
+s
+(
+ 
+e
+m
+
+i
+t
+n
+u
+R
+
+140
+120
+100
+80
+60
+40
+20
+
+ 
+)
+s
+(
+ 
+e
+m
+
+i
+t
+n
+u
+R
+
+Leviathan 
+
+Snake 
+
+140
+
+120
+
+100
+
+80
+
+60
+
+40
+
+20
+
+ 
+)
+s
+(
+ 
+e
+m
+
+i
+t
+n
+u
+R
+
+50
+
+60
+
+70
+
+80
+90
+minsup 
+
+100
+
+110
+
+120
+
+105
+
+SIGN 
+
+140
+120
+100
+80
+60
+40
+20
+
+ 
+)
+s
+(
+ 
+e
+m
+
+i
+t
+n
+u
+R
+
+115
+
+minsup 
+
+FIFA 
+
+125
+
+41
+
+43
+
+45
+
+47
+49
+minsup 
+
+51
+
+53
+
+55
+
+2500
+
+2700
+
+2900
+
+minsup 
+
+SPADE
+CloSpan
+
+SPAM
+CM-SPAM
+
+Snake 
+
+PrefixSpan
+CM-SPADE
+
+GSP
+CM-ClaSP
+
+3100
+
+ClaSP
+
+Fig. 5. Execution times
+
+50
+
+P. Fournier-Viger et al.
+
+Table 3. Candidate reduction
+
+BMS
+
+Kosarak
+
+Leviathan Snake
+
+Sign Fifa
+
+CM-SPAM 78 to 93 % 94 to 98 % 50 to 51 % 28%
+CM-SPADE 75 to 76 % 98 %
+CM-ClaSP 79 to 93% 75 %
+
+50 %
+50 to 52 % 18 %
+
+63 % 61 to 68 %
+25 to 26 % 69 % 63 to 69 %
+63 % 67 to 68 %
+
+Table 4. CMAP implementations comparison
+
+BMS
+
+Kosarak
+
+Leviathan Snake
+
+Sign
+
+Fifa
+
+38
+
+16
+
+60
+
+2500
+
+minsup
+CMAP Size (hashmap) 0.5 MB 33.1 MB 15 MB 64 KB 3.19 MB 0.4 MB
+1.7 KB 0.2 MB 34.1 MB
+CMAP Size (matrix)
+Pair count (hashmap) 50,885
+144
+247,009 101,888,836 81,450,625 400
+Pair count (matrix)
+
+310 MB
+41,677
+
+0.9 MB 388 MB
+
+105
+
+43
+
+17,887
+71,289
+
+2,500
+8,940,100
+
+58,772
+
+pruning is an eﬀective technique to improve the performance of vertical mining
+algorithms. The dataset where the performance of the modiﬁed algorithms is
+closer to the original algorithms is Snake because all items co-occurs with each
+item in almost all sequences and therefore fewer candidates could be pruned.
+For other datasets, the percentage of candidates pruned range from 50% and to
+98 %). The percentage slowly decrease as minsup get lower because less pairs
+in CMAP had a count lower than minsup for pruning.
+
+Best Performance. For mining sequential patterns, CM-SPADE had the best
+performance on all but two datasets (Kosarak and BMS). The second best algo-
+rithm for mining sequential patterns is CM-SPAM (best performance on BMS
+and Kosarak). For mining closed sequential patterns, CM-ClaSP has the best
+performance on four datasets (Kosarak, BMS, Snake and Leviathan). CM-ClaSP
+is only outperformed by CloSpan on two datasets (FIFA and SIGN) and for low
+minsup values.
+
+Memory Overhead. We also studied the memory overhead of using CMAPs.
+We measured the total memory used by a matrix implementation and a hashmap
+implementation of CMAPs (cf. section 3.1) for all datasets for the lowest minsup
+values from the previous experiments. Results are shown in Table 4. Size is
+measured in terms of memory usage and number of entries in CMAPs. From
+these results, we conclude that (1) the matrix implementation is smaller for
+datasets with a small number of distinct items (Snake and SIGN), while (2) the
+hashmap implementation is smaller for datasets with a large number of items
+(BMS, Leviathan, Kosarak and FIFA) and (3) the hashmap implementation has
+a very low memory overhead (less than 35 MB on all datasets).
+
+5 Conclusion
+
+Sequential pattern mining algorithms using the vertical format are very eﬃcient
+because they can calculate the support of candidate patterns by avoiding costly
+
+Fast Vertical Mining of Sequential Patterns
+
+51
+
+database scans. However, the main performance bottleneck of vertical mining
+algorithms is that they usually spend lot of time evaluating candidates that do
+not appear in the input database or are infrequent. To address this problem,
+we presented a novel data structure named CMAP for storing co-occurrence
+information. We have explained how CMAPs can be used for pruning candi-
+dates generated by vertical mining algorithms. We have shown how to integrate
+CMAPs in three state-of-the-art vertical algorithms. We have performed an ex-
+tensive experimental study on six real-life datasets to compare the performance
+of the modiﬁed algorithms (CM-ClaSP, CM-SPADE and CM-SAPM) with state-
+of-the-art algorithms (ClaSP, CloSpan, GSP, PreﬁxSpan, SPADE and SPAM).
+Results show that the modiﬁed algorithms (1) prune a large amount of candi-
+dates, (2) are up to 8 times faster than the corresponding original algorithms
+and (3) that CM-SPADE and CM-ClaSP have respectively the best performance
+for mining sequential patterns and closed sequential patterns.
+
+The source code of all algorithms and datasets used in our experiments can
+
+be downloaded from http://goo.gl/hDtdt.
+
+For future work, we plan to develop additional optimizations and also to
+integrate them in sequential rule mining [5], top-k sequential pattern mining [4]
+and maximal sequential pattern mining [6].
+
+Acknowledgement. This work is partially ﬁnanced by a National Science and
+Engineering Research Council (NSERC) of Canada research grant, a PhD grant
+from the Seneca Foundation (Regional Agency for Science and Technology of
+the Region de Murcia), and by the Spanish Oﬃce for Science and Innovation
+through project TIN2009-14372-C03-01 and PlanE, and the European Union by
+means of the European Regional Development Fund (ERDF, FEDER).
+
+References
+
+1. Agrawal, R., Ramakrishnan, S.: Mining sequential patterns. In: Proc. 11th Intern.
+
+Conf. Data Engineering, pp. 3–14. IEEE (1995)
+
+2. Aseervatham, S., Osmani, A., Viennet, E.: bitSPADE: A Lattice-based Sequential
+Pattern Mining Algorithm Using Bitmap Representation. In: Proc. 6th Intern.
+Conf. Data Mining, pp. 792–797. IEEE (2006)
+
+3. Ayres, J., Flannick, J., Gehrke, J., Yiu, T.: Sequential pattern mining using a
+bitmap representation. In: Proc. 8th ACM SIGKDD Intern. Conf. Knowledge Dis-
+covery and Data Mining, pp. 429–435. ACM (2002)
+
+4. Fournier-Viger, P., Gomariz, A., Gueniche, T., Mwamikazi, E., Thomas, R.: TKS:
+Eﬃcient Mining of Top-K Sequential Patterns. In: Motoda, H., Wu, Z., Cao, L.,
+Zaiane, O., Yao, M., Wang, W. (eds.) ADMA 2013, Part I. LNCS, vol. 8346, pp.
+109–120. Springer, Heidelberg (2013)
+
+5. Fournier-Viger, P., Nkambou, R., Tseng, V.S.: RuleGrowth: Mining Sequential
+Rules Common to Several Sequences by Pattern-Growth. In: Proc. ACM 26th
+Symposium on Applied Computing, pp. 954–959 (2011)
+
+6. Fournier-Viger, P., Wu, C.-W., Tseng, V.S.: Mining Maximal Sequential Patterns
+without Candidate Maintenance. In: Motoda, H., Wu, Z., Cao, L., Zaiane, O., Yao,
+M., Wang, W. (eds.) ADMA 2013, Part I. LNCS, vol. 8346, pp. 169–180. Springer,
+Heidelberg (2013)
+
+52
+
+P. Fournier-Viger et al.
+
+7. Gomariz, A., Campos, M., Marin, R., Goethals, B.: ClaSP: An Eﬃcient Algorithm
+for Mining Frequent Closed Sequences. In: Pei, J., Tseng, V.S., Cao, L., Motoda,
+H., Xu, G. (eds.) PAKDD 2013, Part I. LNCS, vol. 7818, pp. 50–61. Springer,
+Heidelberg (2013)
+
+8. Han, J., Kamber, M.: Data Mining: Concepts and Techniques, 2nd edn. Morgan
+
+Kaufmann, San Francisco (2006)
+
+9. Mabroukeh, N.R., Ezeife, C.I.: A taxonomy of sequential pattern mining algo-
+
+rithms. ACM Computing Surveys 43(1), 1–41 (2010)
+
+10. Pei, J., Han, J., Mortazavi-Asl, B., Wang, J., Pinto, H., Chen, Q., Dayal, U., Hsu,
+M.: Mining sequential patterns by pattern-growth: the PreﬁxSpan approach. IEEE
+Trans. Knowledge Data Engineering 16(11), 1424–1440 (2004)
+
+11. Srikant, R., Agrawal, R.: Mining Sequential Patterns: Generalizations and Per-
+formance Improvements. In: Apers, P.M.G., Bouzeghoub, M., Gardarin, G. (eds.)
+EDBT 1996. LNCS, vol. 1057, pp. 3–17. Springer, Heidelberg (1996)
+
+12. Yan, X., Han, J., Afshar, R.: CloSpan: Mining closed sequential patterns in large
+
+datasets. In: Proc. 3rd SIAM Intern. Conf. on Data Mining, pp. 166–177 (2003)
+
+13. Zaki, M.J.: SPADE: An eﬃcient algorithm for mining frequent sequences. Machine
+
+Learning 42(1), 31–60 (2001)
+
+

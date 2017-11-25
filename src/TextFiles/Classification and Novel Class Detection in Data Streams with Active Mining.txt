@@ -1,0 +1,1512 @@
+Classiﬁcation and Novel Class Detection in Data
+
+Streams with Active Mining
+
+Mohammad M. Masud1, Jing Gao2, Latifur Khan1,
+
+Jiawei Han2, and Bhavani Thuraisingham1
+
+1 Department of Computer Science, University of Texas at Dallas
+
+2 Department of Computer Science, University of Illinois at Urbana-Champaign
+
+Abstract. We present ActMiner, which addresses four major chal-
+lenges to data stream classiﬁcation, namely, inﬁnite length, concept-drift,
+concept-evolution, and limited labeled data. Most of the existing data
+stream classiﬁcation techniques address only the inﬁnite length and
+concept-drift problems. Our previous work, MineClass, addresses the
+concept-evolution problem in addition to addressing the inﬁnite length
+and concept-drift problems. Concept-evolution occurs in the stream when
+novel classes arrive. However, most of the existing data stream classiﬁ-
+cation techniques, including MineClass, require that all the instances in
+a data stream be labeled by human experts and become available for
+training. This assumption is impractical, since data labeling is both time
+consuming and costly. Therefore, it is impossible to label a majority of
+the data points in a high-speed data stream. This scarcity of labeled data
+naturally leads to poorly trained classiﬁers. ActMiner actively selects
+only those data points for labeling for which the expected classiﬁcation
+error is high. Therefore, ActMiner extends MineClass, and addresses the
+limited labeled data problem in addition to addressing the other three
+problems. It outperforms the state-of-the-art data stream classiﬁcation
+techniques that use ten times or more labeled data than ActMiner.
+
+1 Introduction
+
+Data stream classiﬁcation is more challenging than classifying static data because
+of several unique properties of data streams. First, data streams are assumed to
+have inﬁnite length, which makes it impractical to store and use all the historical
+data for training. Therefore, traditional multi-pass learning algorithms are not
+directly applicable to data streams. Second, data streams observe concept-drift,
+which occurs when the underlying concept of the data changes over time. In or-
+der to address concept-drift, a classiﬁcation model must continuously adapt itself
+to the most recent concept. Third, data streams also observe concept-evolution,
+which occurs when a novel class appears in the stream. In order to cope with
+concept-evolution, a classiﬁcation model must be able to automatically detect
+novel classes when they appear, before being trained with the labeled instances
+of the novel class. Finally, high speed data streams suﬀer from insuﬃcient labeled
+data. This is because, manual labeling is both costly and time consuming. There-
+fore, the speed at which the data points are labeled lags far behind the speed
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part II, LNAI 6119, pp. 311–324, 2010.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2010
+
+312
+
+M.M. Masud et al.
+
+at which data points arrive in the stream, leaving most of the data points in
+the stream as unlabeled. So, supervised classiﬁcation techniques suﬀer from the
+scarcity of labeled data for learning, resulting in a poorly built classiﬁer. Most
+existing data stream classiﬁcation techniques address only the inﬁnite length,
+and concept-drift problems [1–3]. Our previous work MineClass [4] addresses
+the concept-evolution problem in addition to the inﬁnite length and concept-
+drift problems. However, it did not address the limited labeled data problem.
+Our current work, ActMiner, extends MineClass by addressing all the four prob-
+lems and providing a more realistic data stream classiﬁcation framework than
+the state-of-the-art.
+
+A solution to the inﬁnite length problem is incremental learning, which re-
+quires a single pass over the training data. In order to cope with concept-drift,
+a classiﬁer must be continuously updated to be consistent with the most recent
+concept. ActMiner applies a hybrid batch-incremental process [2, 5] to solve the
+inﬁnite length and concept-drift problems. It divides the data stream into equal
+sized chunks and trains a classiﬁcation model from each chunk. An ensemble of
+M such models is used to classify the unlabeled data. When a new data chunk
+becomes available for training, a new model is trained, and an old model from
+the ensemble is replaced with the new model. The victim for the replacement
+is chosen by evaluating the accuracy of each model on the latest labeled chunk.
+In this way, the ensemble is kept up-to-date. ActMiner also solves the concept-
+evolution problem by automatically detecting novel classes in the data stream.
+In order to detect novel class, it ﬁrst identiﬁes the test instances that are well-
+separated from the training data, and tag them as Raw outlier. Then raw outliers
+that possibly appear as a result of concept-drift or noise are ﬁltered out. If a
+suﬃcient number of such strongly cohesive ﬁltered outliers (called F -outliers)
+are observed, a novel class is assumed to have appeared, and the F -outliers are
+classiﬁed as novel class instances. Finally, ActMiner solves the limited labeled
+data problem by requiring only a few selected instances to be labeled. It iden-
+tiﬁes the instances for which the classiﬁcation model has the highest expected
+error. This selection is done without knowing the true labels of those instances.
+By selecting only a few instances for labeling, it saves 90% or more labeling time
+and cost, than traditional approaches that require all instances to be labeled.
+
+We have several contributions. First, we propose a framework that addresses
+four major challenges in data stream classiﬁcation. To the best of our knowl-
+edge, no other existing data stream classiﬁcation technique addresses all these
+four problems in a single framework. Second, we show how to select only a few
+instances in the stream for labeling, and justify this selection process both the-
+oretically and empirically. Finally, our technique outperforms state-of-the-art
+data stream classiﬁcation techniques using ten times or even less amount of la-
+beled data for training. The rest of the paper is organized as follows. Section 2
+discusses the related works in data stream classiﬁcation. Section 3 describes the
+proposed approach. Section 4 then presents the experiments and analyzes the
+results. Section 5 concludes with directions to future work.
+
+2 Related Work
+
+Classiﬁcation and Novel Class Detection
+
+313
+
+Related works in data stream classiﬁcation can be divided into three groups:
+i) approaches that address the inﬁnite length and concept-drift problems, ii)
+approaches that address the inﬁnite length, concept-drift, and limited labeled
+data problems, and iii) approaches that address the inﬁnite length, concept-drift,
+and concept-evolution problems. Groups i) and ii) again can be subdivided into
+two subgroups: single model and ensemble classiﬁcation approach.
+
+Most of the existing techniques fall into group i). The single-model approaches
+in group i) apply incremental learning and adapt themselves to the most recent
+concept by continuously updating the current model to accommodate concept
+drift [1, 3, 6]. Ensemble techniques [2, 5] maintain an ensemble of models, and
+use ensemble voting to classify unlabeled instances. These techniques address
+the inﬁnite length problem by keeping a ﬁxed-size ensemble, and address the
+concept-drift problem by updating the ensemble with newer models. ActMiner
+also applies an ensemble classiﬁcation technique. Techniques in group ii) goes
+one step ahead of group i) by addressing the limited labeled data problem. Some
+of them apply active learning [7, 8] to select the instances to be labeled, and
+some [9] apply random sampling along with semi-supervised clustering. ActMiner
+also applies active learning, but its data selection process is diﬀerent from the
+others. Unlike other active mining techniques such as [7] that requires extra
+computational overhead to select the data, ActMiner does the selection on the
+ﬂy during classiﬁcation. Moreover, none of these approaches address the concept-
+evolution problem, but ActMiner does.
+
+Techniques in group iii) are the most rare. An unsupervised novel concept
+detection technique for data streams is proposed in [10], but it is not applicable to
+multi-class classiﬁcation. Our previous work MineClass [4] addresses the concept-
+evolution problem on a multi-class classiﬁcation framework. It can detect the
+arrival of a novel class automatically, without being trained with any labeled
+instances of that class. However, it does not address the limited labeled data
+problem, and requires that all instances in the stream be labeled and available for
+training. ActMiner extends MineClass by requiring only a few chosen instances
+to be labeled, thereby reducing the labeling cost by 90% or more.
+
+3 ActMiner: Active Classiﬁcation and Novel Class
+
+Detection
+
+In this section we discuss ActMiner in details. Before describing ActMiner, we
+brieﬂy introduce MineClass, and present some deﬁnitions.
+
+3.1 Background: Novel Class Detection with MineClass
+ActMiner is based on our previous work MineClass [4], which also does data
+stream classiﬁcation and novel class detection. MineClass is an ensemble clas-
+siﬁcation approach, which keeps an ensemble L of M classiﬁcation models, i.e.,
+L={L1,...,LM} . First, we deﬁne the concept of novel class and existing class.
+
+314
+
+M.M. Masud et al.
+
+Deﬁnition 1 (Existing class and Novel class). Let L be the current ensem-
+ble of classiﬁcation models. A class c is an existing class if at least one of the
+models Li ∈ L has been trained with class c. Otherwise, c is a novel class.
+The basic assumption in novel class detection lies in the following property.
+Property 1. Let x be an arbitrary instance belonging to a class c(cid:3), and c be any
+class other than c(cid:3). Also, let λc(cid:2),q(x) be the q-nearest neighbors of x within class
+c(cid:3), and λc,q(x) be the q-nearest neighbors of x within class c. Then the mean
+distance from x to λc(cid:2),q(x) is less than the mean distance from x to λc,q(x), for
+any class c (cid:3)= c(cid:3).
+In other words, property 1 states that an instance is closer to other same class
+instances and farther from the instances of any other class. Therefore, if a novel
+class arrives, the instances belonging to that class must be closer to other novel
+class instances and far from any existing class instances. This is the basic idea
+in detecting novel class with MineClass. MineClass detects novel classes in three
+steps: i) creating decision boundary for a classiﬁer during its training, ii) detect-
+ing and ﬁltering outliers, and iii) computing cohesion among the outliers, and
+separation of the outliers from the training data.
+
+The decision boundaries are created by clustering the training data, and saving
+the cluster centroids and radii as pseudopoints. Each pseudopoint represents a
+hypersphere in the feature space. Union of all the hyperspheres in a classiﬁcation
+model constitutes the decision boundary for that model. The decision boundary
+for the ensemble of models is the union of the decision boundaries of each model
+in the ensemble. Any test instance falling outside the decision boundary of the
+ensemble of models is considered an outlier, called F -outlier.
+Deﬁnition 2 (F−outlier). A test instance is an F−outlier (i.e., ﬁltered out-
+lier) if it is outside the decision boundary of all classiﬁers Li ∈ L.
+If any test instance x is inside the decision boundary, then it can be shown that
+there is at least one existing class instance x(cid:3), such that the mean distance from
+x to the existing class instances is less than the mean distance from x(cid:3) to the
+existing class instances. Therefore, according to property 1, x must be an ex-
+isting class instance. Any F -outlier is a potential novel class instance, because
+it is outside the decision boundary of the ensemble of models, and therefore,
+we its membership in the existing classes cannot be guaranteed. However, only
+one F -outlier does not imply a novel class. We need to know whether there are
+enough F -outliers that are suﬃciently close to each other and far from the ex-
+isting class instances. This is done by computing the cohesion among F -outliers
+and separation of F -outliers from existing class instances. This is done using
+the following equation: q-N SC(x) = bmin(x)−a(x)
+max(bmin(x),a(x)), where x is an F -outlier,
+bmin(x) is the mean distance from x to its q-nearest existing class instances and
+a(x) is the mean distance from x to its q-nearest F -outlier instances. A positive
+value indicates that x is closer to other F -outlier instances than the existing
+class instances. If q-NSC(x) is positive for at least q F -outlier instances, then a
+novel class is assumed to have arrived. This is the basic working principle of the
+DetectNovelClass() function in algorithm 1.
+
+Classiﬁcation and Novel Class Detection
+
+315
+
+3.2 ActMiner Algorithm
+
+ActMiner, which stands for Active Classiﬁer for Data Streams with novel class
+Miner, performs classiﬁcation and novel class detection in data streams while
+requiring very small amount of labeled data for training. The top level algorithm
+is sketched in algorithm 1.
+
+< f out, ˆyk > ← Classify(xk,L) //ˆyk is the predicted class label of xk
+if f out = true then buf ⇐ xk //enqueue into buﬀer
+else output prediction < xk, ˆyk > end if
+end for
+f ound ← DetectNovelClass(L,buf ) //(see section 3.1)
+if f ound=true then
+
+for each novel class instance xk ∈ buf do ˆyk ← “novel class” end for
+
+//Classiﬁcation, outlier detection, novel class detection
+buf ← empty //temporary buﬀer
+for each xk ∈ Dn do
+
+Algorithm 1. ActMiner
+1: L ← Build-initial-ensemble(), L ← empty //training data
+2: while true do
+3: Dn ← the latest data chunk in the stream
+4:
+5:
+6:
+7:
+8:
+9:
+10:
+11:
+12:
+13:
+14:
+15:
+16:
+17:
+18:
+19:
+20:
+21:
+22:
+23:
+24:
+25:
+26:
+27: end while
+
+end for
+//Training
+L(cid:2) ← Train-and-save-decision-boundary (L) //(see section 3.1)
+L ← Update(L,L(cid:2)
+L ← empty
+
+,L)
+
+end if
+for each instance xk ∈ buf output prediction < xk, ˆyk > end for
+//Label the chunk
+for each xk ∈ Dn do
+
+if xk is an weakly classiﬁed instance (WCI)
+then L ⇐ < xk, yk > //label it and save (yk is the true class label of xk)
+else L⇐ < xk, ˆyk > //save in training buﬀer with the predicted class label
+end if
+
+The algorithm starts with building the initial ensemble L = {L1, ..., LM}
+with the ﬁrst few data chunks of the stream (line 1), and initializing the training
+buﬀer. Then a while loop (line 2) runs indeﬁnitely until the stream is ﬁnished.
+Within the while loop, the latest data chunk Dn is examined. Each instance xk
+in Dn is ﬁrst passed to the Classify() function, which uses the existing ensemble
+to get its predicted class ˆyk and its F -outlier status (line 7). If it is identiﬁed as
+an F -outlier, then it is temporarily saved in a buﬀer buf for further inspection
+(line 8), otherwise, we output its predicted class (line 9). Then we call the De-
+tectNovelClass() function to inspect buf to detect whether any novel class has
+arrived (line 11). If a novel class has arrived then the novel class instances are
+classiﬁed as “novel class” (line 13). Then the class predictions of all instances in
+
+316
+
+M.M. Masud et al.
+
+buf are sent to the output (line 15). We then select the instances that need to
+be labeled (lines 17-22). Only the instances identiﬁed as Weakly Classiﬁed In-
+stance (WCI) are required to be labeled by human experts, and they are saved
+in the training buﬀer with their true class labels (line 19). We will explain WCI
+shortly. All other instances remain as unlabeled, and they are saved in the train-
+ing buﬀer with their predicted class labels (line 20). A new model L(cid:3) is trained
+with the training buﬀer (line 24), and this model is used to update the existing
+ensemble L (line 25). Updating is done by ﬁrst evaluating each model Li ∈ L on
+L, and replacing the worst (based on accuracy) of them with L(cid:3). ActMiner can
+be applied to any base learning algorithm in general. The only operation that
+needs to be speciﬁc to a learning algorithm is train and save decision boundary.
+
+3.3 Data Selection for Labeling
+
+Unlike MineClass, ActMiner does not need all the instances in the training data
+to have true labels. Only those instances need to be labeled about whose class
+labels MineClass is the most uncertain. We call these instances as “weakly classi-
+ﬁed instances” or WCIs. ActMiner ﬁnds the WCIs and presents them to the user
+for labeling, because the ensemble has the highest uncertainty in classifying the
+WCIs. In order to perform ensemble voting on an instance xj, ﬁrst we initialize
+a vector V = {v[1], ..., v[C]} to zeros, where C is the total number of classes, and
+each v[k] represents a real value. Let classiﬁer Li predicts the class label of xj
+to be c, where c ∈ {1, ..., C}. Then we increment v[c] by 1. Let v[max] represent
+the maximum among all v[i]. Then the predicted class of xj is max. An instance
+xj is a WCI if either i) The instance has been identiﬁed as an F -outlier (see
+deﬁnition 2), or ii) The ratio of its majority vote to its total vote is less than
+the Minimum Majority Threshold (MMT), a user-deﬁned parameter.
+
+(cid:2)
+
+s
+
+For condition i), consider that F -outliers are outside the decision boundary
+of all the models in the ensemble. So the ensemble has the highest uncertainty in
+classifying them. Therefore, F -outliers are considered as WCIs and need to be
+labeled. For condition ii), let us denote the ratio with Majority to Sum (M2S)
+v[i]. There-
+ratio. Let v[max] be maximum in the vector V , and let s =
+fore, the M2S ratio of xj is given by: M2S(xj) = v[max]
+. The data point xj is
+considered to be a WCI if M2S(xj) < MMT. A lower value of M2S(xj) indicates
+higher uncertainty in classifying that instance, and vice versa.
+
+C
+i=1
+
+Next we justify the reason for labeling the WCIs of the second type, i.e.,
+instances that have M2S(xj) < MMT. We show that the ensemble classiﬁcation
+error is higher for the instances having lower M2S.
+Lemma 1. Let A and B be two sets of disjoint datapoints such that for any
+xa ∈ A, and xb ∈ B, M2S(xa) < M2S(xb). Then the ensemble error on A is
+higher than the ensemble error on B.
+Proof. Given an instance x, the posterior probability distribution of class c is
+p(c|x). Let C be the total number of classes, and c ∈ {1, ..., C}. According to
+
+Classiﬁcation and Novel Class Detection
+
+317
+
+Tumer and Ghosh [11], a classiﬁer is trained to learn a function fc(.) that
+approximates this posterior probability (i.e., probability of classifying x into
+class c): fc(x) = p(c|x) + ηc(x) where ηc(x) is the error of fc(x) relative to
+p(c|x). This is the error in addition to Bayes error and usually referred to as the
+added error. This error occurs either due to the bias of the learning algorithm,
+and/or the variance of the learned model. According to [11], the expected added
+error can be obtained from the following formula: Error = σ
+is the variance of ηc(x), and s is the diﬀerence between the derivatives of p(c|x)
+and p(¬c|x), which is independent of the learned classiﬁer.
+Let L = {L1, ..., LM} be an ensemble of M classiﬁers, where each classiﬁer
+Li is trained from a data chunk. If we average the outputs of the classiﬁers in
+a M-classiﬁer ensemble, then according to [11], the probability of the ensemble
+(x),
+in classifying x into class c is: f avg
+c (x) is the output of the m-th
+where f avg
+classiﬁer Lm, and ηavg
+(x) is the added error of the ensemble, given by:
+c
+c (x) is the added error of the m-th classiﬁer
+c (x), where ηm
+ηm
+ηavg
+c
+in the ensemble. Assuming the error variances are independent, the variance of
+ηavg
+c
+
+M
+m=1
+(x) is the output of the ensemble L, f m
+
+(x), i.e., the error variance of the ensemble, σ2
+
+c (x) = p(c|x) + ηavg
+
+2
+ηc(x)
+s where σ2
+
+(x), is given by:
+
+(x) = 1
+M
+
+(x) = 1
+M
+
+M
+m=1
+
+ηc(x)
+
+f m
+
+(cid:2)
+
+(cid:2)
+
+c
+
+c
+
+c
+
+ηavg
+c
+
+σ2
+
+ηavg
+c
+
+(x) =
+
+1
+M 2
+
+M(cid:3)
+
+m=1
+
+σ2
+
+ηm
+c (x)
+
+,
+
+(1)
+
+ηm
+
+ηavg
+c
+
+Also, let σ2
+
+(xa)(A), and σ2
+
+c (x) is the variance of ηm
+ηavg
+c
+
+c (x).
+where σ2
+(xb)(B) be the variances of the ensemble error
+on A, and B, respectively. Let zc(x) be 1 if the true class label of x is c, and
+zc(x) be 0, otherwise. Also, let f m
+c (x) be either 0 or 1. The error variance of
+classiﬁer Lm on A is given by [7]:
+c (xa)(A) =
+
+(zc(xa) − f m
+
+c (xa))2,
+
+(2)
+
+(cid:3)
+
+σ2
+
+ηm
+
+1
+|A|
+
+xa∈A
+
+c (xa))2
+
+c (xa) is either 0 or 1,
+
+where (zc(xa) − f m
+is the squared error of classiﬁer Lm on in-
+stance xa. Since we assume that f m
+it follows that
+(zc(xa) − f m
+c (xa))2 = 0 if the prediction of Lm is correct, and = 1, other-
+wise. Let xa be an arbitrary instance in A, and let r(xa) be the majority
+let us divide the classiﬁers into two groups. Let
+vote count of xa. Also,
+group 1 be {Lmj
+}r(xa)
+j=1 , i.e., the classiﬁers that contributed to the majority
+vote, and group 2 be {Lmj
+i.e., all other classiﬁers. Since we
+consider that the errors of the classiﬁers are independent,
+it is highly un-
+likely that majority of the classiﬁers will make the same mistake. Therefore,
+we may consider the votes in favor of the majority class to be correct.
+So, all classiﬁers in group 1 has correct prediction, and all other classiﬁers
+
+}M
+j=r(xa)+1,
+
+318
+
+M.M. Masud et al.
+
+have incorrect predictions. The combined squared error (CSE) of the individual
+classiﬁers in classifying xa into class c is:
+(zc(xa) − f mj
+
+(zc(xa) − f mj
+
+(zc(xa) − f m
+
+c (xa))
+
+(xa))
+
+(xa))
+
+r(xa)(cid:3)
+
+M(cid:3)
+
+M(cid:3)
+
++
+
+=
+
+2
+
+2
+
+2
+
+c
+
+c
+
+m=1
+
+= 0 +
+
+j=1
+
+j=r(xa)+1
+
+M(cid:3)
+
+(zc(xa) − f mj
+
+c
+
+2
+
+(xa))
+
+j=r(xa)+1
+
+(3)
+
+c
+
+Note that CSE is the sum of the squared errors of individual classiﬁers in the
+ensemble, not the error of the ensemble itself. Also, note that each component
+of group 2 in the CSE, i,e,. each (zc(xa) − f mj
+(xa))2, j > r(xa) contributes 1 to
+the sum (since the prediction is wrong). Now we may proceed as follows:
+M2S(xa) < M2S(xb) ⇒ r(xa) < r(xb)
+(since the total vote = M)
+This implies that the size of group 2 for xa is larger than that for xb.
+Therefore, the CSE in classifying xa is greater than that of xb, since
+each component of group 2 in CSE contributes 1 to the sum. Continuing from
+eqn (4),
+⇒ M(cid:3)
+
+(zc(xa) − f mj
+
+(zc(xb) − f mj
+
+(xa))2 >
+
+(xb))2
+
+(4)
+
+M(cid:3)
+
+c
+
+c
+
+j=r(xa)+1
+
+j=r(xb)+1
+
+m=1
+
+m=1
+
+M(cid:3)
+
+c (xb))2
+
+c (xa))2 >
+
+(zc(xb) − f m
+
+(zc(xa) − f m
+
+⇒ M(cid:3)
+Now, according to the Lemma statement, for any pair (xa ∈ A, xb ∈ B),
+M2S(xa) < M2S(xb) holds, and hence, inequality (5) holds. Therefore, the
+mean CSE of set A must be less than the mean CSE of set B, i.e.,
+⇒ 1
+|A|
+
+c (xa))2 > 1
+|B|
+
+(zc(xa) − f m
+
+(zc(xb) − f m
+
+(using eqn 3)
+
+c (xb))2
+
+M(cid:3)
+
+(cid:3)
+
+M(cid:3)
+
+(cid:3)
+
+(5)
+
+(zc(xa) − f m
+
+c (xa))2) >
+
+m=1
+
+xb∈B
+1
+|B|
+
+M(cid:3)
+
+(
+m=1
+
+(zc(xb) − f m
+
+c (xb))2)
+
+(cid:3)
+
+xb∈B
+
+m=1
+(cid:3)
+
+xa∈A
+1
+|A|
+
+⇒ M(cid:3)
+
+(
+m=1
+
+xa∈A
+c (xa)(A) >
+(xa)(A) > σ2
+
+ηm
+
+σ2
+
+σ2
+
+m=1
+
+M(cid:3)
+
+c (xb)(B)
+
+⇒ M(cid:3)
+⇒ σ2
+That is, the ensemble error variance, and hence, the ensemble error (since error
+variance is proportional to error) on A is higher than that of B.
+(cid:2)
+
+(using eqn 1)
+
+(using eqn 2)
+
+(xb)(B)
+
+ηavg
+c
+
+ηavg
+c
+
+m=1
+
+ηm
+
+4 Experiments
+
+In this section we describe the datasets, experimental environment, and discuss
+and analyze the results.
+
+Classiﬁcation and Novel Class Detection
+
+319
+
+4.1 Data Sets and Experimental Setup
+
+We use two synthetic and two real datasets for evaluation. These are: Syn-
+thetic data with only concept-drift (SynC), Synthetic data with concept-drift
+and novel-class (SynCN), Real data - KDDCup 99 network intrusion detection
+(KDD), and Real data - Forest cover dataset from UCI repository (Forest).
+Due to space limitation, we omit the details of the datasets. Details can be found
+in [4]. We use the following parameter settings, unless mentioned otherwise: i)
+K (number of pseudopoints per classiﬁer) = 50, ii) q (minimum number of in-
+stances required to declare novel class) = 50, iii) L (ensemble size) = 6, iv) S
+(chunk size) = 2,000. v) MMT (minimum majority threshold) = 0.5.
+
+4.2 Baseline Approach
+
+We use the same baseline techniques that were used to compare with MineClass
+[4]. Since to the best of our knowledge, there is no technique that can both
+classify and detect novel class in data streams, a combination of two baseline
+techniques are used in MineClass: OLIN DDA [10], and Weighted Classiﬁer
+Ensemble (W CE) [2], where the former works as novel class detector, and the
+latter performs classiﬁcation. For each chunk, we ﬁrst detect the novel class
+instances using OLIN DDA. All other instances in the chunk are assumed to be
+in the existing classes, and they are classiﬁed using W CE. We use OLIN DDA
+as the novelty detector, since it is a recently proposed algorithm that is shown
+to have outperformed other novelty detection techniques in data streams [10].
+
+However, OLIN DDA assumes that there is only one “normal” class, and all
+other classes are “novel”. So, it is not directly applicable to the multi-class nov-
+elty detection problem, where any combination of classes can be considered as the
+“existing” classes. We propose two alternative solutions. First, we build parallel
+OLIN DDA models, one for each class, which evolve simultaneously. Whenever
+the instances of a novel class appear, we create a new OLIN DDA model for
+that class. A test instance is declared as novel, if all the existing class models
+identify this instance as novel. We will refer to this baseline method as WCE-
+OLINDDA PARALLEL. Second, we initially build an OLIN DDA model with
+all the available classes. Whenever a novel class is found, the class is absorbed into
+the existing OLIN DDA model. Thus, only one “normal” model is maintained
+throughout the stream. This will be referred to as WCE-OLINDDA SINGLE.
+In all experiments, the ensemble size and chunk-size are kept the same for both
+these techniques. Besides, the same base learner is used for W CE and ActMiner.
+The parameter settings for OLINDDA are the same as in [4].
+
+In this experiment, we also use WCE-OLINDDA Parallel and
+
+WCE-OLINDDA Single for comparison, with some minor changes. In order to
+see the eﬀects of limited labeled data on WCE-OLINDDA models, we run two dif-
+ferent settings for WCE-OLINDDA Parallel and WCE-OLINDDA Single. First,
+we run WCE-OLINDDA Parallel ( WCE-OLINDDA Single) with all instances
+in each chunk labeled. We denote this setting as WCE-OLINDDA Parallel-
+Full (WCE-OLINDDA Single-Full). Second, we run WCE-OLINDDA Parallel
+
+320
+
+M.M. Masud et al.
+
+identiﬁed as novel
+(WCE-OLINDDA Single). We denote
+
+(WCE-OLINDDA Single) with exactly the same instances labeled as were
+labeled by ActMiner, plus any instance
+class by
+WCE-OLINDDA Parallel
+this
+set-
+ting as WCE-OLINDDA Parallel-Partial (WCE-OLINDDA Single-Partial). We
+will henceforth use the acronyms AM for ActMiner, WOPf
+for WCE-
+OLINDDA Parallel-Full, WOSf for WCE-OLINDDA Single-Full, WOPp for
+WCE-OLINDDA Parallel-Partial, and WOSp
+for WCE-OLINDDA Single-
+Partial.
+
+4.3 Evaluation
+
+N
+
+Evaluation approach: Let Fn = total novel class instances misclassiﬁed as ex-
+isting class, Fp = total existing class instances misclassiﬁed as novel class, Fe
+= total existing class instances misclassiﬁed (other than Fp), Nc = total novel
+class instances in the stream, N = total instances the stream. We use the fol-
+lowing performance metrics to evaluate our technique: Mnew = % of novel class
+instances Misclassiﬁed as existing class = Fn∗100
+, Fnew = % of existing class
+Nc
+instances Falsely identiﬁed as novel class = Fp∗100
+, ERR = Total misclassiﬁca-
+N−Nc
+tion error (%)(including Mnew and Fnew) = (Fp+Fn+Fe)∗100
+. From the deﬁnition
+of the error metrics, it is clear that ERR is not necessarily equal to the sum of
+Mnew and Fnew. Also, let Lp be the percentage of instances in the data stream
+required to have labels for training.
+
+Evaluation is done as follows: we build the initial models in each method with
+the ﬁrst init number labeled chunks with all instances in each chunk labeled.
+In our experiments, we set init number = 3. From the 4th chunk onward, we
+evaluate the performances of each method on each data point. We update the
+models with a new chunk whenever all weakly classiﬁed instances (WCIs) in that
+chunk are labeled.
+Results: Figures 1(a1),1(b1) show the ERR of each baseline technique and ﬁg-
+ures 1(a2),1(b2) show the percentage of data labeled (Lp) corresponding to each
+technique on a real (Forest) and a synthetic (SynCN) dataset with decision
+tree. Corresponding charts for other datasets and k-NN classiﬁer are similar,
+and omitted due to the space limitation. Figure 1(a1) shows the ERR of each
+technique at diﬀerent stream positions for Forest dataset. The X axis in this
+chart corresponds to a particular stream position, and the corresponding value
+at the Y axis represents the ERR upto that position. For example, at X=200,
+corresponding Y values represent the ERR of a technique on the ﬁrst 200K in-
+stances in the stream. At this position, corresponding Y values (i.e., ERR) of
+AM, WOPf, WOPP , WOSf and WOSp are 7.5%, 10.8%, 56.2%, 12.3%, and
+63.2%, respectively. The percentage of data required to be labeled (LP ) by each
+of these techniques for the same dataset (Forest) is shown in ﬁgure 1(a2). For ex-
+ample, at the same X position (X=200), the LP values for AM, WOPf, WOPP ,
+WOSf and WOSp are 8.9%, 100%, 12.7%, 100%, and 9%, respectively. Therefore,
+from the ﬁrst 200K instances in the stream, AM required only 8.9% instances to
+have labels, whereas, its nearest competitor (WOPf ) required 100% instances to
+
+Classiﬁcation and Novel Class Detection
+
+321
+
+(a1) Forest
+
+(b1) SynCN
+
+(c1) Forest
+
+(d1) SynCN
+
+AM
+WOPf
+WOPp
+WOSf
+WOSp
+
+ 100  200  300  400
+
+ 100
+
+ 200
+
+ 300
+
+(a2) Forest
+
+(b2) SynCN
+
+R
+R
+E
+
+ 80
+ 70
+ 60
+ 50
+ 40
+ 30
+ 20
+ 10
+ 0
+
+)
+
+p
+L
+(
+ 
+
+d
+e
+l
+e
+b
+a
+l
+ 
+t
+n
+e
+c
+r
+e
+P
+
+ 100
+
+ 80
+
+ 60
+
+ 40
+
+ 20
+
+ 0
+
+35K
+30K
+25K
+20K
+15K
+10K
+5K
+0
+
+35K
+30K
+25K
+20K
+15K
+10K
+5K
+0
+
+d
+e
+s
+s
+i
+
+m
+
+ 
+s
+e
+c
+n
+a
+t
+s
+n
+i
+ 
+l
+e
+v
+o
+N
+
+d
+e
+r
+e
+t
+n
+u
+o
+c
+n
+e
+ 
+s
+e
+c
+n
+a
+t
+s
+n
+i
+ 
+l
+e
+v
+o
+N
+
+ 100  200  300  400
+
+ 100  200  300
+
+(c2) Forest
+
+(d2) SynCN
+
+ 100  200  300  400
+
+ 100
+
+ 200
+
+ 300
+
+ 100  200  300  400
+
+ 100  200  300
+
+Stream (in thousand data pts)
+
+Stream (in thousand data pts)
+
+Fig. 1. Overall error (ERR), percentage of data required to be labeled (Lp), total novel
+instances missed, and encountered by each method
+
+have labels. So, AM, using 11 times less labeled data, achieves lower ERR rates
+than WOPf . Note that ERR rates of other methods such as WOPp, which uses
+less than 100% labeled data, are much worse.
+
+Figures 1(c1),1(d1) show the number of novel instances missed (i.e., misclassi-
+ﬁed as existing class) by each baseline technique, and ﬁgures 1(c2),1(d2) report
+the total number of novel instances encountered by each technique on the same
+real (Forest) and synthetic (SynCN) datasets with decision tree classiﬁer. For
+example, in ﬁgure 1(c1), for X=200, the Y values represent the total number of
+novel class instances missed by each technique within the ﬁrst 200K instances
+in the stream. The corresponding Y values for AM, WOPf, WOPP , WOSf and
+WOSp are 366, 5,317, 13,269, 12,156 and 14,407, respectively. ﬁgure 1(c2) shows
+the total number of novel instances encountered by each method at diﬀerent
+stream positions for the same dataset. Diﬀerent approaches encounter diﬀerent
+amount of novel class instances because the ensemble of classiﬁers in each ap-
+proach evolve in diﬀerent ways. Therefore, a class may be novel for one approach,
+and may be existing for another approach.
+
+Table 1 shows the summary of the evaluation. The table is split into two parts:
+the upper part shows the ERR and Mnew values, and the lower part shows the
+Fnew and Lp values. For example, consider the upper part of the table corre-
+sponding to the row KDD under Decision tree. This row shows the ERR and
+Mnew rates for each of the baseline techniques on KDD dataset for decision tree
+classiﬁer. Here AM has the lowest ERR rate, which is 1.2%, compared to 5.8%,
+64.0%, 6.7%, and 74.8% ERR rates of WOPf, WOPp, WOSf and WOSp, re-
+spectively. Also, the Mnew rate of AM is much lower (1.4%) compared to any
+other baselines. Although WOSf and WOPf have lower ERR rates in SynC
+
+322
+
+M.M. Masud et al.
+
+Table 1. Performance comparison
+
+ERR
+
+Mnew
+
+Classiﬁer
+
+Dataset
+
+AM WOPf WOPp WOSf WOSp AM WOPf WOPp WOSf WOSp
+
+Decision tree
+
+k-NN
+
+Classiﬁer
+
+Decision tree
+
+k-NN
+
+SynC 13.4 14.1
+SynCN 0.3
+8.9
+1.2
+5.8
+KDD
+6.3
+7.9
+Forest
+0.0
+2.4
+SynC
+SynCN 0.0
+8.9
+1.1
+4.9
+KDD
+4.1
+7.1
+Forest
+
+Dataset
+
+12.8
+13.9
+6.7
+8.5
+1.1
+13.9
+5.2
+4.6
+
+42.5
+38.4
+64.0
+74.5
+2.4
+17.2
+15.3
+16.9
+Fnew
+
+-
+
+-
+
+0.0
+1.4
+4.6
+
+26.5
+13.2
+30.7
+
+42.3
+55.7
+74.8
+77.4
+1.1
+26.5
+36.0
+12.9
+63.2
+37.8 15.4 32.0
+
+0.0
+6.2
+
+-
+
+-
+
+-
+
+96.2
+96.9
+70.1
+
+-
+
+96.2
+96.5
+70.1
+
+-
+
+96.3
+96.1
+83.1
+
+-
+
+98.9
+99.1
+82.2
+
+-
+
+31.0
+22.4
+69.3
+
+-
+
+26.3
+76.1
+28.6
+Lp
+
+AM WOPf WOPp WOSf WOSp AM WOPf WOPp WOSf WOSp
+0.0
+2.05
+SynC
+SynCN 0.0
+9.31
+3.34
+1.1
+KDD
+Forest
+3.0
+6.56
+0.0
+1.09
+SynC
+SynCN 0.0
+8.35
+1.73
+0.9
+KDD
+Forest
+1.9
+5.20
+
+1.0 1.04 100
+0.1 9.31 100
+0.03 3.33 100
+0.2 6.51 100
+1.1
+100
+0.1 8.35 100
+0.03 1.73 100
+0.2 5.05 100
+
+3.41
+12.10
+8.82
+8.08
+2.46
+12.73
+7.94
+6.82
+
+1.1
+0.1
+0.03
+0.2
+1.1
+0.1
+0.03
+0.2
+
+100
+100
+100
+100
+100
+100
+100
+100
+
+2.4
+1.6
+4.3
+1.1
+2.4
+1.6
+4.4
+1.1
+
+2.4
+1.5
+4.5
+1.1
+2.4
+1.7
+4.8
+1.0
+
+0.0
+
+(decision tree), and Forest (k-NN), respectively, they use at least 20 times more
+labeled data than AM in those datasets, which is reported in the lower right
+part of the table (under Lp), and their Mnew rates are much higher than AM.
+Note that Lp is determined from the WCIs, i.e., what percentage of instances are
+weakly classiﬁed by the ensemble. Therefore, it is diﬀerent for diﬀerent datasets.
+Some readers might ﬁnd it surprising that active learning outperforms learn-
+ing with full labels. However, it should be noted that ActMiner outperforms
+other proposed techniques, not MineClass itself. MineClass, using 100% labeled
+instances for training, still outperforms ActMiner because ActMiner uses less la-
+beled instance. However, other proposed techniques (like WOP) have too strong
+requirement about class properties. For example, OLINDDA requires the classes
+to have convex shape, and assumes similar density of each class of data. On the
+other hand, ActMiner does not have any such requirement. Therefore, in most
+real world scenarios, where classes have non-convex shape, and diﬀerent classes
+have diﬀerent data densities, ActMiner performs much better than OLINDDA
+in detecting novel class, even with much less label information.
+
+Figure 2(left) shows the eﬀect of increasing the minimum majority threshold
+(MMT) on ERR rate, and ﬁgure 2(right) shows the percentage instances labeled
+for diﬀerent values of MMT on SynC. For AM, the ERR rate starts decreasing
+after MMT=0.5. This is because there is no instance for which the M2S (majority
+to sum) ratio is less than 0.5. So, Lp remains the same (1%) for MMT=0.1 to 0.5
+(see ﬁgure 2(b)), since the only instances needed to be labeled for these values
+of MMT are the F -outlier instances. However, when MMT=0.6, more instances
+needed to be labeled (Lp=3.2%) as the M2S ratio for these (3.2-1.0=) 2.2%
+instances are within the range [0.5,0.6). The overall ERR also reduces since more
+labeled instances are used for training. Sensitivity of AM to other parameters
+are similar to MineClass [4], and omitted here due to space limitations.
+
+Classiﬁcation and Novel Class Detection
+
+323
+
+AM
+WOPf
+WOPp
+WOSf
+WOSp
+
+R
+R
+E
+
+ 40
+
+ 30
+
+ 20
+
+ 10
+
+ 0
+
+AM
+WOPf
+WOPp
+WOSf
+WOSp
+
+)
+
+p
+L
+(
+ 
+d
+e
+l
+e
+b
+a
+l
+ 
+t
+n
+e
+c
+r
+e
+P
+
+ 100
+
+ 80
+
+ 60
+
+ 40
+
+ 20
+
+ 0
+
+ 0.2
+
+ 0.4
+
+ 0.6
+MMT
+
+ 0.8
+
+ 1
+
+ 0.2
+
+ 0.4
+
+ 0.6
+MMT
+
+ 0.8
+
+ 1
+
+Fig. 2. Eﬀects of increasing the minimum majority threshold (MMT)
+
+Table 2. Running time comparison in all datasets
+
+Dataset
+
+Time(sec)/1K
+
+Time(sec)/1K
+
+(including labeling time)
+AM WOPf WOSf AM WOPf WOSf
+
+SynC 0.32
+SynCN 1.6
+1.1
+KDD
+Forest
+0.87
+
+0.41
+14.3
+24.0
+8.5
+
+0.2
+3.1
+0.6 34.4 1,024.0
+0.5 66.0 1,008.5
+
+1,000.6
+1,000.5
+
+Table 2 reports the running times of AM and other baseline techniques
+on diﬀerent datasets with decision tree. Running times with k-NN also have
+similar characteristics. Since WOPf and WOPp have the same running times,
+we report only WOPf . The same is true for WOSf and WOSp. The columns
+headed by “Time (sec)/1K ” show the average running times (train and test)
+in seconds per 1000 points excluding data labeling time, and the columns
+headed by “Time (sec)/1K (including labeling time)” show the same including
+data labeling time. For example, excluding the data labeling time, AM takes
+1.1 seconds to process 1K instances on the KDD dataset, whereas WOPf,
+WOPp takes 24.0, and 0.5 seconds, respectively. In general, WOPf is much
+slower than AM, requiring about C times more runtime than AM. This is
+because WOP maintains C parallel OLIN DDA models to detect novel classes.
+Besides, OLINDDA creates clusters using an internal buﬀer every time it
+encounters an instance that is identiﬁed as unknown, which consumes much
+of its running time. On the other hand, WOSf runs slightly faster than AM
+in three datasets. But this advantage of WOSf is undermined by its much
+poorer performance in classiﬁcation accuracy than AM. If we consider the
+data labeling time, we get a more compelling picture. We consider the labeling
+times only for real datasets. Suppose the labeling time for each data point
+for the real datasets is 1 sec, although in real life, data labeling may require
+much longer time [12]. Out of each 1000 instances, AM requires only 33, and
+65 instances to have labels for the KDD, and Forest datasets, respectively
+(see table 1 under Lp). Whereas WOPf and WOSf require all the 1000
+instances to have labels. Therefore, the total running time of AM per 1000
+
+324
+
+M.M. Masud et al.
+
+instances including data labeling time is only 3.4% and 6.5% of that of WOPf
+and WOSf for KDD and Forest datasets, respectively. Thus, AM outperforms
+the baseline techniques both in classiﬁcation accuracies and running times.
+
+5 Conclusion
+
+Our approach, ActMiner, provides a more complete framework for data stream
+classiﬁcation than existing techniques. ActMiner integrates the solutions to four
+major data stream classiﬁcation problems: inﬁnite length, concept-drift, concept-
+evolution, and limited labeled data. Most of the existing techniques address only
+two or three of these four problems. ActMiner reduces data labeling time and cost
+by requiring only a few selected instances to be labeled. Even with this limited
+amount of labeled data, it outperforms state-of-the-art data stream classiﬁcation
+techniques that use ten times or more labeled data. In future, we would like to
+address the dynamic feature set problem and multi-label classiﬁcation problems
+in data stream classiﬁcation.
+
+References
+
+1. Hulten, G., Spencer, L., Domingos, P.: Mining time-changing data streams. In:
+
+Proc. KDD ’01, pp. 97–106 (2001)
+
+2. Wang, H., Fan, W., Yu, P.S., Han, J.: Mining concept-drifting data streams using
+
+ensemble classiﬁers. In: Proc. KDD ’03, pp. 226–235 (2003)
+
+3. Chen, S., Wang, H., Zhou, S., Yu: Stop chasing trends: Discovering high order
+
+models in evolving data. In: Proc. ICDE ’08, pp. 923–932 (2008)
+
+4. Masud, M.M., Gao, J., Khan, L., Han, J., Thuraisingham, B.M.: Integrating
+novel class detection with classiﬁcation for concept-drifting data streams. In:
+Buntine, W., Grobelnik, M., Mladeni´c, D., Shawe-Taylor, J. (eds.) ECML PKDD
+2009. LNCS, vol. 5782, pp. 79–94. Springer, Heidelberg (2009)
+
+5. Kolter, J.Z., Maloof, M.A.: Using additive expert ensembles to cope with concept
+
+drift. In: Proc. ICML ’05, Bonn, Germany, pp. 449–456 (2005)
+
+6. Yang, Y., Wu, X., Zhu, X.: Combining proactive and reactive predictions for data
+
+streams. In: Proc. KDD ’05, pp. 710–715 (2005)
+
+7. Zhu, X., Zhang, P., Lin, X., Shi, Y.: Active learning from data streams. In: Perner,
+P. (ed.) ICDM 2007. LNCS (LNAI), vol. 4597, pp. 757–762. Springer, Heidelberg
+(2007)
+
+8. Fan, W., an Huang, Y., Wang, H., Yu, P.S.: Active mining of data streams. In:
+
+SDM, pp. 457–461 (2004)
+
+9. Masud, M.M., Gao, J., Khan, L., Han, J., Thuraisingham, B.M.: A practical ap-
+proach to classify evolving data streams: Training with limited amount of labeled
+data. In: Proc. ICDM ’08, pp. 929–934 (2008)
+
+10. Spinosa, E.J., de Leon, F., de Carvalho, A.P., Gama, J.: Cluster-based novel con-
+cept detection in data streams applied to intrusion detection in computer networks.
+In: Proc. SAC ’08, pp. 976–980 (2008)
+
+11. Tumer, K., Ghosh, J.: Error correlation and error reduction in ensemble classiﬁers.
+
+Connection Science 8(304), 385–403 (1996)
+
+12. van Huyssteen, G.B., Puttkammer, M.J., Pilon, S., Groenewald, H.J.: Using
+machine learning to annotate data for nlp tasks semi-automatically. In: Proc.
+Computer-Aided Language Processing, CALP’07 (2007)
+
+

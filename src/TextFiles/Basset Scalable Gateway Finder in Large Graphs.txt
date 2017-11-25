@@ -1,0 +1,1666 @@
+BASSET: Scalable Gateway Finder in Large
+
+Graphs
+
+Hanghang Tong1, Spiros Papadimitriou2, Christos Faloutsos1,
+
+Philip S. Yu3, and Tina Eliassi-Rad4
+
+1 Carnegie Mellon University
+{htong,christos}@cs.cmu.edu
+
+2 IBM T.J. Watson
+spapadim@us.ibm.com
+
+3 University of Illinois at Chicago
+
+psyu@cs.uic.edu
+
+4 Lawrence Livermore National Laboratory
+
+eliassi@llnl.gov
+
+Abstract. Given a social network, who is the best person to introduce
+you to, say, Chris Ferguson, the poker champion? Or, given a network
+of people and skills, who is the best person to help you learn about, say,
+wavelets? The goal is to ﬁnd a small group of ‘gateways’: persons who
+is close enough to us, as well as close enough to the target (person, or
+skill) or, in other words, are crucial in connecting us to the target.
+
+The main contributions are the following: (a) we show how to formu-
+late this problem precisely; (b) we show that it is sub-modular and thus
+it can be solved near-optimally; (c) we give fast, scalable algorithms to
+ﬁnd such gateways. Experiments on real data sets validate the eﬀective-
+ness and eﬃciency of the proposed methods, achieving up to 6,000,000x
+speedup.
+
+Keywords: Gateway, Sub-modularity, Scalability, Graph-Mining.
+
+1 Introduction
+
+What is the best gateway between a source node and a target node, in a net-
+work? This is a core problem that appears under several guises, with numerous
+generalizations. Motivating applications include the following:
+
+1. In a corporate social network, which are the key people that bring or hold
+diﬀerent groups together? Or, if seeking to establish a cross-division project,
+who are the best people to lead such an eﬀort?
+
+2. In an immunization setting, given a set of nodes that are infected, and a set
+of nodes we want to defend, which are the best few ‘gateways’ we should
+immunize?
+
+3. Similarly, in a network setting, which are the gateway nodes we should best
+
+defend against an attack, to maximize connectivity from source to target.
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part II, LNAI 6119, pp. 449–463, 2010.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2010
+
+450
+
+H. Tong et al.
+
+The problem has several, natural generalizations: (a) we may be interested in
+the top k best gateways (in case our ﬁrst few choices are unavailable); (b) we
+may have more than one source nodes, and more than one target nodes, as
+in the immunization setting above; (c) we may have a bi-partite graph with
+relationships (edges) between diﬀerent node types, as in the last example above.
+Our main contributions in this paper are:
+
+– A novel ‘gateway-ness’ score for a given source and target, that agrees with
+human intuition. Its generalization to the case where we have a group of
+nodes as the source and the target;
+
+– Two algorithms to ﬁnd a set of nodes with the highest ‘gateway-ness’ score,
+
+which (1) are fast and scalable; and (2) lead to near-optimal results;
+
+– Extensive experimental results on real data sets, showing the eﬀectiveness
+
+and eﬃciency of the proposed methods.
+
+The rest of the paper is organized as follows: We give the problem deﬁnitions
+in Section 2; present ‘gateway-ness’ scores in Section 3; and deal with the com-
+putational issues in Section 4. We evaluate the proposed methods in Section 5.
+Finally, we review the related work in Section 6 and conclude in Section 7.
+
+Table 1. Symbols
+
+(cid:2)
+
+Symbol Deﬁnition and Description
+A, B, . . . matrices (bold upper case)
+the element at the ith row and jth column of matrix A
+A(i, j)
+the ith row of matrix A
+A(i, :)
+the jth column of matrix A
+A(:, j)
+transpose of matrix A
+A
+a, b, . . .
+column vectors
+p, q, . . .
+ordered sequences
+S,T , . . .
+sets (calligraphic)
+n
+number of nodes in the graph
+m
+number of edges in the graph
+the ‘Gateway-ness’ score for the subset of nodes I wrt s and t
+g(s, t,I)
+g(S,T , I) the ‘Gateway-ness’ score for the subset of nodes I wrt S and T
+r(s, t)
+rI (s, t)
+
+the proximity score from s to t
+the proximity score from s to t by setting the subset of
+nodes indexed by I as sinks
+
+2 Problem Deﬁnitions
+
+Table 1 lists the main symbols we use throughout the paper. In this paper, we
+focus on directed weighted graphs. We represent the graph by its normalized
+adjacency matrix (A). Following standard notation, we use capital bold letters
+for matrices (e.g., A), lower-case bold letters for vectors (e.g., a), and calli-
+graphic fonts for sets (e.g., S). We denote the transpose with a prime (i.e., A(cid:3)
+
+BASSET: Scalable Gateway Finder in Large Graphs
+
+451
+
+is the transpose of A). We use arrowed lower-case letters for paths on the graph
+(e.g., p), which are ordered sequences. We use parenthesized superscripts to
+represent source/target information for the corresponding variables. For example
+p(s,t) = {s = u0, u1, ..., ul = t} is a path from the source node s to the target
+node t. If the source/target information is clear from the context, we omit the
+superscript for brevity. A sink node i on the graph is a node without out-links
+(i.e., A(:, i) = 0). We use subscripts to denote the corresponding variable after
+setting the nodes indexed by the subscripts as sinks. For example, p(s,t)I
+is the
+path from the source node s to the target node t, which does not go through any
+nodes indexed by the set I (i.e., ui /∈ I, i = 0, ..., l). With the above notations,
+our problems can be formally deﬁned as follows:
+
+Problem 1. (Pair-Gateway)
+Given: A weighted directed graph A, a source node s, a target node t, and a
+
+Find: A set of at most k nodes which has the highest ‘gate-way-ness’ score wrt
+
+budget (integer) k;
+
+s and t.
+
+Problem 2. (Group-Gateway)
+Given: A weighted directed graph A, a group of source nodes S, a group of
+
+target nodes T , and a budget (integer) k;
+S and T .
+
+Find: A set of at most k nodes which has the highest ‘gate-way-ness’ score wrt
+
+In both Problem 1 (Pair-Gateway) and Problem 2 (Group-Gateway), there are
+two sub-problems: (1) how to deﬁne the ‘gateway-ness’ score of a given subset
+of nodes I; (2) how to ﬁnd the subset of nodes with the highest ‘gateway-ness’
+score. In the next two sections, we present the solutions for each, respectively.
+
+3 Proposed ‘Gateway-ness’ Scores
+
+In this section, we present our deﬁnitions for ‘Gateway-ness’. We ﬁrst focus on
+the case of a single source s and a single target t (Pair-Gateway). We then
+generalize to the case where both the source and the target are a group of nodes
+(Group-Gateway)
+
+3.1 Node ‘Gateway-ness’ Score
+
+Given a single source s and a single target t, we want to measure the ‘Gateway-
+ness’ score for a given set of nodes I. We ﬁrst give the formal deﬁnitions in such
+a setting and then provide some intuitions for our deﬁnitions.
+
+For a graph A, we can use random walk with restart to measure the proxim-
+ity (i.e., relevance/closeness) from the source node s to the target node t, which
+is deﬁned as follows: Consider a random particle that starts from node s. The
+particle iteratively transits to its neighbors with probability proportional to the
+
+452
+
+H. Tong et al.
+
+corresponding edge weights. Also at each step, the particle returns to node s
+with some restart probability (1− c). The proximity score from node s to node t
+is deﬁned as the steady-state probability r(s, t) that the particle will be on node
+t [15]. Intuitively, r(s, t) is the fraction of time that the particle starting from
+node s will spend on node t of the graph, after an inﬁnite number of steps.
+Intuitively, a set of nodes I are good gateways wrt s and t if they play an
+important role in the proximity measure from the source to the target. Therefore,
+our ‘Gateway-ness’ score can be deﬁned as follows:
+
+g(s, t,I) (cid:2) Δr(s, t) (cid:2) r(s, t) − rI(s, t)
+
+(1)
+
+where rI(s, t) is the proximity score from source s to t after setting the subset
+of nodes indexed by I as sinks.
+
+3.2 Group ‘Gateway-ness’ Score
+Here we consider the case where the source and/or target consist of more than
+one nodes. Suppose we have a group of source nodes S and a group of target
+nodes T . Then, the ‘Gateway-ness’ score for a given set of nodes I can be deﬁned
+in a similar way:
+
+g(S,T ,I) (cid:2)
+
+(cid:2)
+
+s∈S,t∈T
+
+Δr(s, t) (cid:2)
+
+(r(s, t) − rI(s, t))
+
+(2)
+
+(cid:2)
+
+s∈S,t∈T
+
+where rI(s, t) is the proximity score from s to t by setting the subset of nodes
+indexed by I as sinks (i.e., delete all out-edges, by setting A(:, i) = 0 for all
+i ∈ I).
+
+4 BASSET: Proposed Fast Solutions
+
+In this section, we address how to quickly ﬁnd a subset of nodes of the highest
+‘Gateway-ness’ score. We start by showing that the straight-forward methods (re-
+ferred to as ‘Com-RWR’) are computationally intractable. Then, we present the
+proposed BASSET (BASSET-N for Pair-Gateway and BASSET-G for Group-
+Gateway). For each case, we ﬁrst present the algorithm and then analyze its
+eﬀectiveness as well as its computational complexity.
+
+4.1 Computational Challenges
+
+Here, we present the computational challenges and the way we tackle them. For
+the sake of succinctness, we mainly focus on BASSET-N.
+
+There are two main computational challenges in order to ﬁnd a subset of
+nodes with the highest ‘Gateway-ness’ score. First of all, we need to compute
+the proximity from the source to the target on diﬀerent graphs, each of which
+is a perturbed version of the original graph. This essentially means that we
+cannot directly apply some powerful pre-computational method to evaluate the
+proximity from the source to the target (after setting the subset of nodes indexed
+
+BASSET: Scalable Gateway Finder in Large Graphs
+
+453
+
+n
+k
+
+by I as sinks). Instead, we have to rely on on-line iterative methods, whose
+computational complexity is O(m). The challenges are compounded by the need
+to evaluate g(s, t,I) (eq. (1)) or g(S,T ,I)(eq. (2)) an exponential number of
+(cid:4)
+(cid:3)
+). Putting these together, the straightforward way to ﬁnd k nodes with
+times (
+(cid:3)
+(cid:4)
+the highest ‘Gateway-ness’ score is O(
+m). This is computationally intractable.
+Suppose on a graph with 1, 000, 000 nodes, we want to ﬁnd the best k = 5
+gateway nodes. If computing each proximity score takes 0.001 seconds, then
+2.64 × 1017 years are needed to ﬁnd the gateways. This is much longer than the
+age of the universe.1
+
+n
+k
+
+To tackle such challenges, we resort to two main ideas, which are summarized
+in Theorem 1. According to Theorem 1, in order to evaluate the ‘Gateway-
+ness’ score of a given set of nodes, we do not need to actually set these nodes
+as sinks and compute the proximity score on the new graph. Instead, we can
+compute it from the original graph. In this way, we can utilize methods based
+on pre-computation to accelerate the process. Furthermore, since g(s, t,I) and
+g(S,T ,I) are sub-modular wrt I, we can develop some greedy algorithm to
+avoid exponential enumeration, and still get some near-optimal solution. In The-
+orem 1, A is the normalized adjacency matrix of the graph. It is worth pointing
+out that The proposed methods (BASSET-N and BASSET-G) we will intro-
+duce are orthogonal to the speciﬁc way of normalization. For simplicity, we use
+column-normalization throughout this paper. Also, Q(I,I) is a |I|×|I| matrix,
+containing the elements in the matrix Q which are at the rows/columns indexed
+by I. Similarly, Q(t,I) is a row vector with length |I|, containing the elements
+in the matrix Q which are at the tth row and the columns indexed by I. Q(I, s)
+is a column vector with length |I|, containing the elements in the matrix Q
+which are at the sth column and the rows indexed by I.
+Theorem 1. Core Theorem. Let A be the normalized adjacency matrix of the
+graph, and Q = (1−c)(I−cA)−1. For a given source s and target t, the ‘Gateway-
+ness’ score of a subset of nodes I deﬁned in eq. (1) satisﬁes the properties P1 and
+P2. For a given source group S and target group T , the ‘Gateway-ness’ score of
+a subset of nodes I deﬁned in eq. (2) satisﬁes the properties P3 and P4, where
+s (cid:3)= t, s, t /∈ I, S (cid:5)T = ∅, S (cid:5)I = ∅, and T (cid:5)I = ∅.
+P1. g(s, t,I) = Q(t,I)Q(I,I)−1Q(I, s);
+P2. g(s, t,I) is sub-modular wrt the set I.
+P3. g(S,T ,I) =
+P4. g(S,T ,I) is sub-modular wrt the set I.
+Proof of P1: WLOG, we assume that I = {n − k + 1, ...n}. Let A and ˜A be
+the normalized adjacency matrices of the graph before/after we set the subset
+of nodes in I as sinks. Write A and ˜A in block form:
+
+s∈S,t∈T Q(t,I)Q(I,I)−1Q(I, s);
+
+(cid:6)
+
+(3)
+
+(cid:7)
+
+A =
+
+A1,1 A1,2
+A2,1 A2,2
+
+(cid:8)
+
+(cid:7)
+
+, ˜A =
+
+˜A1,1 ˜A1,2
+˜A2,1 ˜A2,2
+
+(cid:8)
+
+(cid:7)
+
+(cid:8)
+
+=
+
+A1,1 0
+A2,1 0
+
+1 According to Wikipedia, (http://en.wikipedia.org/wiki/Age of the universe),
+the age of the universe is about 1.4 × 1010 year.
+
+454
+
+H. Tong et al.
+
+where 0 is a matrix with all zero elements.
+
+Let ˜Q = (1 − c)(I − c ˜A)−1. We can also write ˜Q and Q in block form:
+(cid:8)−1
+
+(cid:7)
+
+(cid:7)
+
+(cid:8)
+
+I − cA1,1 −cA1,2
+−cA2,1 I − cA2,2
+
+Q = (1 − c)(I − cA)
+
+−1
+
+=
+
+(cid:7)
+
+˜Q =
+
+(cid:8)
+
+˜Q1,1 ˜Q1,2
+˜Q2,1 ˜Q2,2
+
+= (1 − c)
+
+= (1 − c)
+(cid:8)−1
+
+Q1,1 Q1,2
+Q2,1 Q2,2
+(cid:7)
+I − cA1,1 0
+−cA2,1 I
+
+Applying the block matrix inverse lemma [12] to ˜Q and Q, we get the following
+equations:
+
+−1, ˜Q1,2 = 0
+
+˜Q1,1 = (1 − c)(I − cA1,1)
+˜Q2,1 = c(1 − c)A2,1(I − cA1,1)
+Q1,1 = (1 − c)(I − cA1,1)
++ c2
+Q1,2 = c(I − cA1,1)
+Q2,1 = cQ2,2A2,1(I − cA1,1)
+
+A1,2Q2,2
+−1
+
+−1
+
+−1
+
+−1, ˜Q2,2 = (1 − c)I
+(I − cA1,1)
+
+−1
+
+A1,2Q2,2A2,1(I − cA1,1)
+
+Therefore, we have
+
+˜Q1,1 = Q1,1 − Q1,2Q
+
+−1
+2,2Q2,1
+
+−1
+
+(4)
+
+(5)
+
+On the other hand, based on the properties of random walk with restart [15],
+we have r(i, j) = Q(j, i), and rI(i, j) = ˜Q(j, i),(i, j = 1, ..., n). Together with
+eq. (5), we have
+
+g(s, t,I) = r(s, t) − rI(s, t) = Q1,1(t, s) − ˜Q1,1(t, s) = Q1,2(t, :)Q
+
+−1
+2,2Q1,2(:, s)
+
+(6)
+(cid:5)(cid:6)
+
+which completes the proofs of P1.
+Proof of P3: Since P1 holds, we have
+g(S,T , I) =
+
+Δr(s, t) =
+
+(cid:2)
+
+(cid:2)
+
+s∈S,t∈T
+
+s∈S,t∈T
+
+g(s, t,I) =
+
+(cid:2)
+
+s∈S,t∈T
+
+Q(t,I)Q(I, I)
+
+−1
+
+Q(I, s)(7)
+
+(cid:5)(cid:6)
+which completes the proofs of P3.
+Proof of P2: Let I,J ,K be three subsets and I ⊆ J . We will ﬁrst prove by
+induction that, for any integer power j, the following inequality holds element-
+wise.
+
+jI − A
+
+jI (cid:9) K ≥ A
+
+jJ − A
+
+A
+
+jJ (cid:9) K
+
+(8)
+
+It is easy to verify the base case (i.e.,j = 1) for eq. (8) holds. Next, assume that
+eq. (8) holds for j = 1, ..., j0, and we want to prove that it also holds for the case
+j = j0 + 1:
+− A
+
+j0+1I (cid:9) K = A
+
+j0+1I
+
+A
+
+− A
+j0+1I
+j0I − A
+j0J − A
+j0J − A
+
+j0I (cid:9) KAI + A
+j0I (cid:9) K)AI + A
+j0J (cid:9) K)AI + A
+j0J (cid:9) K)AJ + A
+
+j0I (cid:9) KAI − A
+j0+1I (cid:9) K
+j0I (cid:9) K(AI − AI (cid:9) K)
+j0I (cid:9) K(AJ − AJ (cid:9) K)
+j0J (cid:9) K(AJ − AJ (cid:9) K) = A
+
+= (A
+≥ (A
+≥ (A
+
+j0+1J − A
+
+j0+1J (cid:9) K(9)
+
+BASSET: Scalable Gateway Finder in Large Graphs
+
+455
+
+In eq. (9), the ﬁrst inequality holds because of the induction assumption. The
+second inequality holds because AI ≥ AJ ≥ 0 holds element-wise, and AI (cid:9) K ≥
+AJ (cid:9) K ≥ 0 holds element-wise.
+
+Since ˜Q = (1 − c)(I − c ˜A)−1 = (1 − c)
+∞(cid:2)
+
+g(s, t,I ∪ K) − g(s, t,I) = (1 − c)
+
+(cid:6)∞
+
+j=0(c ˜A)j, we have
+
+((cAI)
+
+j
+
+(t, s) − (cAI (cid:9) K)
+
+j
+
+(t, s))
+
+j=0
+
+∞(cid:2)
+
+≥ (1 − c)
+= g(s, t,J ∪ K) − g(s, t,J )
+
+((cAJ )
+
+j=0
+
+j
+
+(t, s) − (cAJ (cid:9) K)
+
+j
+
+(t, s))
+
+(10)
+(cid:5)(cid:6)
+Therefore, g(s, t,I) is sub-modular, which completes the proof of P2.
+s∈S,t∈T g(s, t,I) (In other words, g(S,T ,I)
+Proof of P4: Since g(S,T ,I) =
+is a non-negative linear combination of sub-modular functions) , according to
+the linearity of sub-modular functions [8], we have that g(S,T ,I) is also sub-
+(cid:5)(cid:6)
+modular, which completes the proof of P4.
+
+(cid:6)
+
+4.2 BASSET-N for Problem 1
+
+r(i,i)
+
+BASSET-N Algorithm. Our fast solution for Problem 1is summarized in Alg. 1.
+In Alg. 1, after initialization (step 1), we ﬁrst pick a node i0with the highest r(s,i)r(i,t)
+(step 3). Then, in steps 4-14, we ﬁnd the rest of the nodes in a greedy way. That is,
+in each outer loop, we try to ﬁnd one more node while keeping the current I un-
+changed. According to P1 of theorem 1, v(i) computed in step 7 is the gateway score
+for the subset J .2 If the current subset of nodes I can completely disconnect the
+source and the target
+stop the
+algorithm (step 12). Therefore, Alg. 1 always returns no more than k nodes. It is
+worth pointing out that in Alg. 1, all the proximity scores are computed from the
+original graph A. Therefore, we can utilize some powerful methods based on pre-
+computation to accelerate the whole process. To name a few, for a medium size
+graph A (e.g., a few thousands of nodes), we can pre-compute and store the matrix
+Q = (1 − c)(I − cA)−1; for large unipartite graphs and bipartite graphs, we can
+use the NB LIN and BB LIN algorithms, respectively [15].
+
+(by setting them as
+
+sinks), we will
+
+Analysis of BASSET-N. In this subsection, we analyze the eﬀectiveness and
+the eﬃciency of Alg. 1. First, the eﬀectiveness of the proposed BASSET-N is
+guaranteed by the following lemma. According to Lemma 1, although BASSET-
+N is a greedy algorithm, the results it outputs are near-optimal.
+Lemma 1. Eﬀectiveness of BASSET-N. Let I be the subset of nodes se-
+lected by Alg. 1 and |I| = k0. Then, g(s, t,I) ≥ (1 − 1/e)max|J |=k0 g(s, t,J ),
+where g(s, t,I), and g(s, t,J ) are deﬁned by eq. (1).
+Proof: It is easy to verify that the node i0 selected in step 10 of Alg. 1 satisﬁes
+i0 = argmaxj /∈I,j(cid:6)=s,j(cid:6)=tg(s, t,I (cid:9)
+j). Also, we have g(s, t, φ) = 0, where φ is an
+
+2 This is because in random walk with restart, we have r(i, j) = Q(j, i) for any i, j [15].
+
+456
+
+H. Tong et al.
+
+r(s,i)r(i,t)
+
+r(i,i)
+
+(cid:2)
+
+r(J ,J )
+
+else
+
+break;
+
+budget k and the parameter c
+
+ﬁnd i0 = argmaxiv(i); add i0 to I.
+
+, where i = 1, ..., n and i (cid:5)= s, i (cid:5)= t. add i0 to I.
+
+for i = 1 to n, and i (cid:5)= s, i (cid:5)= t and i /∈ I do
+−1r(s,J )
+(cid:2)
+
+Algorithm 1. BASSET-N
+Input: the normalized adjacency matrix A, the source node s, the target node t, the
+Output: a set of nodes I, where |I| ≤ k.
+1: initialize I to be empty.
+2: compute the proximity score r(s, t) from the source node s to the target node t.
+3: ﬁnd i0 = argmaxi
+4: for j = 2 to k do
+5:
+let J = I ∪ i.
+6:
+compute v(i) = r(J , t)
+7:
+end for
+8:
+if maxiv(i) ≤ r(s, t) then
+9:
+10:
+11:
+12:
+end if
+13:
+14: end for
+15: return I
+empty set. On the other hand, according to Theorem 1, g(s, t,I) is sub-modular
+wrt the subset I. Therefore, we have g(s, t,I) ≥ (1 − 1/e)max|J |=k0 g(s, t,J ),
+(cid:5)(cid:6)
+which completes the proof.
+Next, we analyze the eﬃciency of BASSET-N, which is given in Lemma 23. We
+can draw the following two conclusions, according to Lemma 2: (1) the proposed
+BASSET-N achieves a signiﬁcant speedup over the straight-forward method (O(n·
+(cid:4)
+(cid:3)
+m)). For example, in the graph with 100 nodes and 1,000 edges, in
+k4) vs. O(
+order to ﬁnd the gateway with k = 5 nodes, BASSET-N is more than 6 orders
+of magnitude faster, and the speedup quickly increases wrt the size of the graph;
+(2) the proposed BASSET-N is applicable to large graphs since it is linear wrt the
+number of the nodes.
+Lemma 2. Eﬃciency of BASSET-N. The computational complexity of Alg. 1
+is upper bounded by O(n · k4).
+Proof: The cost for steps 1-2 is constant. The cost for step 3 is O(n). At each
+inner loop (steps 6-7), the cost is O(nj3 + nj2). The cost for steps 9-13 is O(n).
+The outer loop has no more than k − 1 iterations. Putting these together, the
+computational cost for BASSET-N is:
+
+n
+k
+
+Cost(BASSET-N) ≤ n +
+
+k(cid:2)
+
+j=1
+
+(nj3
+
++ nj2
+
++ n)
+
+= n + nk + n
+
+k(k + 1)(2k + 1)
+
+6
+
++ n
+
+k2(k + 1)2
+
+4
+
+= O(nk4
+
+which completes the proof.
+
+) (11)
+(cid:5)(cid:6)
+
+3 Here, we assume that the cost to get one proximity score is constant, which can be
+
+achieved with pre-computation methods [15].
+
+BASSET: Scalable Gateway Finder in Large Graphs
+
+457
+
+4.3 BASSET-G for Problem 2
+
+(cid:6)
+
+s∈S, t∈T r(s,i)r(i,t)
+
+BASSET-G Algorithm. Our fast solution for Problem 2 is summarized in
+Alg. 2. It works in a similar way as Alg. 1: after initialization (step 1), we ﬁrst
+pick a node i0 with the highest
+(step 3). Then, in steps
+4-14, we ﬁnd the rest of the nodes in a greedy way. That is, in each outer-loop,
+we try to ﬁnd one more node while keeping the current I unchanged. If the
+current subset of the nodes I can completely disconnect the source group and
+the target group (by setting them as sinks), we will stop the algorithm (step 10).
+As in Alg. 1, all the proximity scores are computed from the original graph A.
+Therefore, we can again utilize those powerful pre-computation based methods
+to accelerate the whole process.
+
+r(i,i)
+
+the budget k and the parameter c
+
+Algorithm 2. BASSET-G
+Input: the normalized adjacency matrix A, the source group S, the target group T ,
+Output: a set of nodes I, where |I| ≤ k.
+1: initialize I to be empty.
+2: compute the proximity score
+
+s∈S, t∈T r(s, t) from the source group S to the target
+, where i = 1, ..., n and i (cid:5)= s, i (cid:5)= t; add i0
+
+3: ﬁnd i0 = argmaxi
+
+s∈S, t∈T r(s,i)r(i,t)
+
+(cid:6)
+
+(cid:6)
+
+group T .
+to I.
+
+r(i,i)
+
+(cid:6)
+
+end for
+
+for i = 1 to n, and i (cid:5)= s, i (cid:5)= t and i /∈ I do
+s∈S, t∈T r(J , t)
+(cid:2)
+
+4: for j = 2 to k do
+5:
+let J = I ∪ i.
+6:
+compute v(i as v(i) =
+7:
+if maxiv(i) ≤ (cid:6)
+8:
+s∈S, t∈T r(s, t) then
+9:
+ﬁnd i0 = argmaxiv(i); add i0 to I.
+10:
+11:
+12:
+end if
+13:
+14: end for
+15: return I
+
+break;
+
+else
+
+r(J ,J )
+
+−1r(s, J )
+
+(cid:2)
+
+Analysis of BASSET-G. The eﬀectiveness and eﬃciency of the proposed
+BASSET-G are given in Lemma 3 and Lemma 4, respectively. Similar as BASSET-
+N, the proposed BASSET-G is (1) near-optimal; and (2) fast and scalable for large
+graphs.
+Lemma 3. Eﬀectiveness of BASSET-G. Let I be the subset of nodes se-
+lected by Alg. 2 and |I| = k0. Then, g(S,T ,I) ≥ (1− 1/e)max|J |=k0 g(S,T ,J ),
+where g(S,T ,I), and g(S,T ,J ) are deﬁned by eq. (2).
+(cid:5)(cid:6)
+Proof: Similar as for Lemma 1. Omitted for brevity.
+Lemma 4. Eﬃciency of BASSET-G. The computational complexity of Alg. 2
+is upper bounded by O(n · (max(k,|S|,|T |))4).
+Proof: Similar as for Lemma 2. Omitted for brevity.
+
+(cid:5)(cid:6)
+
+458
+
+H. Tong et al.
+
+5 Experimental Evaluations
+
+In this section we present experimental results. All the experiments are designed
+to answer the following questions:
+
+– Eﬀectiveness: how eﬀective are the ‘Gateway-ness’ scores in real graphs?
+– Eﬃciency: how fast and scalable are BASSET-N and BASSET-G?
+
+5.1 Data Sets
+
+We used three real data sets, which are summarized in table 2.
+
+Table 2. Summary of the data sets
+
+Name
+
+PolBooks
+
+AA
+
+NetFlix
+
+n
+
+105
+
+m
+
+882
+
+418,236
+2,667,199
+
+2,753,798
+56,919,190
+
+Weight
+
+No
+Yes
+No
+
+The ﬁrst data set (PolBooks) is a co-purchasing book network.4 Each node
+is a political book and there is an edge between two books if purchased by the
+same person. Overall, we have n = 105 nodes and m = 882 edges.
+
+The second data set (AA) is a co-authorship network, where each node is an
+author and the edge weight is the number of the co-authored papers between
+the two corresponding persons. Overall, we have n = 418, 236 nodes and m =
+2, 753, 798 edges.
+
+The last data set (NetFlix) is from the Netﬂix prize5. Rows represent users
+and columns represent movies. If a user has given a particular movie positive
+ratings (4 or 5), we connect them with an edge. In total, we have 2,667,199 nodes
+(2,649,429 users and 17,770 movies), and 56,919,190 edges.
+
+5.2 Eﬀectiveness
+
+Here, we evaluate the eﬀectiveness of the proposed ‘Gateway-ness’ scores. We
+ﬁrst compare with several candidate methods in terms of separating the source
+from the target. And then, we present various case studies.
+
+Quantitative Comparisons. The basic idea of the proposed ‘Gateway-ness’
+scores is to ﬁnd a subset of nodes which collectively play an important role in
+measuring the proximity from the source node (or source group) to the target
+node (or target group). Here, we want to validate this basic assumption. We
+compare it with the following alternative choices: (a) selecting k nodes with the
+highest center-piece AND score (CePS-AND) [13]; (b) selecting k nodes with
+the highest center-piece OR score (CePS-OR) [13]; (c) randomly selecting k
+
+4
+
+5
+
+http://www.orgnet.com/
+http://www.netflixprize.com/
+
+BASSET: Scalable Gateway Finder in Large Graphs
+
+459
+
+Table 3. Eﬀectiveness comparison be-
+tween BASSET-N and alternatives. x-axis
+is the budget k and y-axis is the normal-
+ized decay of proximity. Higher is better.
+The proposed BASSET-N is the best.
+
+1
+
+0.9
+
+0.8
+
+0.7
+
+0.6
+
+0.5
+
+0.4
+
+0.3
+
+0.2
+
+0.1
+
+0
+
+0
+
+CePS−AND
+CePS−OR
+Rand
+Neighbor−Rand
+Topk−Ind
+Basset−N
+
+5
+
+10
+
+15
+
+Table 4. BASSET-N on PolBooks
+Graph. (‘c’ for ‘conservative’, ‘l’ for ‘lib-
+eral’, and ‘n’ for ‘neutral’)
+
+Node
+
+10
+13
+103
+
+5
+8
+77
+78
+59
+52
+42
+
+Book Title
+Bush country
+
+Oﬀ with their heads
+
+Back up such up
+
+Sleeping with the devil
+
+Ghost wars
+
+Plan of attack
+Bush at war
+
+Rise of the vulcanes
+
+Allies
+
+The Bushes
+
+Label
+
+c
+c
+l
+n
+n
+n
+c
+c
+c
+c
+
+r(i,i)
+
+r(i,i)
+
+r(s,t)
+
+nodes (Rand); (d) randomly selecting k nodes from the neighboring nodes of
+the source node and the target node (Neighbor-Rand); (e) selecting k nodes
+with the highest r(s,i)r(i,t)
+(Topk-Ind). We randomly select a source node s and
+a target node t,6 and then use the diﬀerent methods to select a subset I with k
+nodes. Figure 2 presents the comparison results, where the x-axis is the number
+of nodes selected (k), and the y-axis is the normalized decay in terms of the
+proximity score from the source node s to the target node t ( r(s,t)−rI (s,t)
+). The
+resulting curves are averaged over 1,000 randomly chosen source-target pairs.
+From table 3, we can see that (1) the proposed BASSET-N performs best in
+terms of separating the source from the target; (2)Topk-Ind, where we simply
+select k nodes with highest r(s,i)r(i,t)
+, does not perform as well as BASSET-N,
+where we want to ﬁnd a subset of k nodes which collectively has the highest score
+r(I, t)(cid:3)r(I,I)−1r(s,I)(cid:3).
+Case Studies. Next, we will show some case studies, to demonstrate the eﬀec-
+tiveness of BASSET-N and BASSET-G.
+PolBooks. For this data set, the nodes are political books and the existence of
+the edge indicates the co-purchasing (by the same person) of the two books. Each
+book is annotated by one of the following three labels: ‘liberal’, ‘conservative’ and
+‘neutral’. We pick a ‘liberal’ book (‘The Price of Loyalty’) as the source node, and
+a ‘conservative’ book (‘Losing Bin Laden’) as the target node. Then, we ran the
+proposed BASSET-N to ﬁnd the gateway with 10 nodes. The result is presented in
+table 4. The result is again consistent with human intuition, - the resulting gate-
+way books are either popular books in one of the two communities (‘conservative’
+vs. ‘liberal’) such as, ‘Bush country’ from ‘conservative’, ‘Back up suck up’ from
+‘liberal’, etc; or those ‘neutral’ books which are likely to be purchased by readers
+from both communities (e.g., ‘Sleeping with the devil’, etc).
+
+6 The result when source and target are a group of nodes is similar, and omitted for
+
+brevity.
+
+460
+
+H. Tong et al.
+
+Table 5. BASSET-G on AA Network
+
+(a) A group of people in ‘text’ to a group of people in ‘databases’
+
+(b) A group of people in ‘theory ’ to a group of people in ‘bioinfomatics’
+
+AA. We use this data set to perform case studies for the proposed BASSET-
+G. We choose (1) a group of people from a certain ﬁeld (e.g., ‘text’, ‘theory’,
+etc) as the source group S; and (2) another group of people in some other ﬁeld
+(e.g., ‘databases’, ‘bioinfomatics’, etc) as the target group T . Then, we ran the
+proposed BASSET-N to ﬁnd the gateway with k = 10 nodes. Table 5 lists some
+results. They are all consistent with human intuition, - the resulting authors are
+either productive authors in one of the two ﬁelds, or multi-disciplinary, who have
+close collaborations to both the source and the target groups of authors.
+
+5.3 Eﬃciency
+
+We will study the wall-clock running time of the proposed BASSET-N and
+BASSET-G here. Basically, we want to answer the following two questions:
+
+1. (Speed) What is the speedup of the proposed BASSET-N and BASSET-G
+
+over the straightforward methods?
+
+2. (Scalability) How do BASSET-N and BASSET-G scale with the size of the
+
+graph (n and m)?
+
+First, we compare BASSET-N and BASSET-G with two straightforward meth-
+ods: (1) ‘Com-RWR’, where we use combinatorial enumeration to ﬁnd the gateway
+and, for each enumeration, we compute the proximity from the new graph; and (2)
+‘Com-Eval’, where we use combinatorial enumeration to ﬁnd the gateway, and for
+each enumeration, we compute the proximity from the original graph. Figure 1
+shows the comparison on PolBooks graph. We can draw the following conclusions.
+(1) Straightforward methods (‘Com-RWR’ and ‘Com-Eval’) are computationally
+intractable even for a small graph. For example, it takes more than 1, 000 seconds
+and 100, 000 seconds to ﬁnd the k = 5 gateway by ‘Com-Eval’ and by ‘Com-RWR’,
+respectively. (2) The speedup of the proposed BASSET-N and BASSET-G over
+both ‘Com-Eval’ and ‘Com-RWR’ is signiﬁcant - in most cases, we achieve several
+(up to 6) orders of magnitude speedups. (3) The speedup of the proposed BASSET-
+N and BASSET-G over both ‘Com-RWR’ and ‘Com-Eval’ quickly increases wrt
+the size of the gateway k. Note that we stop running the program if it takes more
+than 100,000 seconds (i.e., longer than a day).
+
+BASSET: Scalable Gateway Finder in Large Graphs
+
+461
+
+>=100,000
+
+10,000
+
+1,000
+
+)
+s
+d
+n
+o
+c
+e
+s
+(
+ 
+
+e
+m
+
+i
+t
+ 
+k
+c
+o
+c
+−
+
+l
+
+l
+l
+
+a
+w
+
+100
+
+10
+
+1
+
+0.1
+
+0.01
+
+0.001
+
+0.0001
+
+0
+
+Basset−N
+Com−Eval
+Com−RWR
+
+5
+
+10
+
+15
+
+k
+
+)
+s
+d
+n
+o
+c
+e
+s
+(
+ 
+
+e
+m
+
+i
+t
+ 
+k
+c
+o
+c
+−
+
+l
+
+l
+l
+
+a
+w
+
+>=100,000
+
+10,000
+
+1,000
+
+100
+
+10
+
+1
+
+0.1
+
+0.01
+
+0.001
+
+0.0001
+
+0
+
+Basset−G
+Com−Eval
+Com−RWR
+
+5
+
+10
+
+15
+
+k
+
+(a) BASSET-N
+
+(b) BASSET-G
+
+Fig. 1. Comparison of speed on PolBooks graph. Wall-clock time vs. k. Lower is better.
+Time is in logarithm scale. The proposed BASSET-N and BASSET-G (red star) are
+signiﬁcantly faster.
+
+)
+s
+d
+n
+o
+c
+e
+s
+(
+ 
+
+e
+m
+
+i
+t
+ 
+k
+c
+o
+c
+−
+
+l
+
+l
+l
+
+a
+w
+
+)
+s
+d
+n
+o
+c
+e
+s
+(
+ 
+
+e
+m
+
+i
+t
+ 
+k
+c
+o
+c
+−
+
+l
+
+l
+l
+
+a
+w
+
+20
+
+18
+
+16
+
+14
+
+12
+
+10
+
+8
+
+6
+
+4
+
+2
+
+0
+
+1
+
+25
+
+20
+
+15
+
+10
+
+5
+
+0
+
+1
+
+k=1
+k=2
+k=5
+k=10
+k=15
+
+10
+
+9
+
+8
+
+7
+
+6
+
+5
+
+4
+
+3
+
+2
+
+1
+
+)
+s
+d
+n
+o
+c
+e
+s
+(
+ 
+
+e
+m
+
+i
+t
+ 
+k
+c
+o
+c
+−
+
+l
+
+l
+l
+
+a
+w
+
+k=1
+k=2
+k=5
+k=10
+k=15
+
+2
+
+3
+
+4
+
+5
+
+# of edges
+
+6
+x 107
+
+0
+0.4
+
+0.6
+
+0.8
+
+1
+# of nodes
+
+1.2
+
+1.4
+
+1.6
+
+1.8
+x 106
+
+wall-clock time vs. m
+(ﬁx n = 2, 667, 199)
+
+wall-clock time vs. n
+(ﬁx m = 23, 874, 700)
+
+(a) BASSET-N
+
+k=1
+k=2
+k=5
+k=10
+k=15
+
+12
+
+10
+
+8
+
+6
+
+4
+
+2
+
+)
+s
+d
+n
+o
+c
+e
+s
+(
+ 
+
+e
+m
+
+i
+t
+ 
+k
+c
+o
+c
+−
+
+l
+
+l
+l
+
+a
+w
+
+k=1
+k=2
+k=5
+k=10
+k=15
+
+2
+
+3
+
+4
+
+5
+
+# of edges
+
+6
+x 107
+
+0
+0.4
+
+0.6
+
+0.8
+
+1
+# of nodes
+
+1.2
+
+1.4
+
+1.6
+
+1.8
+x 106
+
+wall-clock time vs. m
+(ﬁx n = 2, 667, 199)
+
+wall-clock time vs. n
+(ﬁx m = 23, 874, 700)
+
+(b) BASSET-G
+
+Fig. 2. Scalability of BASSET. Wall-clock time vs. the size of the graph. Lower is
+better. |S| = |T | = 5.
+
+462
+
+H. Tong et al.
+
+Next, we evaluate the scalability of the proposed BASSET-N and BASSET-G
+wrt the size of the graph, using the largest data set (NetFlix). From ﬁgure 2,
+we can make the following conclusions: (1) if we ﬁx the number of nodes (n)
+in the graph, the wall-clock time of both BASSET-N and BASSET-G is almost
+constant wrt the number of edges (m); and (2) if we ﬁx the number of edges (m)
+in the graph, the wall-clock time of both BASSET-N and BASSET-G is linear
+wrt the number of nodes (n). Therefore, they are suitable for large graphs.
+
+6 Related Work
+
+In this section, we review the related work, which can be categorized into three
+parts:
+Betweenness centrality. The proposed ‘Gateway-ness’ scores relate to mea-
+sures of betweenness centrality, both those based on the shortest path [4], as
+well as those based on random walk [10]. When the gateway set size is k = 1,
+the proposed ‘Gateway-ness’ scores can be viewed as query-speciﬁc betweenness
+centrality measures. Moreover, in the proposed BASSET-N and BASSET-G, we
+aim to ﬁnd a subset of nodes collectively, wherein traditional betweenness cen-
+trality, we usually calculate the score for each node independently (and then
+might pick k nodes with the highest individual scores).
+Connection subgraphs. In the proposed BASSET-N, the idea of ﬁnding a
+subset of nodes wrt the source/target is also related to the concept of connection
+subgraphs, such as [3,7,13]. However, in connection subgraphs, we aim to ﬁnd a
+subset of nodes which have strong connections among themselves for the purpose
+of visualization. While in the proposed BASSET-N, we implicity encourage the
+resulting subset of nodes to be disconnected with each other so that they are
+able to collectively disconnect the target node from the source node to the largest
+extent (if we set them as sinks).
+Graph proximity. The basic idea of the proposed BASSET-N and BASSET-G
+is to ﬁnd a subset of nodes which will bring the largest decrease of the prox-
+imity score from the source node (or the source group) to the target node (or
+the target group). Graph proximity itself is an important building block in many
+graph mining settings. Representative work includes the BANKS system [1], link
+prediction [9], content-based image retrieval [6], cross-modal correlation discov-
+ery [11], pattern matching [14], ObjectRank [2], RelationalRank [5], etc.
+
+7 Conclusion
+
+In this paper, we study how to ﬁnd good ‘gateway’ nodes in a graph, given one
+or more source and target nodes. Our main contributions are: (a) we formulate
+the problem precisely; (b) we develop BASSET-N and BASSET-G, two fast
+(up to 6,000,000x speedup) and scalable (linear wrt the number of the nodes
+in the graph) algorithms to solve it in a provably near-optimal fashion, using
+sub-modularity. We applied the proposed BASSET-N and BASSET-G on real
+data sets to validate the eﬀectiveness and eﬃciency.
+
+BASSET: Scalable Gateway Finder in Large Graphs
+
+463
+
+Acknowledgements
+
+This material is based upon work supported by the National Science Foun-
+dation under Grants No. DBI-0640543 IIS-0705359 CNS-0721736 IIS0808661
+iCAST and was performed under the auspices of the U.S. Department of En-
+ergy by Lawrence Livermore National Laboratory under contract No. DE-AC52-
+07NA27344. This work is also partially supported by an IBM Faculty Award,
+a SPRINT gift, with additional funding from Intel, and Hewlett-Packard. Any
+opinions, ﬁndings, and conclusions or recommendations expressed in this ma-
+terial are those of the author(s) and do not necessarily reﬂect the views of the
+National Science Foundation, or other funding parties.
+
+References
+
+1. Aditya, B., Bhalotia, G., Chakrabarti, S., Hulgeri, A., Nakhe, C., Parag, S.S.:
+Banks: Browsing and keyword searching in relational databases. In: VLDB,
+pp. 1083–1086 (2002)
+
+2. Balmin, A., Hristidis, V., Papakonstantinou, Y.: Objectrank: Authority-based key-
+
+word search in databases. In: VLDB, pp. 564–575 (2004)
+
+3. Faloutsos, C., McCurley, K.S., Tomkins, A.: Fast discovery of connection sub-
+
+graphs. In: KDD, pp. 118–127 (2004)
+
+4. Freeman, L.C.: A set of measures of centrality based on betweenness. Sociometry,
+
+35–41 (1977)
+
+5. Geerts, F., Mannila, H., Terzi, E.: Relational
+
+link-based ranking. In: VLDB,
+
+pp. 552–563 (2004)
+
+6. He, J., Li, M., Zhang, H.-J., Tong, H., Zhang, C.: Manifold-ranking based image
+
+retrieval. ACM Multimedia, 9–16 (2004)
+
+7. Koren, Y., North, S.C., Volinsky, C.: Measuring and extracting proximity in net-
+
+works. In: KDD, pp. 245–255 (2006)
+
+8. Krause, A., Guestrin, C.: Near-optimal nonmyopic value of information in graphical
+
+models. In: UAI, pp. 324–331 (2005)
+
+9. Liben-Nowell, D., Kleinberg, J.: The link prediction problem for social networks.
+
+In: Proc. CIKM (2003)
+
+10. Newman, M.: A measure of betweenness centrality based on random walks. Social
+
+Networks 27, 39–54 (2005)
+
+11. Pan, J.-Y., Yang, H.-J., Faloutsos, C., Duygulu, P.: Automatic multimedia cross-
+
+modal correlation discovery. In: KDD, pp. 653–658 (2004)
+
+12. Piegorsch, W., Casella, G.E.: Inverting a sum of matrices. SIAM Review 32, 470
+
+(1990)
+
+13. Tong, H., Faloutsos, C.: Center-piece subgraphs: problem deﬁnition and fast solu-
+
+tions. In: KDD, pp. 404–413 (2006)
+
+14. Tong, H., Faloutsos, C., Gallagher, B., Eliassi-Rad, T.: Fast best-eﬀort pattern
+
+matching in large attributed graphs. In: KDD, pp. 737–746 (2007)
+
+15. Tong, H., Faloutsos, C., Pan, J.-Y.: Random walk with restart: Fast solutions and
+applications. Knowledge and Information Systems: An International Journal, KAIS
+(2008)
+
+

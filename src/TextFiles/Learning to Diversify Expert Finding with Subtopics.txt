@@ -1,0 +1,972 @@
+Learning to Diversify Expert Finding
+
+with Subtopics(cid:2)
+
+Hang Su1, Jie Tang2, and Wanling Hong1
+
+1 School of Software, Beihang University, China, 100191
+
+{suhang,wanling}@sse.buaa.edu.cn
+
+2 Department of Computer Science and Technology, Tsinghua University, China, 100084
+
+jietang@tsinghua.edu.cn
+
+Abstract. Expert ﬁnding is concerned about ﬁnding persons who are knowl-
+edgeable on a given topic. It has many applications in enterprise search, social
+networks, and collaborative management. In this paper, we study the problem of
+diversiﬁcation for expert ﬁnding. Speciﬁcally, employing an academic social net-
+work as the basis for our experiments, we aim to answer the following question:
+Given a query and an academic social network, how to diversify the ranking list,
+so that it captures the whole spectrum of relevant authors’ expertise? We precisely
+deﬁne the problem and propose a new objective function by incorporating topic-
+based diversity into the relevance ranking measurement. A learning-based model
+is presented to solve the objective function. Our empirical study in a real system
+validates the effectiveness of the proposed method, which can achieve signiﬁcant
+improvements (+15.3%-+94.6% by MAP) over alternative methods.
+
+1 Introduction
+
+Given a coauthor network, how to ﬁnd the top-k experts for a given query q? How to
+diversify the ranking list so that it captures the whole spectrum of relevant authors’ ex-
+pertise? Expert ﬁnding has long been viewed as a challenging problem in many different
+domains. Despite that considerable research has been conducted to address this prob-
+lem, e.g., [3,17], the problem remains largely unsolved. Most existing works cast this
+problem as a web document search problem, and employ traditional relevance-based
+retrieval models to deal with the problem.
+
+Expert ﬁnding is different from the web document search. When a user is looking
+for expertise collaborators in a domain such as “data mining”, she/he does not typically
+mean to ﬁnd general experts in this ﬁeld. Her/his intention might be to ﬁnd experts on
+different aspects (subtopics) of data mining (e.g., “association rules”, “classiﬁcation”,
+“clustering”, or “graph mining”). Recently, diversity already becomes a key factor to
+address the uncertainty and ambiguity problem in information retrieval [12,21]. How-
+ever, the diversiﬁcation problem is still not well addressed for expert ﬁnding. In this
+paper, we try to give an explicit diversity-based objective function for expert ﬁnding,
+and to leverage a learning-based algorithm to improve the ranking performance.
+
+(cid:2) The work is supported by the Natural Science Foundation of China (No. 61073073) and Chi-
+nese National Key Foundation Research (No. 60933013), a special fund for Fast Sharing of
+Science Paper in Net Era by CSTD.
+
+P.-N. Tan et al. (Eds.): PAKDD 2012, Part I, LNAI 7301, pp. 330–341, 2012.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2012
+
+Learning to Diversify Expert Finding with Subtopics
+
+331
+
+Fig. 1. Illustrative example of diversiﬁed expert ﬁnding. The query is “information retrieval”, and
+the list on the left side is obtained by language model. All the top ﬁve are mainly working on
+retrieval models. The right list is obtained by the proposed diversiﬁed ranking method with four
+subtopics (indicated by different colors).
+
+Motivating Examples. To illustrate this problem, Figure 1 gives an example of di-
+versiﬁed expert ﬁnding. The list on the left is obtained by using language model, a
+state-of-the-art relevance-based ranking model [2]. We see that all the top ﬁve experts
+are mainly working on information retrieval models. The right list is obtained using
+the proposed diversiﬁed ranking method with four subtopics. The top two experts are
+working on information retrieval models, but the third one is working on multimedia
+retrieval, the fourth is about digital library, and the ﬁfth is about information retrieval
+using natural language processing. The diversiﬁed ranking list is more useful in some
+sense: the user can quickly gain the major subtopics of the query, and could reﬁne the
+query according to the subtopic that she/he is interested in. Additionally, the user can
+have the hint about what the other users are recently interested in, as the ranking list is
+obtained by learning from the user feedback (e.g., users’ click data).
+
+We aim to conduct a systematic investigation into the problem of diversifying expert
+ﬁnding with subtopics. The problem is non-trivial and poses a set of unique challenges.
+First, how to detect subtopics for a given query? Second, how to incorporate the diver-
+sity into the relevance-based ranking score? Third, how to efﬁciently perform the expert
+ranking algorithm so that it can be scaled up to handle large networks?
+
+Contributions. We show that incorporating diversity into the expert ﬁnding model
+can signiﬁcantly improve the ranking performance (+15.3%-+94.6% in terms of MAP)
+compared with several alternative methods using language model, topic model and ran-
+dom walk. In this work, we try to make the following contributions:
+
+– We precisely formulate the problem of diversiﬁed expert ﬁnding and deﬁne an ob-
+jective function to explicitly incorporate the diversity of subtopics into the relevance
+ranking function.
+
+332
+
+H. Su, J. Tang, and W. Hong
+
+– We present a learning-based algorithm to solve the objective function.
+– We evaluate the proposed method in a real system. Experimental results validate its
+
+effectiveness.
+
+Organization. Section 2 formulates the problem. Section 3 explains the proposed
+method. Section 4 presents experimental results that validate the effectiveness of our
+methodology. Finally, Section 5 reviews related work and Section 6 concludes.
+
+2 Problem Deﬁnition
+
+In this section, we formulate the problem in the context of academic social network
+to keep things concrete, although adaption of this framework to expert ﬁnding in other
+social-network settings is straightforward.
+
+Generally speaking, the input of our problem consists of (1) the results of any topic
+modeling such as predeﬁned ontologies or topic cluster based on pLSI [9] or LDA [5]
+and (2) a social network G = (V, E) and the topic model on authors V , where V is a
+set of authors and E ⊂ V × V is a set of coauthor relationships between authors. More
+precisely, we can deﬁne a topic distribution over each author as follows.
+
+Topic distribution: In social networks, an author usually has interest in multiple topics.
+Formally, each user v ∈ V is associated with a vector θv ∈ R
+T of T -dimensional topic
+z θvz = 1). Each element θvz is the probability (i.e., p(z|v)) of the user
+distribution (
+on topic z.
+
+(cid:2)
+
+In this way, each author can be mapped onto multiple related topics. In the meantime,
+for a given query q, we can also ﬁnd a set of associated topics (which will be depicted
+in detail in §3). Based on the above concepts, the goal of our diversiﬁed expert ﬁnding
+is to ﬁnd a list of experts for a given query such that the list can maximally cover the
+associated topics of the query q. Formally, we have:
+
+Problem 1. Diversiﬁed Expert Finding. Given (1) a network G = (V, E), (2) T -
+dimensional topic distribution θv ∈ R
+T for all authors v in V , and (3) a metric function
+f (.), the objective of diversiﬁed expert ﬁnding for each query q is to maximize the
+following function:
+
+T(cid:2)
+
+z=1
+
+f (k|z, G, Θ, q) × p(z|q)
+
+(1)
+where f (k|z, G, Θ, q) measures the relevance score of top-k returned authors given
+topic z; we can apply a parameter τ to control the complexity of the objective function
+by selecting topics with larger probabilities (i.e., minimum number of topics that satisfy
+(cid:2)
+
+z p(z|q) ≥ τ). In an extreme case (τ = 1), we consider all topics.
+
+Please note that this is a general formulation of the problem. The relevance metric
+f (k|z, G, Θ, q) can be instantiated in different ways and the topic distribution can also
+be obtained using different algorithms. Our formulation of the diversiﬁed expert ﬁnding
+is very different from existing works on expert ﬁnding [3,16,17]. Existing works have
+
+Learning to Diversify Expert Finding with Subtopics
+
+333
+
+mainly focused on ﬁnding relevant experts for a given query, but ignore the diversi-
+ﬁcation over different topics. Our problem is also different from the learning-to-rank
+work [11,23], where the objective is to combine different factors into a machine learn-
+ing model to better rank web documents, which differs in nature from our diversiﬁed
+expert ﬁnding problem.
+
+3 Model Framework
+
+3.1 Overview
+
+At a high level, our approach primarily consists of three steps:
+
+– We employ an uniﬁed probabilistic model to uncover topic distributions of authors
+
+in the social network.
+
+– We propose an objective function which incorporates the topic-based diversity into
+
+the relevance-based retrieval model.
+
+– We present an efﬁcient algorithm to solve the objective function.
+
+3.2 Topic Model Initialization
+
+In general, the topic information can be obtained in many different ways. For exam-
+ple, in a social network, one can use the predeﬁned categories or user-assigned tags
+as the topic information. In addition, we can use statistical topic modeling [9,5,20] to
+automatically extract topics from the social networking data. In this paper, we use the
+author-conference-topic (ACT) model [20] to initialize the topic distribution of each
+user. For completeness, we give a brief introduction of the ACT model. For more de-
+tails, please refer to [20].
+ACT model simulates the process of writing a scientiﬁc paper using a series of prob-
+abilistic steps. In essence, the topic model uses a latent topic layer Z = {z1, z2, ..., zT}
+as the bridge to connect the different types of objects (authors, papers, and publication
+venues). More accurately, for each object it estimates a mixture of topic distribution
+which represents the probability of the object being associated with every topic. For ex-
+ample, for each author, we have a set of probabilities {p(zi|a)} and for each paper d, we
+have probabilities {p(zi|d)}. For a given query q, we can use the obtained topic model
+to do inference and obtain a set of probabilities {p(zi|q)}. Table 1 gives an example of
+the most relevant topics for the query “Database”.
+
+3.3 DivLearn: Learning to Diversify Expert Finding with Subtopics
+
+Objective Function. Without considering diversiﬁcation, we can use any learning-to-
+rank methods [11] to learn a model for ranking experts. For example, given a training
+data set (e.g., users’ click-through data), we could maximize normalized discounted
+cumulative gain (NDCG) or Mean Average Precision (MAP). In this section, we use
+MAP as the example in our explanation. Basically, MAP is deﬁned as:
+
+334
+
+H. Su, J. Tang, and W. Hong
+
+Table 1. Most relevant topics (i.e., with a higher p(z|q)) for query “Database”
+
+Topic
+Topic 127: Database systems
+Topic 134: Gene database
+Topic 106: Web database
+Topic 99: XML data
+Topic 192: Query processing
+
+M AP (Q, k) =
+
+|Q|(cid:2)
+
+j=1
+
+1|Q|
+
+p(z|q)
+0.15
+0.09
+0.07
+0.05
+0.04
+
+(cid:3)k
+
+i=1 P rec(aji) × rel(aji)
+
+(cid:3)k
+
+i=1 rel(aji)
+
+(2)
+
+where Q is a set of queries in the training data; P rec(aji) represents the precision
+value obtained for the set of top i returned experts for query qj; rel(aji) is an indicator
+function equaling 1 if the expert aji is relevant to query qj, 0 otherwise. The normalized
+inner sum denotes the average precision for the set of top k experts and the normalized
+outer sum denotes the average over all queries Q.
+
+Now, we redeﬁne the objective function based on a generalized MAP metric called
+MAP-Topic, which explicitly incorporates the diversity of subtopics. More speciﬁcally,
+given a training data set {(q(j), Aq(j) )}, where q(j) ∈ Q is query and Aq(j) is the set of
+related experts for query q(j), we can deﬁne the following objective function:
+
+O =
+
+1|Q|
+
+|Q|(cid:2)
+
+T(cid:2)
+
+j=1
+
+z=1
+
+p(z|q) ×
+
+i=1 rel(aji) × (cid:2)i
+(cid:3)k
+
+i=1 p(z|aji) × rel(aji)
+
+m=1 p(z|ajm)
+
+i
+
+(cid:3)k
+
+(3)
+
+where rel(aji) is an indicator function with a value of 1 if aji is in Aq(j) , 0 otherwise.
+
+Linear Ranking Model. To instantiate the expert ranking model, we deﬁne differ-
+ent features. For example, for expert ﬁnding in the academic network, we deﬁne fea-
+tures such as the number of publications, h-index score of the author, and the language
+model-based relevance score. For the i-th feature, we deﬁne φi(a, q) as the feature value
+of author a to the given query q. Finally, without loss of generality, we consider the lin-
+ear model to calculate the score for ranking experts, thus have
+
+s(a, q) = w
+
+T
+
+N(cid:2)
+
+Φ (a, q) =
+
+wiφi (a, q)
+
+i=1
+
+(4)
+
+where wi is the weight of the i-the feature. Given a feature weight vector w, according
+to the objective function described above, we can calculate a value, denoted as O(w),
+to evaluate the ranking results of that model. Thus our target is to ﬁnd a conﬁguration
+of w to maximize O(w).
+
+3.4 Model Learning
+Many algorithms can be used for ﬁnding the optimal w in our model, such as hill
+climbing [15], gene programming(GP) [10], random walk, gradient descent [4]. For the
+
+Learning to Diversify Expert Finding with Subtopics
+
+335
+
+Algorithm 1. Model learning algorithm.
+
+Input: training samples S
+Output: learned parameters w
+Initialize globalBestW, step
+for circle = 1 → loop do
+
+w ← empiricalV ector + randomV ector
+repeat
+
+wnew ← w + step
+if O(wnew) > O(w) then
+
+w ← wnew
+
+else
+
+Update step
+
+end if
+
+until convergence
+if O(w) > O(globalBestW ) then
+
+globalBestW ← w
+
+end if
+end for
+return globalBestW
+
+purpose of simplicity and effectiveness, in this paper, we utilize the hill climbing algo-
+rithm due to its efﬁciency and ease of implementation. The algorithm is summarized in
+Algorithm 1.
+
+Different from the original random start hill climbing algorithm which starts from
+pure random parameters, we add our prior knowledge empiricalV ector to the initial-
+ization of w, as we know some features such as BM25 will directly affect the relevance
+degree tends to be more important. By doing so, we could reduce the CPU time for
+training.
+
+4 Experiment
+
+We evaluate the proposed models in an online system, Arnetminer1.
+
+4.1 Experiment Setup
+
+Data Sets. From the system, we obtain a network consisting of 1,003,487 authors,
+6,687 conferences, and 2,032,845 papers. A detailed introduction about how the aca-
+demic network has been constructed can be referred to [19]. As there is no standard data
+sets available, and also it is difﬁcult to create such an data sets with ground truth. For
+a fair evaluation, we construct a data set in the following way: First, we select a num-
+ber of most frequent queries from the query log of the online system; then we remove
+the overly speciﬁc or lengthy queries (e.g., ‘A Convergent Solution to Subspace Learn-
+ing’) and normalize similar queries (e.g., ‘Web Service’ and ‘Web Services’ to ‘Web
+
+1 http://arnetminer.org
+
+336
+
+H. Su, J. Tang, and W. Hong
+
+Table 2. Statistics of selected queries. Entropy(q) = − (cid:3)T
+i=1 p(zi|q) log p(zi|q) measures
+the query’s uncertainty; #(τ = 0.2) denotes the minimum number of topics that satisfy
+(cid:3)
+
+P (z|q) ≥ τ .
+
+Data Source Venue
+Query
+Data Mining
+KDD 08-11
+Information Retrieval SIGIR 08-11
+Software Engineering ICSE 08-11
+Machine Learning
+
+NIPS 08-11 & ICML 08-11
+
+Entropy #(τ = 0.1) #(τ = 0.2)
+
+4.9
+4.8
+4.5
+4.6
+
+3
+3
+1
+2
+
+5
+8
+3
+4
+
+Service’). Second, for each query, we identify the most relevant (top) conferences. For
+example, for ‘Web Service’, we select ICWS and for ‘Information Retrieval’, we select
+SIGIR. Then, we collect and merge PC co-chairs, area chairs, and committee members
+of the identiﬁed top conferences in the past four years. In this way, we obtain a list of
+candidates. We rank these candidates according to the appearing times, breaking ties
+using the h-index value [8]. Finally, we use the top ranked 100 experts as the ground
+truth for each query.
+
+Topic Model Estimation. For the topic model (ACT), we perform model estimation
+by setting the topic number as 200, i.e., T = 200. The topic number is determined by
+empirical experiments (more accurately, by minimizing the perplexity [2], a standard
+measure for estimating the performance of a probabilistic model, the lower the better).
+The topic modeling is carried out on a server running Windows 2003 with Dual-Core
+Intel Xeon processors (3.0 GHz) and 4GB memory. For the academic data set, it took
+about three hours to estimate the ACT model.
+
+We produce some statistics for the selected queries (as shown in Table 2).
+Entropy(q) measures the query’s uncertainty and #(τ = 0.2) denotes the minimum
+number of topics that satisfy
+
+P (z|q) ≥ τ.
+
+(cid:2)
+
+Feature Deﬁnition. We deﬁne features to capture the observed information for ranking
+experts of a given query. We consider two types of features: 1) query-independent fea-
+tures (such as h-index, sociability, and longevity) and 2) query-dependent features (such
+as BM25 [13] score and language model with recency score). A detailed description of
+the feature deﬁnition is given in Appendix.
+
+Evaluation Measures and Comparison Methods. To quantitatively evaluate the pro-
+posed method, we consider two aspects: relevance and diversity. For the feature-based
+ranking, we consider six-fold cross-validation(i.e. ﬁve folds for training and the rest for
+testing) and evaluate the approaches in terms of Prec@5, Prec@10, Prec@15, Prec@20,
+and MAP. And we conduct evaluation on the entire data of the online system (including
+916,946 authors, 1,558,499 papers, and 4,501 conferences). We refer to the proposed
+method as DivLearn and compare with the following methods:
+
+RelLearn: A learning-based method. It uses the same setting (the same feature deﬁni-
+tion and the same training/test data) as that in DivLearn, except that it does not consider
+the topic diversity and directly use MAP as the objective function for learning.
+
+Learning to Diversify Expert Finding with Subtopics
+
+337
+
+Table 3. Performance for expert search approaches (%)
+
+Approach Prec@5 Prec@10 Prec@15 Prec@20 MAP
+21.1
+26.3
+LM
+17.8
+BM25
+27.1
+32.3
+ACT
+23.3
+34.6
+ACT+RW 21.1
+20.4
+12.2
+LDA
+pLSI
+21.1
+31.8
+35.8
+27.8
+RelLearn
+35.6
+41.3
+DivLearn
+
+13.6
+14.7
+21.4
+18.9
+15.6
+18.6
+26.1
+25.8
+
+15.6
+14.8
+21.5
+20.7
+15.9
+19.3
+24.8
+26.7
+
+18.3
+16.7
+22.8
+20.6
+15
+21.1
+24.4
+28.3
+
+Language Model: Language model(LM) [2] is one of the state-of-the-art approaches
+for information retrieval. It deﬁnes the relevance between an expert (document) and a
+query as a generative probability: p(q|d) =
+
+w∈q p(w|d).
+
+(cid:3)
+
+BM25 [13]: Another state-of-the-art probabilistic retrieval model for information re-
+
+trieval.
+
+pLSI: Hofmann proposes the probabilistic Latent Semantic Indexing(pLSI) model in
+[9]. After modeling, the probability of generating a word w from a document d can be
+z=1 p(w|z)p(z|d). To learn the model, we
+calculated using the topic layer: p(w|d) =
+use the EM algorithm[9].
+
+(cid:2)T
+
+LDA: Latent Dirichlet Allocation (LDA) [5] also models documents by using a topic
+layer. We performed model estimation with the same setting as that for the ACT model.
+ACT: ACT model is presented in §3. As the learned topics is usually general and not
+speciﬁc to a given query, only using it alone for modeling is too coarse for academic
+search [22], so the ﬁnal relevance score is deﬁned as a combination with the language
+model p(q|a) = pACT (q|a) × pLM (q|a).
+
+ACT+RW: A uniform academic search framework proposed in [17], which combines
+
+random walk and the ACT model together.
+
+4.2 Performance Comparison
+
+Table 3 lists the performance results of the different comparison methods. It can be
+clearly seen that our learning approach signiﬁcantly outperforms the seven comparison
+methods. In terms of P@5, our approach achieves a +23% improvement compared with
+the (LDA). Comparing with the other expert ﬁnding methods, our method also results
+in an improvement of 8-18%. This advantage is due to that our method could combine
+multiple sources of evidences together. From Table 3, we can also see that the learning-
+based methods (both RelLearn and DivLearn) outperform the other relevance-based
+methods in terms of all measurements. Our DivLearn considers the diversity of topics,
+thus further improve the performance.
+
+4.3 Analysis and Discussion
+
+Now, we perform several analysis to examine the following aspects of DivLearn:(1)
+convergence property of the learning algorithm; (2) effect of different topic threshold;
+and (3) effect of recency impact function in Eq. 7.
+
+338
+
+H. Su, J. Tang, and W. Hong
+
+)
+
+(
+
+%
+P
+A
+M
+
+45
+
+40
+
+35
+
+30
+
+25
+
+20
+
+ 
+0
+
+ 
+
+LM
+BM25
+ACT
+ACT+RW
+LDA
+pLSI
+DivLearn
+
+0.2
+
+0.4
+
+τ
+
+0.6
+
+0.8
+
+1
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+y
+t
+i
+l
+i
+
+b
+a
+b
+o
+r
+P
+ 
+d
+e
+
+t
+
+l
+
+a
+u
+m
+u
+C
+
+0
+
+ 
+0
+
+ 
+
+Data Mining
+Machine Learning
+Natural Language Processing
+Semantic Web
+
+(cid:3)
+
+z p(z|q) for top
+
+(a) Effect of threshold τ on MAP
+
+(b) Cumulated probabilities
+topics of example queries
+
+Fig. 2. Effect of topic threshold analysis
+
+50
+150
+#Topics (ordered by p(z|q))
+
+100
+
+200
+
+Convergence Property. We ﬁrst study the convergence property of the learning al-
+gorithm. We trace the execution of 72 random hill climbing runs to evaluate the con-
+vergence of the model learning algorithm. On average, the number of iterations to ﬁnd
+the optimal parameter w varies from 16 to 28. The CPU time required to perform each
+iteration is around 1 minute. This suggests that the learning algorithm is efﬁcient and
+has a good convergence property.
+
+(cid:2)
+
+Effect of Topic Threshold. We conduct an experiment to see the effect of using dif-
+ferent thresholds τ to select topics in the objective function (Eq. 3). We select the min-
+z p(z|q) ≥ τ, then
+imum number of topics with higher probabilities that statisfy
+re-scale this sum to be 1 and assign 0 to other topics. Clearly, when τ = 1, all topics
+are counted. Figure 2a shows the value of MAP of multiple methods for various τ. It
+shows that this metrics is consistent to a certain degree. The performance of different
+methods are relatively stable with different parameter setting. This could be explained
+by Figure 2b, which depicts the cumulated P (z|q) of top n topics. As showed, for a
+given query, p(z|q) tends to be dominated by several top related topics. Statistics in
+Table 2 also conﬁrm this observation. All these observations conﬁrm the effectiveness
+of the proposed method.
+
+Effect of Recency. We evaluate whether expert ﬁnding is dynamic over time. In Eq. 7,
+we deﬁne a combination feature of the language model score and the recency score
+(Func 1). Now, we qualitatively examine how different settings for the recency impact
+function will affect the performance of DivLearn. We also compared with some other
+) (Func 2) [14]. Figure 3 shows the
+recency function with Recency(p) = 2( d.year - current year
+performance of MAP with different parameter λ. The baseline denote the performance
+without considering recency. It shows that recency is an important factor and both im-
+pact functions perform better than the baseline which does not consider the recency.
+
+λ
+
+Learning to Diversify Expert Finding with Subtopics
+
+339
+
+DivLearn + Func 1
+DivLearn + Func 2
+Baseline
+
+ 
+
+1
+
+2
+
+5
+
+10
+
+15
+
+Recency Parameter
+
+)
+
+(
+
+%
+P
+A
+M
+
+45
+
+40
+
+35
+
+30
+
+25
+
+20
+
+ 
+
+Fig. 3. MAP for different recency impact functions with different parameters
+
+We can also see that both impact function perform best with the setting of λ (cid:5) 5. On
+average, the ﬁrst impact function (Func 1, used in our approach) performs a bit better
+than Func 2.
+
+5 Related Work
+
+Previous works related to our learning to diversify for expert ﬁnding with subtopics
+can be divided into the following three aspects: expert ﬁnding, learning to rank, search
+result diversiﬁcation. On expert ﬁnding, [17] propose a topic level approach over het-
+erogenous network. [3] extended language models to address the expert ﬁnding prob-
+lem. TREC also provides a platform for researchers to evaluate their models[16]. [7]
+present a learning framework for expert ﬁnding, but only relevance is considered. Other
+topic model based approaches were proposed either[17].
+
+Learning to rank aims to combining multiple sources of evidences for ranking. Liu
+[11] gives a survey on this topic. He categorizes the related algorithms into three groups,
+namely point-wise, pair-wise and list-wise. To optimize the learning target, in this paper
+we use an list-wise approach, which is similar to [23].
+
+Recently, a number of works study the problem of result diversiﬁcation by taking
+inter-document dependencies into consideration [1,25,6,18]. Yue and Joachims [24]
+present a SVM-based approach for learning a good diversity retrieval function. For
+evaluation, Agrawal et al. [1] generalize classical information retrieval metrics to ex-
+plicitly account for the value of diversiﬁcation. Zhai et al. [25] propose a framework for
+evaluating retrieval different subtopics of a query topic. However, no previous work has
+been conducted for learning to diversify expert ﬁnding.
+
+6 Conclusion
+
+In this paper, we study the problem of learning to diversify expert ﬁnding results us-
+ing subtopics. We formally deﬁne the problem in a supervised learning framework. An
+objective function is deﬁned by explicitly incorporating topic-based diversity into the
+
+340
+
+H. Su, J. Tang, and W. Hong
+
+relevance based ranking model. An efﬁcient algorithm is presented to solve the ob-
+jective function. Experiment results on a real system validate the effectiveness of the
+proposed approach.
+
+Learning to diversify expert ﬁnding represents a new research direction in both infor-
+mation retrieval and data mining. As future work, it is interesting to study how to incor-
+porate diversity of relationships between experts into the learning process. In addition,
+it would be also interesting to detect user intention and to learn weights of subtopics via
+interactions with users.
+
+References
+
+1. Agrawal, R., Gollapudi, S., Halverson, A., Ieong, S.: Diversifying search results. In: WSDM
+
+2009, pp. 5–14. ACM (2009)
+
+2. Baeza-Yates, R., Ribeiro-Neto, B., et al.: Modern information retrieval, vol. 463. ACM Press,
+
+New York (1999)
+
+3. Balog, K., Azzopardi, L., de Rijke, M.: Formal models for expert ﬁnding in enterprise cor-
+
+pora. In: SIGIR 2006, pp. 43–50. ACM (2006)
+
+4. Bertsekas, D.: Nonlinear programming. Athena Scientiﬁc, Belmont (1999)
+5. Blei, D.M., Ng, A.Y., Jordan, M.I.: Latent dirichlet allocation. In: NIPS 2001, pp. 601–608
+
+(2001)
+
+6. Carbonell, J.G., Goldstein, J.: The use of mmr, diversity-based reranking for reordering doc-
+
+uments and producing summaries. In: SIGIR 1998, pp. 335–336 (1998)
+
+7. Fang, Y., Si, L., Mathur, A.: Ranking experts with discriminative probabilistic models. In:
+
+SIGIR 2009 Workshop on LRIR. Citeseer (2009)
+
+8. Hirsch, J.E.: An index to quantify an individual’s scientiﬁc research output. Proceedings of
+
+the National Academy of Sciences 102(46), 16569–16572 (2005)
+
+9. Hofmann, T.: Probabilistic latent semantic indexing. In: SIGIR 1999, pp. 50–57. ACM (1999)
+10. Koza, J.: On the programming of computers by means of natural selection, vol. 1. MIT Press
+
+(1996)
+
+11. Liu, T.: Learning to rank for information retrieval. Foundations and Trends in Information
+
+Retrieval 3(3), 225–331 (2009)
+
+12. Radlinski, F., Bennett, P.N., Carterette, B., Joachims, T.: Redundancy, diversity and interde-
+
+pendent document relevance. SIGIR Forum 43, 46–52 (2009)
+
+13. Robertson, S., Walker, S., Hancock-Beaulieu, M., Gatford, M., Payne, A.: Okapi at trec-4.
+
+In: Proceedings of TREC, vol. 4 (1995)
+
+14. Roth, M., Ben-David, A., Deutscher, D., Flysher, G., Horn, I., Leichtberg, A., Leiser, N.,
+Matias, Y., Merom, R.: Suggesting friends using the implicit social graph. In: KDD 2010
+(2010)
+
+15. Russell, S., Norvig, P., Canny, J., Malik, J., Edwards, D.: Artiﬁcial intelligence: a modern
+
+approach, vol. 74. Prentice Hall, Englewood Cliffs (1995)
+
+16. Soboroff, I., de Vries, A., Craswell, N.: Overview of the trec 2006 enterprise track. In: Pro-
+
+ceedings of TREC. Citeseer (2006)
+
+17. Tang, J., Jin, R., Zhang, J.: A topic modeling approach and its integration into the random
+
+walk framework for academic search. In: ICDM 2008, pp. 1055–1060 (2008)
+
+18. Tang, J., Wu, S., Gao, B., Wan, Y.: Topic-level social network search. In: KDD 2011, pp.
+
+769–772. ACM (2011)
+
+19. Tang, J., Yao, L., Zhang, D., Zhang, J.: A combination approach to web user proﬁling. ACM
+
+TKDD 5(1), 1–44 (2010)
+
+Learning to Diversify Expert Finding with Subtopics
+
+341
+
+20. Tang, J., Zhang, J., Yao, L., Li, J., Zhang, L., Su, Z.: Arnetminer: extraction and mining of
+
+academic social networks. In: KDD 2008, pp. 990–998 (2008)
+
+21. Tong, H., He, J., Wen, Z., Konuru, R., Lin, C.-Y.: Diversiﬁed ranking on large graphs: an
+
+optimization viewpoint. In: KDD 2011, pp. 1028–1036 (2011)
+
+22. Wei, X., Croft, W.: Lda-based document models for ad-hoc retrieval. In: SIGIR 2006, pp.
+
+178–185. ACM (2006)
+
+23. Yeh, J., Lin, J., Ke, H., Yang, W.: Learning to rank for information retrieval using genetic
+
+programming. In: SIGIR 2007 Workshop on LR4IR. Citeseer (2007)
+
+24. Yue, Y., Joachims, T.: Predicting diverse subsets using structural svms. In: ICML 2008, pp.
+
+1224–1231. ACM (2008)
+
+25. Zhai, C., Cohen, W., Lafferty, J.: Beyond independent relevance: methods and evaluation
+
+metrics for subtopic retrieval. In: SIGIR 2003, pp. 10–17. ACM (2003)
+
+Appendix: Feature Deﬁnition
+
+This section depicts how we deﬁne features in our experiment. In total, we deﬁned
+features of two categories: query-independent and query-dependent.
+
+– h-index: h-index equals h indicates that an author has h of N papers with at least h
+
+citations each, while the left (N − h) papers have at most h citations each.
+
+– Longevity: Longevity reﬂects the length of an author’s academic life. We consider
+the year when one author published his/her ﬁrst paper as the beginning of his/her
+academic life and the last paper as the end year.
+
+– Sociability: The score of an author’s sociability is deﬁned based on how many co-
+
+author he/she has. This score is deﬁned as:
+
+(cid:2)
+
+ln(#co − paperc)
+
+Sociability(A) = 1 +
+
+(5)
+where #co− paperc denotes the number of papers coauthored between the author
+and the coauthor c.
+
+c∈A’s coauthors
+
+– Language Model with Recency: We consider the effect of recency and impact factor
+of conference. Thus the language model score we used for an author is redeﬁned
+as:
+
+LM (q|a) =
+
+(cid:2)
+
+d∈{a’s publications}
+
+p(q|d) × Impact(d.conf erence) × Recency(d)
+
+(6)
+
+where Recency(d) for publication d is deﬁned as:
+
+Recency(d) = exp
+
+(cid:4)
+
+d.year - current year
+
+λ
+
+(cid:5)
+
+(7)
+
+– BM25 with Recency: It deﬁnes a similar relevance score as that in Eq. 6, except that
+
+the p(q|d) is obtained by BM25.
+
+

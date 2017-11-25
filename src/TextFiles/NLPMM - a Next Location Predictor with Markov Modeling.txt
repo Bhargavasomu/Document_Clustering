@@ -1,0 +1,1094 @@
+NLPMM: A Next Location Predictor with Markov
+
+Modeling
+
+Meng Chen1, Yang Liu1, and Xiaohui Yu1,2,(cid:2)
+
+1 School of Computer Science and Technology, Shandong University, Jinan, China, 250101
+
+2 School of Information Technology, York University, Toronto, ON, Canada, M3J 1P3
+
+chenmeng114@hotmail.com, {yliu,xyu}@sdu.edu.cn
+
+Abstract. In this paper, we solve the problem of predicting the next locations
+of the moving objects with a historical dataset of trajectories. We present a Next
+Location Predictor with Markov Modeling (NLPMM) which has the following
+advantages: (1) it considers both individual and collective movement patterns in
+making prediction, (2) it is effective even when the trajectory data is sparse, (3)
+it considers the time factor and builds models that are suited to different time pe-
+riods. We have conducted extensive experiments in a real dataset, and the results
+demonstrate the superiority of NLPMM over existing methods.
+
+Keywords: moving pattern, next location prediction, time factor.
+
+1 Introduction
+
+The prevalence of positioning technology has made it possible to track the movements
+of people and other objects, giving rise to a variety of location-based applications. For
+example, GPS tracking using positioning devices installed on the vehicles is becom-
+ing a preferred method of taxi cab ﬂeet management. In many social network applica-
+tions (e.g., Foursquare), users are encouraged to share their locations with other users.
+Moreover, in an increasing number of cities, vehicles are photographed when they pass
+the surveillance cameras installed over highways and streets, and the vehicle passage
+records including the license plate numbers, the time, and the locations are transmitted
+to the data center for storage and further processing.
+
+In many of these location-based applications, it is highly desirable to be able to ac-
+curately predict a moving object’s next location. Consider the following example in
+location-based advertising. Lily has just shared her location with her friends on the so-
+cial network website. If the area she will pass by is known in advance, it is possible to
+push plenty of information to her, such as the most popular restaurant and the products
+on sale in that area. As another example, if we could predict the next locations of vehi-
+cles on the road, then we will be able to forecast the trafﬁc conditions and recommend
+more reasonable routes to drivers to avoid or alleviate trafﬁc jams.
+
+Several methods have been proposed to predict next locations, most of which fall into
+one of two categories: (1) methods that use only the historical trajectories of individual
+objects to discover individual movement patterns [7, 12], and (2) methods that use the
+
+(cid:2) Corresponding Author.
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part II, LNAI 8444, pp. 186–197, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+NLPMM: A Next Location Predictor with Markov Modeling
+
+187
+
+historical trajectories of all objects to identify collective movement patterns [10, 11].
+The majority of the existing methods train models based on frequent patterns and/or
+association rules to discover movement patterns for prediction.
+
+However, there are a few major problems with the existing methods. First, those
+methods focus on either the individual patterns or the collective patterns, but very of-
+ten the movements of objects reﬂect both individual and collective properties. Second,
+in some circumstances (e.g., social check-in, and vehicle surveillance), the data points
+are very sparse; the trajectories of some objects may consist of only one record. One
+cannot construct meaningful frequent patterns with these trajectories. Finally, the ex-
+isting methods do not give proper consideration to the time factor. Different movement
+patterns exist in different time, for example, Bob is going to leave his house. If it is 8
+a.m. on a weekday, he is most likely to go to work. But if it is 11:30 a.m., he is more
+likely to go to a restaurant, and he may go shopping if it is 3 p.m on weekends. Failing
+to take time factor into account would result in higher error rates in predicting the next
+locations.
+
+To address those problems, we propose a Next Location Predictor with Markov Mod-
+eling (NLPMM) to predict the next locations of moving objects given past trajectory
+sequences. NLPMM builds upon two models: the Global Markov Model (GMM) and
+the Personal Markov Model (PMM). GMM utilizes all available trajectories to discover
+global behaviours of the moving objects based on the assumption that they often share
+similar movement patterns (e.g., people driving from A to B often take the same route).
+PMM, on the other hand, focuses on modeling the individual patterns of each mov-
+ing object using its own past trajectories. The two models are combined using linear
+regression to produce a more complete and accurate predictor.
+
+Another distinct feature of NLPMM lies in its treatment of the time factor. The move-
+ment patterns of objects vary from one time period to another (e.g., weekdays vs. week-
+ends). Meanwhile, similarities also exist for different time periods (e.g., this Monday
+and next), and the movement patterns of moving objects tend to be cyclical. We thus
+propose to cluster the time periods based on the similarity in movement patterns and
+build a separate model for each cluster.
+
+The performance of NLPMM is evaluated in a real dataset consisting of the vehicle
+passage records over a period of 31 days (1/1/2013 - 1/31/2013) in a metropolitan area.
+The experimental results conﬁrm the superiority of the proposed methods over existing
+methods.
+
+The contributions of this paper can be summarized as follows.
+– We propose a Next Location Predictor with Markov Modeling to predict the next
+location a moving object will arrive at. To the best of our knowledge, NLPMM
+is the ﬁrst model that takes a holistic approach and considers both individual and
+collective movement patterns in making prediction. It is effective even when the
+trajectory data is sparse.
+
+– Based on the important observation that the movement patterns of moving objects
+often change over time, we propose methods that can capture the relationships be-
+tween the movement patterns in different time periods, and use this knowledge to
+build more reﬁned models that are better suited to different time periods.
+
+– We conduct extensive experiments using a real dataset and the results demonstrate
+
+the effectiveness of NLPMM.
+
+188
+
+M. Chen, Y. Liu, and X. Yu
+
+The remainder of this paper is organized as follows. Section 2 reviews related work.
+Section 3 gives the preliminaries of our work. Section 4 describes our approach of
+Markov modeling. Section 5 presents methods that take the time factor into consider-
+ation. The experimental results and performance analysis are presented in Section 6.
+Section 7 concludes this paper.
+
+2 Related Work
+
+There have appeared a considerable body of work on knowledge discovery from trajec-
+tories, where a trajectory is deﬁned as a sequence of locations ordered by time-stamps.
+In what follows, we discuss three categories of studies that are most closely related
+to us.
+
+Route planning: Several studies use GPS trajectories for route planning through con-
+structing a complete route [2, 3, 16]. Chen et al. search the k Best-Connected Trajecto-
+ries from a database [3] and discover the most popular route between two locations [2].
+Yuan et al. ﬁnd the practically fastest route to a destination at a given departure time
+using historical taxi trajectories [16].
+
+Long-range prediction: Long-range prediction is studied in [5, 8], where they try
+to predict the whole future trajectory of a moving object. Krumm proposes a Simple
+Markov Model that uses previously traversed road segments to predict routes in the
+near future [8]. Froehlich and Krumm use previous GPS traces to make a long-range
+prediction of a vehicle’s trajectory [5].
+
+Short-range prediction: Short-range prediction has been widely investigated
+[7, 10–12], which is concerned with the prediction of only the next location. Some
+of these methods make prediction with only the individual movements [7, 12], while
+others use the historical movements of all the moving objects [10, 11]. Xue et al. con-
+struct a Probabilistic Sufﬁx Tree (PST) for each road using the taxi traces and propose a
+method based on Variable-order Markov Models (VMMs) for short-term route predic-
+tion [12]. Jeung et al. present a hybrid prediction model to predict the future locations of
+moving objects, which combine predeﬁned motion functions using the object’s recent
+movements with the movement patterns of the object [7]. Monreale et al. use the previ-
+ous movements of all moving objects to build a T-pattern tree to make future location
+prediction [10]. Morzy uses a modiﬁed version of the PreﬁxSpan algorithm to discover
+frequent trajectories and movement rules with all the moving objects’ locations [11].
+
+In addition to the three aforementioned categories of work, there has also appeared
+work on using social-media data for trajectory mining [9, 13]. Kurashima et al. recom-
+mend travel routes based on a large set of geo-tagged and time-stamped photographs
+[9]. Ye et al. utilize a mixed Hidden Markov Model to predict the category of a user’s
+next activity and then predict a location given the category [13].
+
+3 Preliminaries
+
+In this section, we will explain a few terms that are required for the subsequent discus-
+sion, and deﬁne the problem addressed in this paper.
+
+NLPMM: A Next Location Predictor with Markov Modeling
+
+189
+
+Deﬁnition 1 (Sampling Location). For a given moving object o, it passes through a
+set of sampling locations, where each sampling location refers to a point or a region (in
+a two-dimensional area of interest) where the position of o is recorded.
+
+For example, the positions of the cameras in the trafﬁc surveillance system can be
+
+considered as the sampling locations.
+
+Deﬁnition 2 (Trajectory Unit). For a given moving object o, a trajectory unit, denoted
+by u, is the basic component of its trajectory. Each trajectory unit u can be represented
+by (u.l, u.t), where u.l is the id of the sampling location of the moving object at time-
+stamp u.t.
+
+Deﬁnition 3 (Trajectory). For a moving object, its trajectory T is deﬁned as a time-
+ordered sequence of trajectory units: < u1, u2, . . . , un >.
+
+From Deﬁnition 2, T can also be represented as < (u1.l, u1.t) , (u2.l, u2.t) , . . . ,
+(un.l, un.t) > where ui.t < ui+1.t (1 (cid:2) i (cid:2) n − 1).
+
+Deﬁnition 4 (Candidate Next Locations). For the sampling location ui.l, we deﬁne a
+sampling location uj.l as a candidate next location of ui.l if a moving object can reach
+uj.l from ui.l directly.
+
+The set of candidate next locations can be obtained either by prior knowledge (e.g.,
+locations of the surveillance cameras combined with the road network graph), or by
+induction from historical trajectories of moving objects.
+
+Deﬁnition 5 (Sampling Location Sequence). For a given trajectory < (u1.l, u1.t) ,
+(u2.l, u2.t) , . . . , (un.l, un.t) >, its sampling location sequence refers to a sequence of
+sampling locations appearing in the trajectory, denoted as < u1.l, u2.l, . . . , un.l >.
+
+Deﬁnition 6 (Preﬁx Set). For a sampling location ui.l and a given set of trajectories
+T , its preﬁx set of size N , denoted by SN
+i , refers to the set of sequences such that each
+sequence is a length N subsequence that immediately precedes ui+1.l in the sampling
+location sequence of some trajectory T ∈ T .
+
+4 Markov Modeling
+
+We choose to use Markov models to solve the next location prediction problem. Specif-
+ically, a state in the Markov model corresponds to a sampling location, and state transi-
+tion corresponds to moving from one sampling location to the next.
+
+In order to take into consideration both the collective and the individual movement
+patterns in making the prediction, we propose two models, a Global Markov Model
+(GMM) to model the collective patterns, and a Personal Markov Model (PMM) to model
+the individual patterns and solve the problem of data sparsity. They are combined using
+linear regression to generate a predictor.
+
+190
+
+M. Chen, Y. Liu, and X. Yu
+
+4.1 Global Markov Model
+Using historical trajectories, we can train an order-N GMM to give a probabilistic pre-
+diction over the next sampling locations for a moving object, where N is a user-chosen
+parameter. Let P (li) represents a discrete probability of a moving object arriving at
+(cid:2)
+sampling location li. The order-N GMM implies that the probability distribution P (l
+)
+for the next sampling location l
+of a given moving object o is independent of all but
+the immediately preceding N locations that o has arrived at:
+(cid:2)|SN
+i )
+
+(cid:2)| < lj, . . . , li >) = P (l
+
+P (l
+
+(1)
+
+(cid:2)
+
+For a given trajectory dataset, an order-N GMM for the sampling location li can be
+trained in the following way. We ﬁrst construct the preﬁx set SN
+i . Next, for every preﬁx
+in SN
+i , we compute the frequency of each distinct sampling location appearing after this
+preﬁx in the dataset. These frequencies are then normalized to get a discrete probability
+distribution over the next sampling location.
+
+We start with a ﬁrst order GMM, followed by a second-order GMM, etc., until the
+order-N GMM has been obtained, to train a variable-order GMM. In contrast to the
+order-N GMM, the variable-order GMM learns such conditional distributions with a
+varying N and provides the means of capturing different orders of Markov dependen-
+cies based on the observed data. There exist many ways to utilize the variable-order
+GMM for prediction. Here we adopt the principle of longest match. That is, for a given
+sampling location sequence ending with li, we ﬁnd its longest sufﬁx match from the set
+of sequences in the preﬁx set of li.
+
+4.2 Personal Markov Model
+
+The majority of people’s movements are routine (e.g., commuting), and they often have
+their own individual movement patterns. In addition, about 73% of trajectories in our
+dataset contain only one point, but they also can reﬂect the characteristics of the moving
+objects’ activities. For example, someone who lives in the east part of the city is unlikely
+to travel to a supermarket 50 kilo-meters away from his home. Therefore, we propose a
+Personal Markov Model (PMM) for each moving object to predict next locations.
+
+The training of PMM consists of two parts: training a variable-order Markov model
+for every moving object using its own trajectories of length than 1, and a zero-order
+Markov model for every moving object using the trajectory units.
+
+For training the variable-order Markov model, we construct the preﬁx set for every
+moving object using its own trajectories, and then we compute the probability distri-
+bution of the next sampling locations. Specially, we iteratively train a variable-order
+Markov model with order i ranging from 1 to N using the trajectories of one moving
+object.
+
+(cid:2)
+
+) denotes the number of times a sampling location l
+
+We train a zero-order Markov model using the trajectory units. For a moving object,
+let N (l
+appears in the training
+trajectories. Let Ll(cid:2) be the set of distinct sampling locations appearing in the training
+trajectories. Then we have
+
+(cid:2)
+
+(cid:2)
+
+P (l
+
+) =
+
+(cid:2)
+
+(cid:2) N (l)
+
+(cid:2)
+
+)
+
+N (l
+l∈L
+
+l
+
+.
+
+(2)
+
+NLPMM: A Next Location Predictor with Markov Modeling
+
+191
+
+The zero-order Markov model can be seamlessly integrated with the variable-order
+
+Markov model to obtain the ﬁnal PMM.
+
+4.3 Integration of GMM and PMM
+
+i =
+
+(cid:3)
+pi
+1, pi
+
+There are many methods to combine the results from a set of predictors. For our prob-
+lem, we choose to use linear regression to integrate the two models we have proposed.
+For the given i-th trajectory sequence, both GMM and PMM can get a vector of
+probabilities, pw
+(w = 1 for GMM and w = 2 for PMM), where
+m is the number of the sampling locations, and pi
+j is the probability of location j being
+m)(cid:3)
+the next sampling location. We also have a vector of indicators yi = (yi
+for the i-th trajectory sequence, where yi
+j = 1 if the actual next location is j and 0
+otherwise. We can predict yi through a linear combination of the vectors generated by
+GMM and PMM:
+
+2,··· , yi
+
+2,··· , pi
+
+(cid:4)(cid:3)
+
+m
+
+1, yi
+
+2(cid:5)
+
+ˆyi = β01 +
+
+βwpw
+i
+
+(3)
+
+w=1
+
+where 1 is a unit vector, and β0, β1, and β2 are the coefﬁcients to be estimated.
+
+Given a set of n training trajectories, we can compute the optimal values of βi
+i=1 ||yi − ˆyi||, where || · || is the
+through standard linear regression that minimizes
+Euclidean norm. The βi values thus obtained can then be used for prediction. For a par-
+ticular trajectory, we can predict the top k next sampling locations by identifying the k
+largest elements in the estimator ˆy.
+
+(cid:2)n
+
+5 Time Factor
+
+The movement of human beings demonstrates a great degree of temporal regularity
+[1, 6]. In this section, we will ﬁrst discuss how the movement patterns are affected by
+time, and then show how to improve the predictor proposed in the preceding section by
+taking the time factor into consideration.
+
+5.1 Observations and Discussions
+
+We illustrate how time could affect people’s movement patterns through Figure 1. In
+this case, for a sampling location l, there are seven candidate next locations, and the
+distributions over those locations do differ from one period to another. For instance,
+vehicles are most likely to arrive at the ﬁfth location during the period from 9:00 to
+10:00, whereas the most probable next location is the second for the period from 14:00
+to 15:00.
+
+Therefore, the prediction model should be made time-aware, and one way to do this
+is to train different models for different time periods. In what follows, we will explore a
+few methods to determine the suitable time periods. Here, we choose day as the whole
+time span, i.e., we study how to ﬁnd movement patterns within a day. However, any
+other units of time, such as hour, week or month, could also be used depending on the
+scenario.
+
+192
+
+M. Chen, Y. Liu, and X. Yu
+
+y
+t
+i
+l
+i
+b
+a
+b
+o
+r
+p
+
+0.4
+
+0.3
+
+0.2
+
+0.1
+
+0
+
+1
+
+2
+
+3
+
+4
+
+5
+sampling location
+
+9:00-10:00
+10:00-11:00
+11:00-12:00
+12:00-13:00
+13:00-14:00
+14:00-15:00
+15:00-16:00
+
+15:00-16:00
+
+13:00-14:00
+
+11:00-12:00
+
+time
+
+9:00-10:00
+
+6
+
+7
+
+Fig. 1. An example of time affecting people’s movement patterns
+
+5.2 Time Binning
+
+A straight-forward approach is to partition the time span into a given number (M ) of
+equi-sized time bins, and all trajectories are mapped to those bins according to their
+time stamps. A trajectory spanning over more than one bin is split into smaller sub-
+trajectories such that the trajectory units in each sub-trajectory all fall in the same bin.
+We then train M independent models, each for a different time bin, using the trajectories
+falling in each bin. Prediction is done by choosing the right model based on the time-
+stamp. We call this approach Time Binning (TB).
+
+However, this approach has some limitations: the sizes of all time bins are equal,
+rendering it difﬁcult to ﬁnd the correct bin sizes that ﬁt all movement patterns in the
+time span, as some patterns manifest themselves over longer periods whereas others
+shorter. One possible improvement to TB is to start with a small bin size, and gradually
+merge the time bins whose distributions are considered similar by some metric.
+
+5.3 Distributions Clustering
+
+We propose a method called Distributions Clustering (DC) to perform clustering of the
+time bins based on the similarities of the probability distributions in each bin. Here, the
+probability distribution refers to the transition probability from one location to another.
+Compared with TB, the trajectories having similar probability distributions are expected
+to be put in one cluster, leading to clearer revelation of the moving patterns. Here, we
+use cosine similarity to measure the similarities between the distributions, but the same
+methodology still applies when other distance metrics such as the Kullback-Leibler
+divergence [4] are used.
+
+For an object o appearing at a given sampling location l with a time point falling into
+the ith time bin, let pm
+i be an m-dimensional vector that represents the probabilities of
+o moving from l to another location, where m is the total number of sampling locations.
+We measure the similarity of two time bins i and j (with respect to o) using the cosine
+
+NLPMM: A Next Location Predictor with Markov Modeling
+
+193
+
+(cid:3)
+pm
+i .pm
+j
+
+(cid:6)
+(cid:4)
+(cid:6)
+similarity, cosij =
+. With the similarity metric deﬁned, we
+can perform clustering for each sampling location l on the time bins. The algorithm is
+detailed in Algorithm 1. The results will be a set of clusters, each containing a set of
+time bins, for the sampling location l.
+
+(cid:3)|pm
+i | .
+
+(cid:6)
+(cid:6)pm
+j
+
+(cid:4)
+
+/
+
+Algorithm 1. DC: Detecting Q clusters for the M time bins
+Input: cluster number Q, time bins number M and the probability distributions of trajectories
+
+in each time bin;
+Output: the clusters;
+1. random select Q time bins as the initial cluster centres;
+2. repeat
+3.
+
+calculate the similarity of the probability distributions of trajectories in each time bin and
+the cluster centres;
+assign each time bin to the cluster centre with the maximum similarity;
+recalculate the probability distributions of trajectories in the cluster centres;
+
+4.
+5.
+6. until clusters do not change or the maximum number of iterations has been reached
+7. return the clusters;
+
+For a given location li, we can get Q clusters, deﬁned as Ck
+
+Combined with the order-N Markov model, the probability distribution P (l
+next sampling location l
+
+i , k = 1, 2,··· , Q.
+) for the
+of a given moving object o can be computed with the formula:
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)| < (uj.l, uj.t) , . . . , (ui.l, ui.t) >) = P (l
+
+P (l
+
+(cid:2)|Ck
+
+i ,SN
+i )
+
+(4)
+
+We then train Q models with the trajectories in each cluster to form a new model
+NLPMM-DC (which stands for NLPMM with Distributions Clustering). In the new
+model, the sequence of just-passed locations and the time factor are both utilized by
+combing distributions clustering and Markov model.
+
+6 Performance Evaluation
+
+We have conducted extensive experiments to evaluate the performance of the proposed
+NLPMM using a real vehicle passage dataset. In this section, we will ﬁrst describe the
+dataset and experimental settings, followed by the evaluation metrics to measure the
+performance. We then show the experimental results.
+
+6.1 Datasets and Settings
+
+The dataset used in the experiments consists of real vehicle passage records from the
+trafﬁc surveillance system of a major metropolitan area with a 6-million population. The
+dataset contains 10,344,058 records during a period of 31 days (from January 1, 2013
+to January 31, 2013). Each record contains three attributes, the license plate number of
+the vehicle, the ID of the location of the surveillance camera, and the time of vehicle
+passing the location. There are about 300 camera locations on the main roads. The
+average distance between a neighboring pair of camera locations is approximately 3
+kilometers.
+
+194
+
+M. Chen, Y. Liu, and X. Yu
+
+6.2 Pre-processing
+
+We pre-process the dataset to form trajectories, resulting in a total of 6,521,841 tra-
+jectories. According to statistics, the trajectories containing only one point account for
+about 73% of all trajectories, which testiﬁes to the sparsity of data sampling. We choose
+a total of 1,760,897 trajectories with the length greater than one to calculate the number
+of candidate next locations for every sampling location. Due to the sparsity of cam-
+era locations, about 86.3% of the sampling locations have more than 10 candidate next
+sampling locations, and the average number of candidate next locations is about 43. We
+predict top-k next sampling locations in the experiments.
+
+6.3 Evaluation Metrics
+
+Our evaluation uses the following metrics that are widely employed in multi-label clas-
+siﬁcation studies [14].
+
+Prediction Coverage: It is deﬁned as the percentage of trajectories for which the next
+location can be predicted based on the model. Let c (l) be 1 if it can be predicted and 0
+l∈T c (l) /|T |, where |T | denotes the total number of
+otherwise. Then P reCovT =
+trajectories in the testing dataset.
+
+(cid:2)
+
+Accuracy: It is deﬁned as the frequency of the true next location occurring in the list
+of predicted next locations. Let p (l) be 1 it does and 0 otherwise. Then accuracyT =
+(cid:2)
+l∈T p (l) /|T |.
+One-error: It is deﬁned as the frequency of the top-1 predicted next location not
+being the same as the true next location. Let e (l) be 0 if the top-1 predicted sampling
+location is the same as the true next location and 1 otherwise. Then one − errorT =
+| (cid:2)
+
+l∈T e (l) /T |.
+Average Precision: Given a list of top-k predicted next locations, the average pre-
+l∈T (p (i) /i) /|T |, where i denotes the position
+cision is deﬁned as AveP recT =
+in the predicted list, and p (i) takes the value of 1 if the predicted location at the i-th
+position in the list is the actual next location.
+
+(cid:2)
+
+6.4 Evaluation of NLPMM
+
+We evaluate the performance of NLPMM and its components, PMM, and GMM. For
+each experiment, we perform 50 runs and report the average of the results. First, we
+study the effect of the order of the Markov model by varying N from 1 to 6. Figure 2(a)
+shows that the accuracy has an apparent improvement when the order N increases from
+1 to 2 for all models. The accuracy reaches the maximum when N is set to 3 and remains
+stable as N increases further. Therefore, we set N to 3 in the following experiments.
+Next, we evaluate the effect of top k on PMM, GMM, and NLPMM. From Figure 2(b),
+we can observe that the accuracy of all three models improves as k increases. Further-
+more, the accuracy of GMM and NLPMM is signiﬁcantly better than that of PMM,
+and the best results are given by NLPMM. Since the average number of candidate next
+
+(cid:92)
+(cid:70)
+(cid:68)
+(cid:85)
+(cid:88)
+(cid:70)
+(cid:70)
+(cid:68)
+
+(cid:19)(cid:17)(cid:24)
+(cid:19)(cid:17)(cid:23)(cid:24)
+(cid:19)(cid:17)(cid:23)
+(cid:19)(cid:17)(cid:22)(cid:24)
+(cid:19)(cid:17)(cid:22)
+(cid:19)(cid:17)(cid:21)(cid:24)
+(cid:19)(cid:17)(cid:21)
+
+(cid:19)(cid:17)(cid:24)(cid:25)
+
+(cid:19)(cid:17)(cid:24)(cid:24)
+
+(cid:19)(cid:17)(cid:24)(cid:23)
+
+(cid:19)(cid:17)(cid:24)(cid:22)
+
+(cid:19)(cid:17)(cid:24)(cid:21)
+
+(cid:85)
+(cid:82)
+(cid:85)
+(cid:85)
+(cid:72)
+(cid:16)
+(cid:72)
+(cid:81)
+(cid:82)
+
+NLPMM: A Next Location Predictor with Markov Modeling
+
+195
+
+(cid:92)
+(cid:70)
+(cid:68)
+(cid:85)
+(cid:88)
+(cid:70)
+(cid:70)
+(cid:68)
+
+(cid:19)(cid:17)(cid:28)
+(cid:19)(cid:17)(cid:27)
+(cid:19)(cid:17)(cid:26)
+(cid:19)(cid:17)(cid:25)
+(cid:19)(cid:17)(cid:24)
+(cid:19)(cid:17)(cid:23)
+(cid:19)(cid:17)(cid:22)
+
+(cid:51)(cid:48)(cid:48)
+(cid:42)(cid:48)(cid:48)
+(cid:49)(cid:47)(cid:51)(cid:48)(cid:48)
+
+(cid:20)
+
+(cid:21)
+
+(cid:22)
+
+(cid:23)
+
+(cid:24)
+
+(cid:78)
+
+(cid:25)
+
+(cid:26)
+
+(cid:27)
+
+(cid:28)
+
+(cid:20)(cid:19)
+
+(b)
+
+(cid:51)(cid:48)(cid:48)
+(cid:42)(cid:48)(cid:48)
+(cid:49)(cid:47)(cid:51)(cid:48)(cid:48)
+
+(cid:21)
+
+(cid:20)
+(cid:25)
+(cid:87)(cid:75)(cid:72)(cid:3)(cid:82)(cid:85)(cid:71)(cid:72)(cid:85)(cid:3)(cid:49)(cid:3)(cid:82)(cid:73)(cid:3)(cid:48)(cid:68)(cid:85)(cid:78)(cid:82)(cid:89)(cid:3)(cid:80)(cid:82)(cid:71)(cid:72)(cid:79)
+
+(cid:22)
+
+(cid:23)
+
+(cid:24)
+
+(a)
+
+Fig. 2. Performance of PMM, GMM, and NLPMM
+
+(cid:82)(cid:81)(cid:72)(cid:16)(cid:72)(cid:85)(cid:85)(cid:82)(cid:85)
+(cid:68)(cid:89)(cid:72)(cid:85)(cid:68)(cid:74)(cid:72)(cid:3)(cid:83)(cid:85)(cid:72)(cid:70)(cid:76)(cid:86)(cid:76)(cid:82)(cid:81)
+
+(cid:19)(cid:17)(cid:25)(cid:21)
+
+(cid:19)(cid:17)(cid:25)(cid:20)
+
+(cid:19)(cid:17)(cid:25)
+
+(cid:19)(cid:17)(cid:24)(cid:28)
+
+(cid:81)
+(cid:82)
+(cid:76)
+(cid:86)
+(cid:76)
+(cid:70)
+(cid:72)
+(cid:85)
+(cid:83)
+(cid:3)
+(cid:72)
+(cid:74)
+(cid:68)
+(cid:85)
+(cid:72)
+(cid:89)
+(cid:68)
+
+(cid:21)(cid:23)
+
+(cid:20)(cid:21)
+
+(cid:27)
+
+(cid:25)
+
+(cid:23)
+
+(cid:22)
+
+(cid:86)(cid:76)(cid:93)(cid:72)(cid:3)(cid:82)(cid:73)(cid:3)(cid:87)(cid:76)(cid:80)(cid:72)(cid:3)(cid:69)(cid:76)(cid:81)(cid:11)(cid:75)(cid:82)(cid:88)(cid:85)(cid:86)(cid:12)
+
+(cid:19)(cid:17)(cid:24)(cid:27)
+
+(cid:21)
+
+(cid:20)
+
+(cid:19)(cid:17)(cid:24)(cid:25)
+
+(cid:19)(cid:17)(cid:24)(cid:24)
+
+(cid:19)(cid:17)(cid:24)(cid:23)
+
+(cid:19)(cid:17)(cid:24)(cid:22)
+
+(cid:19)(cid:17)(cid:24)(cid:21)
+
+(cid:85)
+(cid:82)
+(cid:85)
+(cid:85)
+(cid:72)
+(cid:16)
+(cid:72)
+(cid:81)
+(cid:82)
+
+(cid:82)(cid:81)(cid:72)(cid:16)(cid:72)(cid:85)(cid:85)(cid:82)(cid:85)
+(cid:68)(cid:89)(cid:72)(cid:85)(cid:68)(cid:74)(cid:72)(cid:3)(cid:83)(cid:85)(cid:72)(cid:70)(cid:76)(cid:86)(cid:76)(cid:82)(cid:81)
+
+(cid:19)(cid:17)(cid:25)(cid:21)
+
+(cid:19)(cid:17)(cid:25)(cid:20)
+
+(cid:19)(cid:17)(cid:25)
+
+(cid:19)(cid:17)(cid:24)(cid:28)
+
+(cid:81)
+(cid:82)
+(cid:76)
+(cid:86)
+(cid:76)
+(cid:70)
+(cid:72)
+(cid:85)
+(cid:83)
+(cid:3)
+(cid:72)
+(cid:74)
+(cid:68)
+(cid:85)
+(cid:72)
+(cid:89)
+(cid:68)
+
+(cid:20)
+
+(cid:21)
+
+(cid:23)
+
+(cid:22)
+(cid:70)(cid:79)(cid:88)(cid:86)(cid:87)(cid:72)(cid:85)(cid:3)(cid:81)(cid:88)(cid:80)(cid:69)(cid:72)(cid:85)
+
+(cid:24)
+
+(cid:25)
+
+(cid:26)
+
+(cid:27)
+
+(cid:19)(cid:17)(cid:24)(cid:27)
+
+(a) Effect of the size of time bin
+
+(b) Effect of the number of clusters
+
+Fig. 3. Effect of parameters
+
+locations is 43 (meaning there are 43 possibilities), the accuracy of 0.88 is surprisingly
+good when k is set to 10.
+
+6.5 Effect of the Time Factor
+
+We evaluate the proposed methods that take into consideration of the time factor. Fig-
+ure 3(a) shows the effect of bin size on NLPMM-TB (which stands for NLPMM with
+Time Binning). The performance of NLPMM-TB starts to deteriorate when the bin size
+becomes less than 8, because when the bins get smaller, the trajectories in them become
+too sparse to generate a meaningful collective pattern. Figure 3(b) shows the effect of
+the number of clusters on NLPMM-DC (which stands for NLPMM with Distributions
+Clustering). When it is set to 1, the model is the same as NLPMM. The one-error rate
+declines and the average precision improves as the number increases from 1 to 5. When
+it continues to increase, the result starts to get worse. This is because having too many
+or too few clusters with either hurt the cohesiveness or the separation of the clusters.
+
+We evaluate the performance of NLPMM, NLPMM-TB and NLPMM-DC using one-
+error and average precision. The results are shown in Table 1. NLPMM-TB and NLPMM-
+DC perform better than NLPMM, which is because we can get a more reﬁned model by
+adding the time factor and generate more accurate predictions. NLPMM-DC performs
+best, validating the effectiveness of the method of distributions clustering. It will be
+used in the following comparison with alternative methods.
+
+196
+
+M. Chen, Y. Liu, and X. Yu
+
+Table 1. one-error and average precision of different models
+
+one-error
+
+average precision
+
+NLPMM
+53.8%
+60.2%
+
+NLPMM-TB
+
+NLPMM-DC
+
+53.0%
+60.5%
+
+52.3%
+60.9%
+
+6.6 Comparison with Existing Methods
+
+We compare the proposed NLPMM-DC with the start-of-the-art approaches VMM [12]
+and WhereNext [10]. VMM uses individual trajectories to predict the next locations,
+whereas WhereNext uses all available trajectories to discover collective patterns. In this
+experiment, we predict top-1 next sampling location. The parameters of VMM are set
+as follows: memory length N =3, σ=0.3, and Nmin=1. For WhereNext, the support for
+constructing T-pattern tree is set as 20. For the NLPMM-DC, the setting is that the order
+N = 3 and the number of clusters is set at 5.
+
+(cid:72)
+(cid:87)
+(cid:68)
+(cid:85)
+
+(cid:20)
+
+(cid:19)(cid:17)(cid:27)
+
+(cid:19)(cid:17)(cid:25)
+
+(cid:19)(cid:17)(cid:23)
+
+(cid:19)(cid:17)(cid:21)
+
+(cid:19)
+
+(cid:68)(cid:70)(cid:70)(cid:88)(cid:85)(cid:68)(cid:70)(cid:92)
+(cid:83)(cid:85)(cid:72)(cid:71)(cid:76)(cid:70)(cid:87)(cid:76)(cid:82)(cid:81)(cid:3)(cid:70)(cid:82)(cid:89)(cid:72)(cid:85)(cid:68)(cid:74)(cid:72)
+
+(cid:57)(cid:48)(cid:48)
+
+(cid:58)(cid:75)(cid:72)(cid:85)(cid:72)(cid:49)(cid:72)(cid:91)(cid:87) (cid:49)(cid:47)(cid:51)(cid:48)(cid:48)(cid:16)(cid:39)(cid:38)
+
+(cid:71)(cid:76)(cid:73)(cid:73)(cid:72)(cid:85)(cid:72)(cid:81)(cid:87)(cid:3)(cid:80)(cid:82)(cid:71)(cid:72)(cid:79)(cid:86)
+
+(a)
+
+(cid:92)
+(cid:70)
+(cid:68)
+(cid:85)
+(cid:88)
+(cid:70)
+(cid:70)
+(cid:68)
+
+(cid:19)(cid:17)(cid:24)
+
+(cid:19)(cid:17)(cid:23)
+
+(cid:19)(cid:17)(cid:22)
+
+(cid:19)(cid:17)(cid:21)
+
+(cid:19)(cid:17)(cid:20)
+
+(cid:24)
+
+(cid:57)(cid:48)(cid:48)
+(cid:58)(cid:75)(cid:72)(cid:85)(cid:72)(cid:49)(cid:72)(cid:91)(cid:87)
+(cid:49)(cid:47)(cid:51)(cid:48)(cid:48)(cid:16)(cid:39)(cid:38)
+
+(cid:20)(cid:19)
+
+(cid:20)(cid:24)
+
+(cid:86)(cid:76)(cid:93)(cid:72)(cid:3)(cid:82)(cid:73)(cid:3)(cid:87)(cid:85)(cid:68)(cid:76)(cid:81)(cid:81)(cid:76)(cid:81)(cid:74)(cid:3)(cid:86)(cid:72)(cid:87)(cid:11)(cid:71)(cid:68)(cid:92)(cid:86)(cid:12)
+
+(cid:21)(cid:19)
+
+(cid:21)(cid:24)
+
+(b)
+
+Fig. 4. Performance comparison of NLPMM-DC, VMM, and WhereNext
+
+Figure 4 shows the performance comparison of NLPMM-DC, VMM and WhereNext
+in terms of prediction coverage and accuracy. As shown in Figure 4(a), NLPMM-DC
+performs the best, which can be attributed to the combination of individual and collec-
+tive patterns as well as the consideration of time factor. Figure 4(b) shows that the accu-
+racy of each model improves as the size of training set increases. It is worth mentioning
+that NLPMM-DC performs better than VMM and WhereNext in terms of accuracy for
+any training set size.
+
+7 Conclusions
+
+In this paper, we have proposed a Next Location Predictor with Markov Modeling to
+predict the next sampling location that a moving object will arrive at with a given trajec-
+tory sequence. The proposed NLPMM consists of two models: Global Markov Model
+and Personal Markov Model. Time factor is also added to the models and we propose
+two methods to partition the whole time span into periods of ﬁner granularities, includ-
+ing Time Binning and Distributions Clustering. New time-aware models are trained ac-
+cordingly. We have evaluated the proposed models using a real vehicle passage record
+
+NLPMM: A Next Location Predictor with Markov Modeling
+
+197
+
+dataset. The experiments show that our predictor signiﬁcantly outperforms the state-of-
+the-art methods (VMM and WhereNext).
+
+Acknowledgement. This work was supported in part by the National Natural Science
+Foundation of China Grant (No. 61272092), the Program for New Century Excellent
+Talents in University (NCET-10-0532), the Natural Science Foundation of Shandong
+Province of China Grant (No. ZR2012FZ004), the Independent Innovation Founda-
+tion of Shandong University (2012ZD012), the Taishan Scholars Program, and NSERC
+Discovery Grants. The authors would like to thank the anonymous reviewers, whose
+valuable comments helped improve this paper.
+
+References
+
+1. Ben-Elia, E., Shiftan, Y.: Which road do i take? A learning-based model of route-choice be-
+havior with real-time information. Transportation Research Part A: Policy and Practice 44(4),
+249–264 (2010)
+
+2. Chen, Z., Shen, H.T., Zhou, X.: Discovering popular routes from trajectories. In: ICDE, pp.
+
+900–911 (2011)
+
+3. Chen, Z., Shen, H.T., Zhou, X., Zheng, Y., Xie, X.: Searching trajectories by locations: an
+
+efﬁciency study. In: SIGMOD, pp. 255–266 (2010)
+
+4. Ertoz, L., Steinbach, M., Kumar, V.: A new shared nearest neighbor clustering algorithm and
+
+its applications. In: SDM, pp. 105–115 (2002)
+
+5. Froehlich, J., Krumm, J.: Route prediction from trip observations. SAE SP 2193, 53 (2008)
+6. Gonzalez, M.C., Hidalgo, C.A., Barabasi, A.L.: Understanding individual human mobility
+
+patterns. Nature 453(7196), 779–782 (2008)
+
+7. Jeung, H., Liu, Q., Shen, H.T., Zhou, X.: A hybrid prediction model for moving objects. In:
+
+ICDE, pp. 70–79 (2008)
+
+8. Krumm, J.: A markov model for driver turn prediction. SAE SP 2193(1) (2008)
+9. Kurashima, T., Iwata, T., Irie, G., Fujimura, K.: Travel route recommendation using geotags
+
+in photo sharing sites. In: CIKM, pp. 579–588 (2010)
+
+10. Monreale, A., Pinelli, F., Trasarti, R., Giannotti, F.: Wherenext: A location predictor on tra-
+
+jectory pattern mining. In: SIGKDD, pp. 637–646 (2009)
+
+11. Morzy, M.: Mining frequent trajectories of moving objects for location prediction. In: Perner,
+
+P. (ed.) MLDM 2007. LNCS (LNAI), vol. 4571, pp. 667–680. Springer, Heidelberg (2007)
+
+12. Xue, G., Li, Z., Zhu, H., Liu, Y.: Trafﬁc-known urban vehicular route prediction based on
+
+partial mobility patterns. In: ICPADS, pp. 369–375 (2009)
+
+13. Ye, J., Zhu, Z., Cheng, H.: Whats your next move: User activity prediction in location-based
+
+social networks. In: SDM, pp. 171–179 (2013)
+
+14. Ye, M., Shou, D., Lee, W.C., Yin, P., Janowicz, K.: On the semantic annotation of places in
+
+location-based social networks. In: SIGKDD, pp. 520–528 (2011)
+
+15. Yin, Z., Cao, L., Han, J., Luo, J., Huang, T.: Diversiﬁed trajectory pattern ranking in geo-
+
+tagged social media. In: SDM, pp. 980–991 (2011)
+
+16. Yuan, J., Zheng, Y., Zhang, C., Xie, W., Xie, X., Sun, G., Huang, Y.: T-drive: Driving direc-
+
+tions based on taxi trajectories. In: GIS, pp. 99–108 (2010)
+
+

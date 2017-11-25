@@ -1,0 +1,1109 @@
+Unsupervised Ensemble Learning
+
+for Mining Top-n Outliers(cid:2)
+
+Jun Gao1, Weiming Hu1, Zhongfei(Mark) Zhang2, and Ou Wu1
+
+1 National Laboratory of Pattern Recognition, Institute of Automation,
+
+Chinese Academy of Sciences, Beijing, China
+{jgao,wmhu,wuou}@nlpr.ia.ac.cn
+
+2 Dept. of Computer Science, State Univ. of New York at Binghamton,
+
+Binghamton, NY 13902, USA
+
+zhongfei@cs.binghamton.edu
+
+Abstract. Outlier detection is an important and attractive problem in knowledge
+discovery in large datasets. Instead of detecting an object as an outlier, we study
+detecting the n most outstanding outliers, i.e. the top-n outlier detection. Further,
+we consider the problem of combining the top-n outlier lists from various indi-
+vidual detection methods. A general framework of ensemble learning in the top-n
+outlier detection is proposed based on the rank aggregation techniques. A score-
+based aggregation approach with the normalization method of outlier scores and
+an order-based aggregation approach based on the distance-based Mallows model
+are proposed to accommodate various scales and characteristics of outlier scores
+from different detection methods. Extensive experiments on several real datasets
+demonstrate that the proposed approaches always deliver a stable and effective
+performance independent of different datasets in a good scalability in compari-
+son with the state-of-the-art literature.
+
+1 Introduction
+
+Outlier detection is an important knowledge discovery problem in ﬁnding unusual
+events and exceptional cases from large datasets in many applications such as stock
+market analysis, intrusion detection, and medical diagnostics. Over the past several
+decades, the research on outlier detection varies from the global computation to the
+local analysis, and the descriptions of outliers vary from binary interpretations to prob-
+abilistic representations. Global outlier detection [3,4,5] identiﬁes an observational ob-
+ject with a binary label by the global computation. Local outlier detection [6,7,8,9]
+provides a probabilistic likelihood called outlier score to capture how likely an object
+is considered as an outlier. Outlier scores can be used not only to discriminate outliers
+from normal data, but also to rank all the data in a database, such as the top-n outlier
+detection. There are other efforts that transform the unsupervised outlier detection to a
+classiﬁcation via artiﬁcially generated outliers [10].
+
+(cid:2) This work is supported in part by NSFC(Grant No. 60825204, 60935002 and 60903147),
+NBRPC(2012CB316400) and US NSF(IIS-0812114, CCF-1017828) as well as the Zhejiang
+University – Alibaba Financial Joint Lab.
+
+P.-N. Tan et al. (Eds.): PAKDD 2012, Part I, LNAI 7301, pp. 418–430, 2012.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2012
+
+Unsupervised Ensemble Learning for Mining Top-n Outliers
+
+419
+
+Although there are numerous outlier detection methods proposed in the literature,
+no one method performs better than the others under all circumstances, and the best
+method for a particular dataset may not be known a priori. Each detection method is
+proposed based on the speciﬁc priori knowledge. For example, the nearest neighbor
+based methods assume that the feature space is well enough to discriminate outliers
+from normal data, while the classiﬁcation based and the statistical methods need to
+suppose the distributions of outliers and normal objects, respectively. Hence, their de-
+tection performances vary with the nature of data. This setting motivates a fundamental
+information retrieval problem - the necessity of an ensemble learning of different de-
+tection methods to overcome their drawbacks and to increase the generalization ability,
+which is similar to meta-search that aggregates query results from different search en-
+gines into a more accurate ranking. Like meta-search, ensemble learning in the top-n
+outlier detection is more valuable than the fusion of the binary labels, especially in large
+databases. There is the literature on the ensemble learning of outlier detection, such as
+[13,14,15]. However, all these efforts state the problem of effectively detecting outliers
+in the sub-feature spaces. Since the work of Lazarevic and others focuses on the fusion
+of the sub-feature spaces, these methods are very demanding in requiring the full spec-
+trum of outlier scores in the datasets that prevents them from the fusion of the top-n
+outlier lists in many real-world applications.
+
+Although the problem of ensemble learning in the top-n outlier detection shares a
+certain similarity to that of meta-search, they have two fundamental differences. First,
+the top-n outlier lists from various individual detection methods include the order infor-
+mation and outlier scores of n most outstanding objects. Different detection methods
+generate outlier scores in different scales. This requires the ensemble framework to pro-
+vide a uniﬁed deﬁnition of outlier scores to accommodate the heterogeneity of different
+methods. Second, the order-based rank aggregation methods, such as Mallows Model
+[18], can only combine the information of the order lists with the same length, which
+prevents the application of these rank aggregation methods in the fusion of top-k outlier
+lists. Because, for a particular dataset, there are always several top-k outlier lists with
+various length used to measure the performance and effectiveness of a basic outlier de-
+tection method. In order to address these issues, we propose a general framework of
+ensemble learning in the top-n outlier detection shown in Figure 1, and develop two
+fusion methods: the score-based aggregation method (SAG) and the order-based ag-
+gregation method (OAG). To the best of our knowledge, this is the ﬁrst attempt to the
+ensemble learning in the top-n outlier detection. Speciﬁcally, the contributions of this
+paper are as follows:
+
+– We propose a score-based aggregation method (SAG) to combine the top-n outlier
+lists given by different detection methods without supervision. Besides, we propose
+a novel method for transforming outlier scores to posterior probabilities, which is
+used to normalize the heterogeneous outlier scores.
+
+– We propose an order-based aggregation method (OAG) based on the distanced-
+based Mallows model [16] to aggregate the different top-n outlier lists without su-
+pervision, which can deal with the fusion of top-k outlier lists with various length.
+This method only adopts the order information, which avoids the normalization of
+outlier scores.
+
+420
+
+J. Gao et al.
+
+Fig. 1. The general framework of ensemble learning
+
+– Extensive experiments on real datasets validate the effectiveness of these aggre-
+gation methods, where several state-of-the-art outlier detection methods, including
+the nearest neighbor based and the classiﬁcation based methods, are selected as
+the individual methods for the ensemble learning. Besides, the robustness of the
+proposed aggregation methods is evaluated based on the Uniform noise and the
+Gaussian noise.
+
+The remainder of this paper is organized as follows. Section 2 introduces the framework
+of ensemble learning in the top-n outlier detection and the two novel aggregation meth-
+ods: the score-based and the order-based methods. Section 3 reports the experimental
+results. Finally, Section 4 concludes the paper.
+
+2 Methodologies
+
+We ﬁrst introduce the general framework and the basic notions of ensemble learning in
+the top-n outlier detection, and then introduce the score-based method with a uniﬁed
+outlier score and the order-based method based on the distance-based Mallows model,
+respectively.
+
+2.1 Framework and Notions of Ensemble Learning
+
+Let X = [x1, x2, x3, . . . , xd] be an object in a dataset D, where d is the number of
+attributes and |D| is the number of all the objects.
+
+As shown in Figure 1, there are K individual detection methods that process the orig-
+inal data in parallel. Essentially, all the individual methods return outlier scores rather
+than binary labels to generate the top-n outlier lists, where the number n is determined
+by users. The top-n outlier list σi assigned to the i-th individual method is represented
+as (σ−1(1), S(i1);··· ; σ−1(n), S(in)), where σ−1(i) denotes the index of the object
+assigned to rank i and S(σ−1(i)) is its outlier score. Correspondingly, σ(i) is the rank
+assigned to object Xi. Let Rn be the set of all the top-n orderings over |D| objects, and
+d : Rn × Rn −→ R be the distance between two top-n lists, which should be a right-
+invariant metric. This means that the value of d(π, σ)|∀π, σ ∈ Rn does not depend on
+how objects are indexed.
+
+Unsupervised Ensemble Learning for Mining Top-n Outliers
+
+421
+
+The aggregation model combines K orderings {σi}K
+
+i=1 to obtain the optimal top-
+n outlier list. Clearly, the literature with respect to the fusion of sub-feature spaces
+[13,14,15] can be included in this framework by using the detection model in a special
+sub-feature space as an individual method. In this paper, we only focus on the unsuper-
+vised aggregation models based on the order information and outlier scores.
+
+2.2 Score-Based Aggregation Approach (SAG)
+
+Since a top-n outlier list σi contains the order information and the corresponding outlier
+scores, it is straightforward that combining these outlier scores from different meth-
+ods improves the detection performance. As mentioned in the previous section, outlier
+scores of the existing methods have different scales. For example, outlier scores vary
+from zero to inﬁnity for the nearest based method [6], while lying in the interval [−1, 1]
+for the classiﬁcation based method [10]. In this subsection, an effective method is pro-
+posed to transform outlier scores to posterior probability estimates. Compared with
+outlier scores, the posterior probability based on Bayes’ theorem provides a robust esti-
+mate to the information fusion and a spontaneous measure of the uncertainty in outlier
+prediction. Without loss of generality, we assume that the higher S(i), the more proba-
+ble Xi to be considered as an outlier. Let Yi be the label of Xi, where Yi = 1 indicates
+that Xi is an outlier and Yi = 0 if Xi is normal. According to Bayes’ theorem,
+P (Yi = 1|S(i)) =
+
+P (S(i)|Yi = 1)P (Yi = 1)
+l=0 P (S(i)|Yi = l)P (Yi = l)
+
+P (S(i)|Yi=0)P (Yi=0)
+P (S(i)|Yi=1)P (Yi=1)
+
+(cid:2)1
+
+1 +
+
+(1)
+
+=
+
+1
+
+Let ϕ(i) =
+
+P (S(i)|Yi=0)P (Yi=0)
+P (S(i)|Yi=1)P (Yi=1) . ln
+
+(cid:3)
+(cid:4)
+ϕ(i)
+
+(cid:3)
+(cid:4)
+function that classiﬁes Xi as normal or outlier. Hence, ln
+ϕ(i)
+linear function, proportional to the Z-Score of S(i) as follows:
+
+can be considered as the discriminant
+can be simpliﬁed to a
+
+ϕ(i) = exp
+
+(cid:5)
+
+− S(i) − μ
+
+std + τ
+
+(cid:6)
+
+(2)
+
+where μ and std are the mean value and standard deviation of the original outlier scores,
+respectively. In large datasets, these statistics can be computed by sampling the original
+< 0 means (S(i) − μ)/std > τ; the object
+data. As a discriminant function, ln
+Xi can be assigned as an outlier. In all the experiments, the default value of τ equals
+1.5 based on Lemma 1.
+
+(cid:3)
+(cid:4)
+ϕ(i)
+
+Lemma 1: For any distribution of outlier score S(i), it holds that
+
+(cid:5)
+
+S(i) − μ
+
+std
+
+P
+
+(cid:6)
+
+> τ
+
+≤ 1
+τ 2
+
+Proof: According to Chebyshev’s inequality, it holds that,
+(cid:6)
+(cid:5)
+|S(i) − μ| > τ · std
+
+S(i) − μ
+
+≤ P
+
+> τ
+
+(cid:6)
+
+(cid:5)
+
+P
+
+std
+
+≤ std2
+
+(τ · std)2 =
+
+1
+τ 2
+
+422
+
+J. Gao et al.
+
+Lemma 1 shows a loose bound of deviation probability regardless of the distribution
+of outlier scores. Supposing that outlier scores follow a normal distribution, τ = 1.5
+means that much less than 10% of the objects deviate from the majority of data, which
+follows the deﬁnition of Hawkins outlier [1].
+
+For a top-n outlier list σi, objects in the dataset may not be ranked by σi. The simple
+average posterior probabilities are not appropriate to the top-n ranking aggregation.
+Clearly, objects that appear in all the ranking lists should be more probable to be outliers
+than ones that are only ranked by a single list. Hence, we apply the following fusion
+rules which are proposed by Fox and Show [12].
+
+(cid:2)
+
+rel(i) = nr
+
+d
+
+relj(i) r ∈ (−1, 0, 1)
+
+(3)
+
+j
+
+where nd is the number of the orderings that contain object Xi and relj(i) is the nor-
+malized outlier score of Xi by the j-th individual method. When r = 1, the ultimate
+outlier score is composed of the number of the orderings nd and the sum of its outlier
+scores. When r = 0, the result is only the sum of its outlier scores. When r = −1,
+it is equivalent to the average outlier scores of the orderings containing Xi. According
+to Eq. 1 and Eq. 2, the posterior probabilities can be used to normalize outlier scores
+directly. The detailed steps of SAG are shown in Algorithm 1.
+
+k=1, γ
+
+Algorithm 1. Score-based aggregation method (SAG)
+Input: ψ = {σk}K
+1. Transform outlier scores in ψ to posterior probabilities according to Eq. {1 2}.
+2. Construct an union item pool U including all objects in ψ, and denote the size of U as |U|.
+3. Compute the normalized outlier score {rel(i)}|U|
+i=1 for each object in U according to Eq. 3.
+4. Sort objects in U based on the normalized outlier scores, and output the optimal list π.
+Output: π
+
+2.3 Order-Based Aggregation Approach (OAG)
+
+Given a judge ordering σ and its expertise indicator parameter θ, the Mallows model
+[16]generates an ordering π given by the judge according to the formula:
+
+where
+
+P (π|θ, σ) =
+
+1
+
+Z(σ, θ)
+
+exp(θ · d(π, σ))
+
+Z(σ, θ) =
+
+(cid:2)
+
+π∈Rn
+
+exp(θ · d(π, σ))
+
+(4)
+
+(5)
+
+According to the right invariance of the distance function, the normalizing constant
+Z(σ, θ) is independent of σ, which means Z(σ, θ) = Z(θ). The parameter θ is a non-
+positive quantity and the smaller the value of θ, the more concentrated at σ the ordering
+π. When θ equals 0, the distribution is uniform meaning that the ordering given by the
+judge is independent of the truth.
+
+Unsupervised Ensemble Learning for Mining Top-n Outliers
+
+423
+
+An extended Mallows model is proposed in [17] as follows:
+
+P (π|θ, σ) =
+where σ = (σ1,··· , σK ) ∈ RK
+normalizing constant
+
+1
+
+P (π)exp
+
+Z(σ, θ)
+n , θ = (θ1,··· , θK) ∈ R
+
+i=1
+
+(cid:3) K(cid:2)
+
+θi · d(π, σi)
+
+(cid:4)
+
+(6)
+
+K, P (π) is a prior, and the
+
+Z(σ, θ) = Z(θ) =
+
+(cid:2)
+
+π∈Rn
+
+P (π)exp
+
+(cid:4)
+
+θi · d(π, σi)
+
+(cid:3) K(cid:2)
+
+i=1
+
+(7)
+
+In this extended model, each ordering σi is returned by a judge for a particular set
+of objects. θi represents the expertise degree of the i-th judge. Eq. 6 computes the
+probability that the true ordering is π, given the orderings σ from K judges and the
+degrees of their expertise.
+
+Based on the hypothesis of the distance-based Mallow model, we propose a genera-
+
+tive model of OAG, which can be described as follows:
+P (π, σ|θ) = P (σ|θ, π)P (π|θ) = P (π)
+
+K(cid:5)
+
+i=1
+
+P (σi|θi, π)
+
+(8)
+
+The true list π is sampled from the prior distribution P (π) and σi is drawn from the
+Mallows model P (σi|θi, π) independently. For the ensemble learning of top-n outlier
+lists, the observed objects are the top-n outlier lists σ from various individual detection
+methods, and the unknown object is the true top-n outlier list π. The value of the free
+parameter θi depends on the detection performance of the i-th individual method. The
+goal is to ﬁnd the optimal ranking π and the corresponding free parameter θi which
+maximize the posteriori probability shown in Eq. 6. In this work, we propose a novel
+EM algorithm to solve this problem. For obtaining an accurate estimation of θi by the
+EM-based algorithm, we construct the observed objects by applying several queries
+with different lengths {Nq}Q
+q=1, where N1 = n and Nq/1 > n. Clearly, it is to compute
+the parameter θ = (θ1,··· , θK) by considering the information of different scales. In
+this paper, the default value of Q is 4 and the lengths meet the following requirement:
+Nq = q · n.
+
+2.4 Inference and Algorithm for OAG
+
+= (θ(cid:2)
+
+q=1, the observed objects ψ = {σq|σq ∈ RK
+
+The EM algorithm is widely used for ﬁnding the maximum likelihood estimates in the
+presence of missing data. The procedure includes two steps. First, the expected value of
+the complete data log-likelihood with respect to the unobserved objects φ = {πq|πq ∈
+RNq}Q
+}Q
+q=1, and the current parameter
+estimate θ(cid:2)
+K). Second, compute the optimal parameter θ that maximizes
+the expectation value in the ﬁrst procedure. According to the Mallows model and the
+extended Mallows model, we have the following Lemmas:
+Lemma 2: The expected log-likelihood ζ(θ, θ(cid:2)
+E[log P (φ, ψ|θ)|ψ, θ(cid:2)
+
+1,··· , θ(cid:2)
+
+) meets the following formula
+L(θ) · U (θ(cid:2)
+
+(cid:7)
+
+ζ(θ, θ(cid:2)
+
+) =
+
+] =
+
+)
+
+(9)
+
+Nq
+
+(π1,··· ,πQ)
+
+424
+
+J. Gao et al.
+
+where
+
+L(θ) =
+
+Q(cid:2)
+
+q=1
+
+log P (πq) − Q(cid:2)
+
+K(cid:2)
+
+log Zq(θi) +
+
+Q(cid:2)
+
+K(cid:2)
+
+θi · d(πq, σi
+q)
+
+q=1
+
+i=1
+
+q=1
+
+i=1
+
+U (θ(cid:2)
+
+) =
+
+Q(cid:5)
+
+q=1
+
+P (πq|θ(cid:2), σq)
+
+(10)
+
+(11)
+
+Lemma 3: The parameter θ maximizing the expected value ζ(θ, θ(cid:2)
+formula:
+
+) meets the following
+
+Q(cid:7)
+
+q=1
+
+Eθi (d(πq, σi
+
+q)) =
+
+(cid:7)
+
+Q(cid:7)
+
+(π1,··· ,πQ)
+
+q=1
+
+d(πq, σi
+
+q) · U (θ(cid:2)
+
+)
+
+(12)
+
+The proofs for Lamma 2 and Lamma 3 are omitted due to lack of space. As shown
+in Lamma 3, the value of the right-hand side of Eq. 12 and the analytical expression
+of the left-hand side should be evaluated under the appropriate distance function to ob-
+tain the optimal θ. Before introducing the detailed procedure of our EM-based learning
+algorithm, we bring in an effective distance function d(π, σ) between the top-n order-
+ings π and σ, which is proposed in [18]. To keep this work self-contained, this distance
+function is introduced as follows.
+Deﬁnition 1: Let Fπ and Fσ be the elements of π and σ respectively. Z = Fπ ∩ Fσ
+with |Z| = z. P = Fπ \ Z, and S = Fσ \ Z (note that |P| = |S| = n − z = r).
+Deﬁne the augmented ranking ˜π as π augmented with the elements of S assigned the
+same index n + 1. Clearly, ˜π−1(n + 1) is the set of elements at position n + 1 (˜σ is
+deﬁned similarly). Then, d(π, σ) is the minimum number of the adjacent transpositions
+needed to turn ˜π to ˜σ as follows, where I(x) = 1 if x > 0, and 0 otherwise.
+
+n(cid:7)
+
+d(π, σ) =
+
+Vi(˜π, ˜σ) +
+
+n(cid:7)
+
+i=1
+
+˜π−1(i)∈Z
+
+i=1
+
+˜π−1(i) /∈Z
+
+Ui(˜π, ˜σ) +
+
+r(r + 1)
+
+2
+
+(13)
+
+where
+Vi(˜π, ˜σ) =
+
+n(cid:7)
+
+I(˜σ(˜π−1(i)) − ˜σ(˜π−1(j))) +
+
+j=i
+
+˜π−1(j)∈Z
+
+n(cid:7)
+
+1
+
+j=i
+
+˜π−1(j)∈Z
+
+Ui(˜π, ˜σ) =
+
+(cid:7)
+
+j∈˜π−1(n+1)
+
+I(˜σ(˜π−1(i)) − ˜σ(j))
+
+In each iteration of the EM process, θ is updated by solving Eq. 12. Based on Deﬁnition
+1, Eθi(d(πq, σi
+
+q)) is computed as follows:
+
+Eθi(d(πq, σi
+
+q)) =
+
+Nqeθi
+1 − eθi
+
+− Nq(cid:7)
+
+j=r+1
+
+jejθi
+1 − ejθi
+
++
+
+r(r + 1)
+
+2
+
+− r(z + 1)
+
+eθi(z+1)
+1 − eθi(z+1)
+
+Unsupervised Ensemble Learning for Mining Top-n Outliers
+
+425
+
+This function is a monotonous function of the parameter θi. For estimating the right-
+hand side of Eq. 12, we adopt the Metropolis algorithm introduced in [2] to sample from
+Eq. 6. Suppose that the current list is πt. A new list πt+1 is achieved by exchanging
+the objects i and j, which are randomly chosen from all the objects in πt. Let r =
+P (πt+1|θ, σ)/P (πt|θ, σ). If r ≥ 1, πt+1 is accepted as the new list, otherwise πt+1 is
+accepted with the probability r. Then, θ can be computed by the line search approach
+with the average z of the samples. The steps of OAG are shown in Algorithm 2.
+
+q=1 with |σi
+
+q| = Nq, θ(0), ε, t = 1, T
+
+Algorithm 2. Order-based aggregation method (OAG)
+Input: ψ = {σq}Q
+1. Construct the sampling sets (πi,· ·· , πQ) ∈ RQ
+2. Compute the value of the right-hand side of Eq. 12.
+3. Adopt the line search approach to compute θ(t+1) based on Eq. 12
+4. If t = T , or
+
+(cid:6)K
+
+n by the Metropolis algorithm from Eq. 6.
+
+i=1 |θt+1
+
+i − θt
+
+i| < ε, return θ(t+1) and the optimal top-n outlier list π
+
+estimated by the sampling procedure; else t = t + 1, goto the step 1.
+
+Output: θ, π
+
+3 Experiments
+
+We evaluate the aggregation performances of SAG and OAG methods using a number
+of real world datasets. We measure the robust capabilities of SAG and OAG methods
+to the random rankers, which are generated based on the Uniform distribution and the
+Gaussian distribution, respectively.
+
+3.1 Aggregation on Real Data
+
+In this subsection, we make use of several state-of-the-art methods, including LOF [6],
+K-Distance [3], LOCI [7], Active Learning [10], and Random Forest [11] as the individ-
+ual methods to return the original top-n outliers lists. Since the performances of LOF
+and K-Distance depend on the parameter K that determines the scale of the neighbor-
+hood, we take the default value of K as 2.5% of the size of a real dataset. Both LOF and
+LOCI return outlier scores for each dataset based on the density estimation. However,
+K-Distance [3] only gives objects binary labels. Hence, according to the framework of
+K-Distance, we compute outlier scores as the distance between an object and its Kth
+nearest neighbor. Active learning and Random Forest both transform outlier detection to
+classiﬁcation based on the artiﬁcial outliers generated according to the procedures pro-
+posed in [10]. These two methods both compute outlier scores by the majority voting
+of the weak classiﬁers or the individual decision trees.
+
+The real datasets used in this section consist of the Mammography dataset, the Ann-
+thyroid dataset, the Shuttle dataset, and the Coil 2000 dataset, all of which can be
+downloaded from the UCI database except for the Mammography dataset.1 Table 1
+
+1 Thank Professor Nitesh.V.Chawla for providing this dataset, whose email address is
+
+nchawla@nd.edu
+
+426
+
+J. Gao et al.
+
+Table 1. Documentations of the real data
+
+Dataset
+
+Mammography Ann-thyroid Shuttle-1 Shuttle-2 Shuttle-3 Coil-2000
+
+Number
+of data
+Proportion of outliers
+
+normal
+outlier
+
+10923
+260
+2.32%
+
+3178
+73
+
+2.25%
+
+11478
+
+11478
+
+39
+
+5474
+348
+0.11% 0.34% 6.58% 5.98%
+
+11478
+809
+
+13
+
+summarizes the documentations of these real datasets. All the comparing outlier de-
+tection methods are evaluated using precision and recall in the top-n outlier list σ as
+follows
+
+P recision = T N/AN
+
+Recall = T N/ON
+
+S(i)−mean
+
+where T N is the number of outliers in ordering σ, AN is the length of σ, and ON
+is the number of outliers in the dataset. For the quantity AN equals ON in this work,
+precision has the same value with recall. Hence, only precision is used to measure the
+performance of each compared method in this section. Clearly, if all the objects in σ are
+outliers, its precision and recall both achieve the maximum value 100%. The Breadth-
+ﬁrst and Cumulative Sum methods proposed in Feature Bagging [13] are used as the
+baselines. For Feature Bagging does not introduce how to normalize heterogeneous
+outlier scores, the original outlier scores are processed by the typical normalization
+method: Snorm(i) =
+, where mean is the average score of all the objects
+and std is the standard deviation of outlier scores. Besides, Cumulative Sum requires
+that every object should be given an outlier score by every individual method. However,
+for the top-n outlier lists, some objects lying in the ordering σi may not be ranked by
+σj. This means that Cumulative Sum cannot be applied in the fusion of the top-n outlier
+lists. Hence, we replace the sum of all the outlier scores with the average of the outlier
+scores from the individual methods containing the corresponding object for Cumulative
+Sum. The Mallows Model [18] is also used as the baseline. As discussed in the previous
+section, for this algorithm can not combine the basic lists σ with various lengths to
+achieve the true list π, it needs to use all the datasets to compute the expertise indicator
+parameter θ.
+
+std
+
+Table 2 lists the experimental results of the individual methods and all the aggre-
+gation methods. Figure 2 shows the posterior probability curves based on SAG for the
+individual methods on the Mammography dataset. It is very clear that different detection
+methods have different scales of outlier scores and posterior probability computed by
+SAG is a monotonic increasing function of outlier scores. In the individual method pool,
+LOF achieves the best performance on the Mammography and the Shuttle-2 datasets,
+and K-Distance achieves the best performance on the Shuttle-1 dataset. LOCI detects
+the most outliers on the Coil 2000 dataset with Active learning. Random Forest is supe-
+rior to the other methods on the Ann-thyroid and Shuttle-3 datasets. However, none of
+the outliers is detected by Random Forest on the Shuttle-1,2 datasets. The above results
+have veriﬁed the motivation that there is a need of ensemble learning in the top-n outlier
+detection.
+
+From Table 2, we see that SAG with r = 1 and SAG with r = 0 achieve the similar
+performance on all the real datasets. Clearly, for the probability-based SAG method,
+
+Unsupervised Ensemble Learning for Mining Top-n Outliers
+
+427
+
+(a) LOF
+
+(b) K-Distance
+
+(c) LOCI
+
+(d) Active Learning
+
+(e) Random Forest
+
+Fig. 2. The posterior probability curves based on SAG and score histograms of various individual
+methods on the Mammography dataset
+
+Table 2. The precisions in the top-n outlier lists for all the individual methods and the aggregation
+methods on the real data
+
+Dataset Mammography
+
+Ann-thyroid
+
+PPPPPPP
+
+Method
+
+LOF
+
+K-Distance
+
+LOCI
+
+Active Learning
+Random Forests
+Average of All
+Cumulative Sum
+
+Breadth-ﬁrst
+
+Mallows Model
+
+SAG (r= 1)
+SAG (r= 0)
+SAG (r=-1)
+
+OAG
+
+(Top 260)
+
+19.0%
+13.8%
+8.8%
+18.1%
+15.4%
+15.0%
+10.0%
+14.2%
+13.1%
+18.5%
+18.5%
+5.4%
+19.7%
+
+Coil-2000
+(Top-348)
+
+0%
+0%
+
+Shuttle-2
+(Top-39)
+
+Shuttle-3
+(Top-809)
+
+Shuttle-1
+(Top-13)
+23.1% 53.8% 28.4%
+29.8% 48.7% 34.5%
+33.3% 67.0%
+7.7%
+30.3%
+15.4%
+70.6%
+15.2% 27.2% 46.2%
+23.1% 58.9% 40.0%
+28.2% 46.9%
+23.1% 51.3% 44.4%
+23.1% 48.7% 61.3%
+23.1% 48.7% 62.1%
+43.6% 59.5%
+7.7%
+
+(Top-73)
+5.5%
+39.7%
+8.0%
+37.0%
+8.9%
+28.8%
+8.9%
+28.8%
+8.6%
+41.1%
+8.0%
+35.1%
+10.3%
+31.5%
+10.6%
+38.4%
+8.0%
+38.4%
+9.8%
+34.2%
+9.5%
+34.2%
+10.9%
+26.0%
+42.5% 30.8% 53.8% 71.7% 9.1%
+
+0%
+
+0%
+
+the number nd of the individual top-n outlier lists contributes little to the ﬁnal fusion
+performance. Compared with the above aggregation methods, the performance of SAG
+with r = −1 varies with the nature of the data dramatically. SAG with r = −1 achieves
+the best performance on the Coil 200 dataset. However, it performs more poorly than
+SAG with r = {1, 0} and OAG on the other datasets. This demonstrates that the average
+of the uniﬁed outlier scores does not adapt to the fusion of the top-n lists. In general,
+since outlier scores are always either meaningless or inaccurate, the order-based ag-
+gregation method makes more sense than the score-based method. OAG achieves the
+
+428
+
+J. Gao et al.
+
+(a) Mammography
+
+(b) Shuttle-3
+
+Fig. 3. The precisions of OAG and SAG (r = 1) varying with the number of random lists Kr on
+the Mammography data and Shuttle-3 data
+
+Table 3. The parameter θ of all the individual methods and ﬁve random lists on the Mammogra-
+phy and Shuttle-3 datasets
+
+PPPPPPP
+
+Method
+
+Dataset
+
+Mammogrpahy
+
+Shuttle-3
+
+Active
+
+Learning
+
+Random
+Forests
+-0.0058 -0.0052 -0.0039
+-0.0055 -0.0054 -0.0044
+-0.0014 -0.0018 -0.0037
+-0.0018 -0.0014 -0.0035
+
+random lists
+(Average)
+-0.00014
+-0.00016
+-0.00001
+-0.00002
+
+LOF K-Distance LOCI
+
+Uniform-Noise -0.0058
+Gaussian-Noise -0.0061
+Uniform-Noise -0.0014
+Gaussian-Noise -0.0014
+
+-0.0039
+-0.0033
+-0.0016
+-0.0016
+
+best performance than SAG on the Mammography, the Ann-thyroid, and the Shuttle-
+1,3 datasets. Both Cumulative Sum and SAG are score-based fusion methods. Table 2
+shows that the performance of SAG is more stable and effective, especially SAG with
+r = 1. Breath-ﬁrst, Mallows Model, and OAG are all the order-based fusion methods.
+Although Breath-ﬁrst can be used in the aggregation of top-n outlier lists, it is sensitive
+to the order of the individual methods. Mallows Model supposes that there is a ﬁxed
+expertise indicator parameter θ for an individual method regardless of the nature of
+the data. Experiment results indicates that this hypothesis is not appropriate for the en-
+semble learning in the top-n outlier detection. Overall, SAG and OAG both achieve the
+better performances than Average of All and the aggregation methods Breadth-ﬁrst, Cu-
+mulative Sum and Mallows Model, which means that the proposed approaches deliver a
+stable and effective performance independent of different datasets in a good scalability.
+
+3.2 Robustness of Two Aggregation Methods
+
+In this subsection, the goal is to examine the behavior of the SAG and OAG methods
+when poor judges are introduced into the individual method pool. For a dataset D, the
+top-n outlier lists of the poor judges are generated from the underlying distribution U .
+First, the outlier scores of all the data are sampled from the distribution U . Then, the
+random top-n outlier lists are obtained by sorting all the data based on the outlier scores.
+In our experiments, two alternative deﬁnitions of U are used: Uniform distribution on
+the interval [0, 1] and standard Gaussian distribution. The corresponding top-n lists are
+called Uniform-Noise and Gaussian-Noise. The individual method pool contains the
+
+Unsupervised Ensemble Learning for Mining Top-n Outliers
+
+429
+
+previous ﬁve individual detection methods, and the Kr random lists of the poor judges,
+where Kr varies from 1 to 5.
+
+For lack of the space, only the results on the Mammography dataset and the Shuttle-
+3 dataset are shown in the Figure 3. Clearly, OAG is more robust to the random poor
+judges than SAG regardless of Uniform-Noise or Gaussian-Noise. Especially, OAG
+achieves a better performance when the number Kr of random lists increases. Table 3
+gives the value of the parameter θ of the individual method pool on the Mammogra-
+phy and Shuttle-3 datasets. The parameter θ of each Uniform-Noise or Gaussian-Noise
+is close to zero. This demonstrates that OAG learns to discount the random top-n lists
+without supervision.
+
+4 Conclusions
+
+We have proposed the general framework of the ensemble learning in the top-n outlier
+detection in this paper. We have proposed the score-based method (SAG) with the nor-
+malized method of outlier scores, which is used to transform outlier scores to posterior
+probabilities. We have proposed the order-based method (OAG) based on the distance-
+based Mallows model to combine the order information of various individual top-n
+outlier lists. Theoretical analysis and empirical evaluations on several real data sets
+demonstrate that both SAG and OAG can effectively combine the state-of-the-art de-
+tection methods to deliver a stable and effective performance independent of different
+datasets in a good scalability, and OAG can discount the random top-n outlier lists with-
+out supervision.
+
+References
+
+1. Hawkins, D.: Identiﬁcation of Outliers. Chapman and Hall, London (1980)
+2. Hastings, W.K.: Monte Carlo sampling methods using Markov chains and their applications.
+
+Journal of Biometrika 57(1), 97–109 (1970)
+
+3. Knorr, E.M., Ng, R.T., Tucakov, V.: Distance-based outliers: algorithms and applications.
+
+Journal of VLDB 8(3-4), 237–253 (2000)
+
+4. Jain, A.K., Murty, M.N., Flynn, P.J.: Data clustering: a review. Journal of ACM Computing
+
+Surveys (CSUR) 31(3), 264–323 (1999)
+
+5. Barnett, V., Lewis, T.: Outliers in Statistic Data. John Wiley, New York (1994)
+6. Breunig, M.M., Kriegel, H.-P., Ng, R.T., Sander, J.: Lof: Identifying density-based local
+
+outliers. In: SIGMOD, pp. 93–104 (2000)
+
+7. Papadimitriou, S., Kitagawa, H., Gibbons, P.: Loci: Fast outlier detection using the local
+
+correlation integral. In: ICDE, pp. 315–326 (2003)
+
+8. Yang, J., Zhong, N., Yao, Y., Wang, J.: Local peculiarity factor and its application in outlier
+
+detection. In: KDD, pp. 776–784 (2008)
+
+9. Gao, J., Hu, W., Zhang, Z(M.), Zhang, X., Wu, O.: RKOF: Robust Kernel-Based Local
+Outlier Detection. In: Huang, J.Z., Cao, L., Srivastava, J. (eds.) PAKDD 2011, Part II.
+LNCS(LNAI), vol. 6635, pp. 270–283. Springer, Heidelberg (2011)
+
+10. Abe, N., Zadrozny, B., Langford, J.: Outlier detection by active learning. In: KDD, pp. 504–
+
+509 (2006)
+
+11. Breiman, L.: Random Forests. J. Machine Learning 45(1), 5–32 (2001)
+
+430
+
+J. Gao et al.
+
+12. Fox, E., Shaw, J.: Combination of multiple searches. In: The Second Text REtrieval Confer-
+
+ence (TREC-2), pp. 243–252 (1994)
+
+13. Lazarevic, A., Kumar, V.: Feature bagging for outlier detection. In: KDD, pp. 157–166 (2005)
+14. Gao, J., Tan, P.N.: Converting output scores from outlier detection algorithms into probability
+
+estimates. In: ICDM, pp. 212–221 (2006)
+
+15. Nguyen, H., Ang, H., Gopalkrishnan, V.: Mining outliers with ensemble of heterogeneous
+
+detectors on random subspaces. Journal of DASFAA 1, 368–383 (2010)
+
+16. Mallows, C.: Non-null ranking models. I. J. Biometrika 44(1/2), 114–130 (1957)
+17. Lebanon, G., Lafferty, J.: Cranking: Combining rankings using conditional probability mod-
+
+els on permutations. In: ICML, pp. 363–370 (2002)
+
+18. Klementiev, A., Roth, D., Small, K.: Unsupervised rank aggregation with distance-based
+
+models. In: ICML, pp. 472–479 (2008)
+
+

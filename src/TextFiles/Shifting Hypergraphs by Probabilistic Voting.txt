@@ -1,0 +1,1324 @@
+Shifting Hypergraphs by Probabilistic Voting
+
+Yang Wang1,2, Xuemin Lin1, Qing Zhang2,1, and Lin Wu1
+
+1 The University of New South Wales, Sydney, Australia
+
+{wangy,lxue,linw}@cse.unsw.edu.au
+2 Australian E-Health Research Center
+
+qing.zhang@csiro.au
+
+Abstract. In this paper, we develop a novel paradigm, namely hyper-
+graph shift, to ﬁnd robust graph modes by probabilistic voting strategy,
+which are semantically sound besides the self-cohesiveness requirement in
+forming graph modes. Unlike the existing techniques to seek graph modes
+by shifting vertices based on pair-wise edges (i.e, an edge with 2 ends),
+our paradigm is based on shifting high-order edges (hyperedges) to de-
+liver graph modes. Speciﬁcally, we convert the problem of seeking graph
+modes as the problem of seeking maximizers of a novel objective func-
+tion with the aim to generate good graph modes based on sifting edges
+in hypergraphs. As a result, the generated graph modes based on dense
+subhypergraphs may more accurately capture the object semantics be-
+sides the self-cohesiveness requirement. We also formally prove that our
+technique is always convergent. Extensive empirical studies on synthetic
+and real world data sets are conducted on clustering and graph match-
+ing. They demonstrate that our techniques signiﬁcantly outperform the
+existing techniques.
+
+Keywords: Hypergraphs, Mode Seeking, Probabilistic Voting.
+
+1
+
+Introduction
+
+Seeking graph based modes is of great importance to many applications in ma-
+chine learning literature, e.g., image segmentation [9], feature matching [3]. In
+order to ﬁnd the good modes of graphs, Pavan et al. [16] converted the problem
+of mode seeking into the problem of discovering dense subgraphs, and proposed
+a constrained optimization function for this purpose. Liu et al. [14] proposed
+another method, namely graph shift. It generalized the idea of non-parametric
+data points shift paradigms (i.e., Mean Shift [4] and Medoid Shift [17,18,19] to
+graph shift for graph mode seeking). An iterative method is developed to get
+the local maximizers, of a constrained objective function, as the good modes of
+graphs. While the graph (vertices) shift paradigm may deliver good results in
+many cases for graph mode seeking, we observe the following limits. Firstly, the
+graph modes generated based on shifting vertices only involve the information
+of pair-wise edges between vertices. As a result, the generated graphs modes
+may not always be able to precisely capture the overall semantics of objects.
+Secondly, the graph shift algorithm is still not strongly robust to the existence
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part II, LNAI 8444, pp. 234–246, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+Shifting Hypergraphs by Probabilistic Voting
+
+235
+
+Fig. 1. Comparison between graph shift and hypergraph shift on saliency detection,
+from left to right: input image, ground truth, graph shift, hypergraph shift
+
+of a large number of outliers. Besides, no theoretical studies are conducted to
+show the convergence of iteration of shifting.
+Our Approach: Observing the above limits, we propose a novel paradigm,
+namely hypergraph shift, aimed at generating graph modes with high order in-
+formation. Diﬀerent from graph shift paradigms that only shift vertices of graphs
+based on pair-wise edges, our technique shifts high order edges (hyperedges in
+hypergraphs). Our technique consists of three key phases, 1) mode seeking (sec-
+tion 4.1) on subhypergraphs, 2) probabilistic voting (section 4.2) to determine
+a set of hyperedges to be expanded in mode seeking, and 3) iteratively perform
+the above two stages until convergence.
+
+By these three phases, our approach may accurately capture the overall se-
+mantics of objects. Fig. 1 illustrates an example where the result of our approach
+for hypergraph shift can precisely capture the the scene of a person riding on
+a bicycle. Nevertheless, the result performed by graph shift method in [14] fails
+to capture the whole scene; instead, by only focusing on the requirement of
+self-cohesiveness, three graph modes are generated.
+Contributions: To the best of our knowledge, this is the ﬁrst work based on
+shifting hyperedges to conduct graph mode seeking. Our contributions may be
+summarized as follows. (1) We specify the similarities on hyperedges, followed
+by an objective function for mode seeking on hypergraphs. (2) An eﬀective hy-
+pergraph shift paradigm is proposed. Theoretical analysis for hypergraph shift is
+also provided to guarantee its convergence. The proposed algorithm is naturally
+robust to outliers by expanding modes via the probabilistic voting strategy. (3)
+Extensive experiments are conducted to verify the eﬀectiveness of our techniques
+over both synthetic and real-world datasets.
+Roadmap: We structure our paper as follows: The preliminaries regarding hy-
+pergraph are introduced in section 2, followed by our technique for hypergraph
+shift in sections 3 and 4. Experimental studies are performed in section 5, and
+we conclude this paper in section 6.
+
+2 Probabilistic Hypergraph Notations
+
+Diﬀerent from simple graph, each edge of hypergraph (known as hyperedge) can
+connect more than two vertices. Formally, we denote a weighted hypergraph
+
+as G = (V,E,W), with vertex set as V = {v1, v2, . . . , v|V|}, hyperedge set as
+
+236
+
+Y. Wang et al.
+
+E = {e1, e2, . . . , e|E|}, and W = {w(e1), w(e2),· · ·, w(e|E|)}, where w(ei) is the
+weight of ei. The relationship between the hyperedges and vertices is deﬁned by
+incidence matrix H ∈ R
+. Instead of assigning a vertex vi to a hyperedge ej
+with a binary decision, we establish the values probabilistically [5,8]. Speciﬁcally,
+we deﬁne the entry hvi,ej of H as Eq. (1).
+
+|V|×|E|
+
+(cid:2)
+
+p(vi|ej), if vi ∈ ej;
+0,
+otherwise.
+
+hvi,ej =
+
+(1)
+where p(vi|ej) describes the likelihood that a vertex vi is connected to hyperedge
+ej. Then we deﬁne a diagonal matrix De regarding the degree of all hyperedges,
+v∈V hv,ei, and a diagonal matrix Dv regarding the
+with De(i, i) = δ(ei) =
+e∈E hvi,ew(e). Based on that, to describe
+degree of all vertices, with Dv(i, i) =
+the similarity between hyperedges, we deﬁne a novel hyperedge-adjacency
+matrix M ∈ R
+
+in the context of hypergraph. Speciﬁcally, we have
+
+|E|×|E|
+
+(cid:3)
+
+(cid:3)
+
+(cid:4)
+
+M(i, j) =
+
+w(ei)
+0,
+
+|ei∩ej|
+δ(ei) + w(ej)
+
+|ei∩ej|
+δ(ej )
+
+i (cid:3)= j
+otherwise
+
+(2)
+
+Example 1. Consider the case in Fig.2, for e2 and e3, the only common vertex
+is v2, then, we have |e2 ∩ e3|=1, and the aﬃnity value between e2 and e3 is
+M(2, 3) = w(e2) · 1
+
+2 + w(e3) · 1
+
+w(e2)+w(e3)
+
+2 =
+
+2
+
+.
+
+Now, we describe the modes of hypergraph.
+
+3 Modes of Hypergraph
+
+We consider the mode of a hypergraph as a dense subhypergraph consisting of
+hyperedges with high self-compactness. We ﬁrst deﬁne the hypergraph den-
+sity, then formulate the modes of a hypergraph, which leads to our hypergraph
+shift algorithm in section 4.
+
+e0
+
+e1
+
+e2
+
+e3
+
+e4
+
+0v
+
+e0
+
+e1
+
+3v
+
+e2
+
+1v
+
+e3
+
+2v
+
+e4
+
+5v
+
+4v
+
+v0 h(v0,e0) h(v0,e1)
+v1
+v2
+v3
+v4
+v5
+
+h(v1,e3) h(v1,e4)
+
+h(v2,e1) h(v2,e2) h(v2,e3)
+h(v3,e1) h(v3,e2)
+
+h(v4,e4)
+h(v5,e4)
+
+Fig. 2. A toy example on hypergraph. Left: a hypergraph. Right: The incidence matrix
+of hypergraph.
+
+Shifting Hypergraphs by Probabilistic Voting
+
+237
+
+Hypergraph Density. We describe hypergraph G with n hyperedges by prob-
+
+abilistic coordinates fashion as p ∈ Δn, where Δn = {p|p ≥ 0,|p|1 = 1}, |p|1
+is the L1 norm of vector p, and p = {p1, p2, . . . , pn}. Speciﬁcally, pi indicates
+the probability of ei contained by the probabilistic cluster of G. Then the aﬃn-
+(cid:3)
+ity value between any pair-wise x ∈ Δn and y ∈ Δn is deﬁned as m(x, y) =
+i,j M(i, j)xiyj = xT My. The hypergraph density or self-cohesiveness of
+
+G, is deﬁned as Eq. (3).
+
+F (p) = pT Mp.
+
+(3)
+
+Intuitively, hypergraph density can be interpreted by the following principle.
+Suppose hyperedge set E is mapped to I = {im|m = 1, . . . ,|E|}, which is the
+representation in a speciﬁc feature space regarding all hyperedges in E, where we
+deﬁne a kernel function K : I × I → R. Speciﬁcally, K(im, in) = M(m, n). Thus,
+the probabilistic coordinate p can be interpreted to be a probability distribution,
+that is, the probability of im occurring in a speciﬁc subhypergraph is pm. Assume
+that the distribution is sampled N times, then the number of data im is N pm.
+For im, the density is d(im) =
+, then we have the average density
+of the data set:
+
+n N pmK(m,n)
+
+N
+
+(cid:2)
+
+(cid:2)
+
+m N pmd(im)
+
+N
+
+d =
+
+=
+
+(cid:3)
+
+m(cid:2)=n
+
+pmK(im, in)pn = p
+
+T
+
+Mp
+
+(4)
+
+Deﬁnition 1. (Hypergraph Mode) The mode of a hypergraph G is repre-
+sented as a dense subhypergraph that locally maximizes the Eq. (3).
+
+Given a vector p ∈ Δn, the support of p is deﬁned as the set of indices
+corresponding to its nonzero components: θ(p) = {i ∈ |E| : pi (cid:3)= 0}. Thus, its
+corresponding subhypergraph is Gθ(p), composed of all vertices whose indices
+is a local maximizer i.e., the mode of F (p), then Gθ(p∗) is a
+are in θ(p). If p
+dense subhypergraph. Hence, the problem of mode seeking on a hypergraph is
+equivalent to maximizing the density measure function F (p), which is taken as
+the criterion to evaluate the goodness of any subhypergraph.
+
+∗
+
+To ﬁnd the modes, i.e., the local maximizers of Eq. (3), we classify it into the
+
+standard quadratic program (StQP) [16,1]:
+
+maxF (p), s.t.p ∈ Δn,
+
+(5)
+
+According to [16,1], a local maximizer p
+meets the Karush-Kuhn-Tucker(KKT)
+condition. In particular, there exist n + 1 real Lagrange multipliers μi (cid:2) 0(1 ≤
+i ≤ n) and λ, such that:
+
+∗
+
+for all i = 1, . . . , n, and
+it indicates that i ∈ θ(p
+∗
+rewritten as:
+
+and μi are nonnegative,
+) implies μi = 0. Thus, the KKT condition can be
+
+(cid:3)n
+
+(Mp)i − λ + μi = 0
+i=1 p
+
+∗
+i μi = 0. Since p
+(cid:2)
+
+∗
+
+∗
+
+= λ, i ∈ θ(p
+);
+(cid:3) λ, otherwise.
+and ei.
+
+∗
+
+∗
+
+(Mp
+
+)i
+
+where (Mp
+
+∗
+
+)i is the aﬃnity value between p
+
+(6)
+
+(7)
+
+238
+
+Y. Wang et al.
+
+4 Hypergraph Shift Algorithm
+
+Assume p
+
+Commonly the hypergraph can be very large, a natural question is how to per-
+form modes seeking on a large hypergraph? To answer this question, we perform
+mode seeking on subhypergraph, and determine whether it is the mode of the
+hypergraph. If not, we shift to a new subhypergraph by expanding the neighbor
+hyperedges of the current mode to perform mode seeking. Prior to that, we study
+the circumstances that determine whether the mode of a subhypergraph is the
+mode of that hypergraph.
+
+S is the mode of subhypergraph S containing m = |θ(p
+S )| hyper-
+∗
+∗
+S to |E| dimensional p
+∗
+∗
+edges, then we expand the m dimensional p
+by ﬁlling
+zeros into the components, whose indices are in the set of G−S. Based on that,
+∗
+S is the mode of hypergraph G.
+Theorem 1 is presented to determine whether p
+S of the subgraph S is also the mode of hypergraph G
+∗
+Theorem 1. A mode p
+S ), j ∈ G − S,
+∗
+if and only if for all hyperedge ej, m(p
+∗
+S by ﬁlling zeros to the elements whose indices are
+where p
+in G−S and Ij is the vector containing only hyperedge ei where its i-th element
+is 1 with others 0.
+, Ij) (cid:3)
+Proof. Straightforwardly, θ(p
+F (p
+is the mode of hypergraph G. Otherwise
+if m(p
+violates the KKT condition,
+(cid:4)
+thus it is not the mode of G.
+
+) = θ(p
+S ) = λ, ∀j ∈ G − S, p
+∗
+∗
+
+) = FS(p
+∗
+
+, Ij) > F (p
+
+) = FS(p
+∗
+
+∗
+S ). Due to m(p
+
+∗
+
+, Ij) (cid:3) F (p
+
+∗
+
+) = FS(p
+
+) = λ, which indicates that p
+
+∗
+
+S ), F (p
+∗
+
+∗
+
+∗
+
+is computed from p
+
+∗
+
+∗
+
+∗
+
+Next, we introduce our hypergraph shift algorithm, which consists of two
+steps: The ﬁrst step performs mode seeking on an initial subhypergraph. If the
+mode obtained in the ﬁrst step is not the mode of that hypergraph, it shifts
+to a larger subhypergraph by expanding the support of the current mode to
+its neighbor hyperedges using the technique, namely probabilistic voting. The
+above steps alternatively proceed until the mode of hypergraph is obtained.
+
+4.1 Higher-Order Mode Seeking
+
+Given an initialization of p(0), we ﬁnd solutions of Eq. (5) by using the replicator
+dynamics, which is a class of continuous and discrete-time dynamical systems
+arising in evolutionary game theory [20]. In our setting, we use the following
+form:
+
+pi(t + 1) = pi(t)
+
+(M · p(t))i
+p(t)T Mp(t)
+
+, i = 1, . . . ,|E|
+
+(8)
+
+It can be seen that the simplex Δn is invariant under these dynamics, which
+means that every trajectory starting in Δn will remain in Δn for all future
+times. Furthermore, according to [20], the objective function of Eq. (3) strictly
+increases along any nonconstant trajectory of Eq. (8), and its asymptotically
+stable points are in one-to-one with local solutions of Eq. (5).
+
+Shifting Hypergraphs by Probabilistic Voting
+
+239
+
+0v
+
+1v
+
+4v
+
+5v
+
+e4
+
+e1
+
+e3
+
+3v
+
+e2
+
+2v
+
+0v
+
+1v
+
+0v
+
+1v
+
+e1
+
+e3
+
+4v
+
+5v
+
+e4
+
+e1
+
+e3
+
+4v
+
+5v
+
+e4
+
+3v
+
+e2
+
+2v
+
+3v
+
+e2
+
+2v
+
+Fig. 3. Probabilistic voting strategy. The hyperedge e3 is selected to be the dominant
+seed because of its higher closeness, as measured by Eq. (12). We start the expansion
+from e3 and then include its nearest neighbor e4 into the mode.
+
+4.2 Probabilistic Voting
+
+We propose to ﬁnd the dominant seeds of the subhypergraph, from which
+we perform hypergraph shift algorithm. Before presenting the formal deﬁni-
+tion of dominant seeds, we start with the intuitive idea that the assignment of
+hyperedge-weights induces an assignment of weights on the hyperedges. There-
+fore, the average weighted degree of a hyperedge ek from subhypergraph S is
+deﬁned as:
+
+Note that gek (ek) = 0 for any ek ∈ S. Moreover, if ej (cid:2) S, we have:
+
+gS(ek) =
+
+1|S|
+
+M(k, j)
+
+(cid:5)
+ej∈S
+
+ψS(ei, ej) = M(i, j) − gS(ei)
+
+Intuitively, ψS(ei, ej) measures the relative closeness between ej and ei with
+respect to the average closeness between ei and its neighbors in S.
+Let S ⊆ E be a nonempty subset of hyperedges, and ei ∈ S. The weight of ei
+
+is given as
+
+wS(ei) =
+
+(cid:4)
+
+(cid:3)
+
+ej∈S−{ei}
+
+1,
+
+if |S| =1;
+ψS−{ei}(ej, ei)wS−{ei}(ej), otherwise.
+(cid:3)
+
+wS(ei) measures the overall closeness between hyperedge ei and other hyperedges
+of S −{ei}. Moreover, the total weight of S is deﬁned as W (S) =
+ei∈S wS (ei).
+Finally, we formally deﬁne the dominant seed of subhypergraph S as follows.
+Deﬁnition 2. (Dominant Seed) The dominant seed of a subhypergraph S is
+the subset of hyperedges with higher closeness than others.
+
+Besides, the closeness of the dominant seed is evaluated as follows:
+
+(9)
+
+(10)
+
+(11)
+
+(cid:4)
+
+p(ei|S) =
+
+wS (ei)
+W (S) ,
+
+0,
+
+if ei ∈ S
+otherwise.
+
+(12)
+
+We utilize dominat seeds to expand the current subhypergraph, which is named
+probabilistic voting that works by the following priciple. To expand S to a
+
+240
+
+Y. Wang et al.
+
+new subhypergraph, we decrease the possibility of the hyperedges in the current
+mode, while increase the possibility of hyperegdes with large rewards not be-
+longing to the current mode. As a result, the possibility of hyperedges that are
+neighborhoods of the hyperedges in S with the large value of p(ei|S) is increased.
+We present an example in Fig.3 to illustrate that.
+Particularly, we calculate the shifting vector Δp, such that F (p
++ Δp) >
+F (p
+∗
+). According to Theorem 1, there exist some hyperedges ei, such that
+), otherwise, hi = max{(cid:3)
+, Ii) > F (p
+i − 1
+∗
+∗
+m(p
+)), 0}. The
+if i ∈ θ(p
+above deﬁnition of hi for i ∈ θ(p
+), decreases the possibility of ei in the current
+mode. However, we try to preserve the dominant seeds with a larger value of
+i − 1, and increase the possibility of the hyperedges ej ∈ G − S that are the
+∗
+p
+neighborhoods of dominant seeds of the current mode.
+Assume F (h) = η, then we have:
+
+), i ∈ G − S. We deﬁne a direction vector h as hi = p
+
+ej∩ei(cid:6)=∅ p(ej|S)(m(p
+
+, Ii) − F (p
+
+∗
+
+∗
+
+∗
+
+∗
+
+∗
+
+∗
+
+∗
+
+Q(c) = F (p
+= ηc2 + 2c(p
+
++ ch) − F (p
+∗
+)T Mh
+
+∗
+
+)
+
+(13)
+
+∗
+
+We want to maximize Eq. (13), which is the quadratic function of c. Since Δ =
+∗
+4(p
+), we
+λ , mini{ p∗
+},
+1−p∗
+have p
+and Δp = c(cid:5)h, which is the expansion vector.
+
+Mh)2 > 0, if η < 0, then we have c =
+i −1) ≥ 0, then c ≤ mini{ p∗
+∗
+1−p∗
+
+p∗Mh
+}. Thus, c(cid:5) = min{ p∗Mh
+
+. Otherwise, for i ∈ θ(p
+
+∗
+i +c(p
+
+λ
+
+i
+
+i
+
+i
+
+i
+
+We summarize the procedure of hypergraph shift in Algorithm 1.
+
+Algorithm 1. Hypergraph Shift Algorithm.
+
+Input: The hyperedge-adjacency matrix M of hypergraph G, the start vector p
+
+(a cluster of hyperedges).
+
+Output: The mode of hypergraph G.
+while p is not the mode of G do
+
+Evolve p towards the mode of subhypergraph Gθ(p) by Eq. (8);
+if p is not the mode of hypergrah G then
+
+Expand p by using expansion vector Δp;
+Update p by mode seeking;
+
+else
+
+return;
+
+One may wonder whether Algorithm 1 converges, we answer this question in
+
+theorem 2.
+
+Theorem 2. Algorithm 1 is convergent.
+Proof. The mode sequence set {(p
+⊂ U generated by Algorithm 1
+is compact. We construct −F (p), which is a continuous and strict decreasing
+function over the trajactory of sequence set. Assume the solution set is Γ , then
+the mode sequence generated by Algorithm 1 is closed on U−Γ . The above three
+
+)(t)}∞
+
+t=1
+
+∗
+
+Shifting Hypergraphs by Probabilistic Voting
+
+241
+
+conclusions are identical to the convergence conditions of Zangwill convergence
+(cid:4)
+theorem [21].
+
+5 Experimental Evaluations
+
+In this section, we conduct extensive experiments to evaluate the performance
+of hypergraph shift. Speciﬁc experimental setting are elaborated in each experi-
+ment.
+Competitors. We compare our algorithm against a few closely related methods,
+which are introduced as follows.
+
+For clustering evaluations, we consider the following competitors:
+
+– The method proposed by Liu et al. in [13], denote by Liu et al. in follows.
+– The approach presented by Bulo et al. in [2], denote by Bulo et al. in follows.
+– Eﬃcient hypergraph clustering [12] (EHC) aims to handle the higher-order
+relationships among data points and seek clusters by iteratively updating the
+cluster membership for all nodes in parallel, and converges relatively fast.
+
+For graph matching, we compare our method to the state-of-the-arts below:
+
+– Graph shift (GS).
+– Two hypergraph matching methods (TM) [6] and (PM) [22].
+– SC+IPFP. The algorithm of spectral clustering [10] (SC), enhanced by the
+technique of integer projected ﬁxed point [11], namely SC+IPFP is an eﬀec-
+tive method in graph matching. Thus, it is suitable to compare our method
+against SC+IPFP in terms of graph matching.
+
+5.1 Clustering Analysis
+
+Consider that hypergraph shift is a natural clustering tool, and all the hyperedges
+shifting towards the same mode should belong to a cluster. To evaluate the
+clustering performance, we compare HS against Liu et al. , Bulo et al. and EHC
+over the data set of ﬁve crescents, as shown in Fig.4.
+
+We performed extensive tests including clustering accuracy and noise robust-
+ness on ﬁve crescents gradually decreasing sampling density from 1200 pts to
+100 pts. We used the standard clustering metric, normalized mutual information
+(NMI). The NMI accuracy are computed for each method in Fig.5 (a), with
+respect to decreasing sample points and increasing outliers. It shows that hyper-
+graph shift has the best performance even in sparse data, whereas EHC quickly
+degenerates from 600 pts. The accuracies of methods in Liu et al. and Bulo et
+al. are inferior to EHC, which is consistent to the results in [12]. To test the
+robustness against noises, we add Gaussian noise , such that  ∼ N (0, 4), in
+accordance with [14], to the ﬁve crescents samples, and re-compute the NMI val-
+ues. As illustrated in Fig.5 (b), the three baselines of Liu et al. , Bulo et al. and
+EHC drop faster than hypergraph shift. This is because the eigenvectors required
+by Liu et al. are aﬀected by all weights, no matter they are deteriorated or not;
+
+242
+
+Y. Wang et al.
+
+30
+
+25
+
+20
+
+15
+
+10
+
+5
+
+0
+
+−5
+
+−10
+
+−15
+
+30
+
+25
+
+20
+
+15
+
+10
+
+5
+
+0
+
+−5
+
+−10
+
+30
+
+25
+
+20
+
+15
+
+10
+
+5
+
+0
+
+−5
+
+−10
+
+−40
+
+−30
+
+−20
+
+−10
+
+0
+
+10
+
+−40
+
+−30
+
+−20
+
+−10
+
+0
+
+10
+
+−40
+
+−30
+
+−20
+
+−10
+
+0
+
+10
+
+(a)
+
+(b)
+
+(c)
+
+Fig. 4. “Five crescents” examples with decreasing sample points from 600 pts in (a)
+to 300 pts in (b) and 200 pts in (c)
+
+ 0.98
+
+ 0.96
+
+ 0.94
+
+ 0.92
+
+ 0.9
+
+ 0.88
+
+ 0.86
+
+I
+
+M
+N
+
+HS
+EHC
+Bulo et al
+Liu et al
+
+ 0.9
+
+ 0.85
+
+ 0.8
+
+ 0.75
+
+ 0.7
+
+ 0.65
+
+ 0.6
+
+I
+
+M
+N
+
+ 0.84
+
+ 1200
+
+ 1000
+
+ 800
+
+ 600
+
+ 400
+
+ 200
+
+Sample Points
+
+(a)
+
+ 0.55
+
+ 10  20  30  40  50  60  70  80  90  100
+
+HS
+EHC
+Bulo et al
+Liu et al
+
+Outlier Addition(%)
+
+(b)
+
+Fig. 5. Clustering comparisons on diﬀerent sample sizes. We illustrate the averaged
+NMI with respect to the number of sample points and the ratio of outlier addition in
+(a) and (b), respectively.
+
+EHC is better than Liu et al. and Bulo et al. , however, it performs clustering by
+only considering the strength of aﬃnity relationship within a hyperedge, which
+is not as robust against noises as the mode with high-order constraints; Hyper-
+graph shift, in contrast, can ﬁnd a dense high-order subhypergraph, which is
+more robust to noises.
+
+We are interested in another important aspect: speed of convergence, under
+varying number of data points. In Fig.6, we present the evaluation of the com-
+putational cost of the four methods with varying number of data points. Fig.6
+(a) shows the average computational time per iteration of each method against
+the number of samples. We can see that the computation time per step for each
+method varies almost linearly with the number of data points. As expected, the
+least expensive method per step is Liu et al. , which performs update in se-
+quence. And our method proceeds with expansion and dropping strategy, in the
+expense of more time. However, the drawback of Liu et al. is its large iterations
+to convergence. In contrast, both ours and EHC are relatively stable w.r.t. the
+number of samples. Our method converges very fast, requiring on average 10
+
+3
+-
+
+0
+1
+
+ 
+*
+)
+c
+e
+S
+
+i
+
+i
+
+ 
+
+(
+ 
+e
+m
+T
+g
+n
+n
+n
+u
+R
+
+Shifting Hypergraphs by Probabilistic Voting
+
+243
+
+ 9
+ 8
+ 7
+ 6
+ 5
+ 4
+ 3
+ 2
+ 1
+ 0
+
+HS
+EHC
+Bulo et al
+Liu et al
+
+ 0
+
+ 1
+
+ 2
+
+ 3
+
+ 4
+
+ 5
+
+ 6
+
+Sample Points * 104
+
+(a)
+
+s
+p
+e
+S
+
+t
+
+ 
+f
+
+o
+
+ 
+r
+e
+b
+m
+u
+N
+
+ 800
+
+ 700
+
+ 600
+
+ 500
+
+ 400
+
+ 300
+
+ 200
+
+ 100
+
+ 0
+
+HS
+EHC
+Bulo et al
+Liu et al
+
+ 0  100 200 300 400 500 600 700 800 900
+
+Sample Points
+
+(b)
+
+Fig. 6. The computational cost as a function of the sample size. (a) The running time
+against increasing number of sample points. (b) The number of steps to convergence
+against increasing number of sample points.
+
+iterations. This ﬁgure experimentally show that our method, by taking larger
+steps towards a maximum, has signiﬁcantly better speed of convergence with
+slightly better accuracy.
+
+5.2 Graph Matching
+
+In this part, we present some experiments on graph matching problems. We
+will show that this graph matching problem is identical to mode seeking on
+a graph with certain amount of noises and outliers. Following the experiment
+setup of [14], the equivalence of graph matching problem to mode seeking can be
+described as follows. Suppose there are two sets of feature points, P and Q, from
+two images. For each point p ∈ P , we can ﬁnd some similar points q ∈ Q, based
+on local features. Each pair of (p, q) is a possible correspondence and all such
+pairs form the correspondence set C = {(p, q)|p ∈ P, q ∈ Q}. Then a graph G
+is constructed based on C with each vertex of G representing a pair in C. Edge
+e(vi, vj) connecting vi and vj reﬂects the relation between correspondence ci and
+cj. Due to space limitations, we refer the interested readers to [14] for details.
+Afterwards, the hyperedge construction and weight calculation are conducted
+according to our technique section. We use the PASCAL 2012 [7] database as
+benchmark in this evaluation. The experiments are diﬃcult due to the large
+number of outliers, that are, large amount of vertices and most of them represent
+incorrect correspondence, and also due to the large intra-category variations in
+shape present in PASCAL 2012 itself. Under each category, we randomly select
+two images as a pair and calculate the matching rate by each method. We run
+50 times on each category and the averaged results are report in Table 1. The
+ﬁnal matching rate is averaged over rate values of all categories.
+
+244
+
+Y. Wang et al.
+
+Fig. 7. Examples from shape matching database
+
+Table 1. Average matching rates for the experiments on PASCAL 2012 database
+
+SC+IPFP GS
+
+TM PM HS
+
+Car
+
+Motorbike
+
+62.5% 60.1% 60.7% 59.2% 66.4%
+62.3% 60.1% 63.5 % 62.7% 67.3%
+57.6% 55.7% 54.2% 48.7% 53.1%
+46.7% 49.2% 44.9% 40.3% 54.3%
+30.6% 28.5% 26.6% 24.3% 36.9%
+All-averaged 51.8% 50.7% 50.1% 47.0% 55.8%
+
+Person
+Animal
+Indoor
+
+We also conducted shape matching [15] on the aﬃnity data on the database
+from ShapeMatcher1, which contains 21 objects with 128 views for each object.
+A few examples of dog’s shape are shown in Fig.7. For each shape, we compute
+the matching score as the aﬃnity value using the shape matching method [15],
+thus obtain a 2688×2688 aﬃnity matrix. We compare our method with EHC and
+GS. The results are shown in Table 2. Both GS and HS can specify the number
+of objects, however, HS outperforms GS in terms of precision due to the fact
+that HS considers high-order relationship among vertices rather than pair-wise
+relation.
+
+Table 2. Precision results for EHC, GS and HS on the shape matching aﬃnity data
+
+Objects recognized
+
+EHC
+18
+
+GS
+21
+
+HS
+21
+
+Precision
+
+72.7% 83.5% 89.82 %
+
+1
+
+http://www.cs.toronto.edu/~dmac/ShapeMatcher/index.html
+
+Shifting Hypergraphs by Probabilistic Voting
+
+245
+
+6 Conclusion
+
+In this paper, we propose a novel hypergraph shift algorithm aimed at ﬁnding
+the robust graph modes by probabilistic voting strategy, which are semanti-
+cally sound besides the self-cohesiveness. Experimental studies show that our
+paradigm outperforms the state-of-the-art clustering and matching approaches
+observed from both synthetic and real-world data sets.
+
+Acknowledgment. Xuemin Lin’s research is supported by ARC DP0987557,
+ARC DP110102937, ARC DP120104168 and NSFC61021004.
+
+References
+
+1. Bomze, I.M.: Branch-and-bound approahces to standard quadratic optimization
+
+problems. Journal of Global Optimization 22(1-4), 17–37 (2002)
+
+2. Bulo, S., Pellilo, M.: A game-theoretic approach to hypergraph clustering. In: NIPS
+
+(2009)
+
+3. Cho, M., Lee, K.M.: Progressive graph matching: Making a move of graphs via
+
+probabilistic voting. In: CVPR (2012)
+
+4. Comaniciu, D., Meer, P.: Mean shift: A robust approach toward feature space
+
+analysis. TPAMI 24(5), 603–619 (2002)
+
+5. Ding, L., Yilmaz, A.: Interactive image segmentation using probabilistic hyper-
+
+graphs. Pattern Recognition 43(5), 1863–1873 (2010)
+
+6. Duchenme, O., Bach, F., Kweon, I., Ponce, J.: A tensor-based algorithm for high-
+
+order graph matching. In: CVPR (2009)
+
+7. Everingham, M., Van Gool, L., Williams, C.K.I., Winn, J., Zisserman, A.: The
+
+PASCAL Visual Object Classes Challenge 2012 (VOC 2012) Results,
+http://www.pascal-network.org/challenges/VOC/voc2012/workshop/index.
+html
+
+8. Huang, Y., Liu, Q., Zhang, S., Metaxas, D.N.: Image retrieval via probabilistic
+
+hypergraph ranking. In: CVPR (2010)
+
+9. Kim, S., Nowozin, S., Kohli, P., Yoo, C.D.: Higher-order correlation clustering for
+
+image segmentation. In: NIPS (2011)
+
+10. Leoradeanu, M., Hebert, M.: A spectral technique for correspondence problems
+
+using pairwise constraints. In: ICCV (2005)
+
+11. Leordeanu, M., Hebert, M., Sukthankar, R.: Integer projected ﬁxed point for graph
+
+matching and map inference. In: NIPS (2009)
+
+12. Leordeanu, M., Sminchisescu, C.: Eﬃcient hypergraph clustering. In: AISTATS
+
+(2012)
+
+13. Liu, H., Latecki, L., Yan, S.: Robust clustering as ensembles of aﬃnity relations.
+
+In: NIPS (2010)
+
+14. Liu, H., Yan, S.: Robust graph mode seeking by graph shift. In: ICML (2010)
+15. Macrini, D., Siddiqi, K., Dickinson, S.: From skeletons to bone graphs: Medial
+
+abstrations for object recognition. In: CVPR (2008)
+
+16. Pavan, M., Pelillo, M.: Dominant sets and pairwise clustering. TPAMI 29(1),
+
+167–171 (2007)
+
+17. Sheikh, Y., Khan, E.A., Kanade, T.: Mode seeking by medoidshifts. In: ICCV
+
+(2007)
+
+246
+
+Y. Wang et al.
+
+18. Wang, Y., Huang, X.: Geometric median-shift over riemannian manifolds. In:
+Zhang, B.-T., Orgun, M.A. (eds.) PRICAI 2010. LNCS, vol. 6230, pp. 268–279.
+Springer, Heidelberg (2010)
+
+19. Wang, Y., Huang, X., Wu, L.: Clustering via geometric median shift over rieman-
+
+nian manifolds. Information Science 20, 292–305 (2013)
+
+20. Weibull, J.W.: Evolutionary game theory. MIT Press (1995)
+21. Zangwill, W.: Nonlinear programming: a uniﬁed approach. Prentice-Hall (1969)
+22. Zass, R., Shashua, A.: Probabilistic graph and hypergraph matching. In: CVPR
+
+(2008)
+
+

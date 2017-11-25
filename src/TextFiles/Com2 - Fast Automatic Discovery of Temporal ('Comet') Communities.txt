@@ -1,0 +1,1319 @@
+Com2: Fast Automatic Discovery of
+Temporal (’Comet’) Communities
+
+Miguel Araujo∗
+
+CMU/University of Porto
+maraujo@cs.cmu.edu
+
+Spiros Papadimitriou
+Rutgers University
+
+spapadim@business.rutgers.edu
+
+Stephan Guennemann
+
+Carnegie Mellon University
+sguennem@cs.cmu.edu
+
+Christos Faloutsos*
+
+Carnegie Mellon University
+
+christos@cs.cmu.edu
+
+Prithwish Basu
+
+BBN Technologies
+pbasu@bbn.com
+
+Ananthram Swami
+
+Army Research Laboratory
+
+ananthram.swami.civ@mail.mil
+
+Evangelos E. Papalexakis*
+Carnegie Mellon University
+
+epapalex@cs.cmu.edu
+
+ABSTRACT
+Given a large who-calls-whom network, changing over time,
+how can we ﬁnd patterns and anomalies? We propose Com2,
+which operates on a network of 4 million mobile users, with
+51 million edges (phonecalls), over 14 days. Com2 is able
+to spot temporal communities (comet communities), in a
+scalable and parameter-free way.
+
+The idea behind our method is to use a novel and fast,
+incremental tensor analysis approach, coupled with mini-
+mum description language to discover both transient and pe-
+riodic/repeating communities without the need for user-deﬁned
+parameters. We report our ﬁndings, which include large
+’star’-like patterns, near-bipartite-cores, as well as tiny groups
+(5 users), calling each other hundreds of times within a few
+days.
+
+1.
+
+INTRODUCTION
+
+Given a large who-calls-whom network, over time,
+how can we ﬁnd patterns and communities? How do
+the communities change over time? One would expect
+to see cliques (say, groups of people, calling each other)
+with near-stable behavior—possibly a weekly periodic-
+ity. Is this true? Are there other types of patterns we
+should expect to see?
+
+Here we focus on exactly this problem: how to ﬁnd
+time-varying communities, in a scalable, parameter-free
+way. We analyze a large, million-node graph, from an
+anonymous (and anonymized) dataset of mobile cus-
+tomers of a large population. We shall refer to time-
+varying communities as comet communities, because
+they (may) come and go, like comets.
+
+Spotting communities and understanding how they
+evolve are crucial questions for forecasting, provision-
+ing and anomaly detection. The contributions of our
+∗Aﬃliated with iLab of CMU
+
+1
+
+Danai Koutra*
+
+Carnegie Mellon University
+
+dkoutra@cs.cmu.edu
+
+method, Com2, are the following:
+
+• Scalability: Com2 is linear on the input size,
+thanks to a careful,
+incremental tensor-analysis
+method, based on fast, iterated rank-1 decompo-
+sitions.
+
+• Parameter-free: additionally, Com2 utilizes a
+novel MDL-based formulation of the problem, to
+automatically guide the community discovery pro-
+cess.
+
+• Eﬀectiveness: We applied Com2 on real and
+synthetic data, discovering time-varying commu-
+nities that agree with intuition.
+
+The rest of this paper is organized in a typical way:
+we summarize necessary background, discuss related
+work, describe our proposed method and experiments,
+and ﬁnally conclude.
+
+2. BACKGROUND AND RELATED WORK
+In this section, we summarize related work on graph
+patterns, tensor decomposition methods, and general
+anomaly detection algorithms for graphs.
+2.1 Patterns in graphs
+
+Anomaly detection goes hand-in-hand with patterns:
+whichever node violates the expected pattern is labeled
+as an anomaly. There is a long list of patterns that
+static graphs follow, as listed in a recent book [5] (e.g.,
+power laws in the degree and eigenvalue distribution;
+super-linearities; reciprocity, small diameter, etc). There
+are fewer patterns known for time-evolving graphs (e.g.,
+shrinking diameters, densiﬁcation [19]).
+
+For static graphs, there seem to be small communities
+(say 10–20 people, calling each other) [27], but apart
+from that, no clear, large-scale communities (’no good
+
+cuts’ [21]).
+It is completely unknown whether these
+small communities persist over time, or ﬂicker, or have
+some other behavior.
+2.2 Tensor Decomposition
+
+An n-mode tensor is a generalization of the concept
+of matrices: a 2-mode tensor is just a matrix, a 3-mode
+tensor looks like a data-cube, and a 1-mode tensor is a
+vector. Among the several ﬂavors of tensor decomposi-
+tions (see [16]), the most intuitive one is the so called
+Canonical Polyadic (CP) or PARAFAC decomposition
+[13]. PARAFAC is the generalization of SVD (Singu-
+lar Value Decomposition), in higher modes. See Fig. 1
+for an example, where the 3 modes are caller-id, callee-
+id and timestamp. Like SVD, PARAFAC gives a soft
+clustering of rows/columns/ﬁbers: Rows (i.e., callers)
+with high values in the (cid:126)a1 vector participate heavily
+in the ﬁrst concept (say, a large community); similarly,
+columns (i.e., callees) and ﬁbers (i.e., timestamps) with
+high values in the (cid:126)b1 and (cid:126)c1 vectors, also participate in
+the ﬁrst community.
+
+Tensors have also been used for anomaly detection in
+computer networks, [23] and Facebook interactions [25];
+for clustering of web pages [17]; for link prediction [8];
+for epilepsy signal analysis [1], and many more.
+
+In [26], the authors provide evidence that when the
+factors of the CP/PARAFAC decomposition are sparse,
+then doing the decomposition by extracting a rank-
+one component each time approximates the ’batch’, full
+rank decomposition with very high accuracy; this premise
+is key to the present paper, since it allows us to perform
+anomaly detection very fast, by extracting only rank-
+one components.
+
+date
+
+(cid:126)c1
+
+≈
+
+(cid:126)c2
+
+(cid:126)b1
+
++
+
+(cid:126)b2
+
++
+
+(cid:126)cF
+
+. . . +
+
+(cid:126)bF
+
+caller
+
+X
+
+(cid:126)a1
+
+(cid:126)a2
+
+(cid:126)aF
+
+receiver
+
+Figure 1: PARAFAC decomposition of three-way tensor
+as sum of F outer products (rank-one tensors), reminiscing of the
+rank-F singular value decomposition of a matrix.
+
+2.3 Time evolving graphs
+
+Graph evolution has been a topic of interest for some
+time, particularly in the context of web data, e.g. [18]
+and [20]. Additionally, prior work [33, 32] has focused
+on eﬃcient update of key characteristic quantities (such
+as node centrality/importance or node proximity) as
+well as low-dimensional representations of the adjacency
+matrix, as a graph evolves over time (edge additions
+or deletions), without the need to compute everything
+from scratch, which is prohibitively expensive. MDL-
+based approaches for detecting overlapping communi-
+
+ties in static graphs [11] as well as non-overlapping com-
+munities in time-evolving graphs [29] have been previ-
+ously proposed. However, the former cannot be easily
+generalized to time-evolving graphs, whereas the lat-
+ter focuses on incremental, streaming community dis-
+covery, imposing segmentation constraints over time,
+rather than on discovering comet communities. Other
+work, e.g. [22], studies the problem of detecting chang-
+ing communities, but requires selecting a small num-
+ber of parameters. Furthermore, broadly related work
+uses tensor-based methods for analysis and prediction
+of time-evolving “multi-aspect” structures, e.g., [30, 8].
+2.4 Anomaly detection
+
+Anomaly detection algorithms for points in low-dimen-
+sional space include LOF [4] and many follow-up papers;
+see [6] and [2] for a comprehensive survey and book, re-
+spectively. Representative works on anomaly detection
+for graph data include the early, MDL-based approach
+of [10], OddBall [3] and RolX [14]. All these algorithms
+are for static graphs.
+
+3. PROPOSED METHOD
+
+In this section we formalize our problem, present the
+proposed method and we analyze it. We ﬁrst describe
+our MDL-based formalization, which guides the com-
+munity discovery process. Next, we describe a novel,
+fast, and eﬃcient search strategy, based on iterated
+rank-1 tensor decompositions which, combined with the
+formal objective, can discover time varying communi-
+ties in a fast and eﬃcient, yet eﬀective, manner, as we
+demonstrate in the experiments section.
+3.1 Formal objective of our method
+
+The input of our method is a temporal directed net-
+work consisting of sources S, destinations D, and time
+stamps T . We represent this network via a 3-mode ten-
+sor X ∈ {0, 1}|S|×|D|×|T | where Xi,j,t = 1 if source i is
+connected to destination j at time t. As an abbreviation
+we use N = |S|, M = |D|, and K = |T |.
+
+The goal of our method is to automatically detect
+
+communities
+
+Definition 1. Community
+
+A community is a triplet C = (S, D, T ) with S ⊆ S,
+D ⊆ D, and T ⊆ T such that each triplet describes an
+‘important’ time-varying aspect.
+
+Since our method should support the detection of
+communities which appear or disappear over time, e.g.
+following a weekly periodicity, it is important to note
+that the set T is not restricted to consecutive time steps
+only. This way, we are able to detect patterns which, for
+example, occur only during weekends or only at public
+holidays.
+
+2
+
+We propose to measure the ‘importance’ of a commu-
+nity via the principle of compression, i.e. by the commu-
+nity’s ability to help us compress the 3-mode tensor: if
+most of the sources are connected to most of the desti-
+nations during most of the indicated dates, then we can
+compress this ’comet-community’ easily. By ﬁnding the
+set of communities leading to the best compression of
+the tensor, we get the overall most important commu-
+nities.
+
+Definition 2. Block and Block Density
+
+We deﬁne a ‘block’ (S, D, T ) as the set of all tiplets
+(s, d, t) such that s ⊆ S, d ⊆ D, and t ⊆ T . The density
+of the block is the ratio of the number of triplets that are
+non-zeros in the tensor and the block size, |S|∗|D|∗|T|.
+
+More speciﬁcally, in our method we use MDL (Min-
+imum Description Length) [12]. That is, we aim at
+minimizing the number of bits required to encode the
+detected patterns (i.e. the model) and to describe the
+data given these patterns (corresponding to the eﬀects
+of the data which are not captured by the model). Thus,
+the overall description cost used in MDL automatically
+trades oﬀ the model’s complexity and its goodness of
+ﬁt. In the following, we provide details how to compute
+the description cost in our setting.
+Description cost. The ﬁrst part of the description
+cost accounts for encoding the detected patterns C =
+{C1, . . . , Cl} (where l is part of the optimization and
+not a priori given). Each pattern Ci = (Si, Di, Ti) can
+completely be described by the cardinalities of the three
+included sets and by the information which vertices and
+time stamps belong to these sets. Thus, the coding cost
+for a pattern Ci is
+
+L1(Ci) = log(cid:63) |Si| + log(cid:63) |Di| + log(cid:63) |Ti|
+
++ |Si| · log N + |Di| · log M + |Ti| · log K
+
+The ﬁrst three terms encode the cardinalities of the sets
+by the function log(cid:63) using the universal code length for
+integers [28]. The last three terms encode the actual
+membership information of the sets: e.g., since the orig-
+inal graph contains N sources, each source included in
+the pattern can be encoded by log N bits, which overall
+leads to |Si| · log N bits to encode all sources included
+in the pattern.
+Correspondingly, a set of patterns C = {C1, . . . , Cl}
+
+can be encoded by the following number of bits:
+
+L2(C) = log(cid:63) |C| +
+
+L1(C)
+
+(cid:88)
+
+C∈C
+
+That is, we encode the number of patterns and sum up
+the bits required to encode each individual pattern.
+
+The second part of the description cost encodes the
+data given the model. That is, we have to provide
+a lossless reconstruction of the data based on the de-
+tected patterns. Since in real world data we expect to
+
+3
+
+ﬁnd overlapping communities, our model should not be
+restricted to handle disjoint patterns. But how to re-
+construct the data based on overlapping patterns? As
+a solution, we refer to the principle of Boolean algebra:
+multiple patterns are combined by a logical disjunction.
+That is, if an edge occurs in at least one of the patterns,
+it is also present in the reconstructed data. This idea
+related to the paradigm of Boolean tensor factorization
+[24]. More formally, in our method, the reconstructed
+tensor is given by.
+
+Definition 3. Tensor reconstruction
+
+Given a pattern C = (S, D, T ). We deﬁne the indicator
+tensor IC ∈ {0, 1}N×M×K to be the 3-mode tensor with
+
+i,j,k = 1 ⇔ i ∈ S ∧ j ∈ D ∧ k ∈ T
+IC
+
+Given a set of patterns C, the reconstructed tensor XC
+is deﬁned as
+
+(cid:95)
+
+C∈C
+
+XC =
+
+IC
+
+where ∨ is the element-wise disjunction.
+
+The tensor XC might not perfectly reconstruct the
+data. Since MDL, however, requires a lossless compres-
+sion, a complete description of the data has to encode
+the ’errors’ made by the model. Here, an error might
+either be an edge appearing in X but not in XC, or vice
+versa. Since we consider a binary tensor, the number of
+errors can be computed based on the squared Frobenius
+
+norm of the residual tensor, i.e.(cid:13)(cid:13)X − XC(cid:13)(cid:13)2
+L3(X|C) = log(cid:63)(cid:13)(cid:13)X − XC(cid:13)(cid:13)2
++(cid:13)(cid:13)X − XC(cid:13)(cid:13)2
+
+Since each ’error’ corresponds to one triplet (source,
+destination, time stamp), the description cost of the
+data can now be computed as
+
+F · (log N + log M + log K)
+Note that technically we also have to encode the car-
+dinalities of the set S, D, and T describing the size of
+the original tensor. Given a speciﬁc dataset, these val-
+ues, however, are constant and thus do not inﬂuence the
+detection of the optimal communities.
+
+F .
+
+F
+
+Overall model. Given the functions L2 and L3, we are
+now able to deﬁne the communities that minimize the
+overall number of bits required to describe the model
+and the data:
+
+Definition 4. Finding comet communities
+
+Given a tensor X ∈ {0, 1}|S|×|D|×|T |. The problem of
+ﬁnding comet communities is deﬁned as ﬁnding a set of
+patterns C∗ ⊆ (P(S) × P(D) × P(T )) such that
+
+C∗ = arg minC [L2(C) + L3(X|C)]
+
+Again, it is important to note that the patterns detected
+based on this deﬁnition are not necessarily disjoint, thus
+better representing the properties of real world data.
+
+Obviously, computing the optimal solution to the above
+problem is infeasible 1. Since the number of patterns is
+exponential w.r.t. the sets S, D, and T , an exhaustive
+enumeration of all patterns is not eﬃcient. In the fol-
+lowing, we present an approximate but scalable solution
+based on an iterative processing scheme.
+3.2 Algorithmic Solution
+
+We approximate the above objective function via an
+iterative algorithm, i.e., we sequentially detect impor-
+tant communities. Since, however, the search space of
+the patterns is extremely large (with most of the pat-
+terns leading to only low compression), the question is
+how to spot the ’good’ communities?
+
+Our idea is to exploit the paradigm of tensor decom-
+position [13]. Tensor decomposition provides us with a
+principled solution to detect patterns in a tensor while
+simultaneously considering the global characteristics of
+the data. It is worth mentioning that tensor decomposi-
+tion cannot directly be used to solve our problem task:
+First, tensor decomposition methods usually require the
+speciﬁcation of the number of components in advance.
+However, we are interested in a parameter-free solution.
+Second, traditional tensor decomposition does not sup-
+port the idea of Boolean disjunctions as proposed in our
+method, and Boolean tensor factorization methods [24]
+are still limited and a new ﬁeld to explore. Finally, ten-
+sor decomposition does not scale to large datasets if the
+number of components is large as many local maximum
+exist. In our case, we expect to ﬁnd many communities
+in the data.
+
+Thus, in this work, we propose a novel, incremental
+tensor analysis for the detection of temporal communi-
+ties. The outline of our method is as follows:
+
+• Step 1: Candidate ‘comet’ community: We
+spot candidates by using an eﬃcient rank-1 tensor
+decomposition. This step provides 3 vectors that
+represent the score of each source, destination and
+time stamp.
+• Step 2: Ordering and community construc-
+tion: The scores obtained in step 1 are used to
+guide the search for important communities. We
+perform an ordering of candidates and use MDL
+to determine the correct community size.
+• Step 3: Tensor adaptation: Based on the al-
+ready detected communities we adapt the tensor
+such that in later iterations, the rank-1 approxi-
+mation is steered to ﬁnd novel communities.
+
+We brieﬂy discuss each step of the method.
+
+3.2.1 Candidate generation
+
+As explained before, exhaustive search of all candi-
+date communities is not possible due to the exponential
+1Already the column reordering problem in 2 dimensions is
+NP-hard [15].
+
+4
+
+number of subsets. We propose to ﬁnd a good initial
+candidate community using a fast implementation of
+rank-1 tensor decomposition. That is, we aim at ﬁnd-
+ing vectors a ∈ RN , b ∈ RM , and c ∈ RK providing a
+low rank approximation of the community. Intuitively,
+sources connected to highly-connected destinations at
+highly active times get an higher score in the vector a,
+similarly for the other 2 vectors. Speciﬁcally, to ﬁnd
+these vectors, a scalable extension of the matrix-power-
+method only needs to iterate over the following equa-
+tions:
+
+ai ← M,K(cid:88)
+bj ← N,K(cid:88)
+ck ← N,M(cid:88)
+
+i=1,k=1
+
+j=1,k=1
+
+Xi,j,kbjck
+
+Xi,j,kaick
+
+Xi,j,kaibj
+
+(1)
+
+(2)
+
+(3)
+
+i=1,j=1
+
+where ai, bj and ck are the scores of source i, destina-
+tion j and time k, respectively.
+
+We can prove that these equations are the result of
+
+an alternating least squares (ALS) [31] method:
+
+Lemma 1. The ALS method reduces to equations Eq 1-
+
+3, when we ask for rank-1 results.
+
+Proof. Substituting vectors a, b, c, instead of ma-
+trices (A, B, C), and carefully handling the Khatri-Rao
+products, we obtain the result.
+
+Notice that the complexity is linear on the size of
+the input tensor: Let E be the number of non zeros
+in the tensor, we can easily show that each iteration
+has complexity O(E) as we only need to consider the
+non zero Xi,j,k values. Furthermore, in our experimen-
+tal analysis in Section 4 (using networks with millions
+of nodes) we saw that a relatively small number of it-
+erations (about 10) is suﬃcient to provide reasonable
+convergence.
+
+We can now use the score vectors a, b and c has a
+
+heuristic to guide our community construction.
+
+3.2.2 Community construction using MDL
+
+Since the tensor decomposition provides numerical
+values for each node/time stamp, its result cannot di-
+rectly be used to specify the communities. Addition-
+ally, there might be no clear cut to distinguish between
+the nodes/time stamps belonging to the community and
+those who do not belong to it.
+
+How to ﬁnd the underlying community based on the
+tensor decomposition? For this step, we refer back to
+our original problem deﬁnition based on MDL (cf. Deﬁ-
+nition 4). Since at this point, however, the overall set of
+patterns is not known, we cannot evaluate the cost func-
+
+tion globally. Instead, we do a local (i.e. community-
+wise) evaluation based on MDL. Our goal is to ﬁnd a
+single community C(cid:48) ∈ (P(S) × P(D) × P(T )) leading
+to the best compression. That is, we aim at minimizing
+the following cost function
+
+C(cid:48) = arg min
+
+[L1(C) + ˆL3(X|C)]
+
+(4)
+
+F
+
+F · (log |S| + log |D| + log |T|)
+
+where for each pattern C = (S, D, T ) we have
+
+C
+
+ˆL3(X|C) = log(cid:63)(cid:13)(cid:13)X ◦ IC − IC(cid:13)(cid:13)2
++(cid:13)(cid:13)X ◦ IC − IC(cid:13)(cid:13)2
++ log(cid:63)(cid:13)(cid:13)X − X ◦ IC(cid:13)(cid:13)2
++(cid:13)(cid:13)X − X ◦ IC(cid:13)(cid:13)2
+
+F
+
+F · (log N + log M + log K)
+As before, the function L1 measures the cost for en-
+coding a single community, while ˆL3(X|C) measures the
+cost for representing the data based on this single com-
+munity. The ﬁrst two summands of ˆL3 encode the errors
+which are located within the community, i.e. the infor-
+mation about edges which are speciﬁed by the pattern
+but not existing in the tensor. Note that for encoding
+each of these edges we only need (log |S| + log |D| +
+log |T|) bits since we know that they are located within
+the pattern. By using the Hadamard product X◦ IC we
+can easily restrict the tensor to the edges of the pattern.
+In contrast, the two remaining summands of ˆL3 encode
+the information about the edges which are included in
+the tensor but not in the pattern. Here, we need for
+each edge (log N + log M + log K) bits.
+
+Even though we now have to ﬁnd a single community
+only, minimizing Equation 4 is still hard. Therefore, we
+exploit the result of the tensor decomposition to design
+a good search strategy.
+
+We ﬁrst sort the sources, destination, and time stamps
+according to the scores provided by the tensor decom-
+position. Let S(cid:48) = (s1, . . . , sN ), D(cid:48) = (d1, . . . , dM ) and
+T (cid:48) = (t1, . . . , tK) denote the lists storing the sorted el-
+ements. We start constructing communities by select-
+ing the most promising triplet ﬁrst, e.g., we form the
+community C1 = ({s1},{d1},{t1}) and we evaluate its
+description cost according to Equation 4.
+
+Given the current community, we incrementally let
+the community grow. We use a round robin procedure
+which successively tries to add sources, destinations or
+time stamps. That is, we implicitly construct the list
+(s2, d2, t2, s3, d3, t3, . . .) and successively add elements
+from this list to the community. After adding a sin-
+gle new element, we recompute Equation 4 and test
+whether the description cost has been lowered. If yes,
+we accept the new community. If no, we reject the ele-
+ment, proceed with the old community and try to add
+further elements. If we observe 9 consecutive rejections,
+the method stops and reports the ﬁnal community.
+3.2.3 Tensor adaptation
+
+The output of the previous two steps of our method
+is a single community. To detect multiple communi-
+ties, multiple iterations are performed. The challenge
+of such an iterative processing is to avoid generating the
+same community again and again. We have to explore
+diﬀerent regions of the search space.
+
+As a solution, we propose the principle of tensor adap-
+tation. Informally, we remove the previously detected
+communities from the tensor, to steer the tensor de-
+composition to diﬀerent regions. More formally: Let
+X(1) = X be the original tensor. In iteration i of our
+method we analyze the tensor X(i) leading to the com-
+munity Ci. The tensor used in iteration i + 1 is recur-
+sively computed as
+
+X(i+1) = X(i) − ICi ◦ X(i)
+
+where ◦ is the Hadamard product. By using the term
+ICi ◦ X(i) we realize to remove only existing edges from
+the graph, thus, ensuring that the matrix X(i+1) is still
+a valid binary tensor.
+
+It is important to note that the MDL score computed
+in the previous step is still evaluated w.r.t. the original
+tensor as speciﬁed by the overall problem deﬁnition.
+The tensor adaptation is only used to guide the search
+for novel patterns.
+3.3 Complexity Analysis
+
+The algorithm runs in O(M ∗ (kE + N logN )), where
+M is the number of communities we obtain, E is the
+number of non-zeros of the tensor, N is the length of
+the biggest mode and k is the number of iterations to
+get the necessary convergence (we propose 10).
+
+Lemma 2. Our algorithm has O(M (kE + N log N ))
+
+complexity, that is, linear on the input size E
+
+Proof. The algorithm runs iteratively. For each com-
+
+munity: (O(M ))
+
+1. The candidate solution is generated using a con-
+stant number of iterations over the non-zeros of
+the tensor in order to apply expressions (1), (2)
+and (3). (O(kE))
+
+2. The N candidate nodes of each mode sorted ac-
+
+coding to score. (O(N logN ))
+
+3. In order to decide if a new node ought to be in-
+serted in the community, we need to ﬁnd the new
+number of holes in the community. This can be
+done in linear time in the number of non-zeros if
+implemented naively. (O(E))
+
+4. EXPERIMENTS
+
+5
+
+We tested our proposed method on a variety of syn-
+thetic tensors, to assert the quality, speed and scalabil-
+ity of the solution. We also applied Com2 on a large,
+real phone call network, demonstrating that it can ﬁnd
+interesting patterns in challenging, real-world scenar-
+ios. This section details the experiments on the datasets
+summarized in Table 1.
+
+4.1 Quality of the solutions
+
+The characterization of the temporal communities
+identiﬁed by the method is important.
+In particular
+we want to answer the following questions: How are
+“overlapping blocks” identiﬁed? How “dense” are the
+communities found?
+
+Impact of overlap.
+
+We ﬁrst constructed a tensor described by two com-
+pletely disjoint temporal communities of the same size
+(C1 = (S1, D1, T1) and C2 = (S2, D2, T2), |S| = |D| =
+|T|) and, as expected, our method was able to correctly
+recover those communities. We proceeded to iteratively
+replace an element from each of S2, D2 and T2 with a
+corresponding element from S1, D1 and T1. Figure 2
+illustrates the two communities in the tensor. The goal
+was to measure how sensitive our method was to this
+overlapp, and whether the two communities could still
+be identiﬁed. Of course, at the extreme, the communi-
+ties themselves essentially merge into a single commu-
+nity.
+
+Impact of block density.
+
+In the previous experiment we brieﬂy described the
+density of communities discovered by Com2. We also
+performed experiments to determine how density im-
+pacts the number of communities found. Figure 3 il-
+lustrates this experiment, in which ten disjoint com-
+munities were constructed in the same tensor. Non-
+zeros were sampled without repetition from each com-
+munity with diﬀerent probabilities (from 10 to 100%).
+Note that again, at the extreme (i.e., near-zero den-
+sity), there is essentially no community present. As we
+show, Com2 also has high discriminative power even
+with respect to varying density.
+
+Figure 3: Synthetic data - Communities with diﬀerent den-
+sities: Illustration of the Tensors used in the second experiment.
+Opacity indicates the non-zeros density in the blocks.
+
+We applied Com2 to the resulting tensor, and stud-
+ied the resulting communities. As expected, all blocks
+with high density (≥ 0.6 in this case), were reported
+as single communities, and most blocks (density ≥ 0.2)
+resulted in a few more communities. The conclusion is
+that Com2 indeed spots communities, perfectly recov-
+ering the underlying model at higher densities, but still
+providing useful insights even at relatively low densities.
+
+Figure 2: Synthetic data - Tensor with overlapping blocks:
+Illustration of the tensors used in the ﬁrst experiment, the number
+of overlapping edges of the two blocks was variable.
+
+Our tests show that the communities are reported as
+independent until there is an overlap of about 70% of
+the elements in each mode, in which case they start be-
+ing reported as a single community. This corresponds to
+an overlapping of slightly over 20% of the non-zero val-
+ues of the two communities and the global community
+formed has 63% of non-zeros. This clearly demonstrates
+that Com2 has high discriminative power: it can detect
+the existence of communities that share some of their
+members and it is able to report them independently,
+regardless of their size (the method is scale-free).
+
+Figure 4: Com2 scales linearly with input size: Running
+time versus number of non-zeros for random tensors.
+
+4.2 Scalability
+
+As detailed in section 3.3 on complexity, Com2’s run-
+ning time is linear on the number of communities and
+
+6
+
+Nodes #Non zeros Time Description
+10-20
+100
+PHONE 3 952 632
+
+100 Overlapping blocks.
+100 Disjoint blocks.
+14 Phone call network.
+
+Abbr
+OLB
+DJB
+
+1000-2000
+500000
+51 119 177
+
+Table 1: Networks used: Two small, synthetic ones; one large real one (“PHONE”).
+
+in the number of non-zero values in the tensor. We con-
+structed a tensor of size 500 × 500 × 500 and randomly
+created connections between sources and destinations at
+diﬀerent timestamps. Figure 4 shows the running time
+in seconds versus the number of non-zeros in the tensor.
+We consider random insertion to be a good worst-case
+scenario for many real-life applications, as the lack of
+pre-deﬁned structure will force many small communi-
+ties to be found, eﬀectively penalizing the running time
+of Com2.
+
+In addition to its almost linear runtime, Com2 is
+also easily parallelizable. By selecting diﬀerent random
+seeds in the tensor decomposition step, diﬀerent com-
+munities can be found in parallel.
+4.3 Discoveries on real data
+
+We applied Com2 to a large dataset from a European
+Mobile Carrier (EURMO) in one country, to character-
+ize the communities found in real phone call data. We
+considered the network formed by calls between clients
+of this company over a period of 14 days. During this
+period, 3 952 632 unique clients made 210 237 095 phone
+calls, 51 119 177 of which formed unique (caller, callee,
+day) triplets. The tensor is very sparse, with density in
+the order of 10−7.
+
+We extracted 1 077 communities using Com2. These
+communities contain a total of 1 271 851 non-zeros, of
+which 12 155 are unique. 589 unique callers and 899
+unique callees are represented, so the ﬁrst observation
+is that the temporal communities overlap over several
+non-zeros and the time component makes it diﬃcult for
+a single community spanning all days to accurately rep-
+resent this structure, hence the need to discover time-
+varying (comet) communities.
+
+Observation 0. Smooth eigenvalue power law.
+
+The analysis of the communities in this phone call
+dataset is far from trivial, as they do not follow the
+typical power-law behavior found in, for example, the
+internet topology [9]. Figure 5 shows the ﬁrst 100 eigen-
+values of both the binary “source-destination” matrix
+(Fig. 5a) and of the weighted version (Fig. 5b, where
+weights correspond to number of phone calls). We can
+see a plateau in the eigenvalue linear plot and a small
+slope in the log-log plot, a clear indicator that we have
+many small communities and there is no “core” that
+can describe the whole network.
+
+Next, we highlight the following patterns obtained
+
+using Com2, despite this diﬃculty:
+
+Observation 1. The biggest communities are more
+
+active during weekdays.
+
+Figure 6a shows the number of active communities per
+day of the week and we can see that most communi-
+ties are signiﬁcantly more active during weekdays. We
+are led to believe that these are mostly companies with
+reduced activity during weekends.
+
+Observation 2. Weekend activity is a by-product of
+
+normal activity.
+
+Figure 6b shows the same information for communi-
+ties that are active at least once during a weekend day.
+Communities active on weekends are not weekend-speciﬁc,
+i.e. they are not groups of people that call each other
+only on these days. What we can see is that weekend
+activity is secondary.
+
+Observation 3. A typical pattern is the “Skewed time
+
+stars”.
+
+When sorting the list of callers by the number of com-
+munities that they are part of, two callers stand out.
+Further inspection shows that they are outliers: one
+participates in 78 279 (source, destination, time) triplets
+as a caller but only in 10 triplets as a receiver, while
+the other participated in 8 909 triplets as a caller and
+in none as a receiver. These two nodes are centers of
+two distinct outgoing stars and were detected by the al-
+gorithm. However, each of these stars does not form a
+unique community, because they do not call every other
+leaf every day, so they are separated into several smaller
+stars that are active at diﬀerent times. In fact, many
+of the communities detected are of this type: a small
+group of callers (2–3) calling a few hundred receivers
+(around 170) over a subset of the weekdays. Such com-
+munities typically encode around 1800 non-zeros, but
+also sometimes overlap.
+
+We deﬁne skewed time stars as a common temporal-
+
+community that has a varying number of receivers. These
+communities have an inversely varying number of times-
+tamps, with communities with more timestamps being
+more common.
+
+Observation 4. A typical pattern is the “Temporal
+
+Bipartite Cores”.
+
+7
+
+to handle real numbers (as opposed to binary values) is
+a very tricky and challenging problem, which is beyond
+the scope of this work. However, tensor decompositions
+also apply to weighted tensors (where, intuitively, the
+weight indicates the “strength” of a connection), po-
+tentially enabling even further interesting ﬁndings. In
+this section, we describe our results from the tensor
+decomposition of the weighted tensor, which potentially
+pave the way for even more interesting ﬁndings on time-
+evolving communities, beyond those we have already
+described in the previous section.
+
+Figure 7 shows the weight of the communities over the
+14 days studied. In the majority of the communities we
+can see reduced activity during weekends (days 4, 5, 11
+and 12) and that there are few variations (most lines
+are overlapping).
+
+In order to better describe our results, we deﬁne the
+
+abc-plot:
+
+Definition 5
+
+(abc-plot). The abc-plot of compo-
+nent k consists of 3 plots, showing the ak, bk and ck
+vectors that correspond to the k component.
+
+In these plots, the x-axis corresponds to the diﬀerent el-
+ements of the vector (unordered), while the y-axis rep-
+resents the corresponding score. Intuitively, a spike at,
+say position 20 of the ak vector implies that row (=
+caller) number 20 strongly participates in the k-th com-
+ponent.
+
+Figure 8 shows the a, b and c components of a typical
+community. From there, we are able to ﬁnd two par-
+ticularly interesting communities whose time evolution
+does not follow the common pattern. We explore these
+two communities in more detail in this section.
+
+Observation 5. Discovery of a “heavy pair” in the
+
+weighted tensor.
+
+The unusual community that peaks on day 10 in the
+time plot (shown in light blue in Fig. 7) has very in-
+teresting a and b components (Fig. 9): they are two
+spikes, which show that a single caller and a single re-
+ceiver are responsible.
+In fact, the caller made 1 280
+distinct phone calls to this receiver on a single day (Fri-
+day).
+
+Possible explanations and their shortcomings:
+This behavior is very surprising, as it represents roughly
+one phone call per minute. Was it a software robot, call-
+ing some number? Or a mis-conﬁgured phone, calling
+again and again?
+
+That was our ﬁrst conjecture: some (mis-conﬁgured)
+script. However, further inspection showed that these
+phonecalls were done in quick bursts over the day, and
+that were not evenly spaced. More surprisingly, they
+were not short calls typical of automatic communica-
+tions, but their duration followed the characteristic power-
+law [7], with some calls lasting over 100 seconds.
+
+(a) Smooth power law: Scree plot,
+i.e., top 100
+eigenvalues, vs rank, of the binary phone call data. No-
+tice how slowly they decrease—both scales linear.
+
+(b) Smooth power law: top 100 eigenvalus vs rank
+in log-log scale. Notice the small slope.
+
+Figure 5: Smooth power law: Top 100 eigen values
+of the phone call dataset. Notice the small slope of the
+log-log plot.
+
+Over 20 medium-size near-bipartite cores were detected
+as communities. These are communities with 4 or more
+callers and an average of 20 receivers that are active
+on every one of the 10 weekdays of the two weeks under
+analysis. These communities represent between 150 and
+400 of the non-zeros of the original tensor, with a block
+density of around 30%.
+
+5. DISCUSSION
+
+Com2 carefully combines a fast and eﬃcient iterated
+rank-1 tensor decompositions to guide the search for
+nodes (and timestamps) that participate in communi-
+ties, and a principled MDL-based model selection crite-
+rion that provides a stopping criterion and guides the
+expansion of communities. We have focused on binary
+tensors, which reveal structural (connectivity) commu-
+nity patterns over time, and have demonstrated inter-
+esting ﬁndings. It is well-known that extending MDL
+
+8
+
+(a) Weekly periodicity
+
+(b) Weekend activity - number of weekend-active commu-
+nities vs time.
+
+Figure 6: Weekly periodicity: a) number of active communities vs time. Notice the weekend dives (days 4, 5 and
+11, 12). b) weekend activity is due to communities that also show dives during weekends.
+
+The time-activity (’c component’) of this unusual com-
+munity is the one in yellow in Figure 7, which is only
+active during 4 consecutive days. Figure 10 shows the
+a and b components of this community, which is com-
+posed of a single caller and 5 receivers, with roughly the
+same height. Surprisingly, these 5 users had an overall
+in-degree of 1 and received, on average, 500 phone calls
+each, on each of the 4 days.
+
+We are completely lost with respect to possible causes,
+and especially to the fact that the 5 recipients received
+roughly equal count of phonecalls from the source.
+
+6. CONCLUSIONS
+
+We focused on deriving patterns from time-evolving
+graphs, and speciﬁcally on spotting comet communities,
+that come and go (possibly periodically). The main
+contributions are the following:
+
+• Formalization: We formalized the problem of
+temporal community detection in tensors and pro-
+vided a method able to detect temporal communi-
+ties.
+
+• Scalability: Our proposed method, Com2, is lin-
+ear on the input size; instead of relying on a com-
+plete tensor factorization, we carefully leverage rank-
+1 decompositions to incrementally guide the search
+process for community detection.
+
+• Parameter-free: In addition to the above, eﬃ-
+cient, incremental search process, we also propose
+a novel MDL-based stopping criterion, which ﬁnds
+such comet communities in a parameter-free fash-
+ion.
+
+• Eﬀectiveness: We applied Com2 on real and
+synthetic data, where it discovered communities
+that agree with intuition.
+
+Figure 7: Weighted tensor analysis: most components have
+a small weekly periodicity. Plot of c-vectors for top 20 communi-
+ties of the weighted analysis. Notice the yellow curve, correspond-
+ing to the heavy-5star and the light blue peak corresponding to
+the heavy-pair.
+
+Thus, our second conjecture was that this behavior is
+not due to a robot or mis-conﬁguration, but it may be
+due to suﬃx-masking: maybe it is a company number,
+and employees from company ‘X’ call employees of com-
+pany ‘Y’, where the last four digits of the callers were
+automatically set to a default suﬃx, like say, ‘0000’.
+But then, again, we rejected this conjecture, because
+such high level of activity should span all weekdays,
+which is not the case here.
+
+In short, we don’t have a plausible conjecture, and,
+unfortunately, we are not allowed to see additional in-
+formation (like demographic data), due to privacy re-
+strictions.
+
+But our main point is that our proposed analysis
+discovers interesting patterns, that a phone-company
+employee could further investigate, to spot errors or
+promising customers (or fraud). The second fascinat-
+ing pattern is what we call “heavy-5-star” pattern:
+
+Observation 6. Discovery of a “heavy-5-star” in the
+
+weighted tensor.
+
+In addition, Com2 can be applied on any edge-labeled
+graph (not necessarily time-based). Future work could
+
+9
+
+(a) Caller component
+
+(b) Receiver component
+
+(c) Time component
+
+Figure 8: Typical a, b and c components of a community obtained by Parafac
+
+focus on exploiting side information, like node-attributes
+(for example, demographic data for each node).
+
+7. REFERENCES
+[1] E. Acar, C. Aykut-Bingol, H. Bingol, R. Bro, and
+
+B. Yener. Multiway analysis of epilepsy tensors.
+In ISMB/ECCB (Supplement of Bioinformatics),
+pages 10–18, 2007.
+
+[2] C. Aggarwal. Outlier Analysis. Springer-Verlag
+
+New York Incorporated, 2013.
+
+[3] L. Akoglu, M. McGlohon, and C. Faloutsos.
+
+OddBall: Spotting anomalies in weighted graphs.
+In PAKDD, pages 410–421, 2010.
+
+[4] M. M. Breunig, H.-P. Kriegel, R. T. Ng, and
+
+J. Sander. Lof: Identifying density-based local
+outliers. In W. Chen, J. F. Naughton, and P. A.
+Bernstein, editors, SIGMOD Conference, pages
+93–104. ACM, 2000.
+
+[5] D. Chakrabarti and C. Faloutsos. Graph Mining:
+Laws, Tools, and Case Studies. Morgan Claypool,
+2012.
+
+[6] V. Chandola, A. Banerjee, and V. Kumar.
+
+Anomaly detection for discrete sequences: A
+survey. IEEE Trans. Knowl. Data Eng.,
+24(5):823–839, 2012.
+
+[7] P. O. V. de Melo, L. Akoglu, C. Faloutsos, and
+
+A. Loureiro. Surprising patterns for the call
+duration distribution of mobile phone users. In
+ECML PKDD, 2010.
+
+[8] D. M. Dunlavy, T. G. Kolda, and E. Acar.
+
+Temporal link prediction using matrix and tensor
+factorization. IEEE TKDD, 2011.
+
+[9] M. Faloutsos, P. Faloutsos, and C. Faloutsos. On
+power-law relationships of the internet topology.
+In SIGCOMM, pages 251–262, 1999.
+
+[10] L. Getoor, T. E. Senator, P. Domingos, and
+
+C. Faloutsos, editors. Proceedings of the Ninth
+ACM SIGKDD International Conference on
+Knowledge Discovery and Data Mining,
+Washington, DC, USA, August 24 - 27, 2003.
+ACM, 2003.
+
+[11] A. Gionis, H. Mannila, and J. K. Sepp¨anen.
+
+Geometric and combinatorial tiles in 0–1 data. In
+PKDD, 2004.
+
+[12] P. D. Gr¨unwald. The minimum description length
+
+principle. The MIT Press, 2007.
+
+[13] R. Harshman. Foundations of the parafac
+procedure: Models and conditions for an”
+explanatory” multimodal factor analysis. 1970.
+[14] K. Henderson, B. Gallagher, L. Li, L. Akoglu,
+T. Eliassi-Rad, H. Tong, and C. Faloutsos. It’s
+who you know: graph mining using recursive
+
+(a) Caller component
+
+(b) Receiver component
+
+(c) Time component
+
+Figure 9: “Heavy pair” - abc-plot, with a, b, and c components: only one spike, in the caller (a) and receiver (b)
+component, signifying only one caller, and only one receiver, in this community/component. In the (c) component:
+High activity on day 10, with medium activity on a few more (but not all) weekdays.
+
+10
+
+(a) Caller component
+
+(b) Receiver component
+
+(c) Time component
+
+Figure 10: “Heavy-5-star” abc-plot: Only one source (single spike) on the caller (a) component; only 5 spikes on the
+receiver (b) component. Notice the roughly-equal height of the 5 spikes, as opposed to a skewed distribution that a
+human would have. Strange activity wrt time (c component): only 3 days, two of which are weekend days.
+
+[25] E. E. Papalexakis, C. Faloutsos, and N. D.
+Sidiropoulos. Parcube: Sparse parallelizable
+tensor decompositions. In ECML/PKDD (1),
+pages 521–536, 2012.
+
+[26] E. E. Papalexakis, N. D. Sidiropoulos, and
+
+R. Bro. From k -means to higher-way
+co-clustering: Multilinear decomposition with
+sparse latent factors. IEEE Transactions on
+Signal Processing, pages 493–506, 2013.
+
+[27] B. A. Prakash, M. Seshadri, A. Sridharan,
+
+S. Machiraju, and C. Faloutsos. Eigenspokes:
+Surprising patterns and scalable community
+chipping in large graphs. PAKDD 2010, 21-24
+June 2010.
+
+[28] J. Rissanen. A universal prior for integers and
+
+estimation by minimum description length. The
+Annals of statistics, pages 416–431, 1983.
+
+[29] J. Sun, S. Papadimitriou, C. Faloutsos, and P. S.
+Yu. Graphscope: Parameter-free mining of large
+time-evolving graphs. In KDD, 2007.
+
+[30] J. Sun, D. Tao, and C. Faloutsos. Beyond streams
+
+and graphs: Dynamic tensor analysis. In KDD,
+2006.
+
+[31] Y. Takane, F. W. Young, and J. De Leeuw.
+
+Nonmetric individual diﬀerences multidimensional
+scaling: an alternating least squares method with
+optimal scaling features. Psychometrika,
+42(1):7–67, 1977.
+
+[32] H. Tong, S. Papadimitriou, J. Sun, P. S. Yu, and
+C. Faloutsos. Colibri: fast mining of large static
+and dynamic graphs. In KDD, 2008.
+
+[33] H. Tong, S. Papadimitriou, P. S. Yu, and
+
+C. Faloutsos. Proximity tracking on time-evolving
+bipartite graphs. In SDM, 2008.
+
+structural features. In C. Apte, J. Ghosh, and
+P. Smyth, editors, KDD, pages 663–671. ACM,
+2011.
+
+[15] D. S. Johnson, S. Krishnan, J. Chhugani,
+
+S. Kumar, and S. Venkatasubramanian.
+Compressing large boolean matrices using
+reordering techniques. In VLDB, 2004.
+
+[16] T. Kolda and B. Bader. Tensor decompositions
+
+and applications. SIAM review, 51(3), 2009.
+[17] T. G. Kolda, B. W. Bader, and J. P. Kenny.
+
+Higher-order web link analysis using multilinear
+algebra. In ICDM, pages 242–249. IEEE
+Computer Society, 2005.
+
+[18] R. Kumar, J. Novak, P. Raghavan, and
+A. Tomkins. On the bursty evolution of
+blogspace. In WWW, 2003.
+
+[19] J. Leskovec, J. Kleinberg, and C. Faloutsos.
+
+Graphs over time: densiﬁcation laws, shrinking
+diameters and possible explanations. In
+Proceedings of the eleventh ACM SIGKDD
+international conference on Knowledge discovery
+in data mining, pages 177–187. ACM, 2005.
+[20] J. Leskovec, J. Kleinberg, and C. Faloutsos.
+
+Graph evolution: Densiﬁcation and shrinking
+diameters. IEEE TKDD, 2007.
+
+[21] J. Leskovec, K. J. Lang, A. Dasgupta, and M. W.
+
+Mahoney. Statistical properties of community
+structure in large social and information
+networks. In WWW, pages 695–704, 2008.
+[22] Z. Liu, J. Yu, Y. Ke, X. Lin, and L. Chen.
+Spotting signiﬁcant changing subgraphs in
+evolving graphs. In ICDM, 2008.
+
+[23] K. Maruhashi, F. Guo, and C. Faloutsos.
+Multiaspectforensics: Pattern mining on
+large-scale heterogeneous networks with tensor
+analysis. In Proceedings of the Third International
+Conference on Advances in Social Network
+Analysis and Mining, 2011.
+
+[24] P. Miettinen. Boolean tensor factorizations. In
+
+ICDM, 2011.
+
+11
+
+

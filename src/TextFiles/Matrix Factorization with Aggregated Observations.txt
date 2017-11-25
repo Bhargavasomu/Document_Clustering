@@ -1,0 +1,1051 @@
+Matrix Factorization
+
+With Aggregated Observations
+
+Yoshifumi Aimoto and Hisashi Kashima
+
+Department of Mathematical Informatics, The University of Tokyo
+
+7-3-1 Hongo, Bunkyo-ku, Tokyo 113-8656, Japan
+
+{Yoshifumi Aimoto,Kashima}@mist.i.u-tokyo.ac.jp
+
+Abstract. Missing value estimation is a fundamental task in machine
+learning and data mining. It is not only used as a preprocessing step in
+data analysis, but also serves important purposes such as recommenda-
+tion. Matrix factorization with low-rank assumption is a basic tool for
+missing value estimation. However, existing matrix factorization methods
+cannot be applied directly to such cases where some parts of the data are
+observed as aggregated values of several features in high-level categories.
+In this paper, we propose a new problem of restoring original micro ob-
+servations from aggregated observations, and we give formulations and
+eﬃcient solutions to the problem by extending the ordinary matrix fac-
+torization model. Experiments using synthetic and real data sets show
+that the proposed method outperforms several baseline methods.
+
+1
+
+Introduction
+
+In many real data analysis applications, we often face datasets with missing val-
+ues due to various reasons such as sensor failures and biased sampling. Since most
+of the existing data analysis methods are not directly applicable to them, we ﬁrst
+need to estimate the missing values before analysis, or we need to develop new
+methods that can handle data with missing values. With its ubiquitous needs,
+missing value estimation [9,1,12] has been placed as one of the fundamental
+tasks in the ﬁeld of machine learning and data mining, and it has been studied
+extensively. A typical dataset looks can be represented as a table with missing
+values (see Table 1). The table shows the numbers of beers of various brands
+purchased by four customers, where missing values are indicated by “-”. The
+
+Table 1. An example of purchase data. Typical data are given as a matrix-shaped table.
+The table shows the numbers of beers of various brands purchased by four customers,
+and missing values are indicated with “-”.
+
+items\users Alice Bob Carol Dave
+3
+Budweiser
+-
+Heineken
+2
+Carlsberg
+2
+
+Miller
+
+2
+2
+1
+3
+
+5
+1
+1
+3
+
+-
+3
+-
+1
+
+J. Pei et al. (Eds.): PAKDD 2013, Part II, LNAI 7819, pp. 521–532, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+522
+
+Y. Aimoto and H. Kashima
+
+beer
+ 10
+
+cola
+ 5
+
+Budweiser
+
+ 3
+
+Heineken
+
+ 5
+
+Carlsberg
+
+ 2
+
+Coca Cola
+
+ 2
+
+Pepsi Cola
+
+ 3
+
+Fig. 1. Some portion of micro-level purchase data (e.g., the number of purchased bot-
+tles of a particular beer brand) are observed in an aggregated category (e.g., “beer”)
+
+table-structured data is mathematically considered as a matrix; hence, matrix
+analysis techniques are useful for missing value estimation. Matrix factorization
+(MF), which decomposes matrices by using the low- rank assumption [3,4], is one
+of the eﬀective approaches to restore missing values in such matrix-shaped data.
+Missing value estimation using low-rank matrix factorization does not arise only
+as a preprocessing step, but also as a primary purpose of the analysis. Typical
+examples include recommender systems [6] and relational learning [10].
+
+In this study, we consider a more complex situation where some parts of data
+are not completely missing, but are observed at a more abstract category level
+as aggregated values. Figure 1 shows examples of such cases. In each category
+(such as “beer” and “cola”), several micro-level counts (such as “Budweiser”
+and “Heineken”) belonging to the category are observed as an aggregated count.
+To address such situations, we introduce a new variant of the missing value
+estimation problem, which we call restoration of micro-level observations from
+aggregated observation, where some parts of data are observed as aggregated val-
+ues of several features. Since the existing techniques for missing value estimation
+including matrix factorization cannot be applied directly to such cases, we extend
+the existing low-rank matrix factorization formulation for missing value estima-
+tion to our case. We also devise iterative algorithms for solving the optimization
+problems, where each step consists of the standard singular value decomposition
+or closed form updates. Finally, using synthetic and real datasets, we show some
+experimental results on micro-observation restoration, which demonstrates that
+the proposed approach performs better than baseline methods.
+
+The remainder of this paper is organized as follows. In Section 2, we intro-
+duce the restoration of micro-level observations from aggregated observation with
+a motivating example of purchase data analysis. We formulate matrix factoriza-
+tion problems with aggregated observations in Section 3, and give an eﬃcient
+algorithm to solve the optimization problems in Section 4. In Section 5, we
+demonstrate the advantage of our approach over baseline approaches. Section 6
+summarizes the related work, and Section 7 concludes the paper.
+
+2 Problem Deﬁnition
+
+In this section, we introduce a new problem that we refer to as the restoration
+of micro observations from aggregated observations using a motivating example
+
+Matrix Factorization With Aggregated Observations
+
+523
+
+Table 2. An example of purchase data with aggregated observations. In addition to
+micro-level observations Z, we have aggregated observations Y , whose allocations to
+micro-level observations are not known. We have to restore the micro-level observation
+X from Y to obtain Z + X which is the true sales data.
+
+micro-level observations Z
+
+aggregated observations Y
+
+items\users Alice Bob Carol Dave items\users Alice Bob Carol Dave
+Budweiser
+Heineken
+Carlsberg
+
+(aggregated)
+
+beer
+
+1
+
+3
+
+3
+
+4
+
+Miller
+
+5
+1
+1
+3
+
+0
+3
+0
+1
+
+2
+2
+1
+3
+
+3
+1
+2
+2
+
+of purchase data. We consider two cases that diﬀer according to the assumption
+we make on categorical structures.
+
+2.1 Motivating Example
+
+Let us assume that we have purchase data represented as a matrix X, where
+each column corresponds to a customer, each row corresponds to a product (such
+as a particular brand of beer), and element Xij indicates the number of i-th
+products the j-th customer purchased. In many cases, the data has many missing
+values; for some (i, j), Xij is completely missing, or a part of Xij is missing (for
+example, only ﬁve of eight actual purchases are recorded). Restoration of the
+true purchases is quite important in sales management and analysis, and various
+missing value imputation methods [5] are employed for the purpose.
+
+Let us now imagine a more complex situation where a part of Xij is not
+missing, but is observed at a more abstract category level. In each category, sev-
+eral micro-level counts belonging to the category are observed as an aggregated
+count. For example, among eight actual purchases of the “Budweiser” brand of
+beer, only ﬁve are observed at the micro level (as ﬁve purchases of Budweiser),
+and the other three are observed in the more abstract “beer” category. The
+“beer” category might have ten purchases, including other beer brands such as
+ﬁve “Heineken” bottles and two “Carlsberg” bottles (See Figure 1). Now our goal
+is to restore the original micro level purchases (such as ten Budweiser purchases)
+from the aggregated observations.
+
+2.2 Restoration of Aggregated Observations
+
+General Problem Deﬁnition. Let us assume that we have two data matrices
+Z and Y . Z is an I × J matrix that represents micro-level observations. In the
+previous example, I is the number of product brands, and J is the number of
+customers. Y is an L × J matrix which represents category-level observations,
+where L indicates the number of categories. An example with purchase data is
+given in Table 2. In addition to Z and Y , we also have a correspondence matrix
+C as side information about product-category relationships. C is an L×I binary
+
+524
+
+Y. Aimoto and H. Kashima
+
+beer
+ 3
+
+gin
+ 1
+
+liqueur
+
+ 3
+
+1
+
+2
+
+1
+
+vodka
+
+ 3
+
+3
+
+Budweiser
+
+ 2
+
+Heineken
+
+ 1
+
+Tanqueray
+
+ 3
+
+Smirnoff
+
+ 4
+
+Fig. 2. (left) Case 1: each micro-level dimension belong to at most one category. (right)
+Case 2: each dimension can belong to more than one category.
+
+matrix, whose ((cid:2), i)-th element is 1 if the i-th product is included in the (cid:2)-th
+category. Our goal is to restore the hidden micro-level observation matrix X (of
+size I × J) from Y with the help of C and Z.
+
+Two Diﬀerent Assumptions on Product-Category Relationships. In our
+problem setting, we consider two diﬀerent assumptions on the correspondence
+matrix C, which results in slightly diﬀerent formulations of the problem.
+
+The ﬁrst case is when each dimension of column vectors belongs to only one
+category (Figure 2 (left)), and the other case is when each dimension can belong
+to more than one category (Figure 2 (right)). Figure 2 (right) shows that a
+micro-level product “Tanqueray” belongs to two possible categories “gin” and
+“liqueur”, and another micro-level product “Smirnoﬀ” belongs to both “vodka”
+and “liqueur”. We denote the former case as Case 1, and the latter as Case
+2. The diﬀerence between the two cases is reﬂected by the deﬁnition of the
+correspondence matrix C. In Case 1, each column of C has at most one value
+as “1” value and the rest are “0”. On the other hand, in Case 2, each column of
+C can have multiple values as 1.
+
+3 Formulation
+
+In this section, we formulate our problem as optimization problems, where we
+restore micro observations X from aggregated observations Y . Our model is an
+extension of the matrix factorization approach for missing value estimation.
+
+3.1 Matrix Factorization Approach for Missing Value Estimation
+
+We ﬁrst review the existing matrix factorization approach for missing value
+estimation, where the observed (micro-level) data matrix Z has missing values,
+i.e., Zij are missing for some (i, j). Let us assume an observation matrix E, where
+Eij = 1 if Zij is observed; otherwise, Eij = 0. To impute the missing values of the
+matrix, the low-rank assumption is often employed. We consider the following
+optimization problem of rank-k approximation of the observed matrix.
+
+minimizeA (cid:2)E ∗ (Z − A)(cid:2)2
+
+F s.t. rank(A) ≤ k,
+
+Matrix Factorization With Aggregated Observations
+
+525
+
+i=1
+
+j=1
+
+X 2
+
+(cid:3)I
+
+I×J is deﬁned as (cid:2)X(cid:2)F =
+where the Frobenius norm of a matrix X ∈ R
+(cid:2)(cid:3)J
+ij, and ∗ indicates the element-wise product. If all of the ele-
+ments of Z are observed, i.e., Eij = 1 for ∀(i, j), the optimal solution is obtained
+by singular value decomposition (SVD). However, since we have missing elements
+in Z, SVD cannot be applied. Furthermore, the optimization problem is not con-
+vex, hence numerical optimization methods do not guarantee optimal solutions.
+Recently, instead of using the rank constraint, the trace-norm constraint is often
+used, because the trace-norm constraint of a matrix is a convex set (whereas the
+rank constraint is not) [11,2]. Using the trace-norm constraint, we can formulate
+the low-rank matrix approximation problem as a convex optimization problem
+as
+
+minimizeA (cid:2)E ∗ (Z − A)(cid:2)2
+
+F s.t. (cid:2)A(cid:2)Tr ≤ τ,
+(cid:4)
+where the trace norm of a matrix X is deﬁned as (cid:2)X(cid:2)Tr = Tr(
+
+XX(cid:3)
+
+).
+
+3.2 Matrix Factorization with Aggregated Observations
+
+Now we extend the previous formulation to address our problem setting. Similar
+to the matrix factorization problem for missing value estimation, we also employ
+the low-rank assumption that our micro-level observations are of low-rank. We
+consider two slightly diﬀerent formulations for the two cases we mentioned in
+the previous section.
+
+Case 1. When each row of the micro-observation matrix can belong to at most
+one category, we need that the linear constraint CX = Y , where each column
+of C has at most one value as “1” and the rest are “0”. For example, let us
+assume that John bought several bottles of beer and cola as in Figure 1, the
+corresponding column in the constraint CX = Y looks like
+
+(cid:5)
+
+(cid:6)
+1 1 1 0 0
+0 0 0 1 1
+
+beer
+cola
+
+(cid:5)
+
+(cid:6)
+10
+5
+
+=
+
+beer
+cola
+
+Budweiser
+Heineken
+Carlsberg
+Coca Cola
+Pepsi Cola
+
+⎤
+
+⎥⎥⎥⎥⎦
+
+⎡
+3
+5
+2
+2
+3
+
+⎢⎢⎢⎢⎣
+
+With the constraint CX = Y , we formulate the optimization problem as follows.
+
+minimizeA,X (cid:2)A − (X + Z)(cid:2)2
+
+s.t. (cid:2)A(cid:2)Tr ≤ τ, CX = Y
+
+F
+
+(1)
+
+Note that we assume that the “true” micro-observations X + Z are of low-rank.
+
+526
+
+Y. Aimoto and H. Kashima
+
+Case 2. When each row of the micro-observation matrix can belong to more
+than one category, aggregation from micro-level observations to category-level
+observations is not unique; therefore, we divide the micro-level observation ma-
+trix X into a sum of multiple matrices {X ((cid:2))}L
+X ((cid:2)) = X is
+satisﬁed.
+
+(cid:2)=1 so that
+
+(cid:3)L
+
+(cid:2)=1
+
+In this case, we need that the linear constraints
+
+C (cid:2):X ((cid:2)) = Y (cid:2): for (cid:2) = 1, 2, . . . , L
+
+(2)
+
+are satisﬁed. Note that one constraint is made for each of the L categories. If
+John bought several bottles of alcoholic beverage as in Figure 2 (right), one
+column in the constraint (2) looks like
+⎤
+⎥⎥⎦
+
+(cid:14)
+0 0 1 1
+
+liqueur.
+
+liqueur
+
+=
+
+(cid:14)
+
+(cid:13)
+3
+
+(cid:13)
+
+⎡
+⎢⎢⎣
+0
+0
+2
+1
+
+Budweiser
+Heineken
+Tanqueray
+Smirnoﬀ
+
+The optimization problem is deﬁned as follows.
+
+minimizeA,X (cid:2)A − (X + Z)(cid:2)2
+
+F
+
+s.t. (cid:2)A(cid:2)Tr ≤ τ
+
+C(cid:2):X ((cid:2)) = Y (cid:2): for (cid:2) = 1, . . . , L,
+
+(3)
+
+L(cid:15)
+
+(cid:2)=1
+
+X ((cid:2)) = X
+
+Table 3 summarizes the ordinary formulation of matrix factorization, our for-
+mulation for Case 1, and one for Case 2.
+
+4 Algorithms
+
+Our optimization problems (1) and (3) are minimization problems of convex
+functions with respect to both A and X. However, the number of variables in-
+volved is large, and it is time-consuming to minimize the objective functions with
+respect to them at once. Therefore, we devise iterative optimization procedures,
+each of whose step optimizes either of A and X. We elaborate the concrete
+implementations of the estimation steps for both Case 1 and Case 2 below.
+
+4.1 Case 1
+
+Our proposed optimization procedure for Case 1 starts with initializing X so
+that the current X satisﬁes CX = Y . The initialization is discussed in the
+Experiments section in detail. Then, we iterate the following updates of A and
+X until convergence.
+
+When we update A, we need to solve the optimization problem
+F s.t. (cid:2)A(cid:2)Tr ≤ τ.
+
+ANEW = argminA(cid:2)A − (X + Z)(cid:2)2
+
+(4)
+
+Matrix Factorization With Aggregated Observations
+
+527
+
+Table 3. Comparison of the formulation of the ordinary formulation of matrix fac-
+torization for missing value imputation and our formulations of restoration of micro
+observations from aggregated observations (Case 1 and Case 2). The constraints X ≥ 0
+and X ((cid:2)) ≥ 0 are the additional non-negativity constraints we employ in Section 4.3.
+
+The existing MF Proposed MF (Case 1) Proposed MF (Case 2)
+Z ∈ R
+
+I×J , τ ∈ R
+
+I×J , τ ∈ R
+
+Z ∈ R
+
++
+
+Inputs
+
+Outputs
+
+Objective
+
+function
+
+A ∈ R
+
+I×J
+
+(cid:4)E ∗ (A − Z)(cid:4)2
+
+F
+
+w.r.t. A
+
+Constraints
+
+(cid:4)A(cid:4)Tr ≤ τ
+
+L×J
+
++, C ∈ R
+L×I , Y ∈ R
+A , X ∈ R
+I×J
+(cid:4)A − (X + Z)(cid:4)2
+
+F
+
+(cid:4)A(cid:4)Tr ≤ τ
+CX = Y
+(X ≥ 0)
+
+w.r.t. A, X
+
+(cid:4)A(cid:4)Tr ≤ τ
+
+C (cid:2):X ((cid:2)) = Y (cid:2):
+(cid:2)L
+(cid:2)=1 X ((cid:2)) = X
+(X ((cid:2)) ≥ 0)
+
+This optimization problem can be solved by applying SVD to X + Z and thresh-
+olding the singular values. Let the SVD of X + Z be U ΣV (cid:3)
+, where U and V
+are orthogonal matrices, and Σ is a diagonal matrix with the singular values
+as its diagonals. We eliminate the singular values less than the threshold τ , and
+denote Σ(cid:4)
+as the diagonal matrix with diagonal elements greater than or equal
+to τ . The optimal solution ANEW of Eq. (4) is obtained as
+
+ANEW = U Σ(cid:4)V (cid:3).
+
+Optimization with respect to X is casted as the minimization problem
+
+X NEW = argminX(cid:2)X − (A − Z)(cid:2)2
+
+F s.t. CX = Y .
+
+(5)
+
+(6)
+
+This is generally a convex quadratic programming problem; however, the optimal
+solution is given in a simple closed form in this case. Since this problem can be
+seen as minimization of the Euclidean distance between X and M with the
+hyper-plane constraint CX = Y , the optimal solution is given as the projection
+of M onto the hyper-plane. Assuming that the micro-level feature i belongs to
+the aggregated category (cid:2), the optimal solution of i-th row X NEW
+is obtained
+as
+
+i:
+
+X NEW
+
+i:
+
+= M i: −
+
+1(cid:3)I
+
+where we deﬁned M = A − Z.
+
+i=1
+
+(C (cid:2):M − Y (cid:2):),
+
+C(cid:2)i
+
+(7)
+
+4.2 Case 2
+X ((cid:2)), the update of A is the same as that for
+In Case 2, noting that X =
+Case 1. However, in contrast to Case 1, the update of X cannot be given in a
+
+(cid:3)L
+
+(cid:2)=1
+
+528
+
+Y. Aimoto and H. Kashima
+
+closed form solution anymore in Case 2, and we have to solve the optimization
+problem
+
+X NEW = argminX (cid:2)X − (A − Z)(cid:2)2
+
+F
+
+s.t. C (cid:2):X ((cid:2)) = Y (cid:2):
+
+((cid:2) = 1, . . . , L), X =
+
+(8)
+
+L(cid:15)
+
+(cid:2)=1
+
+X ((cid:2)).
+
+Although it is a quadratic programming problem, the number of variables in-
+volved is rather large; hence, we again resort to iterative optimization, that is,
+we iterate updates with respect to one of {X ((cid:2))}L
+(cid:2)=1 at once. The optimization
+problem with respect to only X ((cid:2)) with the other {X(j)}j(cid:5)=(cid:2) ﬁxed, the problem
+
+(8) is written as
+
+X ((cid:2))NEW
+
+= argminX ((cid:2)) (cid:2)X((cid:2)) − (M −
+
+(cid:15)
+
+j(cid:5)=(cid:2)
+
+X (j))(cid:2)2
+
+F s.t. C (cid:2):X ((cid:2)) = Y (cid:2):.
+
+This has the same form as that in Case 1; hence, the closed form update becomes
+
+X ((cid:2))NEW
+
+i:
+
+= (M i: −
+
+X (j)) −
+
+1(cid:3)I
+
+i=1
+
+C(cid:2)i
+
+(C (cid:2):(M −
+
+(cid:15)
+
+j(cid:5)=(cid:2)
+
+(cid:15)
+
+i(cid:5)=j
+
+X (j)) − Y (cid:2):).
+
+(9)
+
+4.3 Non-negativity Constraints
+
+Since our original motivation came from the purchase data example, it is some-
+times more reasonable to make a non-negativity assumption on the micro-level
+observations.
+
+In Case 1, we make an additional constraint that X is non-negative. The
+
+resultant optimization problem for Case 1 with respect to X becomes
+F s.t. CX = Y , X ≥ 0.
+
+X NEW = argminX (cid:2)X − M(cid:2)2
+
+Accordingly, the previous closed form solution (7) is modiﬁed to
+
+X NEW
+
+ij
+
+=
+
+(Xij − sj)Y(cid:2)j
+(Y(cid:2)j − (cid:3)I
+
+i=1
+
+C(cid:2)isj)
+
+,
+
+(10)
+
+where sj = min1≤i≤I Xij.
+
+In Case 2, we make the assumption that each X ((cid:2)) is non-negative. The update
+
+(10) is similarly obtained as
+
+X ((cid:2))NEW
+
+ij
+
+=
+
+(Xij − sj)Y(cid:2)j
+Y(cid:2)j − (cid:3)I
+C(cid:2)isj
+
+i=1
+
+.
+
+Note that the modiﬁed optimization problems are still convex; therefore, we
+obtain optimal solutions when converged.
+
+Matrix Factorization With Aggregated Observations
+
+529
+
+5 Experiments
+
+We show some experimental results using synthetic and real datasets that demon-
+strate the reasonable performance of the proposed methods to restore micro-level
+observations from category-level observations. We compare the restoration er-
+rors by the proposed methods with those by four baseline methods, and show
+the advantage of the proposed methods over them.
+
+5.1 Datasets
+
+Synthetic Dataset. The ﬁrst dataset is a set of randomly generated matrices.
+The size of matrices U and V is 1, 000 × 5, and each element Uir ∈ {0, 1, 2, 3}
+and Vjr ∈ {0, 1, 2} is generated uniformly at random over the ranges. The true
+micro-level observation matrix is generated as A = U V (cid:3)
+, where 5% of the
+elements of A are randomly missing.
+A 100 × 1, 000 correspondence matrix C is generated so that the ((cid:2), i)-th
+element is 1 if and only if i is in {10 × ((cid:2) − 1) + 1, . . . , 10 × (cid:2)} for Case 1.
+For Case 2, starting from the C we created for Case 1, we further sample 300
+((cid:2), i) pairs to make additional “1” values. To create category-level observations,
+we employ binomial distributions to divide the true micro-level observations
+A into the hidden part X and the observed part Z. Namely, each element
+pk(1 − p)Aij−k, where p controls
+Zij is determined by Pr(Zij = k) =
+the likeliness of the observation of each micro-observation at its superordinate
+category. For example, p = 1 corresponds to the perfect observation case with
+no category-level observations. In our experiments, we varied p in {0.1, 0.4, 0.7}.
+Once the hidden part X is determined, the corresponding category-level ob-
+servations Y are created using the correspondence relationship CX = Y for
+Case 1. For Case 2, we set X ((cid:2))
+C(cid:2)i if C(cid:2)i = 1, and aggregate X ((cid:2))
+i:
+to Y (cid:2): with C (cid:2):X ((cid:2)) = Y (cid:2):.
+
+(cid:16)
+Aij
+k
+
+(cid:3)I
+
+(cid:17)
+
+i: = X i:/
+
+i=1
+
+Purchase Dataset for Internet Stores. Another dataset is a real cross-store
+purchase dataset collected from 6 internet stores to include for 494 customers,
+and 150 product brands belonging to 11 categories (such as electronic devices,
+undergarments, and magazines). Since the granularities of the input sales logs
+diﬀer from store to store, not all of them provided detailed product names, and
+gave only category-level information. One product can belong to more than one
+category in this dataset; hence, this dataset belongs to Case 2. Since we had no
+ground truth micro-observations, we simulated category-level observations again
+from the micro-observed data; we assumed that some stores did not provide
+micro-level sales, and their sales were given as category-level observations.
+
+5.2 Comparison Methods
+
+Although there have not been any existing methods that address the restoration
+problem to the best of our knowledge, we consider four baseline methods as com-
+
+530
+
+Y. Aimoto and H. Kashima
+
+parison methods to evaluate the proposed methods. The ﬁrst method (that we
+call “Equal” method) divides each category-level observation into its descendant
+micro-observation equally. The second method (that we call “Prop” method)
+divides the category-level observations in proportion to the observed micro-level
+values (of Z) as Xij = ZijY(cid:2)j/C(cid:2):Z :j in Case 1, and X ((cid:2))
+ij = ZijC(cid:2)iY(cid:2)j/C(cid:2):Z :j
+in Case 2. In addition, we applied the matrix factorization method (SVD) to
+the matrices obtained using the above methods, which results in two additional
+baseline methods (which we call “Equal+MF” and “Prop+MF”).
+
+The micro-level estimations obtained by the simple methods are also used
+for initialization of X in the proposed method. Although our formulations are
+convex optimization problems and the solutions do not depend on the initial esti-
+mates, our preliminary experiments suggest that initialization with the “Equal”
+method shows better numerical stability.
+
+5.3 Results
+
+Table 4 and 5 show comparison of errors under diﬀerent methods with varied p
+among {0.1, 0.4, 0.7}, where Table 4 shows the results for the synthetic data in
+Case 1, Table 5 for that in Case 2. Table 6 shows the results for the purchase
+dataset (in Case 2) where one, two, or four stores out of six are assumed not
+to provide micro-level sales. As the evaluation metric, we used the diﬀerence
+between the estimated micro-observations ˆX and the true micro-observations
+X deﬁned as ErrorX ( ˆX) = (cid:2) ˆX − X(cid:2)F/(cid:2)X(cid:2)F. The ranks for matrix factoriza-
+
+tion were determined so that the simple MF method (Equal-MF or Prop-MF)
+performed the best (we reused it for the proposed method); they were 20 for
+the synthetic dataset (Case 1) and the purchase dataset, and 36 for the syn-
+thetic dataset (Case 2). The diﬀerence of the error between each comparison
+method and proposed method is signiﬁcant in the Wilcoxon signed-rank test at
+a 0.05 signiﬁcance level. The results show that the proposed matrix factorization
+method is superior to the baseline methods. Interestingly, the simple application
+of matrix factorization (Equal-MF and Prop-MF) sometimes made the results
+worse than those by Equal and Prop. The simple MF methods roughly corre-
+spond to stopping the iterations of the proposed algorithm at the ﬁrst iteration,
+and the results show it improved the performance after several iterations.
+
+Finally, we mention the computational cost of the proposed method; the com-
+putational cost depends approximately on the number of calls of the SVD rou-
+tine, which was about ﬁve calls to converge.
+
+6 Related Work
+
+Dealing with incomplete data has been studied extensively, and widely applied
+in various ﬁelds including machine learning and data mining. Zhu et al. [12] cat-
+egorized strategies to handle missing data into three categories, that are, case
+deletion, learning without handling of missing data, and data imputation. Case
+
+Matrix Factorization With Aggregated Observations
+
+531
+
+Table 4. Comparison of the micro-observation reconstruction errors by the proposed
+method and the baseline methods with the artiﬁcial dataset in Case 1. p controls how
+likely each micro-observation is observed at its superordinate category. The proposed
+method achieves the lowest error for all p.
+
+p
+0.1 0.384 0.966
+0.4 0.429 0.551
+0.7 0.521 0.552
+
+Equal Prop Equal+MF Prop+MF MFAO
+0.374
+0.419
+0.519
+
+0.399
+0.499
+0.812
+
+0.382
+0.430
+0.772
+
+Table 5. Comparison of the micro-observation reconstruction errors by the proposed
+method and the baseline methods with the artiﬁcial dataset in Case 2. p controls how
+likely each micro-observation is observed at its superordinate category. The proposed
+method achieves the lowest error for all p.
+
+p
+0.1 0.540 1.104
+0.4 0.570 0.708
+0.7 0.615 0.669
+
+Equal Prop Equal+MF Prop+MF MFAO
+0.535
+0.560
+0.611
+
+0.543
+0.592
+0.771
+
+0.646
+0.561
+0.747
+
+Table 6. Comparison of the micro-observation reconstruction errors by the proposed
+method and the baseline methods with the purchase dataset (in Case 2). We assumed
+that some stores (out of six stores) did not provide the micro-level sales, and their
+sales were given as category-level observations. The proposed method achieves the
+lowest error regardless of the number of stores not providing micro-level sales.
+
+Number of stores not
+
+Equal Prop Equal+MF Prop+MF MFAO
+
+providing micro-level sales
+
+1
+2
+4
+
+0.947 1.308
+0.964 1.100
+0.975 1.151
+
+1.006
+1.461
+1.712
+
+1.340
+1.529
+1.800
+
+0.947
+0.939
+0.947
+
+deletion, which ignores missing values, is the simplest method. These kinds of ap-
+proaches require robust methods to counter incomplete data [9]. Methods in the
+second category directly work with missing data. Data imputation approaches
+estimate unobserved values from the observed ones, and this method includes
+the matrix factorization approach we employed in this research.
+
+Missing value imputation approaches can be classiﬁed into two categories,
+that are, data-driven approach and model-based approach [7]. Our method is
+categorized into the latter, and employs the matrix factorization model. There
+are several studies to impute missing values using matrix factorization techniques
+such as SVD and non-negative matrix factorization [8].
+
+7 Conclusion
+
+Missing value estimation is an unavoidable problem in real data analysis. In this
+study, we introduced an extended matrix factorization for a new missing value
+
+532
+
+Y. Aimoto and H. Kashima
+
+estimation problem, that is, restoration of micro-level observations from category-
+level aggregated observation. Since the existing methods cannot directly be ap-
+plied to this problem, we formulated an extended low-rank matrix factorization
+problem, and devised eﬃcient iterative algorithms for solving the optimization
+problems. The experimental results using synthetic and real datasets showed that
+our approach performed better than baseline methods.
+
+Acknowledgment. The authors are grateful to Naonori Ueda, Hiroshi Sawada,
+and Katsuhiko Ishiguro of NTT Communication Science Laboratories, and Noriko
+Takaya of NTT Cyber Solution Laboratory.
+
+References
+
+1. Brand, M.: Incremental singular value decomposition of uncertain data with miss-
+ing values. In: Heyden, A., Sparr, G., Nielsen, M., Johansen, P. (eds.) ECCV 2002,
+Part I. LNCS, vol. 2350, pp. 707–720. Springer, Heidelberg (2002)
+
+2. Candes, E.J., Tao, T.: The power of convex relaxation: Near-optimal matrix com-
+
+pletion. IEEE Transactions on Information Theory 56(5), 2053–2080 (2010)
+
+3. Eckart, C., Young, G.: The approximation of one matrix by another of lower rank.
+
+Psychometrika 1(3), 211–218 (1936)
+
+4. Eriksson, A., Hengel, A.V.D.: Eﬃcient computation of robust low-rank matrix ap-
+proximations in the presence of missing data using the L1 norm. In: Proceedings of
+the IEEE Computer Society Conference on Computer Vision and Pattern Recog-
+nition, pp. 771–778. IEEE, San Francisco (2010)
+
+5. Han, J., Kamber, M., Pei, J.: Data Mining: Concepts and Techniques, 3rd edn.
+
+Morgan Kaufmann (2011)
+
+6. Koren, Y., Bell, R., Volinsky, C.: Matrix factorization techniques for recommender
+
+systems. Computer 42(8), 30–37 (2009)
+
+7. Lakshminarayan, K., Harp, S.A., Samad, T.: Imputation of missing data in indus-
+
+trial databases. Applied Intelligence 11, 259–275 (1999)
+
+8. Lee, L., Seung, D.: Algorithms for non-negative matrix factorization. In: Advances
+
+in Neural Information Processing Systems 13, pp. 556–562 (2001)
+
+9. Little, R.J., Rubin, D.B.: Statistical Analysis with Missing Data. Wiley (1987)
+
+10. Singh, A.P., Gordon, G.J.: Relational learning via collective matrix factorization.
+
+In: ACM SIGKDD, Las Vegas, USA, pp. 650–658 (2008)
+
+11. Srebro, N., Rennie, J., Jaakkola, T.: Maximum-margin matrix factorization. In:
+
+Advances in Neural Information Processing Systems 17 (2005)
+
+12. Zhu, X., Zhang, S., Jin, Z., Zhang, Z., Xu, Z.: Missing value estimation for mixed-
+attribute data sets. IEEE Transactions on Knowledge and Data Engineering 23(1),
+110–121 (2011)
+
+

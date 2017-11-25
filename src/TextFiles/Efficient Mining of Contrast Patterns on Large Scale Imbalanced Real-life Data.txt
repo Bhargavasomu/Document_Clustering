@@ -1,0 +1,1160 @@
+Eﬃcient Mining of Contrast Patterns
+
+on Large Scale Imbalanced Real-Life Data
+
+Jinjiu Li, Can Wang, Wei Wei, Mu Li, and Chunming Liu
+
+Advanced Analytics Institute, University of Technology Sydney, Australia
+
+{fJinjiu.Li,Can.Wang,Wei.Wei,Mu.Li,Chunming.Liug}@student.uts.edu.au
+
+Abstract. Contrast pattern mining has been studied intensively for its
+strong discriminative capability. However, the state-of-the-art methods
+rarely consider the class imbalanced problem, which has been proved
+to be a big challenge in mining large scale data. This paper introduces
+a novel pattern, i.e. converging pattern, which refers to the itemsets
+whose supports contrast sharply from the minority class to the majority
+one. A novel algorithm, ConvergMiner, which adopts T*-tree and branch
+bound pruning strategies to mine converging patterns eﬃciently, is pro-
+posed. Substantial experiments in online banking fraud detection show
+that the ConvergMiner greatly outperforms the existing cost-sensitive
+classiﬁcation methods in terms of predicative accuracy. In particular,
+the eﬃciency improves with the increase of data imbalance.
+
+Keywords: Contrast Pattern, Class Imbalance, Fraud Detection.
+
+1
+
+Introduction
+
+Contrast patterns [11] are the itemsets showing the discrimination between two
+classes in a data set, and they are very useful to detect anomalies. It has been
+widely studied in terms of emerging pattern [3], jumping emerging pattern [5],
+and contrast capturing method [11]. In addition, classiﬁers built by the con-
+trast patterns, such as CAEP [4], are shown to outperform most of the existing
+methods (e.g. C4.5 [12], CMAR [8]) on accuracy. However, the existing contrast
+pattern mining methods do not consider the issue of class imbalance (i.e. the
+data distribution is extremely imbalanced among diﬀerent classes). Such char-
+acteristics is commonly observed in the real-life applications.
+
+Table 1 gives an example of four fraudulent patterns that appear in online
+banking with their False Positive Rates (F P R). There are 1,000,000 genuine
+transactions (Genuine for short) and 1,000 fraud transactions (Fraud for short)
+in the transaction set that involves 112 attributes. In order to catch frauds
+eﬀectively, two criteria are proposed: F P R ≤ 0.8 and the support in Genuine is
+no larger than 0.0001. We can see that only p4 is qualiﬁed. In contrast, patterns
+p1, p2 and p3 have rather high F P R and larger supports in the Genuine, so
+they can not be applied at an acceptable cost of the investigation fee spent on
+post-inspection.
+
+J. Pei et al. (Eds.): PAKDD 2013, Part I, LNAI 7818, pp. 62–73, 2013.
+(cid:0) Springer-Verlag Berlin Heidelberg 2013
+
+Eﬃcient Mining of Contrast Patterns
+
+63
+
+Table 1. Patterns for Fraud Detection
+
+F P R = |Genuine|/|Genuine + F raud|
+
+Frequency
+
+Genuine (size=1M) Fraud (size=1K)
+
+0.96
+0.997
+0.968
+0.769
+
+5000
+6000
+3000
+100
+
+200
+20
+100
+30
+
+Rules
+
+p1 → F raud
+p2 → F raud
+p3 → F raud
+p4 → F raud
+
+The fraudsters invariably try to disguise their behaviors maliciously and by-
+pass the detection system, some typical features are then identiﬁed: (i) The
+itemsets that frequently occur in the Fraud are also usually frequent in the Gen-
+uine (such as p1, p2, p3). (ii) The itemsets with a strong discriminative power
+generally are rarely seen (support ≤ 0.0001) in Genuine (e.g. p4). Therefore,
+
+there are three main challenges in mining contrast patterns to detect the Fraud.
+(1) A strict constraint on F P R demands an extremely small support in the
+Genuine (as shown in Table 1). Given a small support threshold, a huge number
+of itemsets will be generated, especially when plenty of attributes are involved.
+(2) Mining contrast patterns among the large scale data is computationally ex-
+pensive. (3) Selecting the optimal pattern set for classiﬁcation is also with a
+high computational complexity. It is common to see that the serious overlapping
+among patterns, on which the classiﬁers are built, negatively impact the overall
+performance in catching the Fraud.
+
+However, the existing Emerging pattern miner MDB-LLborder [3] dose not con-
+sider the imbalance issue. By applying Max-Miner [1] to mine long patterns with a
+small support threshold in the Genuine, MDB-LLborder consumes a overwhelming
+memory and computational time due to challenges (1) and (2). Though jumping
+emerging patterns [5] can be quickly captured, they are rarely observed in the
+fraud detection scenario according to the feature (i). CAEP [4] suﬀers from the
+serious pattern overlapping confronting with challenge (3).
+
+In this paper, we propose a novel approach to mine contrast patterns in the
+large scale imbalanced data by exploring the converging patterns, which eﬀec-
+tively handle the above challenges. The main contributions are as follows.
+
+– Deﬁne the converging patterns, a novel type of contrast patterns that signif-
+icantly diﬀerentiate itemsets in the class imbalanced data; and propose an
+eﬀective algorithm, called ConvergMiner, to mine the converging patterns.
+– Introduce a series of branch bound pruning strategies to reduce the com-
+putational complexity; present a set of operators and theorems for border
+substraction to cut the computational time and memory cost; and design
+a new index structure T*-tree to support the fast checking of candidate
+patterns.
+
+– Perform extensive experiments to evaluate the eﬀectiveness of our approach
+and strategies against the state-of-art methods in terms of accuracy, conver-
+gence sensitivity and scalability.
+
+The rest of the paper is organized as follows: Section 2 reviews the related
+work. Section 3 deﬁnes the problems and terminologies. Section 4 presents the
+
+64
+
+J. Li et al.
+
+approach of pattern border operation. Section 5 introduces two reﬁning strate-
+gies, T*tree and border splitting. Section 6 proposes the algorithm of converging
+pattern mining. Section 7 proposes the pattern selection and scoring methods
+for prediction. Section 8 shows the evaluation. We conclude in Section 9.
+
+2 Related Work
+
+Several approaches have been proposed to mine the contrast patterns [11]. Emerg-
+ing Patterns (EPs), ﬁrstly introduced in [3], uses growth rate to measure the
+support contrast of an itemset. Disjunctive emerging pattern [11] is a variant
+of EPs to discover the contrast patterns in a high dimensional data set. The
+work in [5] extends the concept of EPs, and introduces the Jumping Emerging
+Patterns (JEPs) whose supports increase abruptly from zero in one data set to
+non-zero in another one. According to [5,4], classiﬁers built by the EPs or JEPs
+outperform most methods (e.g. C4.5 [12], CMAR [8]) on accuracy.
+
+All the above methods are proposed for the class balanced data. However,
+more researchers pay attention to the class imbalanced problems [13,10], which
+widely exit in the real world and greatly challenge the classic data mining al-
+gorithms. Tremendous research eﬀorts have been made on the class-imbalanced
+data, for instance, Cost-Sensitive Neural Network [10], Ad-Cost [13], Cost-SVM
+[9], etc. None of them addresses the mining of contrast patterns in the class
+imbalanced data set, while we focus on solving this problem.
+
+3 Problem Statement
+Let I = {i1, i2, ..., im} be a set of items, an itemset X is a subset of I. A
+
+transaction T is an itemset X whose number of elements is ﬁxed according to
+the number of attributes in the data set. A data set D is a set of T . Suppose
+there are two classes denoted as Ct (the target class, e.g. Fraud) and Cb (the
+background class, e.g. Genuine), and two data sets Dt and Db in D correspond
+to the respective classes Ct and Cb. Transactions in Db are labeled as Cb, and
+
+Fig. 1. An example of converging patterns
+
+Eﬃcient Mining of Contrast Patterns
+
+65
+
+Deﬁnition 1. Converging Patterns (CPs for short) are composed of the
+
+those in Dt are marked as Ct. Sb(X) and St(X) denote the supports of itemset
+X in Db and Dt, respectively.
+itemsets X that satisfy the following condition: CP s = {X|Sb(X) ≤ k(St(X))δ,
+St(X) ≥ θ}, and the Contrast Rate of CPs is deﬁned as F (X) = (St(X))δ/
+Sb(X), where k > 0 is the contrast coeﬃcient, δ > 0 is the converging exponent,
+and θ > 0 is the threshold of the minimal support in Dt.
+
+As the above deﬁnition indicates, CPs are controlled by k and δ. The larger the δ,
+the higher the contrast rate of the generated converging patterns. For example,
+in Fig. 1, itemsets are projected onto the support plane where the vertical axis
+stands for Sb(X) and the horizontal axis denotes St(X). According to Deﬁnition
+1, the itemsets in the shadow region IABF J compose CPs, denoted as {IABF J}.
+
+It is also derived by:
+
+CP s = {IABF J} = {IBF DH} − {IGCDH} − {IAJCG},
+
+(1)
+
+where I(cid:2) represents all the itemsets in region (cid:2).
+The itemsets in IBF DH can be obtained by the Max-Miner [1] in Dt, i.e.
+{IBF DH} = {X|St(X) ≥ θ}. For the second term in Equation (1), we have
+{IGCDH} = {IBF DH} ∩ {IICDE}. The mining of itemsets in IICDE is similar
+to that in IBF DH . Let β=max(k, π), where π is a proper support threshold
+for Max-Miner to output long patterns successfully in Db. Unlike the algorithm
+in [3], which applies a strict growth rate β to mine EPs and does not work
+in imbalanced data as mentioned in Section 1. Then the itemsets in IICDE
+are obtained as {IICDE} = {X|Sb(X) ≥ β}. Thus, {IGCDH} = {X|St(X) ≥
+θ} ∩{X|Sb(X) ≥ β}. Therefore, the main task of ﬁnding the itemsets in IBF CG
+becomes the eﬀective ﬁltering of all the itemsets in IAJCG, i.e., the last term in
+
+Equation (1).
+
+(cid:51)(cid:75)(cid:68)(cid:86)(cid:72)(cid:3)(cid:20)(cid:17)(cid:3)(cid:38)(cid:82)(cid:81)(cid:89)(cid:72)(cid:85)(cid:74)(cid:76)(cid:81)(cid:74)(cid:3)(cid:51)(cid:68)(cid:87)(cid:87)(cid:72)(cid:85)(cid:81)(cid:3)(cid:48)(cid:76)(cid:81)(cid:76)(cid:81)(cid:74)
+
+(cid:51)(cid:75)(cid:68)(cid:86)(cid:72)(cid:3)(cid:21)(cid:17)(cid:3)(cid:38)(cid:79)(cid:68)(cid:86)(cid:86)(cid:76)(cid:73)(cid:76)(cid:72)(cid:85) (cid:36)(cid:86)(cid:86)(cid:72)(cid:80)(cid:69)(cid:79)(cid:76)(cid:81)(cid:74)
+
+(cid:38)(cid:68)(cid:81)(cid:71)(cid:76)(cid:71)(cid:68)(cid:87)(cid:72)(cid:86)(cid:3)
+(cid:74)(cid:72)(cid:81)(cid:72)(cid:85)(cid:68)(cid:87)(cid:76)(cid:82)(cid:81)
+
+(cid:51)(cid:68)(cid:87)(cid:87)(cid:72)(cid:85)(cid:81)(cid:86)(cid:3)
+(cid:89)(cid:72)(cid:85)(cid:76)(cid:73)(cid:76)(cid:70)(cid:68)(cid:87)(cid:76)(cid:82)(cid:81)
+
+(cid:50)(cid:83)(cid:87)(cid:76)(cid:80)(cid:68)(cid:79)(cid:3)(cid:83)(cid:68)(cid:87)(cid:87)(cid:72)(cid:85)(cid:81)(cid:3)
+
+(cid:86)(cid:72)(cid:87)(cid:3)(cid:86)(cid:72)(cid:79)(cid:72)(cid:70)(cid:87)(cid:76)(cid:82)(cid:81)
+
+(cid:53)(cid:76)(cid:86)(cid:78)(cid:3)
+(cid:86)(cid:70)(cid:82)(cid:85)(cid:76)(cid:81)(cid:74)
+
+(cid:48)(cid:68)(cid:91)(cid:16)(cid:48)(cid:76)(cid:81)(cid:72)(cid:85)
+
+(cid:50)(cid:83)(cid:72)(cid:85)(cid:68)(cid:87)(cid:82)(cid:85)(cid:3)(cid:16)
+
+(cid:55)(cid:13)(cid:16)(cid:87)(cid:85)(cid:72)(cid:72)
+
+(cid:54)(cid:83)(cid:79)(cid:76)(cid:87)(cid:76)(cid:81)(cid:74)
+
+(cid:48)(cid:68)(cid:91)(cid:76)(cid:80)(cid:68)(cid:79)(cid:3)(cid:38)(cid:82)(cid:89)(cid:72)(cid:85)(cid:68)(cid:74)(cid:72)(cid:3)(cid:54)(cid:72)(cid:87)
+
+Fig. 2. Framework of building the anomaly detector powered by CPs, where oval boxes
+display the supporting techniques for each stage
+
+Accordingly, the mining of CPs is fulﬁlled by two phases (as shown in
+Fig. 2): candidates generation and pattern veriﬁcation (in phase 1), and predica-
+tive classiﬁer building (in phase 2). Section 4 introduces the method to generate
+the candidate itemsets, section 5 provides the strategies to eliminate the redun-
+dancy, section 7 presents the techniques to select the optimal pattern set and
+calculate the prediction score.
+
+66
+
+J. Li et al.
+
+4 Candidates Generation
+
+As speciﬁed in Section 3, CPs is identiﬁed by Equation (1). In order to perform
+the substraction of itemsets quickly, we propose the Pattern Border to collect the
+itemsets and provide several theorems to support the retrieve of the candidate
+CPs by algebraic operations rather than traversing all elements in borders.
+
+4.1 Pattern Border
+Deﬁnition 2. Given two itemsets L and R (L ⊆ R), the ordered interval [L,R]
+forms a Pattern Border, composed of a set of patterns. The collection of item-
+sets in [L,R] is deﬁned as: [L,R] = {Y |∃X ⊆ R,L ⊆ Y ⊆ X}.
+
+Example 1. Border [a, abcd] contains 8 patterns: a, ab, ac, ad, abc, abd, acd, abcd.
+
+Pattern border is an important concept in CPs mining. A proper adjustment on
+the pattern border greatly avoids the full iteration of every candidate itemset in
+IAJCG, and dramatically speeds up the search of CPs. Since the smallest itemset
+in [L, R] is L and R is the largest one, an itemset X ∈ [L, R] then satisﬁes the
+following conditions:
+
+max
+
+L⊆X⊆R(St(X)) ≤ St(L), min
+
+L⊆X⊆R(St(X)) ≤ St(R)
+
+(2)
+Deﬁnition 3. The Upper Bound F u([L,R]) and Lower Bound F l([L,R])
+of the contrast rate F (X), where X ∈ [L,R], are deﬁned as follows:
+
+([L,R]) ≤ F (X) ≤ F u
+
+([L,R]), L ⊆ X ⊆ R
+
+F l
+
+([L,R]) =
+
+F l
+
+(St(R))δ
+Sb(L)
+
+, F u
+
+([L, R]) =
+
+(St(L))δ
+Sb(R)
+
+.
+
+(3)
+
+(4)
+
+In Section 5.2, F u(X) and F l(X) are applied to prune the searching space.
+
+4.2 Subtraction of Pattern Borders
+
+As shown in Example 1, pattern border is a simple and eﬃcient way to collect
+patterns. Border substraction is frequently performed to generate the candidate
+
+itemsets in IBF CG, according to Equation (1). The most straightforward method
+
+is to enumerate each element in the border and eliminate the redundant elements.
+But, it is rather costly in both computational time and memory when the border
+is large. Thus, we implement the substraction of two borders only based on two
+operators × and −, rather than exploring the borders directly.
+(cid:3) (cid:8)= ∅},
+(cid:3)|X
+several deﬁnitions and theorems are proposed to support the border subtraction
+on the two sets of itemsets: S1 and S2.
+
+Let itemset X ⊆ I, IX = {X
+
+(cid:3) ⊆ X}, and I +
+
+X = {X
+
+(cid:3)|X
+
+(cid:3) ⊆ X, X
+
+Eﬃcient Mining of Contrast Patterns
+
+67
+
+(5)
+
+Deﬁnition 4. The Operator × for S1 and S2 is deﬁned as:
+S1 × S2 = {X1 ∪ X2|X1 ∈ S1, X2 ∈ S2}
+
+The Operator − for S1 and S2 is deﬁned as:
+
+(cid:3)
+2
+
+(cid:3)|X
+|X
+(cid:3)
+2
+
+S1 − S2 = {X
+∪ X
+
+(cid:3) ∈ S1, X
+∈ IX1 , X
+(cid:3)
+⊆ X2} = IX1∪X2, and IX1 − IX2 = {X
+1
+
+(6)
+∪ X
+⊆
+In Particular, IX1 × IX2 = {X
+(cid:3)
+(cid:8)⊆ X2}. The
+1
+X1, X
+operator × is used for splitting a big border, e.g. [∅,{a, b, c, d}] = I{a,b} × I{c,d}.
+The operator − is adopted during the subtraction of two collections of itemsets,
+e.g. [∅,{a, b, c, d}]−[∅,{a, b}] = I{a,b}×I +{c,d}. It will be frequently executed when
+generating the candidate itemsets in IBF CG. We then easily get the following
+
+(cid:3) (cid:8)∈ S2}
+∈ IX2} = {X
+(cid:3)
+(cid:3)|X
+(cid:3) ⊆ X1, X
+(cid:3)
+2
+
+|X
+
+(cid:3)
+1
+
+(cid:3)
+2
+
+(cid:3)
+1
+
+properties and theorems for the operators:
+
+Distributive law : (IX1 ∪ IX2 ) − IX3 = (IX1 − IX3 ) ∪ (IX2 − IX3 )
+Commutative law : IX1 × IX2 = IX2 × IX1
+Associative law : (IX1 × IX2 ) × IX3 = IX1 × (IX2 × IX3 )
+Allocation law : IX1 × (IX2 ∪ IX3 ) = (IX1 × IX2 ) ∪ (IX1 × IX3 )
+
+(7)
+(8)
+
+(9)
+(10)
+
+X1
+
+× I +
+∪ ∅) × (I +
+
+X2 ) ∪ I +
+
+∪ I +
+∪ ∅) = (I +
+
+Theorem 1. IX1∪X2 = (I +
+X1
+∪ I∅
+Proof. IX1 × IX2 = (I +
+Theorem 1 decomposes IX1∪X2 into smaller parts easily to be processed.
+Theorem 2. If X1 ∩ X3 = ∅, then (I +
+Proof. For ∀X ∈ (I +
+as X1 ∩ X3 = ∅
+
+X2 ) ∪ I +
+× IX2 ) − IX3 = I +
+× IX2 ), we have X ∩ X1 (cid:8)= ∅. Then (I +
+
+∪ I +
+
+× IX2
+× IX2 ) ∩ IX3 = ∅
+
+∪ I∅
+× I +
+
+X2
+
+X1
+
+X1
+
+X1
+
+X2
+
+X1
+
+X2
+
+X1
+
+X1
+
+X1
+
+Below, we illustrate the use of these two operators for the border substrac-
+tion.The above techniques are applied to Algorithm 1 (line 4-7) in Section 6.
+Example 2. The border subtraction [∅, abcdef gh] − [∅, ab] − [∅, bc] is obtained
+by the following calculation: (Iabcdef gh − Iab) − Ibc= (Iab × I +
+cdef gh) − Ibc =
+Iab×((Ic×I +
+X2 , we
+get IX1 × I +
+def gh further splits
+× Ih)∪ I +
+× Ief gh)∪ (I +
+into sub-borders: I +
+h .
+Therefore, we get [∅, abcdef gh] − [∅, ab] − [∅, bc] = [d, abcdef gh] ∪ [e, abcef gh] ∪
+[f, abcf gh] ∪ [g, abcgh] ∪ [h, abch] ∪ [ac, abc].
+
+def gh)∪I +
+X2 = IX1 × (cid:2)|X2|
+def gh = (I +
+
+c )−Ibc = (Iabc×I +
+i=1,xi∈X2 (I +
+xi
+
+j>i Ixj ). The set I +
+× If gh)∪ (I +
+
+×Ib). By iterating I +
+
+def gh)∪(I +
+× (cid:3)|X2|
+
+× Igh)∪ (I +
+
+×I +
+
+a
+
+d
+
+f
+
+g
+
+e
+
+c
+
+5 Pattern Veriﬁcation
+The qualiﬁcation of itemsets in IAJCG is veriﬁed in a Branch-and-Bound manner.
+Given a border [L,R], F u(X) and F l(X) are estimated by Equation (4), and
+are used to check the qualiﬁcation of [L,R]. Instead of scanning the database
+repeatedly, we propose the T*-tree to calculate Sb(L), St(L), Sb(R) and St(R),
+which are used to compute F u(X) and F l(X) by scanning database only once.
+Then, the strategies are presented to split [L,R] for checking the sub borders.
+
+68
+
+J. Li et al.
+
+5.1 T*-tree Index
+
+Transaction Tree (T*-tree) extends the classic spatial index, i.e. R-tree [2], to
+obtain new properties which signiﬁcantly accelerate the calculation of support.
+In a R-tree, an object is represented by its Minimal Bounding Box (MBB) [2],
+which is the minimum bounding rectangle surrounding the object. R-tree is built
+on all the MBBs recursively. In order to eﬃciently get the support of an itemset,
+we introduce a novel index T*-tree, in which all the transactions are treated
+as spatial objects wrapped by their MBBs. The query on T*-tree is to check
+how many transactions match a given pattern. Accordingly, the patterns to be
+queried are also mapped to MBBs.
+
+Space division
+
+b2
+
+a1
+
+b3
+
+b1
+
+a2
+
+b1
+
+b2
+
+b3
+
+ROOT
+
+R1,{#Dt=40,#Db=90}
+
+R2,{#Dt=20,#Db=10}
+
+R3,{#Dt=20,#Db=80}
+
+R tree forest
+
+R4,{#Dt=10,#Db=8}
+
+#Dt=3
+#Db=2
+
+#Dt=2
+#Db=2
+
+#Dt=3
+#Db=2
+
+#Dt=2
+#Db=2
+
+R5,{#Dt=10,#Db=2}
+#Dt=2
+#Db=1
+
+#Dt=3
+#Db=0
+
+#Dt=3
+#Db=1
+
+#Dt=2
+#Db=0
+
+Fig. 3. An example of T*-tree, where Ri stands for MBB of an internal node
+
+The main challenge of using T*-tree in a high dimensional data set is that
+the overlapping among nodes increases when more objects are inserted. Serious
+overlapping aﬀects the query eﬃciency severely. Therefore, based on the data
+distribution, the data space is partitioned into multiple subspaces to reduce the
+overlapping of nodes as much as possible. The space partition follows a two-
+tier tree structure, as showed in Fig. 3. In this way, the computational time is
+dramatically cut by taking the following advantages:
+
+1) A T*-tree consists of two layers: trunk and branch. All the attributes are
+sorted in a descending order on the gain ratio [6]. Top 10% (an empirical
+value, for instance) attributes are chosen as the trunk nodes, and the rest
+are the branch nodes. The top one attribute is the ﬁrst level of trunk and so
+forth. With the growth of trunk levels, the data space is divided into smaller
+subspaces. After that, the branches are built in a similar process as R-tree.
+2) Each node stores two values (i.e. (cid:6)Dt and (cid:6)Db, called local supports), which
+
+record the number of transactions in Dt and Db, respectively.
+
+3) The leaf nodes store the transaction chains that record the numbers of trans-
+actions covered by the same MBBs in Dt and Db respectively. Multiple
+transactions can be stored in one transaction chain, especially when the
+transaction volume is huge in Db.
+
+Eﬃcient Mining of Contrast Patterns
+
+69
+
+5.2 Splitting Strategies
+Given [L,R], if F l([L,R]) ≤ 1/k ≤ F u([L,R]) (k is the contrast coeﬃcient in
+Deﬁnition 1), then [L,R] needs to be split into smaller borders for further val-
+idation. The splitting strategies below are used to speed up the search process,
+output CPs and remove unqualiﬁed borders quickly.
+Strategy 1. If F u([L,R]) < 1/k, then F (X) ≤ F u([L, R]) < 1/k. As a result,
+no itemset in [L,R] is qualiﬁed to be chosen. So [L,R] is safely removed.
+Strategy 2. If F l([L,R]) ≥ 1/k, then F (X) ≥ F l([L,R]) ≥ 1/k. Consequently, all
+the itemsets in [L, R] must be selected. There are two directions to split [L,R]:
+for each single item i ∈ {R}−{L}, we extend L to the sub-border [L∪{i}, R], de-
+noted as L+; or narrow down R to form the sub-border [L,R/{i}], denoted as R−
+.
+Strategy 3. If F u([L, R]) − 1/k ≤ 1/k − F l([L,R]), it is quicker to locate the
+sub-borders that can be removed immediately with Strategy 1 by narrowing
+their upper bound. The splitting must follow the direction in which F u of sub-
+{F u([L,R]) − F u([L ∪ {i}, R])} ≥
+borders decreases as fast as possible. If max
+
+i∈{R}−{L}
+
+{F u([L,R]) − F u([L, R/{i}])}, the direction is L+; otherwise, R−
+
+.
+
+max
+
+i∈{R}−{L}
+
+Strategy 4. If F u([L,R]) − 1/k ≥ 1/k − F l([L,R]), it is more eﬃcient to qualify
+the sub-borders which can be delivered directly with Strategy 2 by increasing
+their lower bound. The splitting must follow the direction in which the F l of sub-
+{F l([L∪{i}, R])−F l([L,R])} ≥
+borders increases as quickly as possible. If max
+
+i∈{R}−{L}
+
+{F l([L,R/{i}]) − F l([L, R])}, the direction is L+; otherwise, R−
+
+.
+
+max
+
+i∈{R}−{L}
+
+6 Algorithm of Converging Pattern Mining
+
+Here, a novel algorithm ConvergMiner is proposed to mine CPs eﬃciently. Algo-
+rithm 1 presents the main process of mining CPs, and function CheckContrast
+is the key function to validate the qualiﬁcation of candidate itemsets. There are
+four steps in the main process: Step 1. Build the T*-tree on Dt and Db (Line 1).
+Step 2. Employ the Max-Miner to extract the pattern borders located at IICDE
+and IBF DH (Line 2-3). Step 3. Perform the border substraction to obtain the
+pattern borders locate at IBF CG (Line 4-7). Step 4. Search CPs in IBF CG by
+
+a Divide-and-Conquer procedure (Line 8-9).
+
+7 Scoring for Classiﬁcation
+
+There are two critical issues to be solved during the construction of an accurate
+CPs-based classiﬁer: pattern selection and risk scoring. We adopt an eﬀective
+measure, Maximal Coverage Gain (M CG) [7], to select the globally optimal
+pattern set. Once the optimal pattern set (cid:4)P has been obtained, a base score for
+
+70
+
+J. Li et al.
+
+Algorithm 1. ConvergMiner
+
+-tree on Dt and Db
+
+Data: Dt, Db, k, δ, θ, β, len
+Result: Converging patterns
+
+∗
+
+(cid:5)
+(cid:5)(cid:5)
+
+1 H ← ∅, Build T
+2 S
+
+= {[∅, X]|St(X) ≥ θ}
+= {[∅, X]|Sb(X) ≥ β}
+
+3 S
+(cid:5)
+4 for each E in S
+
+do
+(cid:5)(cid:5)
+for each U in S
+
+do
+
+/* Get itemsets from IBF DH */
+/* Get itemsets from IICDE */
+
+E ← E − U /* Obtain candidates by Opertaor − introduced in Section 4.2
+
+*/
+
+*/
+
+H ← H ∪ E
+CheckContrast([L, R], T
+
+∗
+
+∗
+
+tree, k, δ) /* Search CPs in [L, R]
+
+8 for each [L, R] in H do
+10 Function CheckContrast([L, R], T
+11 Query T*-tree to collect St(L), St(R), Sb(L), Sb(R)
+12 if Sb(L)=0 or F l([L, R]) ≥ 1
+14 else if Sb(R) > 0 and F u([L, R]) < 1
+16 else if Direction([L,R],k,δ)=R− then // Based on strategies 3 and 4
+
+Output [L, R] as CPs group
+Remove [L,R]
+for each i ∈ {{R} − {L}} do
+
+k then // Based on strategy 2
+
+k then // Based on strategy 1
+
+tree, k, δ)
+
+13
+
+15
+
+CheckContrast([L,R/{i}],k,δ )
+
+19 else // Based on strategies 3 and 4
+20
+
+for each i ∈ {{R} − {L}} do
+
+if L∪{i} (cid:2)H then
+
+CheckContrast([L∪{i},R],k,δ )
+
+5
+
+6
+
+7
+
+9
+
+17
+
+18
+
+21
+
+22
+
+23
+
+each rule r : p → Ct in (cid:4)P is calculated by Equation (11). The base score of pi
+
+represents its impact in classiﬁers.
+
+Base(pi) = St(pi) ∗ F (pi)/(1 + F (pi))
+
+In the prediction phase, the score of u is calculated as follows:
+
+(cid:5)
+
+(cid:5)
+
+S(u) =
+
+pi∈ (cid:2)P ,u≺pi
+
+Base(pi)/
+
+Base(pi)
+
+pi∈P
+
+(11)
+
+(12)
+
+Intuitively, given two transactions u1 and u2, if S(u1) > S(u2), then the proba-
+bility of u1 ∈ Ct is larger than that of u2 ∈ Ct. Consequently, transaction u with
+a larger S(u) is more likely to be classiﬁed into Ct.
+
+8 Experiment and Evaluation
+
+Two real-life data sets are used: DS1, the online banking transaction data from
+a major Australian bank. It contains 1,000,000 Genuine (Db) and 1,000 Fraud
+(Dt), and the number of attributes involved is 112; DS2, the social welfare
+payment claim data from Australia. It has 120,000 Genuine (Db) and 2,120
+Fraud (Dt) with 85 attributes. Below, ConvergMiner is compared with the state-
+of-the-art classiﬁcation algorithms on these two class imbalanced data sets in
+terms of accuracy (i.e. Ada-Cost [13], Cost-NN [10], Cost-SVM [9] and CAEP
+[4]), eﬃciency (i.e. MDB-LLborder), and eﬀectiveness of pruning strategies.
+
+Eﬃcient Mining of Contrast Patterns
+
+71
+
+8.1 Accuracy
+
+We compare the performance of the classiﬁer powered by CPs with Ada-Cost
+[13], Cost-NN [10], Cost-SVM [9] and CAEP [4], from the perspective of False
+Positive Rate (F P R) and Detection Rate (DR, or True Positive Rate), which
+are deﬁned as:
+
+F P R =
+
+False Alerts Number
+
+Genuine Instances Number
+
+, DR =
+
+Frauds Caught
+
+Total Frauds Number
+
+(13)
+
+In fact, the smaller the F P R and the larger the DR, the better the classiﬁer.
+Fig. 4 shows that when 60% Fraud are caught, the F P Rs of CPs, CAEP, Cost-
+NN, Ada-Cost and Cost-SVM are 6(cid:0), 9(cid:0), 12(cid:0), 18(cid:0) and 30(cid:0), respectively.
+However, with the increase of F P R, all the classiﬁers achieve a higher DR. When
+F P R = 11(cid:0), CPs catches 82% Fraud, but CAEP only catches 72%, Cost-NN
+catches 55%, Ada-cost catches 40%, and Cost-SVM catches 38%. The accuracy
+test on the data set 2 reveals the similar performance for the above methods
+(as shown in Fig. 5). Overall, we observe that at the same level of F P R, CPs
+achieves much higher DR than other methods; with the same DR, CPs obtains
+much lower F P R. In Fig. 4, when F P R = 5%, CPs outperforms CAEP by 65%,
+Cost-NN by 80%, Ada-Cost by 90%, and Cost-SVM by 250%. In Fig. 5, for
+DR = 60%, CPs outperforms CAEP by F P R = 15(cid:0), which is only 60% of that
+of CAEP (F P R = 24(cid:0)). So, CPs outperforms benchmark methods in accuracy.
+
+CPs
+EPs
+Cost-NN
+Cost-SVM
+Ada-Cost
+
+0.9
+
+0.8
+
+0.7
+
+0.6
+
+0.5
+
+0.4
+
+0.3
+
+0.2
+
+0.1
+
+%
+ 
+e
+t
+a
+r
+ 
+n
+o
+i
+t
+c
+e
+t
+e
+D
+
+0
+ 
+0
+
+2
+
+4
+
+6
+
+8
+
+12
+False positive rate‰
+
+10
+
+CPs
+EPs
+Cost-NN
+Cost-SVM
+Ada-Cost
+
+ 
+
+0.9
+
+0.8
+
+0.7
+
+0.6
+
+0.5
+
+0.4
+
+0.3
+
+0.2
+
+0.1
+
+ 
+
+%
+e
+t
+a
+r
+ 
+n
+o
+i
+t
+c
+e
+t
+e
+D
+
+14
+
+16
+
+18
+
+0
+ 
+0
+
+5
+
+10
+
+15
+
+20
+
+False positive rate‰
+
+25
+
+30
+
+ 
+
+35
+
+40
+
+Fig. 4. ROC on DS1
+
+Fig. 5. ROC on DS2
+
+8.2 Eﬃciency
+
+We compare the computation time consumed by ConvergMiner and MDB-
+LLborder to evaluate their eﬃciency on DS1. For both algorithms, we choose
+the same level of converging exponent δ=1. The contrast rate in ConvergMiner
+and MDB-LLborder are 1/k and the growth rate, respectively. As shown in Fig.
+6, with the increase of 1/k, ConvergMiner gains more beneﬁt from the splitting
+strategies, by which a huge number of sub-borders are eliminated more easily.
+
+72
+
+J. Li et al.
+
+As a result, the number of borders to be split for the further checking decreases
+dramatically. In addition, MDB-LLborder takes more time to process a huge
+number of the sub-border iterations due to the extremely low support in Db.
+For instance, when the contrast rate is 1000, ConvergMiner takes only around
+5% of the computation time consumed by MDB-LLborder. When 1/k is larger
+than 1000, MDB-LLborder does not succeed in identifying the itemsets with the
+support less than 0.0005, but ConvergMiner still works stably. The reason is
+that ConvergMiner assigns a looser value rather than a ﬁxed value to β (in Db),
+and leaves the redundancy to the next step: bound checking and further valida-
+tion. In summary, the results show that ConvergMiner signiﬁcantly outperforms
+MDB-LLborder on the imbalanced data set in terms of the eﬃciency.
+
+)
+s
+(
+ 
+e
+m
+T
+
+i
+
+2000
+
+1800
+
+1600
+
+1400
+
+1200
+
+1000
+
+800
+
+600
+
+400
+
+200
+
+0
+ 
+0
+
+ConvergMiner
+MDB−llborder
+
+ 
+
+500
+
+1000
+
+Contrasting rate
+
+1500
+
+2000
+
+Fig. 6. Eﬃciency against contrast
+
+Fig. 7. Eﬀectiveness on strategies
+
+8.3 Eﬀectiveness of the Pruning Strategies
+
+Two benchmark algorithms, i.e. Split- and tTree-, are designed to evaluate the ef-
+fectiveness of our pruning strategies on DS1. Split- is a variant of ConvergMiner
+when the splitting strategies are replaced by a random one at line 17 in Func-
+tion CheckContrast. tTree- is a variant of ConvergMiner by removing the local
+supports in T*-tree. Other components remain the same as ConvergMiner. Fig 7
+displays the computational time of the three algorithms and the corresponding
+improvements gained from our pruning strategies under diﬀerent contrast rates.
+ConvergMiner obtains the improvement of 50% (upon tTree-) and 90% (upon
+Split-), when the contrast rate is 100 due to the T*-tree and splitting strate-
+gies . With the increase of contrast rate, the improvement rate grows rapidly
+and reaches 2700% (upon tTree-) and 1700% (upon Split-) when the contrast
+rate is 5000. Thus, the proposed splitting strategies and T*-tree are eﬀective in
+enhancing the computational eﬃciency.
+
+9 Conclusion
+
+In this paper, we introduce a novel type of patterns, i.e. converging patterns
+(CPs), on the extremely imbalanced data; and propose an eﬃcient algorithm
+
+Eﬃcient Mining of Contrast Patterns
+
+73
+
+ConvergMiner equipped with eﬀective splitting strategies and a fast tree index
+to mine CPs. The experiments show that our algorithm greatly outperforms
+the state-of-the-art techniques on two real-life large scale imbalanced data sets
+in terms of accuracy and eﬃciency. In addition, ConvergMiner exhibits a strong
+capacity on the scalability and gains more advantages with a larger contrast rate.
+In future, we are going to mine CPs on the sequential data for online banking.
+
+Acknowledgments. This work is sponsored by the Australian Research Coun-
+cil Discovery grant (DP1096218) and Linkage grant (LP100200774).
+
+References
+
+1. Bayardo, R.J.: Eﬀciently mining long patterns from databases. In: SIGMOD 1998,
+
+pp. 85–93 (1998)
+
+2. Beckmann, N., Kriegel, H., Schneider, R., Seeger, B.: The r*-tree: An eﬃcient and
+robust access method for points and rectangles. In: SIGMOD 1990, pp. 322–331
+(1990)
+
+3. Dong, G., Li, J.: Eﬃcient mining of emerging patterns: discovering trends and
+
+diﬀerences. In: SIGKDD 1999, pp. 43–52 (1999)
+
+4. Dong, G., Zhang, X., Wong, L., Li, J.: CAEP: Classiﬁcation by aggregating emerg-
+ing patterns. In: Arikawa, S., Nakata, I. (eds.) DS 1999. LNCS (LNAI), vol. 1721,
+pp. 30–42. Springer, Heidelberg (1999)
+
+5. Fan, H., Ramamohanarao, K.: Fast discovery and the generalization of strong jump-
+ing emerging patterns for building compact and accurate classiﬁers. TKDE 18(6),
+721–737 (2006)
+
+6. Kent, J.: Information gain and a general measure of correlation. Biometrika 70(1),
+
+163–173 (1983)
+
+7. Li, J., Wang, C., Cao, L., Yu, P.S.: Large eﬃcient selection of globally optimal
+rules on large imbalanced data based on rule coverage relationship analysis. In:
+SDM 2013 (accepted, 2013)
+
+8. Li, W., Han, J., Pei, J.: CMAR: Accurate and eﬃcient classiﬁcation based on
+
+multiple class-association rules. In: ICDM 2001, pp. 369–376 (2001)
+
+9. Li, Y., Kwok, J., Zhou, Z.: Cost-sensitive semi-supervised support vector machine.
+
+In: AI 2010, pp. 500–505 (2010)
+
+10. Liu, X., Zhou, Z.: Training cost-sensitive neural networks with methods addressing
+
+the class imbalance problem. TKDE 18(1), 63–77 (2006)
+
+11. Loekito, E., Bailey, J.: Fast mining of high dimensional expressive contrast patterns
+
+using binary decision diagrams. In: SIGKDD 2006, pp. 307–316 (2006)
+
+12. Quinlan, J.R.: C4.5: Programs for Machine Learning. Morgan Kaufmann, Los Altos
+
+(1993)
+
+13. Sun, Y., Kamel, M.: Cost-sensitive boosting for classiﬁcation of imbalanced data.
+
+Pattern Recognition 40(12), 3358–3378 (2007)
+
+

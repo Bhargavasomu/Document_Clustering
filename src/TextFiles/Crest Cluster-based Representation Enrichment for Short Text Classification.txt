@@ -1,0 +1,1768 @@
+Crest: Cluster-based Representation
+
+Enrichment for Short Text Classiﬁcation(cid:2)
+
+Zichao Dai1, Aixin Sun2, and Xu-Ying Liu1
+
+1 MOE Key Laboratory of Computer Network and Information Integration,
+
+School of Computer Science and Engineering, Southeast University, Nanjing, China
+
+2 School of Computer Engineering, Nanyang Technological University, Singapore
+
+daixiaodai.geek@gmail.com, liuxy@seu.edu.cn
+
+axsun@ntu.edu.sg
+
+Abstract. Text classiﬁcation has gained research interests for decades.
+Many techniques have been developed and have demonstrated very good
+classiﬁcation accuracies in various applications. Recently, the popularity
+of social platforms has changed the way we access (and contribute) infor-
+mation. Particularly, short messages, comments, and status updates, are
+now becoming a large portion of the online text data. The shortness, and
+more importantly, the sparsity, of the short text data call for a revisit of
+text classiﬁcation techniques developed for well-written documents such
+as news articles. In this paper, we propose a cluster-based representation
+enrichment method, namely Crest, to deal with the shortness and spar-
+sity of short text. More speciﬁcally, we propose to enrich a short text
+representation by incorporating a vector of topical relevances in addition
+to the commonly adopted tf -idf representation. The topics are derived
+from the knowledge embedded in the short text collection of interest by
+using hierarchical clustering algorithm with purity control. Our experi-
+ments show that the enriched representation signiﬁcantly improves the
+accuracy of short text classiﬁcation. The experiments were conducted on
+a benchmark dataset consisting of Web snippets using Support Vector
+Machines (SVM) as the classiﬁer.
+
+Keywords: Short
+Clustering.
+
+text
+
+classiﬁcation, Representation enrichment,
+
+1
+
+Introduction
+
+The prevalence of Internet-enabled devices (e.g., laptops, tablets, and mobile
+phones) and the increasing popularity of social platforms are changing the way
+we consume and produce information online. A large portion of the data acces-
+sible online is user-generated content in various forms, such as status updates,
+micro-blog posts, comments, and short product reviews. In other words, much
+
+(cid:2) This work was partially done while the ﬁrst author was visiting School of Com-
+puter Engineering, Nanyang Technological University, supported by MINDEF-NTU-
+DIRP/2010/03, Singapore.
+
+J. Pei et al. (Eds.): PAKDD 2013, Part II, LNAI 7819, pp. 256–267, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+Crest for Short Text Classiﬁcation
+
+257
+
+user-generated textual content is in the form of short text. The unique charac-
+teristics (e.g., shortness, noisiness, and sparsity) distinguish short text from the
+well written documents such as news articles and most Web pages. These unique
+characteristics call for a revisit of the techniques developed for text analysis and
+understanding, including text classiﬁcation.
+
+Text classiﬁcation refers to the task of automatically assigning a textual doc-
+ument one or more predeﬁned categories. It has been heavily studied for decades
+and many techniques have been proposed and have demonstrated good classiﬁ-
+cation accuracies in various application domains [13,16]. Nevertheless, most text
+classiﬁcation techniques take advantage of the information redundancy natu-
+rally contained in the well-written documents (or long documents in contrast to
+short text). When facing with short text, the shortness, noisiness, and sparsity,
+adversely aﬀect the classiﬁers from achieving good classiﬁcation accuracies. To
+improve short text classiﬁcation accuracy has since attracted signiﬁcant atten-
+tion from both the industries and academia.
+
+To deal with the shortness and sparsity, most solutions proposed for short text
+classiﬁcation aim to enrich short text representation by bringing in additional
+semantics. The additional semantics could be from the short text data collection
+itself (e.g., named entities, phrases) [7] or be derived from a much larger external
+knowledge base like Wikipedia and WordNet [4,7,10]. The former requires shal-
+low Natural Language Processing (NLP) techniques while the later requires a
+much larger and “appropriate” dataset. Very recently, instead of enriching short
+text representation, another approach known as search-and-vote is proposed to
+improve short text classiﬁcation [15]. The main idea is to mimic human judg-
+ing processing by identifying a few topical representative keywords from each
+short text and use the identiﬁed topical keywords as queries to search for similar
+short texts from the labeled collection. Very much similar to k-nearest-neighbor
+classiﬁer, the category label of the short text for classiﬁcation is voted by using
+the search results. Note that, the aforementioned diﬀerent approaches deal with
+the shortness and sparsity of short text from very diﬀerent perspectives and are
+mostly orthogonal to each other. In other words, on the one hand, these diﬀerent
+approaches could be combined to potentially achieve much better classiﬁcation
+accuracies than any of the approaches alone; on the other hand, this calls for
+further research to improve each individual researches.
+
+In this paper, we focus on improving short text classiﬁcation accuracy by
+enriching the text representation, by not only using its raw words (e.g., bag-of-
+words) but also topical representations. Our approach naturally falls under the
+representation enrichment approach. However, our approach is diﬀerent from
+the earlier works in representation enrichment because of two reasons. First, we
+do not use shallow NLP techniques to extract phrases or any speciﬁc patterns
+because most short texts are noisy preventing many existing NLP toolkits from
+achieving good accuracy. Second, we do not use external knowledge base like
+Wikipedia because some of the short text data collection might be from very
+speciﬁc or niche areas where it is hard to ﬁnd an “appropriate” and large dataset.
+In other words, we consider that if we can discover internally useful knowledge
+
+258
+
+Z. Dai, A. Sun, and X.-Y. Liu
+
+solely from the training dataset when an “appropriate” large external dataset is
+not available. More speciﬁcally, we propose a generic method named Crest to
+ﬁrst discover “high-quality” topic clusters from the training data by grouping
+similar (but not necessary from the same category) training examples together
+to form clusters. Each short text instance is then represented using the topical
+similarities between the short text and the topic clusters in addition to its words
+feature vector. The main advantages of Crest include the following:
+
+– Low-cost in knowledge acquisition. As we mentioned above, Crest does not
+rely on any external knowledge source. It mines topic clusters solely from
+the training examples.
+
+– Reduction in data sparsity. The topic clusters discovered from the training
+data deﬁne a new feature space that each short text instance can be mapped
+to. In this new space, the dimensionality is the number of “high-quality”
+clusters discovered from the training data, which is much smaller than the
+number of words in the bag-of-words representation.
+
+– Easy in implementation and combination. The Crest framework is easy to
+implement and can be easily combined with other approaches dealing with
+short text classiﬁcation.
+
+The rest of the paper is organized as follows. Section 2 surveys the related work
+in short text classiﬁcation. Section 3 describes the Crest method. Section 4
+reports the experimental results and Section 5 concludes this paper.
+
+2 Related Work
+
+Short text processing has attracted research interests for a long time, particularly
+in the meta-search applications to group similar search results into meaningful
+topic clusters. Nevertheless, the key research problem in search snippet cluster-
+ing is to automatically generate meaningful cluster labels [3]. Another direction
+of research in short text processing is to evaluate the similarity of a pair of short
+texts using external knowledge obtained from search engines [11,17]. In [1], se-
+mantic similarity between words is obtained by leveraging page counts and text
+snippets returned by search engine.
+
+For short text classiﬁcation, the work on query classiﬁcation is more related
+as each query can be treated as a piece of short text. In [14], the authors use
+titles and snippets to expand the Web queries and achieve better classiﬁcation
+accuracy on query classiﬁcation task compared to using the queries alone. How-
+ever, the eﬃciency and the reliability issues of using search engine limit the
+employment of search-based method, especially when the set of short text un-
+der consideration is large. To address these issues, researchers turn to utilize
+explicit taxonomy/concepts or implicit topics from external knowledge source.
+These corpora (e.g., Wikipedia, Open Directory) have rich predeﬁned taxon-
+omy and human labelers assign thousands of Web pages to each node in the
+taxonomy. Such information can greatly enrich the short text. These research
+has shown positive improvement though they only used the man-made cate-
+gories and concepts in those repositories. Wikipedia is used in [6] to build a
+
+Crest for Short Text Classiﬁcation
+
+259
+
+concept thesaurus to enhance traditional content similarity measurement. Sim-
+ilarly, in [8], the authors use Wikipedia concept and category information to
+enrich document representation to address semantic information loss caused by
+bag-of-words representation. A weighted vector of Wikipedia-based concepts is
+also used for relatedness estimation of short text in [5]. However, lack of adapt-
+ability is one possible shortcoming of using predeﬁned taxonomy in the above
+ways because the taxonomy may not be proper for certain classiﬁcation tasks. To
+overcome this shortcoming, the authors in [10] derived latent topics from a set of
+documents from Wikipedia and then used the topics as additional features to ex-
+pand the short text. The idea is further extended in [4], to explore the possibility
+of building classiﬁer by learning topics at multi-granularity levels. Experiments
+show that the methods above using the discovered latent topics achieve the
+state-of-the-art performance. In summary, these methods try to enrich the rep-
+resentation of a short text using additional semantics from an external collection
+of documents. However, in some speciﬁc domain (e.g., military or healthcare) it
+might be diﬃcult to get such high quality external corpora due to privacy or
+conﬁdentiality reasons.
+
+Most germane to this work is the approach proposed in [2] which applies
+probabilistic latent semantic analysis (pLSA) on text collection and enriches
+document representation using the latent factors identiﬁed. However, pLSA be-
+comes less reliable in identifying latent topics when applying to very short texts,
+due to the diﬃculties of sparsity and shortness. In this paper, we use a diﬀerent
+approach to ﬁnd the topics embedded in the short text collection by clustering
+the documents in the collection.
+
+3 The Crest Method
+
+Most existing topic-based methods rely on large external sources (such as
+Wikipedia or search engines). However, there exist tough situations in some
+speciﬁc domains (e.g., military or healthcare) where lack of reliable high quality
+external knowledge repositories. This limits the employment of these methods.
+In this scenario, the only available resource is the collection of labeled short
+texts. How to exploit the limited collection at utmost becomes crucial in short
+text classiﬁcation.
+
+The good performance of topic-based methods shows latent topics can be
+very useful to short text classiﬁcation. Since the document collection is the only
+available resource in our scenario, we derive latent topics from the document
+collection itself by exploiting clustering. Then, we use the topic clusters to enrich
+the representation for short texts. The general process of Crest (Cluster-based
+Representation Enrichment for Short Text Classiﬁcation) method is illustrated
+in Figure 1.
+i=1 has n short text documents,
+where x is pre-processed short text document and x ∈ X = Rd. In this paper, we
+adopt tf -idf [12] representation. And y is category label, y ∈ Y = {1, 2, . . . , k}.
+L is a learning algorithm, training a classiﬁer h : X → Y .
+
+Suppose a document collection D = {(xi, yi)}n
+
+260
+
+Z. Dai, A. Sun, and X.-Y. Liu
+
+(cid:55)(cid:85)(cid:68)(cid:76)(cid:81)(cid:76)(cid:81)(cid:74) (cid:44)(cid:81)(cid:86)(cid:87)(cid:68)(cid:81)(cid:70)(cid:72)(cid:86) (cid:90)(cid:76)(cid:87)(cid:75)
+(cid:72)(cid:81)(cid:85)(cid:76)(cid:70)(cid:75)(cid:72)(cid:71) (cid:85)(cid:72)(cid:83)(cid:85)(cid:72)(cid:86)(cid:72)(cid:81)(cid:87)(cid:68)(cid:87)(cid:76)(cid:82)(cid:81)
+(cid:82)(cid:73) (cid:69)(cid:68)(cid:74)(cid:16)(cid:82)(cid:73)(cid:16)(cid:90)(cid:82)(cid:85)(cid:71)(cid:86) (cid:14) (cid:87)(cid:82)(cid:83)(cid:76)(cid:70)(cid:86)
+
+(cid:76)(cid:81)(cid:73)(cid:82)(cid:85)(cid:80)(cid:68)(cid:87)(cid:76)(cid:82)(cid:81)
+
+(cid:38)(cid:79)(cid:88)(cid:86)(cid:87)(cid:72)(cid:85)(cid:76)(cid:81)(cid:74)
+
+(cid:55)(cid:82)(cid:83)(cid:76)(cid:70)
+(cid:38)(cid:79)(cid:88)(cid:86)(cid:87)(cid:72)(cid:85)(cid:86)
+
+(cid:47)(cid:72)(cid:68)(cid:85)(cid:81)(cid:76)(cid:81)(cid:74)
+
+(cid:53)(cid:68)(cid:90) (cid:55)(cid:85)(cid:68)(cid:76)(cid:81)(cid:76)(cid:81)(cid:74) (cid:44)(cid:81)(cid:86)(cid:87)(cid:68)(cid:81)(cid:70)(cid:72)(cid:86)
+(cid:90)(cid:76)(cid:87)(cid:75) (cid:82)(cid:85)(cid:76)(cid:74)(cid:76)(cid:81)(cid:68)(cid:79) (cid:69)(cid:68)(cid:74)(cid:16)(cid:82)(cid:73)(cid:16)(cid:90)(cid:82)(cid:85)(cid:71)(cid:86)
+(cid:85)(cid:72)(cid:83)(cid:85)(cid:72)(cid:86)(cid:72)(cid:81)(cid:87)(cid:68)(cid:87)(cid:76)(cid:82)(cid:81)
+
+(cid:55)(cid:72)(cid:86)(cid:87) (cid:44)(cid:81)(cid:86)(cid:87)(cid:68)(cid:81)(cid:70)(cid:72) (cid:90)(cid:76)(cid:87)(cid:75) (cid:82)(cid:85)(cid:76)(cid:74)(cid:76)(cid:81)(cid:68)(cid:79)
+(cid:69)(cid:68)(cid:74)(cid:16)(cid:82)(cid:73)(cid:16)(cid:90)(cid:82)(cid:85)(cid:71)(cid:86) (cid:85)(cid:72)(cid:83)(cid:85)(cid:72)(cid:86)(cid:72)(cid:81)(cid:87)(cid:68)(cid:87)(cid:76)(cid:82)(cid:81)
+
+(cid:38)(cid:79)(cid:68)(cid:86)(cid:86)(cid:76)(cid:73)(cid:76)(cid:72)(cid:85)
+
+(cid:51)(cid:85)(cid:72)(cid:71)(cid:76)(cid:70)(cid:87)(cid:76)(cid:82)(cid:81)
+
+(cid:55)(cid:72)(cid:86)(cid:87) (cid:44)(cid:81)(cid:86)(cid:87)(cid:68)(cid:81)(cid:70)(cid:72)(cid:86) (cid:90)(cid:76)(cid:87)(cid:75) (cid:72)(cid:81)(cid:85)(cid:76)(cid:70)(cid:75)(cid:72)(cid:71)
+
+(cid:85)(cid:72)(cid:83)(cid:85)(cid:72)(cid:86)(cid:72)(cid:81)(cid:87)(cid:68)(cid:87)(cid:76)(cid:82)(cid:81) (cid:82)(cid:73) (cid:69)(cid:68)(cid:74)(cid:16)(cid:82)(cid:73)(cid:16)(cid:90)(cid:82)(cid:85)(cid:71)(cid:86) (cid:14) (cid:87)(cid:82)(cid:83)(cid:76)(cid:70)(cid:86)
+
+(cid:76)(cid:81)(cid:73)(cid:82)(cid:85)(cid:80)(cid:68)(cid:87)(cid:76)(cid:82)(cid:81)
+
+Fig. 1. Procedure of Crest
+
+3.1 Topic Clusters Generation
+
+Clustering is good at ﬁnding knowledge structure inside data. Crest exploits
+clustering to ﬁnd topics. Intuitively, for each high-level category, for example
+“Business”, it has its a few sub-topics, such as “Accounting”,“Finance”. The
+sub-topics could have diﬀerent topical words, especially when the text is very
+short. In other word, each cluster contains terms and concepts mainly in one
+sub-topic which we could take advantage of to enrich short texts and reduce
+their sparsity.
+
+However, due to the sparsity of short text, the similarity of a pair of short
+text instances may not be reliable enough when it is reﬂected by distance in a
+clustering method. Thus, the resulting clusters may not be qualiﬁed as topics.
+The challenge here is to select “high-quality” clusters as topic clusters. Note that,
+even though there exist many clustering methods, not all clusters generated by a
+clustering method is useful. For instance, a cluster containing very few documents
+(say, only one) or a large number of documents from many diﬀerent categories
+are not useful clusters. The clusters with very few documents fail to cover enough
+concepts in a sub-topic while the clusters containing too many documents are
+not topically speciﬁc.
+
+In summary, Crest selects “high-quality” clusters as topic clusters with two
+criteria: (i) high support, i.e., the number of documents in a cluster is large; and
+(ii) high purity, i.e., the percentage of dominant category of the short texts in a
+cluster is high.
+
+Suppose a cluster Q contains a set of short text instances, Q = {(xi, yi)}q
+
+i=1,
+
+then the support of Q is the number of instances in it, i.e.,
+
+support(Q) = |Q|.
+
+(1)
+
+Crest for Short Text Classiﬁcation
+
+261
+
+And the purity of Q is the percentage of dominant category of the short texts
+in it, which is deﬁned as:
+
+purity(Q) =
+
+(cid:2)
+
+maxy
+
+xi∈Q I(yi = y)
+|Q|
+
+,
+
+(2)
+
+where, I(x) is indicator function, I(x) = 1 if x = 1 and 0 otherwise.
+
+More speciﬁcally, Crest uses a clustering method, such as Ef f icientHAC [9],
+to group short texts into clusters. When a cluster’s purity is low, it does not rep-
+resent a sub-topic even if its support is high. Therefore, we select the clusters
+whose purity values are larger than a pre-deﬁned threshold. We then get a set of
+candidate-clusters C = {C1, C2, . . . , C|C|}. To select clusters with high “support”
+and “purity”, we assign a weight to each cluster in C indicating the quality to
+be a topic cluster of each cluster. Let wi be Ci’s weight:
+wi = support(Ci) × purity(Ci),
+
+(3)
+
+Then the top N clusters with the highest weights are selected as topic clusters
+T , which are rich of representative terms or concepts in particular sub-topics,
+and are later used to enrich short text’s representation.
+In most cases, the weights of candidate-clusters in C are inﬂuenced more by
+their support values. It is reasonable, since the purity values of candidate-clusters
+in C are all larger than a purity threshold, which is often a relatively high value
+to assure all clusters in C be of high purity.
+
+3.2 Representation Enrichment Using Topic Clusters
+
+Crest enriches representation of short text by combining a short text instance’s
+original feature vector, i.e., tf -idf vector, and the additional information from
+the topic clusters. To extract knowledge from topic clusters, a good choice is to
+use the similarity between a short text instance x and each of the topic cluster
+
+Ti in T , which contains the common terms or concepts of a sub-topic. So the
+similarity between a short text instance x and a topic cluster Ti reﬂects how
+likely the common terms or concepts of the sub-topic represented by Ti would
+appear in the text if the “short” text were longer.
+
+For example, a short text (taken from the benchmark dataset used in our
+experiments) is “manufacture manufacturer directory directory china taiwan
+products manufacturers directory- taiwan china products manufacturer direc-
+tory exporter directory supplier directory suppliers business”. And there are
+two topic clusters: cluster 1 represents a sub-topic of “business” category, and
+cluster 2 represents a sub-topic of “health” category. Cluster 1 contains concepts
+like “relation”, “produce”, “machine”, and so on. Cluster 2 contains concepts
+like “symptoms”, “treatment”, “virus”, “diet”. Obviously, the short text is more
+similar to cluster 1. And if it were longer, the word “produce”, “machine” have
+a larger chance to appear in the text.
+
+262
+
+Z. Dai, A. Sun, and X.-Y. Liu
+
+Algorithm 1. The Crest Algorithm
+Input : Training set D = {(xi, yi)}n
+
+classiﬁer h : X → Y , Purity threshold p ∈ [0, 1], Hierarchical clustering
+algorithm Ef f icientHAC, The number of topic clusters N
+
+i=1, Learning algorithm L to train a
+
+1 Training phrase:
+2 %Generate topic clusters
+3 Use Ef f icientHAC algorithm to generate raw cluster set R
+4 Candidate-cluster set C = {r|r ∈ R ∧ purity(r) ≥ p}
+5 for i = 1 to |C| do
+wi = support(Ci) × purity(Ci) %cluster weight
+
+6
+
+7 Select top N clusters from C with highest weights into topic cluster set T
+8 %Enrich representation
+9 for i = 1 to n do
+10
+
+for j = 1 to N do
+
+Calculate similarity sim(xi, Tj) according to Eq.4
+
+11
+
+12
+
+(cid:2)
+i = (xi, sim1(x), . . . , simN (x))
+
+x
+
+i, yi)}n
+13 New data set D(cid:2)
+(cid:2)
+14 Output: A classiﬁer h = L(D(cid:2)
+
+= {(x
+
+i=1
+)
+
+15 Test phrase: for a test instance x
+16 for j = 1 to N do
+17
+
+Calculate the similarity sim(x, Tj) according to Eq.4
+= (x, sim1(x), . . . , simN (x))
+
+(cid:2)
+
+18 x
+19 Prediction ˆy = h(x
+
+(cid:2)
+
+)
+
+Deﬁne the similarity between a short text x and a topic cluster T as:
+
+sim(x, T ) =
+
+x · T
+(cid:4)x(cid:4)(cid:4)T(cid:4)
+
+(4)
+
+In sim(x, T ), the dot product is used to compute the initial similarity value
+between short text and topic cluster. Since the lengths of topic clusters are
+varying, to reduce their inﬂuence, we normalize the lengths of both short text
+and topic cluster to get ﬁnal similarity, i.e., cosine similarity.
+
+Let s = (sim(x, T1), . . . , sim(x, TN )) be the similarity vector, then the
+
+enriched representation of x is:
+
+(cid:4)
+x
+
+= (x, s)
+
+(5)
+
+The pseudo code of Crest is shown in Algorithm 1, in which the clustering
+algorithm Ef f icientHAC can be replaced by another hierarchical clustering
+algorithm.
+
+4 Experiments
+
+Since the problem setting of this paper is that there is no external knowledge
+sources, it is inappropriate to compare Crest with methods relying on some
+
+Crest for Short Text Classiﬁcation
+
+263
+
+Table 1. Basic Statistics of Experiment Dataset
+
+Category # training instances # test instances
+Business
+Computer
+Culture
+Education
+Engineering
+Health
+Politics
+Sports
+Total
+
+1200
+1200
+1880
+2360
+220
+880
+1200
+1120
+10060
+
+300
+300
+330
+300
+150
+300
+300
+300
+2280
+
+external knowledge source. We compare Crest with original representation of
+short text (i.e., tf -idf vectors, denoted by “Raw”). In Crest, the clustering
+strategies EﬃcientHAC [9] is single-link, and the purity threshold is set to be
+0.9. We test diﬀerent values 10, 30, 50, 70, 100, 120 for the number of topic clusters
+N . We use SVM as learning algorithm for both Crest and Raw representations
+using SVMlight with default parameter settings1. We run experiments on the
+benchmark dataset of search snippets collected by [10] and the statistics of the
+dataset is shown in Table 1.
+
+For each parameter settings, we run the experiment for 20 times, then compute
+the average value. We record the F1 measurement. Table 2 shows the F1 results,
+where the tabular in boldface means that Crest’s result is signiﬁcantly better
+than Raw by pairwise t-test with signiﬁcance level at 0.95, “best” is the best F1
+value among Crest with diﬀerent N ’s, “avg.” is the average F1 value over all
+categories. The results are plotted in Fig. 2.
+
+Table 2. F1 Results (%)
+
+Raw
+
+Method
+
+busin. compu. cultu. educa. engin. healt. polit. sport. avg.
+50.23 67.64 66.41 67.49 29.37 59.69 33.32 78.24 56.55
+Crest N = 10 58.79 68.92 68.01 69.57 25.58 63.78 37.09 80.23 59.00
+Crest N = 30 55.87 69.60 68.38 68.78 15.95 62.49 38.51 80.23 57.48
+Crest N = 50 53.97 68.63 66.91 69.48 25.58 61.20 39.68 80.15 58.20
+Crest N = 70 56.37 70.54 66.91 69.48 31.11 60.16 39.78 80.31 59.33
+Crest N = 100 55.65 69.72 67.15 70.48 33.14 60.47 39.36 78.89 59.36
+Crest N = 120 54.91 68.90 68.36 69.62 33.14 60.9 38.95 78.65 59.18
+
+best
+
+58.79 70.54 68.38 70.48 33.14 63.78 39.78 80.31
+
+These results show that Crest improves the classiﬁcation performance con-
+siderably compared to Raw in every category with almost all parameter settings.
+Especially, in some speciﬁc categories such as “business” and “politics”, the im-
+provement is as large as 17.13% and 19.51%, respectively. The results show that
+Crest method utilizing topic clusters extracted from limited training examples
+
+1
+
+http://svmlight.joachims.org/
+
+264
+
+Z. Dai, A. Sun, and X.-Y. Liu
+
+ 
+
+e
+r
+u
+s
+a
+e
+m
+-
+1
+F
+
+0.85
+
+0.75
+
+0.65
+
+0.55
+
+0.45
+
+0.35
+
+0.25
+
+0.15
+
+.
+
+0
+5
+9
+
+ 
+ 
+
+.
+
+0
+5
+6
+
+.
+
+.
+
+0
+5
+6
+
+0
+5
+6
+
+ 
+ 
+
+ 
+ 
+
+.
+
+0
+5
+4
+
+ 
+ 
+
+0
+
+.
+
+5
+5
+
+ 
+ 
+
+ 
+ 
+
+.
+
+0
+6
+4
+
+.
+
+0
+6
+2
+
+ 
+ 
+
+ 
+ 
+
+.
+
+0
+6
+1
+
+0
+6
+0
+
+0
+6
+0
+
+0
+6
+1
+
+.
+
+.
+
+.
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+.
+
+.
+
+0
+7
+0
+
+0
+6
+9
+
+0
+6
+9
+
+.
+
+ 
+ 
+
+.
+
+0
+7
+1
+
+ 
+ 
+
+.
+
+0
+7
+0
+
+0
+6
+9
+
+.
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+.
+
+.
+
+0
+6
+8
+
+0
+6
+8
+
+ 
+ 
+
+ 
+ 
+
+.
+
+0
+6
+8
+
+ 
+ 
+
+.
+
+.
+
+.
+
+0
+6
+7
+
+0
+6
+7
+
+0
+6
+7
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+.
+
+.
+
+.
+
+.
+
+0
+7
+0
+
+0
+6
+9
+
+0
+6
+9
+
+0
+6
+9
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+.
+
+0
+7
+0
+
+0
+7
+0
+
+.
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+.
+
+0
+2
+6
+
+ 
+ 
+
+.
+
+.
+
+0
+3
+3
+
+0
+3
+3
+
+ 
+ 
+
+ 
+ 
+
+.
+
+0
+3
+1
+
+ 
+ 
+
+.
+
+0
+2
+6
+
+ 
+ 
+
+.
+
+.
+
+0
+8
+0
+
+0
+8
+0
+
+0
+8
+0
+
+0
+8
+0
+
+.
+
+.
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+.
+
+.
+
+0
+7
+9
+
+0
+7
+9
+
+ 
+ 
+
+ 
+ 
+
+10
+
+30
+
+50
+
+70
+
+100
+
+120
+
+.
+
+.
+
+.
+
+0
+4
+0
+
+0
+4
+0
+
+0
+3
+9
+
+0
+3
+9
+
+.
+
+.
+
+0
+3
+9
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+.
+
+0
+3
+7
+
+ 
+ 
+
+busin.
+
+compu.
+
+cultu.
+
+educa.
+
+engin.
+
+healt.
+
+polit.
+
+sport.
+
+.
+
+0
+1
+6
+
+ 
+ 
+
+Fig. 2. Comparison among Diﬀerent Embedded Number of Topic Clusters
+
+ 
+ 
+
+e
+r
+u
+s
+a
+e
+M
+-
+1
+F
+
+0.85
+
+0.75
+
+0.65
+
+0.55
+
+0.45
+
+0.35
+
+0.25
+
+0.15
+
+.
+
+0
+
+0
+
+0
+
+.
+
+0
+7
+0
+
+.
+
+.
+
+7
+0
+
+7
+1
+
+7
+1
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+.
+
+0
+7
+0
+
+ 
+ 
+
+0
+
+.
+
+6
+9
+
+ 
+ 
+
+0
+
+0
+
+.
+
+.
+
+6
+9
+
+6
+9
+
+ 
+ 
+
+ 
+ 
+
+0
+
+.
+
+0
+
+6
+8
+
+.
+
+6
+7
+
+ 
+ 
+
+ 
+ 
+
+0
+
+.
+
+6
+6
+
+.
+
+0
+6
+4
+
+ 
+ 
+
+0
+
+ 
+ 
+
+0
+
+.
+
+0
+
+5
+6
+
+.
+
+5
+5
+
+ 
+ 
+
+0
+
+.
+
+.
+
+5
+8
+
+0
+
+5
+6
+
+.
+
+5
+5
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+0
+
+.
+
+5
+4
+
+ 
+ 
+
+0
+
+.
+
+7
+1
+
+ 
+ 
+
+0
+
+.
+
+6
+8
+
+ 
+ 
+
+.
+
+0
+6
+9
+
+ 
+ 
+
+0
+
+0
+
+.
+
+.
+
+6
+9
+
+6
+9
+
+ 
+ 
+
+ 
+ 
+
+0
+
+.
+
+6
+7
+
+ 
+ 
+
+0
+
+.
+
+0
+
+0
+
+.
+
+.
+
+3
+9
+
+3
+9
+
+ 
+ 
+
+ 
+ 
+
+0
+
+.
+
+3
+7
+
+4
+0
+
+ 
+ 
+
+0
+
+.
+
+3
+7
+
+0
+
+.
+
+ 
+ 
+
+0
+
+.
+
+3
+1
+
+ 
+ 
+
+3
+5
+
+ 
+ 
+
+3
+0
+
+0
+
+ 
+ 
+
+ 
+ 
+
+0
+
+0
+
+.
+
+2
+6
+
+ 
+ 
+
+.
+
+2
+6
+
+ 
+ 
+
+.
+
+2
+5
+
+ 
+ 
+
+0
+
+.
+
+.
+
+.
+
+0
+8
+1
+
+0
+8
+0
+
+ 
+ 
+
+ 
+ 
+
+0
+
+.
+
+8
+0
+
+ 
+ 
+
+0
+
+.
+
+0
+8
+0
+
+.
+
+8
+0
+
+ 
+ 
+
+ 
+ 
+
+0
+
+.
+
+7
+9
+
+ 
+ 
+
+0
+
+0
+
+.
+
+0
+
+.
+
+.
+
+5
+9
+
+5
+9
+
+5
+9
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+.
+
+0
+5
+8
+
+ 
+ 
+
+0
+
+.
+
+5
+8
+
+0
+
+.
+
+5
+6
+
+ 
+ 
+
+0
+
+0
+
+.
+
+.
+
+6
+2
+
+6
+1
+
+ 
+ 
+
+ 
+ 
+
+0
+
+0
+
+.
+
+.
+
+6
+0
+
+6
+0
+
+ 
+ 
+
+ 
+ 
+
+0
+
+.
+
+0
+
+.
+
+5
+8
+
+5
+8
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+0
+
+.
+
+0.85 Complete.
+0.90 Complete.
+0.95 Complete.
+0.85 Single.
+0.90 Single.
+0.95 Single.
+
+2
+1
+
+ 
+ 
+
+bus.
+
+com.
+
+cul.
+
+edu.
+
+eng.
+
+hea.
+
+pol.
+
+spo.
+
+avg.
+
+Fig. 3. Comparison among Diﬀerent Clustering Strategies and Purity Thresholds
+
+to enrich short texts is a useful way to overcome the shortness and sparsity of
+short texts. From Fig. 2 we can see that Crest is very robust to the change
+of N , the number of topic clusters. Even when N is very small, Crest im-
+proves the performance largely in almost all categories. This shows the power
+of the enriched representation by exploring topic clusters. The only exception
+is that in category “engineering”, only when the number of topic clusters N is
+greater than 70 can Crest improves the performance. One possible reason is that
+
+Crest for Short Text Classiﬁcation
+
+265
+
+“engineering” category has fewer instances than other categories but covers rel-
+atively a large topic. The instances in this category are harder to be gathered
+together by a clustering method. Crest manages to improve the performance
+of this category by increasing the number of topic clusters in N .
+
+To further study how parameters will aﬀect Crest, we record the F1 results
+of Crest with diﬀerent clustering strategies (single-link or complete-link) and
+diﬀerent purity thresholds (0.85, 0.90, 0.95) while ﬁxing N = 70. The results
+are shown in Fig. 3. Generally speaking, Crest is very robust to the change of
+these parameters when purity threshold is above 0.90. Since the topic clusters
+with higher purity would be more topic-speciﬁc, higher purity threshold leads to
+more helpful critical terms or concepts. On the other hand, clustering strategy
+doesn’t aﬀect the performance signiﬁcantly. Crest is slightly more sensitive to
+purity threshold when using the single-link strategy than using the complete-link
+strategy.
+
+The above experimental results lead to the following conclusions: (1) Crest
+can greatly improve the short text classiﬁcation performance in term of F1 mea-
+sure by enriching the representation with topic information; and (2) Crest is
+robust to parameter settings.
+
+5 Conclusion
+
+Short text classiﬁcation problem attracts much attention from information re-
+trieval ﬁeld recently. In order to handle its shortness and sparsity, various ap-
+proaches have been proposed to enrich short text to get more features like latent
+topics or other information. However, most of them rely on large external knowl-
+edge sources more or less. These methods solve the problem to some extent, but
+still leave large space for improvement, especially under the hard condition that
+no external knowledge source can be acquired. We proposed Crest method to
+handle the short text classiﬁcation in such tough situation. Crest generates
+“high-quality” clusters as topic clusters from training data by exploiting clus-
+tering method, and then uses the topic information to extend representation
+for short text. The experimental results showed that compared to the original
+representation, Crest can signiﬁcantly improves the classiﬁcation performance.
+Though we see positive improvement brought by Crest, there are still room
+for further consideration to boost the performance. For example, we can try to
+combine Crest with other methods for short text classiﬁcation, such as methods
+relying on external knowledge sources. And organizing “high-quality” clusters in
+multi-granularity way to investigate whether it can further improve Crest is
+another interesting problem worth exploring.
+
+Acknowledgement. This work was supported by NSFC (No. 61105046), SRFDP
+(Specialized Research Fund for the Doctoral Program of Higher Education, by
+Ministry of Education, No. 20110092120029), and Open Foundation of National
+Key Laboratory for Novel Software Technology of China (KFKT2011B01). The
+work of the second author was supported by MINDEF-NTU-DIRP/2010/03,
+Singapore.
+
+266
+
+Z. Dai, A. Sun, and X.-Y. Liu
+
+References
+
+1. Bollegala, D., Matsuo, Y., Ishizuka, M.: Measuring semantic similarity between
+words using web search engines. In: Proceedings of the 16th International Confer-
+ence on World Wide Web, New York, pp. 757–766 (2007)
+
+2. Cai, L., Hofmann, T.: Text categorization by boosting automatically extracted
+concepts. In: Proceedings of the 26th Annual International ACM SIGIR Conference
+on Research and Development in Informaion Retrieval, New York, pp. 182–189
+(2003)
+
+3. Carpineto, C., Osi´nski, S., Romano, G., Weiss, D.: A survey of web clustering
+
+engines. ACM Computing Surveys (CSUR) 41(3), 17:1–17:38 (2009)
+
+4. Chen, M., Jin, X., Shen, D.: Short text classiﬁcation improved by learning multi-
+granularity topics. In: Proceedings of the 22nd International Joint Conference on
+Artiﬁcial Intelligence, pp. 1776–1781 (2011)
+
+5. Gabrilovich, E., Markovitch, S.: Computing semantic relatedness using wikipedia-
+based explicit semantic analysis. In: Proceedings of the 20th International Joint
+Conference on Artiﬁcal Intelligence, San Francisco, CA, pp. 1606–1611 (2007)
+
+6. Hu, J., Fang, L., Cao, Y., Zeng, H.-J., Li, H., Yang, Q., Chen, Z.: Enhancing text
+clustering by leveraging wikipedia semantics. In: Proceedings of the 31st Annual
+International ACM SIGIR Conference on Research and Development in Informa-
+tion Retrieval, New York, NY, pp. 179–186 (2008)
+
+7. Hu, X., Sun, N., Zhang, C., Chua, T.-S.: Exploiting internal and external semantics
+for the clustering of short texts using world knowledge. In: Proceedings of the 18th
+ACM Conference on Information and Knowledge Management, pp. 919–928 (2009)
+8. Hu, X., Zhang, X., Lu, C., Park, E.K., Zhou, X.: Exploiting wikipedia as external
+knowledge for document clustering. In: Proceedings of the 15th ACM SIGKDD
+International Conference on Knowledge Discovery and Data Mining, New York,
+NY, pp. 389–396 (2009)
+
+9. Manning, C., Raghavan, P., Sch¨utze, H.: Introduction to Information Retrieval.
+
+Cambridge University Press, Cambridge (2008)
+
+10. Phan, X.-H., Nguyen, L.-M., Horiguchi, S.: Learning to classify short and sparse
+text & web with hidden topics from large-scale data collections. In: Proceedings of
+the 17th International Conference on World Wide Web, New York, NY, pp. 91–100
+(2008)
+
+11. Sahami, M., Heilman, T.D.: A web-based kernel function for measuring the simi-
+larity of short text snippets. In: Proceedings of the 15th International Conference
+on World Wide Web, New York, NY, pp. 377–386 (2006)
+
+12. Salton, G., Buckley, C.: Term-weighting approaches in automatic text retrieval.
+
+Information Processing and Management 24(5), 513–523 (1988)
+
+13. Shen, D., Chen, Z., Yang, Q., Zeng, H., Zhang, B., Lu, Y., Ma, W.: Web-page clas-
+siﬁcation through summarization. In: Proceedings of the 27th Annual International
+ACM SIGIR Conference on Research and Development in Information Retrieval,
+pp. 242–249 (2004)
+
+Crest for Short Text Classiﬁcation
+
+267
+
+14. Shen, D., Pan, R., Sun, J.-T., Pan, J.J., Wu, K., Yin, J., Yang, Q.: Query en-
+richment for web-query classiﬁcation. ACM Transactions on Information Sys-
+tems 24(3), 320–352 (2006)
+
+15. Sun, A.: Short text classiﬁcation using very few words. In: Proceedings of the 35th
+International ACM SIGIR Conference on Research and Development in Informa-
+tion Retrieval, SIGIR 2012, New York, NY, pp. 1145–1146 (2012)
+
+16. Tang, J., Wang, X., Gao, H., Hu, X., Liu, H.: Enriching short text representation
+in microblog for clustering. Frontiers of Computer Science in China 6(1), 88–101
+(2012)
+
+17. Yih, W.-T., Meek, C.: Improving similarity measures for short segments of text. In:
+Proceedings of the 22nd National Conference on Artiﬁcial Intelligence, pp. 1489–
+1494 (2007)
+
+

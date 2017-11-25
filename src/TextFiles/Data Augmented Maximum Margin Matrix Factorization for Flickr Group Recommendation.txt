@@ -1,0 +1,1198 @@
+Data Augmented Maximum Margin Matrix
+
+Factorization for Flickr Group Recommendation
+
+Liang Chen(cid:2), Yilun Wang(cid:2), Tingting Liang, Lichuan Ji, and Jian Wu
+
+College of Computer Science,
+
+{cliang,yilunwang,liangtt,jilichuan,wujian2000}@zju.edu.cn
+
+Zhejiang University, China
+
+Abstract. User groups on photo sharing websites, such as Flickr, are
+self-organized communities to share photos and conversations with sim-
+ilar interest and have gained massive popularity. However, the huge vol-
+ume of groups brings troubles for users to decide which group to choose.
+Further, directly applying collaborative ﬁltering techniques to group rec-
+ommendation will suﬀer from cold start problem since many users do not
+aﬃliate to any group. In this paper, we propose a hybrid recommendation
+approach named Data Augmented Maximum Margin Matrix Factoriza-
+tion (DAM3F), by integrating collaborative user-group information and
+user similarity graph. Speciﬁcally, Maximum Margin Matrix Factoriza-
+tion (MMMF) is employed for the collaborative recommendation, while
+the user similarity graph obtained from the user uploaded images and
+annotated tags is used as an complementary part to handle the cold
+start problem and to improve the performance of MMMF. The experi-
+ments conducted on our crawled dataset with 2196 users, 985 groups and
+334467 images from Flickr demonstrate the eﬀectiveness of the proposed
+approach.
+
+1
+
+Introduction
+
+With the dramatic development of Web 2.0 and social network technologies,
+social media become more and more important as a way for users to obtain
+valuable information, express individual opinions, share experiences as well as
+keep in touch with friends. Online photo sharing sites, such as Flickr 1 and Picasa
+Web Album2, become popular with numerous images uploaded every day (over
+6 billion images in Flickr ) [18]. User groups on such sites are self-organized
+communities to share photos and conversations with similar interest and have
+gained massive popularity. Joining groups facilitates ﬂexibility in indexing and
+managing self photos, making them more accessible to the public and searching
+photos and users with similar interests. As the support of above view, Negoescu
+et al. provide an in-depth analysis of the structure of Flickr groups and the
+motivation of group activities [10][11].
+
+(cid:2) These two authors contributed equally to this work.
+1
+
+2
+
+http://www.flickr.com
+http://picasaweb.google.com
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part I, LNAI 8443, pp. 473–484, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+474
+
+L. Chen et al.
+
+Although the information contributed by user groups could greatly improve
+the user’s browsing experience and enrich the social connections, the real situa-
+tion is that many users rarely join in any group. By studying 3 million images
+and the respective users and groups crawled from Flickr, we discover an inter-
+esting fact that only 6.7% users have ever joined one image group and only 1.9%
+users have joined more than 5 groups. Thus, it is necessary to design a recom-
+mendation approach that could automatically recommend appropriate groups
+for users.
+
+Group recommendation for photo sharing sites is a relatively novel scenario
+that have not been systematically studied. Current works commonly employs tra-
+ditional recommendation techniques such as collaborative ﬁltering [9] and matrix
+factorization [7,15] to recommend groups in a collaborative way. However, the
+recommendation performances of current work are not satisﬁed enough, due to
+two following points which are not yet considered carefully:
+
+– Sparse User-Group Matrix. As discussed above, many users rarely join
+in any group. According to the statistic of our crawled dataset, the density of
+the user-group relationship matrix is only 0.46%. Simply implementing state-
+of-the-art recommendation techniques on such sparse dataset can’t achieve
+satisﬁed result.
+
+– Cold Start Problem. It should be noted that the cold-start problem in
+this paper means recommending groups to the users haven’t joined in any
+group. The sparse user-group matrix makes it more diﬃcultly to handle the
+cold-start problem.
+
+As an early explorer in group recommendation for online photo sharing sites,
+we propose a hybrid recommendation approach named Data Augmented Maxi-
+mum Margin Matrix Factorization (DAM3F) to handle the above two problems,
+by integrating collaborative user-group relationship and user similarity graph.
+On one hand, Maximum Margin Matrix Factorization (MMMF) [17] is adopted
+for collaborative recommendation, by jointly learning the latent factors of users
+and groups from the original user-group relationship. As an improvement of tra-
+dition matrix factorization approaches, Maximum Margin Matrix Factorization
+uses hinge loss instead of sum-square loss and has been proven to be an eﬀec-
+tive approach for collaborative recommendation on sparse dataset. On the other
+hand, the user similarity graph obtained from the user uploaded images and an-
+notated tags is used as an complementary part to handle the cold start problem
+and to improve the performance of MMMF. Speciﬁcally, graph regularization is
+introduced to preserve the user similarity, which provides a more interpretable
+way to characterize the users and groups. Further, a novel objective function is
+proposed which jointly consider the above issues, and an eﬃcient optimization
+algorithm is provided to solve the objective function.
+
+In particular, the main contributions of this paper can be summarized as
+
+follows:
+
+1. This paper proposes a hybrid approach named DAM3F to handle the sparse
+user-group matrix and cold-start problems in Flickr group recommendation.
+
+Data Augmented MMMF for Flickr Group Recommendation
+
+475
+
+2. A novel objective function is proposed by jointly considering the collabora-
+
+tive user-group information and the user similarity graph.
+
+3. To evaluate the performance of the proposed approach, a real-world dataset
+consists of 2196 users, 985 groups and 334467 images is crawled from Flickr.
+The experimental results demonstrate that the proposed approach outper-
+forms the state-of-the-art techniques in terms of six well-known evaluation
+metrics.
+
+The rest of this paper is organized as follows: Section 2 gives a survey of
+related work in group recommendation. Section 3 shows the details of the pro-
+posed approach for Flickr group recommendation, while Section 4 reports the
+performance of DAM3F based on real-world dataset. Finally Section 5 concludes
+this paper.
+
+2 Related Work
+
+User groups on social Websites, are self-organized communities to share pho-
+tos and conversations with similar interest and have gained massive popularity.
+Group recommendation is an important paradigm that discovering the inter-
+esting groups for users, and attracts a lot of attention in recent years. In this
+section, we brieﬂy introduce the related work in this area, by classifying them
+into three categories according to the employed approaches.
+
+– Content-based recommendation: This category of methods recommends
+a group to a user based on the content of user or group, e.g., description
+of the group, the proﬁle of the users interests, etc. Sihem et al. utilize the
+user proﬁles and propose a formal semantics that accounts for both item
+relevance to a group and disagreements among group members [1]. Liu et al.
+propose a tag-based group recommendation method on Flicker dataset by
+building a tag ranking system [8]. Kim et al. represent items with keyword
+features by a content-based ﬁltering algorithm, and propose a community
+recommendation procedure for online readers [6].
+
+– Collaborative ﬁltering based recommendation: This category of meth-
+ods was successfully applied in traditional recommender systems, and is
+based on the assumption that similar users are likely to attend similar groups.
+Chen et al. propose an improved collaborative ﬁltering method named com-
+binational collaborative ﬁltering(CCF), which considers multiple types of co-
+occurrences in social data and recommends personal communities [4]. Zheng
+et al. implement several collaborative ﬁltering methods, and provide a sys-
+tematic experimental evaluation on Flicker group recommendation [20]. Yu
+et al. propose a collaborative ﬁltering recommendation algorithm for Web
+communities, in which the latent links between communities and members
+are utilized to handle the sparsity problem [12].
+
+– Hybrid recommendation: This category of methods combines several al-
+gorithms to recommend groups. Chen et al. compare association rule mining
+
+476
+
+L. Chen et al.
+
+(ARM) and latent dirichlet allocation (LDA) for the community recommen-
+dation, and ﬁnd that LDA performs consistently better than ARM when
+recommending a list of more than 4 communities [3]. Chen et al. design a
+group recommendation system based on collaborative ﬁltering, and employ
+genetic algorithm to predict the possible interactions among group members
+[5]. This strategy makes the estimated rating that a group of members might
+give to a group more correct. Zheng et al. propose a tensor decomposition
+model for Flickr group recommendation, which measures the latent relations
+between users and groups by considering both tags and users social relations
+[19]. Zheng et al. also propose an approach which combines the topic model
+and collaborative ﬁltering, and this method is demonstrated to have better
+performance than traditional CF and negative matrix factorization [18].
+
+The proposed approach DAM3F in the paper is a hybrid one, in which we
+take the advantage of the above related works (e.g., user-annotated tags are
+utilized), and introduce some novel data (i.e., visual features extracted from
+the uploaded images) to further improve the performance of recommendation.
+In the technology aspect, we extend the traditional MMMF, and propose a
+novel objective function in which both user-group relationship and user similarity
+graph are considered. Further, an eﬃcient optimization approach is proposed to
+solve the objective function.
+
+3 DAM3F Based Flickr Group Recommendation
+
+In this section, we show the details of Data Augmented Maximum Margin Ma-
+trix Factorization (DAM3F), which is the extension of the classical Maximum
+Margin Matrix Factorization approach by taking the uploaded images and user-
+annotated tags into consideration. To begin with, we give the main framework
+of DAM3F in Figure 1.
+
+User-Group Relationship
+
+User Similarity Graph
+
+Group Factors
+
+User Factors
+
+After Recommendation
+
+1
+0
+0
+1
+0
+
+1
+0
+1
+0
+1
+
+0
+1
+0
+1
+0
+
+0
+1
+1
+0
+1
+
+0.746
+
+1
+0
+0
+1
+1
+
+1
+1
+1
+0
+1
+
+1
+1
+1
+1
+0
+
+0
+1
+1
+1
+1
+
+Fig. 1. The main framework of the proposed DAM3F. The user-group relationship and
+user similarity graph are integrated in Data Augmented Maximum Margin Matrix Fac-
+torization framework to obtain the user and group latent factor matrices. Speciﬁcally,
+the similarity graph is computed based on the features extracted from images and
+annotated tags. Then the recommendation results can be calculated from the latent
+factors of users and groups.
+
+Data Augmented MMMF for Flickr Group Recommendation
+
+477
+
+3.1 Maximum Margin Matrix Factorization
+Given the sets of M users, N images and P groups respectively, R ∈ RM×P is
+the aﬃliation matrix between users and groups, where Rij = 1 means that the
+ith user is the member of the jth group and 0 otherwise. Furthermore, we use
+matrix S ∈ RM×N to denote the ownership between users and images where
+Sik = 1 indicates that the kth image is uploaded by the ith user. By extracting
+the D dimension visual feature of the N images, we obtain the image feature
+matrix X = [x1, x2, . . . , xN ]T ∈ RN×D. Given the information above, the aims
+of group recommendation is to recover a new aﬃliation matrix Rrec denote the
+relationship between users and groups, and more importantly to recommend new
+groups to users based on Rrec.
+The traditional matrix factorization approaches for recommendation tries to
+factorize the aﬃliation matrix R into two M×K and N×K dimensional low-rank
+matrices U and G by:
+
+(cid:3) R − U GT (cid:3)F +λ((cid:3) U (cid:3)F + (cid:3) G (cid:3)F ),
+
+(1)
+
+argmin
+
+U,G
+
+where (cid:3) · (cid:3)F denotes the Frobenius norm and K is dimensionality of the latent
+factors of both users and groups. Besides, the regularization penalties λ((cid:3) U (cid:3)F
++ (cid:3) G (cid:3)F ) is utilized to avoid over-ﬁtting. Afterwards, the recommendation
+
+results can be obtained by calculating similarity between the latent factors of
+users and groups as Rrec = U GT .
+
+As for our group recommendation problem, Rrecij only has two entries, i.e. 0
+and 1, which indicates whether the ith user aﬃliates to the jth group. Therefore,
+comparing with traditional recommendation techniques which obtain the rating
+matrix, group recommendation is more appropriate to be formulated as a binary
+classiﬁcation problem. Besides, since there are much more 0’s than 1’s in matrix
+R, the resulting recommendation results will be heavily biased towards 0 by
+using traditional matrix factorization approaches.
+
+In order to overcome such limitations, Maximum Margin Matrix Factorization
+(MMMF) is proposed by replacing the sum-squared loss with hinge loss which has
+been widely used in classiﬁcation application, such as Support Vector Machines.
+According to [13][17], the objective function of MMMF can be written as:
+
+h(R − U GT ) + λ((cid:3) U (cid:3)F + (cid:3) G (cid:3)F ),
+
+(2)
+
+argmin
+
+U,G
+
+where h(z) = (1 − z)+ = max(0, 1 − z) corresponds to the hinge loss.
+
+Above formulation can be also interpreted as simultaneous learning of feature
+vectors and linear classiﬁers. By viewing matrix U as the feature vectors of the
+users, matrix G can be regarded as linear classiﬁers that map the user feature
+vectors into binary labels that indicate whether the user is interested in that
+group. In addition, hinge loss is adopted for learning maximum margin classiﬁers
+with respect to each group.
+
+478
+
+L. Chen et al.
+
+3.2 Data Augmented Maximum Margin Matrix Factorization
+
+Similar to other collaborative ﬁltering algorithms, MMMF based recommenda-
+tion still suﬀers cold-start problem, i.e., recommendation results for new users
+who have not joined groups tend to be very inaccurate. This problem could be
+solved, to some extent, by exploiting content information of the users, i.e., the
+features extracted from their uploaded images and the corresponding annotated
+tags. The basic assumption is: if two users have joined in the same group, then
+their uploaded images to this group will probably be visually similar or semanti-
+cally (tag-based) similar. Based on this assumption, we can incorporate such user
+similarity graph into the MMMF based recommendation framework. Firstly, the
+feature vector fi w.r.t. the ith user can be calculated by averaging the feature
+vectors of all his images or tags as:
+
+fi =
+
+(cid:2)
+
+N
+j=1
+(cid:2)
+n
+j=1
+
+Sij Xj
+Sij
+
+,
+
+(3)
+
+where Sij denotes the jth image uploaded by ui, Xj means the visual or semantic
+(tag-based) feature of Sij . It should be noted that the process of feature extrac-
+tion is introduced in Section 4.1. Then we can construct the adjacency matrix
+W of the user similarity graph as follows:
+
+(cid:3)
+
+exp(
+
+Wij =
+
+(cid:3)fi−fj(cid:3)
+
+t
+0,
+
+)2,
+
+if xj ∈ N (xi) or xi ∈ N (xj )
+
+otherwise,
+
+(4)
+
+where N (xi) denotes the k-nearest neighbor of xi and the Heat Kernel is ex-
+
+ploited to measure the similarity of two feature vectors. To guarantee that users
+who upload visually or semantically similar images will also obtain similar latent
+factors, we introduce the following graph regularization term:
+
+(cid:4)
+
+(cid:3) ui − uj (cid:3)2 Wij
+
+=
+
+ij
+(cid:4)
+
+1
+2
+i,j
+(cid:4)
+uiWij uT
+i
+
+− (cid:4)
+− (cid:4)
+=
+=tr(U T (D − W )U )
+=tr(U T LU ),
+
+uiDiiuT
+i
+
+ij
+
+ij
+
+i
+
+ujWij uT
+j
+
+ujWij uT
+j
+
+where tr(·) denotes the matrix trace, Dii =
+L = D − W is the Laplacian matrix of the user similarity graph.
+
+(cid:2)
+i
+
+(5)
+Wij is a diagonal matrix and
+
+By leveraging the collaborating information and user similarity graph, we
+propose the Data Augmented Maximum Margin Matrix Factorization (DAM3F)
+framework, which uniﬁes maximum margin matrix factorization and graph
+regularization as:
+
+h(R − U GT ) + μtr(U T (γL1 + (1 − γ)L2)U ) + λ((cid:3) U (cid:3)F + (cid:3) G (cid:3)F ) (6)
+
+argmin
+
+U,G
+
+Data Augmented MMMF for Flickr Group Recommendation
+
+479
+
+where μ is the trade-oﬀ parameter between collaborating information and con-
+tent information, L1 is the Laplacian matrix of the image based user similarity
+graph (visually), L2 is the Laplacian matrix of the tag based user similarity graph
+(semantically), and γ is the trade-oﬀ parameter between visual information and
+tag information.
+
+Although the proposed objective function is not a convex function of U and G,
+but it is convex to one variable when the other one is ﬁxed. Therefore, we could
+obtain the local optimal solution by alternatively updating the two variables
+using gradient descent methods.
+
+Denoting the objective function as J(U, G), we can calculate the gradient of
+
+J(U, G). The partial derivative with respect to U is:
+
+∂J
+
+∂U = −h(cid:4)
+
+(R − U GT )G + 2μ(γL1 + (1 − γ)L2)U + 2λU
+
+The partial derivative with respect to G is:
+
+∂J
+
+∂G = −h(cid:4)
+
+(R − U GT )T U + 2λG
+
+(7)
+
+(8)
+
+Since the hinge loss function h(z) is non-smooth at z = 1, following [13],
+we adopt smooth hinge instead of hinge loss for the ease of optimization. The
+further details of optimization process is omitted due to the space limitation.
+
+4 Experiments
+
+In this section, we evaluate the performance of the proposed approach on the
+real-world dataset crawled from Flickr by using kinds of metrics, and compare
+it with state-of-the-art approaches. Sepciﬁcally, all experiments are conducted
+on a windows workstation with Intel 2.67GHz Xeon CPU and 32GB RAM by
+using Matlab 8.0.
+
+4.1 Experiment Setup
+
+To evaluate the performance of the proposed approach, we collect an image
+dataset from Flickr by using its API3. The details of this dataset could be found
+in Table 1. To obtain this dataset, we ﬁrst select popular groups in Flickr by
+keyword searching. Then, active users of these groups and their uploaded images
+as well as the annotated tags are crawled, respectively. As for the process of
+feature extraction, we extract 81-dimensional color histogram/moments feature
+and 37-dimensional edge histogram feature to generate the visual feature to
+represent these images by using FELib4, and employ Latent Dirichlet Allocation
+(LDA) to generate 50-dimensional semantic feature to represent the annotated
+
+3
+
+4
+
+http://www.flickr.com/services/api/
+http://www.vision.ee.ethz.ch/~zhuji/felib.html
+
+480
+
+L. Chen et al.
+
+Table 1. Overview of Dataset Crawled from Flickr
+
+#Image
+
+#Group
+
+334467
+
+985
+
+#User
+
+2196
+
+#Tag
+3603353
+
+#Tag Token
+
+239557
+
+Table 2. Group Recommendation Performance Comparison (α = 60%)
+
+Method
+
+CB
+CF
+SVD
+NMF
+
+F1 score RMSE P@5 P@10 MAP MAE
+0.0796 0.1315 0.4691 0.2149 0.3936
+0.0811 0.1533 0.5909 0.2208 0.3923
+0.0863 0.2303 0.5719 0.3778 0.3963
+0.0799 0.2472 0.6589 0.4322 0.3912
+MMMF
+0.0779 0.2478 0.7193 0.4316 0.3859
+DAM3Ftag
+0.0757 0.2612 0.7337 0.4504 0.3743
+DAM3Fvisual 0.3219 0.0755 0.2635 0.7353 0.4527 0.3722
+
+0.1702
+0.1962
+0.2847
+0.3024
+0.2992
+0.3184
+
+tags of the uploaded images. Due to the space limitation, we don’t give the
+details of the tag-based feature extraction.
+To evaluate the performance of group recommendation, we randomly sample
+α× 100% of the user-group assignments from the user-group aﬃliation matrix to
+generate the matrix R for training and use the full user-group aﬃliation matrix
+as the ground-truth for evaluation.
+
+Evaluation Metrics. To comprehensively evaluate the performance of the pro-
+posed approach, we consider the following evaluation metrics: Precision@k (P@k),
+Mean Average Precision (MAP), Mean Absolute Error (MAE) [2], Root Mean
+Squared Error (RMSE), and F1 score. In particular, k is chosen to 5 and 10 for
+P@k metric.
+
+4.2 Recommendation Performance Comparison
+
+In order to demonstrate the eﬀectiveness of the proposed approach, we imple-
+ment the following approaches and compare the performances:
+
+1. CB: Content based recommendation by using the user similarity graph.
+2. CF: Collaborative Filtering
+
+recommendation by using user-group
+
+relationship [14].
+
+3. SVD: Singular Value Decomposition based recommendation by using user-
+
+group relationship[9].
+
+4. NMF: Nonnegative Matrix Factorization based recommendation by using
+
+user-group relationship[15].
+
+5. MMMF: Maximum Margin Matrix Factorization based recommendation
+
+by using user-group relationship[17].
+
+6. DAM3Ftag: One version of the proposed DAM3F in this paper, while only
+
+sematic (tag-based) user similarity graph is combined to MMMF.
+
+Data Augmented MMMF for Flickr Group Recommendation
+
+481
+
+7. DAM3Fvisual: One version of the proposed DAM3F in this paper, while
+
+only visual user similarity graph is combined to MMMF.
+
+In this experiment, parameter μ is set empirically to 1 and λ is set to 0.1.
+The dimensionality of latent factors K is set to 200. It should be noted that the
+parameters of all the competitive methods have been fairly tuned using cross-
+validate, and the average evaluation results after 10-fold cross-validation are
+selected.
+
+Table 2 shows the performance comparison of above group recommendation
+approaches when α = 60% in terms of multiple evaluation metrics. From Table
+2, it can be observed that the two versions of DAM3F largely outperform the
+other state-of-the-art approaches in terms of multiple metrics. The superior per-
+formance of the proposed approach comes from two aspects, one is the selection
+of hinge loss for matrix factorization, while the other one is the integration of
+user similarity graph. Further, it can be discovered that the DAM3Fvisual out-
+performs DAM3Ftag. The reason is two-fold: 1) extracted visual feature is more
+explicit than the semantic (tag-based) feature; 2) User-annotated tags are in-
+herent uncontrolled, ambiguous, and overly personalized. Thus, a pre-processing
+should be implemented before adopting user-annotated tags. In the following
+experiments, we implement a tag recommendation process to smooth the dis-
+tribution of tagging data, and the performance comparison could be found in
+Section 4.4.
+
+ 
+ 
+
+n
+o
+i
+s
+i
+c
+e
+r
+P
+
+ 
+e
+g
+a
+r
+e
+v
+A
+n
+a
+e
+
+ 
+
+M
+
+0.35
+
+0.3
+
+0.25
+
+0.2
+
+0.15
+
+0.1
+
+0.05
+
+0
+
+CB
+CF
+SVD
+NMF
+MMMF
+DAM³F_tag
+DAM³F_visual
+
+20%
+
+40%
+
+60%
+
+80%
+
+α 
+
+Fig. 2. Performance comparison with diﬀerent α in terms of Mean Average Precision
+(MAP)
+
+Figure 2 shows the group recommendation performance comparison of diﬀer-
+ent approaches while the proportion of training data α varies from 20% to 80%
+in terms of MAP. The superior performance at diﬀerent α further veriﬁed the
+eﬀectiveness of the proposed approach. In addition, it can be observed that the
+two versions of DAM3F are of greater advantage than other approaches when α
+gets smaller. The reason is that the user similarity regularization plays a more
+important role when the initial aﬃliation matrix is sparse, which is consistent
+with our motivation.
+
+482
+
+L. Chen et al.
+
+0.327
+
+0.326
+
+0.325
+
+0.324
+
+0.323
+
+0.322
+
+0.321
+
+0.32
+
+0.319
+
+e
+r
+o
+c
+S
+1
+F
+
+ 
+
+0.318
+0
+
+0.1
+
+0.2
+
+DAM3F
+
+0.267
+
+0.266
+
+0.265
+
+0.264
+
+0.263
+
+0.262
+
+P
+A
+M
+
+0.8
+
+0.9
+
+1
+
+0.261
+0
+
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+0.
+
+0.6
+
+0.7
+
+Values of Gamma
+
+DAM3F
+
+0.742
+
+0.741
+
+0.74
+
+0.739
+
+0.738
+
+0.737
+
+0.736
+
+0.735
+
+0.734
+
+5
+@
+P
+
+0.8
+
+0.9
+
+1
+
+0.733
+0
+
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+0.
+
+0.6
+
+0.7
+
+Values of Gamma
+
+0.3
+
+0.4
+
+0.
+
+0.6
+
+0.7
+
+Values of Gamma
+
+(a) F1 Score
+
+(b) MAP
+
+(c) P@5
+
+0.459
+
+0.458
+
+0.457
+
+0.456
+
+0.455
+
+0.454
+
+0.453
+
+0.452
+
+0.451
+
+0
+1
+@
+P
+
+0.45
+0
+
+0.1
+
+0.2
+
+DAM3F
+
+0.0758
+
+0.0757
+
+0.0756
+
+0.0755
+
+0.0754
+
+0.0753
+
+0.0752
+
+0.0751
+
+0.075
+
+E
+S
+M
+R
+
+0.8
+
+0.9
+
+1
+
+0.0749
+0
+
+0.1
+
+0.2
+
+DAM3F
+
+0.378
+
+0.377
+
+0.376
+
+0.375
+
+0.374
+
+0.373
+
+0.372
+
+0.371
+
+0.37
+
+0.369
+
+E
+A
+M
+
+0.8
+
+0.9
+
+1
+
+0.368
+0
+
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+0.
+
+0.6
+
+0.7
+
+Values of Gamma
+
+0.3
+
+0.4
+
+0.
+
+0.6
+
+0.7
+
+Values of Gamma
+
+0.3
+
+0.4
+
+0.
+
+0.6
+
+0.7
+
+Values of Gamma
+
+DAM3F
+
+0.8
+
+0.9
+
+1
+
+DAM3F
+
+0.8
+
+0.9
+
+1
+
+(d) P@10
+
+(e) RMSE
+
+(f) MAE
+
+Fig. 3. Impact of γ to The Performance of DAM3F
+
+4.3 Performance Evaluation of DAM3F
+
+In the proposed DAM3F, we utilize both visual feature extracted from uploaded
+images and semantic feature extracted from annotated tags. In the above experi-
+ment, we implement two versions of DAM3F, in each only one feature is utilized.
+In this section, we evaluate the performance of DAM3F by utilizing these two
+features, and evaluate the impact of trade-oﬀ parameter γ to performance of
+DAM3F in terms of multiple metrics.
+
+Figure 3 shows the performance of DAM3F and the impact of γ to it. The ap-
+proach is DAM3Ftag when γ=0, while the approach is DAM3Fvisual when γ=1.
+From Fig. 3, it could be observed that DAM3F outperforms both DAM3Ftag and
+DAM3Fvisual in terms of all metrics. It can be easily explained that the increase
+of relevant feature improves the performance of recommendation. Further, it
+could be found that the optimal value of γ is diﬀerent for diﬀerent metric. Thus,
+the selection strategy of the optimal value of γ should be adjusted according to
+the application scenario.
+
+4.4 Impact of Tag Recommendation to DAM3F
+
+As discussed above, user-annotated tags are inherent uncontrolled, ambiguous,
+and overly personalized. Thus, a pre-processing should be implemented before
+adopting user-annotated tags. In this section, we implement two commonly ac-
+cepted tag recommendation approach, i.e., Sum and V ote [16], to recommend
+relevant tags to the images with few tags and to delete irrelevant tags for the
+purpose of smoothing the tagging data distribution.
+
+Table 3 show the performance comparison of DAM3F with diﬀerent tag rec-
+ommendation approaches in terms of multiple metrics. From Table 3, it can
+
+Data Augmented MMMF for Flickr Group Recommendation
+
+483
+
+Table 3. Performance Comparison of DAM3F with Diﬀerent Tag Recommendation
+Approaches
+
+Method
+
+F1 score RMSE P@5 P@10 MAP MAE
+DAM3F+ Original Tag 0.3184
+0.0757 0.2612 0.7337 0.4504 0.3743
+0.3197
+0.0754 0.2625 0.7358 0.4532 0.3709
+0.3202 0.0752 0.2628 0.7367 0.4534 0.3706
+
+DAM3F+ Vote
+DAM3F+ Sum
+
+be observed that the introduction of tag recommendation process improves the
+performance of DAM3F in terms of all metrics. It can be easily understood as
+the irrelevant tags don’t contribute to the representation of the uploaded images
+or even have negative eﬀect, while the addition of relevant tags improves the
+representation quality of the tag-based feature.
+
+5 Conclusion and Future Work
+
+In this paper, we propose a hybrid approach for Flickr group recommendation
+by leveraging traditional collaborative recommendation with user similarity reg-
+ularization. More speciﬁcally, the proposed Data Augmented Maximum Margin
+Matrix Factorization (DAM3F) approach integrates the maximum margin ma-
+trix factorization with the user similarity graph calculated from their uploaded
+images and the annotated tags. Experiments implemented on the real-world
+dataset crawled from Flickr demonstrates the eﬀectiveness of the proposed ap-
+proach, by comparing it with state-of-the-art approaches in terms of multiple
+metrics. As a general framework, DAM3F can be also applied to other recom-
+mendation tasks.
+
+In our future work, we will try to employ more personal and contextual infor-
+mation of Flickr users in the framework of DAM3F for the purpose of improving
+group recommendation performance.
+
+Acknowledgements. This research was partially supported by the National
+Technology Support Program under grant of 2011BAH16B04, the National Nat-
+ural Science Foundation of China under grant of 61173176, National Key Science
+and Technology Research Program of China 2013AA01A604.
+
+References
+
+1. Amer-Yahia, S., Roy, S.B., Chawlat, A., Das, G., Yu, C.: Group recommendation:
+Semantics and eﬃciency. Proceedings of the VLDB Endowment 2, 754–765 (2009)
+2. Manning, C.D., Raghavan, P., Schuetze, H.: Introduction to Information Retrieval.
+
+Cambridge University Press (2008)
+
+3. Chen, W.Y., Chu, J.C., Luan, J., Bai, H., Wang, Y., Chang, E.Y.: Collaborative
+ﬁltering for orkut communities: Discovery of user latent behavior. In: Proceedings
+of the 18th International Conference on World Wide Web, pp. 681–690 (2009)
+
+484
+
+L. Chen et al.
+
+4. Chen, W.Y., Zhang, D., Chang, E.Y.: Combinational collaborative ﬁltering for per-
+sonalized community recommendation. In: Proceedings of the 14th ACM SIGKDD
+International Conference on Knowledge Discovery and Data Mining, pp. 115–123
+(2008)
+
+5. Chen, Y.L., Cheng, L.C., Chuang, C.N.: A group recommendation system with
+consideration of interactions among group members. In: Proceedings of the 18th
+International Conference on World Wide Web, vol. 34(3), pp. 2082–2090 (2008)
+
+6. Kim, H.K., Oh, H.Y., Gu, J.C., Kim, J.K.: Commenders: A recommendation pro-
+cedure for online book communities. Electronic Commerce Research and Applica-
+tions 10(5), 501–509 (2011)
+
+7. Koren, Y., Bell, R.M., Volinsky, C.: Matrix factorization techniques for recom-
+
+mender systems. IEEE Computer 42(8), 30–37 (2009)
+
+8. Liu, D., Hua, X.S., Yang, L., Wang, M., Zhang, H.J.: Tag ranking. In: Proceedings
+
+of the 18th International Conference on World Wide Web, pp. 351–360 (2009)
+
+9. Lu, L., Medo, M., Yeung, C.H., Zhang, Y.C., Zhang, Z.K., Zhou, T.: Recommender
+
+systems. Physics Reports 519, 1–49 (2012)
+
+10. Negoescu, R.A., Gatica-Perez, D.: Analyzing ﬂickr groups. In: CIVR, pp. 417–426
+
+(2008)
+
+11. Negoescu, R.A., Gatica-Perez, D.: Modeling ﬂickr communities through probabilis-
+tic topic-based analysis. IEEE Transactions on Multimedia 12(5), 399–416 (2010)
+12. Qian, Y., Zhiyong, P., Liang, H., Ming, Y., Dawen, J.: A latent topic based collab-
+orative ﬁltering recommendation algorithm for web communities. In: Proceedings
+of the Ninth Web Information Systems and Applications Conference, pp. 241–246
+(2012)
+
+13. Rennie, J.D.M., Srebro, N.: Fast maximum margin matrix factorization for collab-
+
+orative prediction. In: ICML, pp. 713–719 (2005)
+
+14. Resnick, P., Iacovou, N., Suchak, M., Bergstrom, P., Riedl, J.: Grouplens: an open
+architecture for collaborative ﬁltering of netnews. In: Proceedings of the 1994 ACM
+Conference on Computer Supported Cooperative Work (1994)
+
+15. Seung, D., Lee, L.: Algorithms for non-negative matrix factorization. In: Advances
+
+in Neural Information Processing Systems, vol. 13, pp. 556–562 (2001)
+
+16. Sigurbj¨ornsson, B., van Zwol, R.: Flickr tag recommendation based on collective
+knowledge. In: Proceedings of the 17th International Conference on World Wide
+Web, pp. 327–336 (2008)
+
+17. Srebro, N., Rennie, J.D., Jaakkola, T.: Maximum-margin matrix factorization. In:
+Advances in Neural Information Processing Systems, vol. 17(5), pp. 1329–1336
+(2005)
+
+18. Zheng, N., Bao, H.: Flickr group recommendation based on user-generated tags
+and social relations via topic model. In: Guo, C., Hou, Z.-G., Zeng, Z. (eds.) ISNN
+2013, Part II. LNCS, vol. 7952, pp. 514–523. Springer, Heidelberg (2013)
+
+19. Zheng, N., Li, Q., Liao, S., Zhang, L.: Flickr group recommendation based on tensor
+decomposition. In: Proceedings of the 33rd International ACM SIGIR Conference
+on Research and Development in Information Retrieval, pp. 737–738 (2010)
+
+20. Zheng, N., Li, Q., Liao, S., Zhang, L.: Which photo groups should i choose? a
+comparative study of recommendation algorithms in ﬂickr. Journal of Information
+Science 36(6), 733–750 (2010)
+
+

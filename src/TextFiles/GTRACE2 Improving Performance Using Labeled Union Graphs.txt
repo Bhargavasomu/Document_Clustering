@@ -1,0 +1,983 @@
+GTRACE2: Improving Performance
+
+Using Labeled Union Graphs
+
+Akihiro Inokuchi1,2 and Takashi Washio1
+
+1 The Institute of Scientiﬁc and Industrial Research, Osaka University
+
+Mihogaoka 8-1, Ibaraki, Osaka 567-0047, Japan
+2 PRESTO, Japan Science and Technology Agency
+{inokuchi,washio}@ar.sanken.osaka-u.ac.jp
+
+Abstract. The mining of a complete set of frequent subgraphs from
+labeled graph data has been studied extensively. Recently, much atten-
+tion has been given to frequent pattern mining from graph sequences.
+In this paper, we propose a method to improve GTRACE which mines
+frequent patterns called FTSs (Frequent Transformation Subsequences)
+from graph sequences. Our performance study shows that the proposed
+method is eﬃcient and scalable for mining both long and large graph
+sequence patterns, and is some orders of magnitude faster than the con-
+ventional method.
+
+Keywords: Frequent Pattern, Graph Sequence, Labeled Union Graph.
+
+1 Introduction
+
+Studies on data mining have established many approaches for ﬁnding charac-
+teristic patterns from various structured data. Graph Mining [5,12,9], which
+eﬃciently mines all subgraphs appearing more frequently than a given thresh-
+old from a set of graphs, focuses on the topological relations between vertices
+in the graphs. Although the major methods for Graph Mining are quite eﬃ-
+cient in practice, they require much computation time to mine complex frequent
+subgraphs due to the NP-completeness of subgraph isomorphism matching [4].
+Accordingly, these conventional methods are not suitable for complex graphs
+such as graph sequences.
+
+However, graph sequences can be used to model objects for many real world
+applications. For example, a human network can be represented as a graph where
+each human and each relationship between two humans correspond to a vertex
+and an edge, respectively. If a human joins (or leaves) the community in the
+human network, the numbers of vertices and edges in the graph increase (or
+decrease). Similarly, a gene network consisting of genes and their interactions
+produces a graph sequence in the course of their evolutionary history by acquiring
+new genes, deleting genes, and mutating genes.
+
+Recently, much attention has been given to frequent pattern mining from
+graph sequences [6,2,1,7]. Figure 1 (a) shows an example of a graph sequence
+consisting of 4 steps where each contains vertices denoted by 5 unique IDs.
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part II, LNAI 6119, pp. 178–188, 2010.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2010
+
+GTRACE2: Improving Performance Using Labeled Union Graphs
+
+179
+
+In [6], we proposed a new method, called GTRACE (Graph TRAnsformation
+sequenCE mining), for mining frequent patterns as shown in Fig. 1 (b) from
+graph sequences under the assumption that the change in each graph is gradual,
+and applied it to graph sequences generated from the Enron dataset. Although
+GTRACE is tractable for the Enron graph sequences containing about 7 steps
+and 100 unique IDs, it is intractable for graph sequences containing more steps
+and unique IDs than those in the Enron graph sequences.
+
+In this paper, we propose a method to improve the eﬃciency of GTRACE
+mining frequent patterns called FTSs (Frequent Transformation Subsequences)
+from graph sequences. Our performance study shows that the proposed method
+is eﬃcient and scalable for mining both long and large graph sequence patterns,
+and is some orders of magnitude faster than GTRACE. Although this paper
+focuses on undirected graphs where only the vertices have labels, the proposed
+method is applicable to both directed graph and undirected graphs where the
+edges also have labels without loss of generality.
+
+2 Representation of Graph Sequences
+
+In this section, we brieﬂy review a compilation used to compactly represent graph
+sequences in GTRACE. Figure 1 (a) shows an example of a graph sequence. The
+graph g(j) is the j-th labeled graph in the sequence. The problem we address
+in this paper is how to mine patterns that appear more frequently than a given
+threshold from a set of graph sequences. In [6], we proposed transformation rules
+to represent graph sequences compactly under the assumption that “the change
+over adjacent graphs is gradual”. In other word, only a small part of the graph
+changes between two successive graphs g(j) and g(j+1) in a graph sequence, while
+the other parts remain unchanged. In the aforementioned human networks and
+the gene networks, these assumptions certainly hold, since most of the changes
+of the vertices are progressive over successive steps. The direct representation
+of a graph sequence is not compact, because many parts of a graph remain
+unchanged over several steps and are therefore redundant in the representation.
+On the other hand, a graph sequence is compactly represented by introducing a
+representation of graph transformation based on rules of insertion, deletion, and
+relabeling of vertices and edges under the assumption of gradual changes.
+A labeled graph g is represented as g = (V, E, L, f), where V = {v1,··· , vz}
+is a set of vertices, E = {(v, v
+(cid:3)) ∈ V × V } is a set of edges, and L is
+a set of labels such that f : V → L. V (g), E(g), and L(g) are sets of vertices,
+edges and labels of g, respectively. A graph sequence is represented as d =
+(cid:4)g(1) g(2) ··· g(n)(cid:5), where the superscript integer of each g is the ordered step in
+
+(cid:3)) | (v, v
+
+Fig. 1. Examples of a graph sequence and a mined frequent pattern
+
+180
+
+A. Inokuchi and T. Washio
+
+(cid:3))) | (v, v
+
+(cid:3)) ∈ E(g(j)), g(j) ∈ d}.
+
+the graph sequence. We assume that each vertex v is mutually distinct from the
+others in any g(j) and keeps a unique ID id(v) in d. We deﬁne the set of unique
+IDs to be IDV (d) = {id(v) | v ∈ V (g(j)), g(j) ∈ d} and the set of pairs of unique
+IDs to be IDE(d) = {(id(v), id(v
+Example 1. In the human network mentioned in Section 1, each person has a
+unique ID, and his/her gender is an example of a vertex label.
+To compactly represent a graph sequence, we focus on the diﬀerences between
+two successive graphs g(j) and g(j+1) in the sequence.
+Deﬁnition 1. Given a graph sequence d = (cid:4)g(1) ··· g(n)(cid:5), each graph g(j) in d
+is called an “interstate”. Moreover, The diﬀerences between the graphs g(j) and
+g(j+1) are interpolated by a virtual sequence (cid:4)g(j,1)g(j,2) ··· g(j,mj )(cid:5), where g(j,1) =
+g(j) and g(j,mj ) = g(j+1). Each graph g(j,k) is called an “intrastate”. The graph
+sequence d is represented by the interpolations as d = (cid:4)s(1)s(2) ··· s(n−1)(cid:5).
+(cid:2)
+The order of interstates represents the order of graphs in a sequence. On the other
+hand, the order of intrastates is the order of graphs in the artiﬁcial interpolation,
+and there can be various interpolations between the graphs g(j) and g(j+1). We
+limit the interpolations to be compact and unambiguous by choosing one with
+the shortest length in terms of graph edit distance.
+Deﬁnition 2. Let a transformation of a graph by insertion, deletion or relabel-
+ing of a vertex or an edge be a unit, and let each unit have edit distance 1. An
+“intrastate sequence” s(j) = (cid:4)g(j,1)g(j,2) ··· g(j,mj )(cid:5) is deﬁned as the interpola-
+tion in which the edit distance between any two successive intrastates is 1, and
+(cid:2)
+in which the edit distance between any two intrastates is minimum.
+
+The transformation is represented by the following “transformation rule (TR)”.
+
+[ojk,ljk], where
+
+of a vertex or an edge,
+
+Deﬁnition 3. A transformation rule (TR) which transforms g(j,k) to g(j,k+1)
+is represented by tr(j,k)
+– tr is a transformation type which is either insertion, deletion, or relabeling
+– ojk is an element in IDV (d) ∪ IDE(d) to be transformed, and
+– ljk ∈ L is a label to be assigned to the vertex by the transformation.
+For the sake of simplicity, we denote the transformation rule by omitting the
+subscripts of ojk and ljk except in the case of ambiguity. We introduced ﬁve
+TRs deﬁned in Table 1. In summary, we give the following deﬁnition of a trans-
+formation sequence.
+Deﬁnition 4. An intrastate sequence s(j) = (cid:4)g(j,1) ··· g(j,mj )(cid:5) is represented by
+seq(s(j)) = (cid:4)tr(j,1)
+(cid:5). This is called an “intrastate transformation
+sequence”. Moreover, a graph sequence d = (cid:4)g(1) ··· g(n)(cid:5) is represented by an
+“interstate transformation sequence” seq(d) = (cid:4)seq(s(1))··· seq(s(n−1))(cid:5).
+(cid:2)
+
+(cid:2)
+
+··· tr(j,mj−1)
+
+[o,l]
+
+[o,l]
+
+GTRACE2: Improving Performance Using Labeled Union Graphs
+
+181
+
+Table 1. Transformation rules (TRs) to represent graph sequence data
+
+(j,k)
+[u,•]
+
+(j,k)
+[u,l]
+
+(j,k)
+[u,l]
+
+to transform to g(j,k+1).
+
+in g(j,k) to transform to g(j,k+1).
+
+Vertex Insertion Insert a vertex with label l and unique ID u into g(j,k)
+vi
+Vertex Deletion Delete an isolated vertex with unique ID u
+vd
+Vertex Relabeling Relabel a label of a vertex with unique ID u
+vr
+Edge Insertion
+ei
+Edge Deletion
+ed
+Arguments l of the transformations of vertex deletion vd, edge insertion ei, and edge
+deletion ed are dummy and represented by ‘•’.
+
+in g(j,k) to be l to transform to g(j,k+1).
+Insert an edge between 2 vertices with unique IDs u1 and u2
+into g(j,k) to transform to g(j,k+1).
+Delete an edge between 2 vertices with unique IDs u1 and u2
+in g(j,k) to transform to g(j,k+1).
+
+(j,k)
+[(u1,u2),•]
+
+(j,k)
+[(u1,u2),•]
+
+Fig. 2. A graph sequence and its TRs
+
+The notation of the intrastate transformation sequence is far more compact
+than the original graph based representation, since only diﬀerences between two
+successive intrastates appear in the sequence. In addition, computing a sequence
+of TRs based on diﬀerences between two graphs is solvable in linear time, because
+all vertices have unique IDs.
+
+Example 2. In Fig. 2 (a), a graph sequence is represented by a sequence of in-
+sertions and deletions of vertices and edges as shown in Fig. 2 (b). The sequence
+is compiled into (cid:4)vi(1,1)
+
+[(2,3),•]vd(2,4)
+
+[2,•] ed(3,1)
+
+[(1,3),•]vd(3,2)
+[1,•]
+
+[(3,4),•]ed(2,3)
+
+[4,C]vi(2,1)
+
+[5,C]ei(2,2)
+
+(cid:5).
+
+3 Mining Frequent Transformation Subsequences
+
+In this section, we brieﬂy review how GTRACE mines frequent transformation
+subsequences (FTSs) from a given set of graph sequences. To mine FTSs from a
+set of compiled graph sequences, we deﬁne an inclusion relation between trans-
+formation sequences. When a transformation sequence seq(d) includes another
+(cid:3)) (cid:7) seq(d) whose detail
+transformation sequence seq(d
+deﬁnition is provided in [6].
+
+(cid:3)), it is denoted by seq(d
+
+As mentioned in [6], to mine FTSs consisting of mutually relevant vertices
+only, we deﬁne the relevancy between unique IDs of vertices and edges as follows.
+
+182
+
+A. Inokuchi and T. Washio
+
+Deﬁnition 5. Unique IDs in d = (cid:4)g(1) ··· g(n)(cid:5) are relevant one another, and d
+is called a “relevant graph sequence”, if the union graph gu(d) of d is a connected
+graph. We deﬁne the union graph of d to be gu(d) = (Vu, Eu) where
+
+Vu = {id(v) | v ∈ V (g(j)), g(j) ∈ d}, and
+Eu = {(id(v), id(v
+
+(1)
+(2)
+(cid:2)
+This union graph of the transformation sequence seq(d) is also deﬁned similar
+to Deﬁnition 5.
+Given a set of data DB = {(cid:4)id, d(cid:5) | d = (cid:4)g(1) ··· g(n)(cid:5)}, the support value
+
+) ∈ E(g(j)), g(j) ∈ d}.
+
+)) | (v, v
+
+(cid:3)
+
+(cid:3)
+
+σ(seq(d
+
+(cid:3))) of a transformation subsequence seq(d
+
+(cid:3)
+σ(seq(d
+
+)) = |{id | (cid:4)id, d(cid:5) ∈ DB, seq(d
+(cid:3)
+
+(cid:3)) is deﬁned to be
+) (cid:7) seq(d)}|.
+
+We call a transformation subsequence whose support value is greater than or
+(cid:3) a “frequent transformation subse-
+equal to a minimum support threshold σ
+quence (FTS)”. The anti-monotonicity of this support value holds. That is, if
+1)) ≥ σ(seq(d
+(cid:3)
+(cid:3)
+(cid:3)
+(cid:3)
+1) (cid:3) seq(d
+2) then σ(seq(d
+2)). Using these settings, we state
+seq(d
+our mining problem as follows.
+Problem 1. Given a dataset DB = {(cid:4)id, d(cid:5) | d = (cid:4)g(1)g(2) ··· g(n)(cid:5)} and a mini-
+(cid:3) as the input, enumerate all relevant FTSs (rFTSs).
+mum support threshold σ
+To enumerate all rFTSs eﬃciently, GTRACE ﬁrst generates a union graph for each
+graph sequence in DB based on the deﬁnition of a union graph. Subsequently, all
+connected frequent subgraphs in these union graphs are enumerated by using the
+conventional Graph Mining algorithm. At each time the algorithm outputs a con-
+nected frequent subgraph, an altered version of PreﬁxSpan [10] is called to mine
+rFTSs from transformation subsequences generated by the following projection.
+Deﬁnition 6. Given a graph sequence (cid:4)id, d(cid:5) ∈ DB and a connected graph g,
+we deﬁne a function “proj1” to project seq(d) to its subsequences.
+) = g}. (cid:2)
+) (cid:7) seq(d) s.t. gu(d
+proj1((cid:4)id, d(cid:5), g) = {(cid:4)id
+(cid:3)
+(cid:3)
+(cid:3) is attached to each transformation subsequence produced by the
+A data ID id
+projection to calculate the exact support value of each rFTS, since multiple
+transformation subsequences are produced from a graph sequence (cid:4)id, d(cid:5) in the
+projection. Since the union graph of an rFTS is also frequent in the union graphs
+of all (cid:4)id, d(cid:5) ∈ DB, we can enumerate all rFTSs from the projected transforma-
+tion subsequences if all connected frequent subgraphs among the union graphs
+of all (cid:4)id, d(cid:5) are given.
+Example 3. Given the graph sequence d in Fig. 3 (a), seq(d) is represented by
+(cid:5), and its union graph
+seq(d) = (cid:4)vi(1,1)
+gu(d) is depicted in Fig. 3 (b). Given a graph g which is a subgraph of gu(d) as
+shown in Fig. 3 (d), one of transformation sequences in proj1((cid:4)id, seq(d)(cid:5), g) is
+(cid:4)id, seq(d
+(cid:5)(cid:5) as depicted in Fig. 3 (c),
+where this subsequence matches with the underlined rules in seq(d).
+
+(cid:3))(cid:5) = (cid:4)id,(cid:4)vi(1,1)
+
+)(cid:5) | id = id
+(cid:3)
+
+[(2,3),•]ed(2,1)
+
+[(1,4),•]ed(2,3)
+
+[(1,3),•]ei(1,3)
+
+[(2,3),•]vi(2,1)
+
+[4,A]ei(2,2)
+
+[3,C]ei(1,2)
+
+[(1,3),•]ei(1,3)
+
+[3,C]ei(1,2)
+
+(cid:3)
+, seq(d
+
+(cid:3)
+, seq(d
+
+[(1,3),•]
+
+[(1,3),•]
+
+GTRACE2: Improving Performance Using Labeled Union Graphs
+
+183
+
+Fig. 3. An example of the projection
+
+(cid:2)
+
+)
+
+1) GTRACE(DB, σ
+2)
+3)
+4)
+5)
+6)
+7)
+
+}
+
+Gu = {gu(d) | (cid:2)id, d(cid:3) ∈ DB}
+for g =FrequentSubgraphMiner(Gu, σ
+
+(cid:2)
+
+(cid:3)id,d(cid:4)∈DB proj1((cid:2)id, d(cid:3), g)
+(cid:2)
+= FTSMiner(proj1(DB, g), σ
+)
+(cid:2) ∧ gu(α) = g}
+
+proj1(DB, g) =
+(cid:2)
+F
+F = F ∪ {α | α ∈ F
+
+(cid:2)
+
+); untill g (cid:5)= null{
+
+Fig. 4. Algorithm for mining rFTSs
+
+Figure 4 shows an algorithm for enumerating all rFTSs F from DB. First, a set
+Gu of the union graphs of graph sequences DB is generated in Line 2. Assuming
+that the function call “FrequentSubgraphMiner” [8] repeatedly and exhaustively
+outputs connected frequent subgraphs g in Gu one at a time in Line 3, FTSMiner,
+which is the altered PreﬁxSpan [10,6], is called in Line 5 with the transformation
+sequences projected in Line 4 to mine rFTSs from proj1(DB, g). Finally, rFTSs
+(cid:4)id,d(cid:5)∈DB proj1((cid:4)id, d(cid:5), g), whose union graphs are
+mined from proj1(DB, g) =
+isomorphic to g, are added to F in Line 6. These processes are continued until
+the connected frequent subgraph g is exhausted in FrequentSubgraphMiner. We
+have implemented FrequentSubgraphMiner using AcGM [8] which is one of the
+conventional Graph Mining methods.
+
+(cid:2)
+
+4 Proposed Method: GTRACE2
+
+Most of the computation time of GTRACE is used to run the altered PreﬁxSpan.
+The reason why the PreﬁxSpan used in GTRACE needs so much computation
+time is as follows. Let Gu and g be a set of union graphs of all (cid:4)id, d(cid:5) ∈ DB
+and a frequent connected subgraph mined by FrequentSubgraphMiner from Gu,
+respectively. The union graphs in Gu are often dense even if each interstate in
+graph sequences is sparse, since a union graph in Gu is generated by superim-
+posing interstates in a graph sequence. In addition, since the union graph of a
+graph sequence is a graph with no labels, there exist many injective functions
+V (g) → V (gu) between g and a dense union graph gu(d) ∈ Gu such that g is a
+subgraph of gu(d). Therefore, many projected transformation subsequences are
+produced from the graph g and one graph sequence d such that g is a subgraph
+of gu(d) according to the deﬁnition of projection.
+
+184
+
+A. Inokuchi and T. Washio
+
+Fig. 5. Union Graph and Labeled Union Graph
+
+To reduce the number of transformation subsequences produced by the pro-
+jection, we redeﬁne the union graph as follows:
+Deﬁnition 7. We redeﬁne a union graph of d as gu(d) = (Vu, Eu, L ∪ {l+}, fu)
+such that
+
+⎧
+⎨
+
+l
+
+if always f(v) = l f or v ∈ V (g(j))
+such that g(j) ∈ d and id(v) = o
+
+(3)
+
+fu(o)|o∈Vu =
+
+⎩
+
+l+ otherwise
+
+where Vu and Eu are given by Eqs. (1) and (2), respectively. L is a set of vertex
+labels in d, f is a function to assign vertex label l ∈ L to each vertex in interstates
+in d, and l+ /∈ L.
+(cid:2)
+The union graph deﬁned here is a labeled graph, although the union graph
+deﬁned in Section 3 is an unlabeled graph. So, we call the union graph we
+have deﬁned here a labeled union graph. A label assigned to each vertex in the
+labeled union graph is determined by Eq. (3). If the vertices with unique ID o
+in interstates in d always have the identical label l ∈ L, a vertex o in the labeled
+union graph of d has the label l. Otherwise, the vertex o has a label l+ such that
+l+ /∈ L.
+Example 4. Figure 5 shows a union graph and a labeled union graph generated
+from the same graph sequence. Since two vertices with unique ID 1 in the graph
+sequence d have diﬀerent labels, the corresponding vertex in the labeled union
+graph has a label l+.
+As mentioned in Section 3, GTRACE generates union graphs of all graph se-
+quences in DB and mines all frequent connected subgraph patterns using AcGM.
+In this process, AcGM checks whether a pattern is included in each union graph.
+Since vertices with label l+ in a labeled union graph should match any vertex
+in a pattern, the subgraph isomorphism test used in AcGM is altered as follows.
+(cid:3) is a subgraph of g, if there
+Given two graphs g(V, E, L, f) and g
+(cid:3) → V that satisﬁes the following conditions for
+exists an injective function φ : V
+∀v, v1, v2 ∈ V
+1. (φ(v1), φ(v2)) ∈ E, if (v1, v2) ∈ E
+(cid:3)(v) or f(φ(v)) = l+.
+2. f(φ(v)) = f
+By integrating the deﬁnition of the labeled union graph and the subgraph iso-
+morphism test with GTRACE, we propose a new method called GTRACE2 to
+mine all rFTSs from graph sequences. According to the following lemma, we
+reduce the computation time to mine all rFTSs from graph sequences.
+
+(cid:3), and
+
+(cid:3)), g
+
+(cid:3)(V
+
+, E
+
+, L
+
+, f
+
+(cid:3).
+
+(cid:3)
+
+(cid:3)
+
+(cid:3)
+
+GTRACE2: Improving Performance Using Labeled Union Graphs
+
+185
+
+Fig. 6. Inputs of projection of GTRACE and GTRACE2
+
+Lemma 1. If g1 is an unlabeled graph generated by removing all labels from a
+labeled graph g2 to be used as input of projection in GTRACE2, then
+| ∪(cid:4)id,d(cid:5)∈DB proj2((cid:4)id, d(cid:5), g2)| ≤ | ∪(cid:4)id,d(cid:5)∈DB proj1((cid:4)id, d(cid:5), g1)|,
+
+where proj1 and proj2 are functions to project a graph sequence in GTRACE
+and GTRACE2, respectively. In addition, for (cid:4)id2, seq(d2)(cid:5) ∈ proj2((cid:4)id2, d(cid:5), g2),
+there must exists a transformation sequence (cid:4)id1, seq(d1)(cid:5) ∈ proj1((cid:4)id1, d(cid:5), g1)
+such that id1 = id2 and seq(d2) (cid:7) seq(d1). Therefore, the average number of
+TRs in transformation sequences in ∪(cid:4)id,d(cid:5)∈DBproj2((cid:4)id, d(cid:5), g2) is less than or
+equal to the average number of TRs in transformation sequences in
+∪(cid:4)id,d(cid:5)∈DBproj1((cid:4)id, d(cid:5), g1).
+(cid:2)
+The proof of Lemma 1 is omitted due to the lack of space, but an example is
+given in Example 5. As shown in the experiments in [10], the computation time
+to run PreﬁxSpan is proportional to the number of sequences in its input, and
+it increases exponentially when the average number of items in the sequences
+increases. According to Lemma 1, since the number of transformation sequences
+generated by the projection in GTRACE2 usually decreases and the average
+number of TRs in the transformation sequences usually becomes less than in the
+original GTRACE, the computation time for running the altered PreﬁxSpan in
+GTRACE2 is reduced.
+Example 5. The graph sequence (cid:4)1, d(cid:5) at the center of Fig. 5 is represented as
+(cid:5)(cid:5), and its union graph and labeled
+(cid:4)1,(cid:4)vi(1,1)
+union graph are shown in Fig. 5. Given the graph g1 shown in Fig. 6 (a) as input
+of the projection in GTRACE, two vertices in g1 correspond to vertices with
+unique IDs 1 and 2 or vertices with unique IDs 1 and 3 in the union graph gu(d).
+Therefore, proj1((cid:4)1, d(cid:5), g1) is
+[2,B]ei(1,3)
+
+(cid:5)(cid:5),(cid:4)1,(cid:4)vi(1,1)
+
+{(cid:4)1,(cid:4)vi(1,1)
+
+[(1,2),•]vr(2,3)
+
+[(1,3),•]vr(2,3)
+
+[(1,2),•]vi(2,1)
+
+[2,B]ei(1,3)
+
+[1,A]vi(1,2)
+
+[1,A]vi(2,1)
+
+[3,C]ei(2,2)
+
+[(1,3),•]vr(2,3)
+
+[1,B]
+
+[3,C]ei(2,2)
+
+[1,B]
+
+[1,A]vi(1,2)
+
+[1,B]
+
+(cid:5)(cid:5)}.
+
+On the other hand, given the graph g2 shown in Fig. 6 (b) as input of the
+projection in GTRACE2, proj2((cid:4)1, d(cid:5), g2) is
+[1,A]vi(1,2)
+
+{(cid:4)1,(cid:4)vi(1,1)
+
+[2,B]ei(1,3)
+
+[(1,2),•]
+
+(cid:5)(cid:5)},
+
+since two vertices with unique ID 1 and 2 in the input graph g2 correspond
+to vertices with unique IDs 1 and 2 in the labeled union graph gu(d), respec-
+tively. This projected transformation sequence does not include vr(2,3)
+[1,B] to satisfy
+gu(d) = g in Deﬁnition 8.
+
+186
+
+A. Inokuchi and T. Washio
+
+Table 2. Results for the Enron dataset
+
+90
+42.0
+37.7
+
+7
+
+GTRACE2 comp. time
+
+100
+
+110 120 140
+
+150 170 182
+
+|IDV (d)|
+GTRACE comp. time
+
+80
+0.18
+comp. time for PreﬁxSpan 0.048
+# of subgraph patterns
+avg. # of trans. seq.
+avg. # of TRs
+
+4
+
+10
+
+–
+–
+–
+–
+–
+
+–
+–
+–
+–
+–
+
+–
+–
+–
+–
+–
+
+1509.5
+1407.7
+
+–
+–
+–
+–
+–
+0.39 0.63 0.67 1.2
+
+–
+–
+–
+–
+–
+30.1
+0.34
+3.8
+0.078 0.11 0.22 0.20 0.45 2.5
+50
+
+36
+
+39
+
+45
+
+28
+585
+6.5
+
+26
+415
+6.2
+
+809
+10.3
+0.14
+
+19249 269726
+23.4
+0.25
+comp. time for PreﬁxSpan 0.015 0.062
+# of subgraph patterns
+avg. # of trans. seq.
+avg. # of TRs
+, n
+
+29
+22
+656 813 892 1333 2078 2201
+197
+7.9
+6.4
+4.7
+7.0
+7
+60% 50% 40% 20% 5% 2% 5
+–
+–
+7.5
+–
+–
+–
+comp. time for PreﬁxSpan 1.7
+–
+–
+–
+4
+–
+# of subgraph patterns
+–
+–
+–
+avg. # of trans. seq.
+–
+–
+–
+avg. # of TRs
+2.7 25.6 327.3 1.3
+4.1
+1.4 24.0 325.5 0.50 0.97 2.7
+46
+52
+
+41334 202432
+16.8
+0.52
+comp. time for PreﬁxSpan 0.03
+13
+# of subgraph patterns
+avg. # of trans. seq.
+avg. # of TRs
+
+3028 2424 1468 991 1940 2293 2201
+6.6
+7.9
+
+–
+–
+–
+–
+–
+1.2
+0.17
+29
+
+7.9
+6
+–
+–
+–
+–
+–
+2.2
+
+22.3
+0.92
+0.11
+24
+
+132.4
+60.9
+
+2906
+6.0
+
+3288
+4.7
+
+–
+–
+–
+–
+–
+
+σ
+GTRACE comp. time
+
+–
+–
+–
+–
+–
+4.1
+2.7
+52
+
+7.7
+
+8.2
+
+8.7
+
+6.0
+
+6.7
+
+GTRACE2 comp. time
+
+81
+
+124
+
+44
+
+47
+
+(cid:2)
+
+7
+
+6.7
+
+6.7
+
+–
+–
+–
+–
+–
+
+comp. time: computation time [sec],
+comp. time for PreﬁxSpan: total computation time to run the altered PreﬁxSpan,
+# of subgraph patterns: the number of frequent connected subgraphs mined by AcGM,
+avg. # of trans. seq.: the average number of transformation sequences in proji(DB, g),
+avg. # of TRs: the average number of TRs in transformation sequences in proji(DB, g)
+Default: minimum support σ
+
+=15%, # of vertex labels |Lv| = 8, # of edge labels |Le| = 1,
+
+# of persons |IDV (d)| = 182, # of interstates in a graph sequence n=7.
+
+(cid:2)
+
+5 Experiment and Discussion
+
+The proposed method was implemented in C++. The experiments were executed
+on an HP xw4600 with an Intel Core 2 8600 3.33 GHz processor and 2 GB of main
+memory and running Windows XP. The performance of the proposed method
+was evaluated using both artiﬁcial and real world graph sequence data. Due to
+the lack of space, we report the experiments using the real world data.
+
+To assess the practicality of the proposed method, it was applied to the Enron
+Email Dataset [3]. We assigned a unique ID to each person participating in email
+communication, and assigned an edge to a pair communicating via email on a
+particular day, thereby obtaining a daily graph g(j). In addition, one of the
+vertex labels {CEO, Employee, Director, Manager, Lawyer, President, Trader,
+Vice President} was assigned to each vertex. We then obtained a set of weekly
+graph sequence data DB. The total number of weeks, i.e., number of sequences,
+was 123. We randomly sampled |IDV (d)|(= 1 ∼ 182) persons to form DB.
+
+Table 2 shows the computation times [sec] to run GTRACE and GTRACE2,
+total computation times [sec] to run the altered PreﬁxSpan, the numbers of
+frequent connected subgraphs mined by AcGM, the average numbers of trans-
+formation sequences in proji(DB, g), and the average numbers of transformation
+sequences in proji(DB, g) obtained for various numbers of unique IDs (persons)
+|IDV (d)|, minimum support σ
+(cid:3), and numbers of interstates n in each graph se-
+quence of the dataset. All the other parameters were set to the default values
+indicated at the bottom of the table. Thus, the dataset with the default values
+
+GTRACE2: Improving Performance Using Labeled Union Graphs
+
+187
+
+as contained 123 graph sequences each consisting of 182 persons (unique IDs)
+and 7 interstates. The parameter n =5, 6, or 7 indicates that each sequence d in
+DB consists of 5, 6, or 7 steps (interstates) from Monday to Friday, Saturday,
+or Sunday, respectively. When the required computation time exceeds two hours
+or a memory overﬂow occurs, the results are indicated by “-”.
+
+The upper, lower left, and lower right parts of the table show experimental
+results with regard to the number of persons (unique IDs), the minimum sup-
+port threshold, and the number of interstates in graph sequences in the graph
+sequence database, respectively. The table indicates that GTRACE proved in-
+tractable for the graph sequence dataset generated from the default values,
+althought the proposed method GTRACE2 is tractable with respect to the
+database. In addition, the computation times for both GTRACE and GTRACE2
+are exponential with respect to the increases of the number of |IDV (d)| and the
+number of interstates in the graph sequence database and with respect to the
+decrease of the minimum support threshold. The main reason that the compu-
+tation time increases is the increase in the number of frequent patterns.
+
+The computation times for GTRACE2 are much smaller than those for
+GTRACE, although the number of times to call the altered PreﬁxSpan increases.
+Most of computation time of GTRACE is used running the altered PreﬁxSpan.
+As shown in [10], the computation time of PreﬁxSpan is proportional to the
+number of sequences in its input and increase exponentially with respect to the
+average number of items in sequences in its input. The scalability of GTRACE2
+comes from reducing the number of transformation sequences and the number of
+TRs in transformation sequences in the projected database by using the labeled
+union graph proposed in Section 4. GTRACE2 is practical, because it can be
+applied to graph sequences that are both longer and larger than those to which
+GTRACE can be applied.
+
+6 Conclusion
+
+In this paper, we proposed a method to improve GTRACE which mines a set
+of relevant frequent transformation subsequences (rFTSs) from given graph se-
+quences by deﬁning the labeled union graph. We developed a graph sequence
+mining program GTRACE2, and conﬁrmed its eﬃciency and practical per-
+formance through computational experiments using artiﬁcial and real world
+datasets. Our performance study showed that the proposed method is some
+orders of magnitude faster than the conventional method, and is eﬃcient and
+scalable for mining both long and large graph sequence patterns. Recently, we
+have proposed a method for mining another class of frequent patterns, called
+FRISSs (Frequent, Relevant, and Induced Subgraph Subsequences), from graph
+sequence [7]. The principle proposed in this paper using labeled graphs can be
+applied to the method. In real applications, it is hard to enumerate usefule and
+interesting FTSs which are exactly included in graph sequences. In future work,
+we plan to extend GTRACE2 to mine FTSs which are approximately included in
+graph sequences by using sliding windows and time constraints proposed in [11].
+
+188
+
+A. Inokuchi and T. Washio
+
+References
+
+1. Berlingerio, M., et al.: Mining Graph Evolution Rules. In: Proc. of Euro. Conf. on
+Principles and Practice of Knowledge Discovery in Databases, pp. 115–130 (2009)
+2. Borgwardt, K.M., et al.: Pattern Mining in Frequent Dynamic Subgraphs. In: Proc.
+
+of Int’l Conf. on Data Mining, pp. 818–822 (2006)
+
+3. Enron Email Dataset, http://www.cs.cmu.edu/~enron/
+4. Garey, M., Johnson, D.: Computers and Intractability: A Guide to the Theory of
+
+NP-Completeness. W.H. Freeman, New York (1979)
+
+5. Inokuchi, A., et al.: An Apriori-based Algorithm for Mining Frequent Substruc-
+˙Zytkow, J.M. (eds.)
+
+tures from Graph Data. In: Zighed, D.A., Komorowski, J.,
+PKDD 2000. LNCS (LNAI), vol. 1910, pp. 13–23. Springer, Heidelberg (2000)
+
+6. Inokuchi, A., Washio, T.: A Fast Method to Mine Frequent Subsequences from
+Graph Sequence Data. In: Proc. of Int’l Conf. on Data Mining, pp. 303–312 (2008)
+7. Inokuchi, A., Washio, T.: Mining Frequent Graph Sequence Patterns Induced by
+
+Vertices. In: Proc. of SIAM Int’l Conf. on Data Mining (2010)
+
+8. Inokuchi, A., et al.: A Fast Algorithm for Mining Frequent Connected Subgraphs.
+
+IBM Research Report, RT0448 (2002)
+
+9. Nijssen, S., Kok, J.N.: A Quickstart in Frequent Structure Mining can Make a
+Diﬀerence. In: Proc. of Int’l Conf. on Knowledge Discovery and Data Mining,
+pp. 647–652 (2004)
+
+10. Pei, J., et al.: PreﬁxSpan: Mining Sequential Patterns by Preﬁx-Projected Growth.
+
+In: Proc. of Int’l Conf. on Data Eng., pp. 2–6 (2001)
+
+11. Srikant, R., Agrawal, R.: Mining Sequential Patterns: Generalizations and Perfor-
+mance Improvements. In: Proc. of Int’l Conf. on Extending Database Technology,
+pp. 3–17 (1996)
+
+12. Yan, X., Han, J.: gSpan: Graph-Based Substructure Pattern Mining. In: Proc. of
+
+Int’l Conf. on Data Mining, pp. 721–724 (2002)
+
+

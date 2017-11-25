@@ -1,0 +1,1157 @@
+Fast Perceptron Decision Tree Learning from
+
+Evolving Data Streams
+
+Albert Bifet, Geoﬀ Holmes, Bernhard Pfahringer, and Eibe Frank
+
+University of Waikato, Hamilton, New Zealand
+
+{abifet,geoff,bernhard,eibe}@cs.waikato.ac.nz
+
+Abstract. Mining of data streams must balance three evaluation dimen-
+sions: accuracy, time and memory. Excellent accuracy on data streams
+has been obtained with Naive Bayes Hoeﬀding Trees—Hoeﬀding Trees
+with naive Bayes models at the leaf nodes—albeit with increased run-
+time compared to standard Hoeﬀding Trees. In this paper, we show
+that runtime can be reduced by replacing naive Bayes with perceptron
+classiﬁers, while maintaining highly competitive accuracy. We also show
+that accuracy can be increased even further by combining majority vote,
+naive Bayes, and perceptrons. We evaluate four perceptron-based learn-
+ing strategies and compare them against appropriate baselines: simple
+perceptrons, Perceptron Hoeﬀding Trees, hybrid Naive Bayes Perceptron
+Trees, and bagged versions thereof. We implement a perceptron that uses
+the sigmoid activation function instead of the threshold activation func-
+tion and optimizes the squared error, with one perceptron per class value.
+We test our methods by performing an evaluation study on synthetic and
+real-world datasets comprising up to ten million examples.
+
+1 Introduction
+
+In the data stream model, data arrive at high speed, and algorithms that process
+them must do so under very strict constraints of space and time. Consequently,
+data streams pose several challenges for data mining algorithm design. First,
+algorithms must make use of limited resources (time and memory). Second, they
+must deal with data whose nature or distribution changes over time.
+
+An important issue in data stream mining is the cost of performing the learn-
+ing and prediction process. As an example, it is possible to buy time and space
+usage from cloud computing providers [25]. Several rental cost options exist:
+
+– Cost per hour of usage: Amazon Elastic Compute Cloud (Amazon EC2) is
+a web service that provides resizable compute capacity in the cloud. Cost
+depends on the time and on the machine rented (small instance with 1.7 GB,
+large with 7.5 GB or extra large with 15 GB).
+
+– Cost per hour and memory used: GoGrid is a web service similar to Amazon
+EC2, but it charges by RAM-Hours. Every GB of RAM deployed for 1 hour
+equals one RAM-Hour.
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part II, LNAI 6119, pp. 299–310, 2010.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2010
+
+300
+
+A. Bifet et al.
+
+It is crucial to ﬁnd mining methods that use resources eﬃciently. In this spirit, we
+propose in this paper the Hoeﬀding Perceptron Tree for classiﬁcation, as a faster
+method compared to the state-of-the-art Hoeﬀding Tree with naive Bayes leaves.
+The idea is to implement perceptron classiﬁers at the leaves of the Hoeﬀding
+Tree, to potentially increase accuracy, but mainly to reduce runtime.
+
+We introduce the use of RAM-Hours as an evaluation measure of the resources
+used by streaming algorithms. The paper is structured as follows: related work is
+presented in Section 2. Hoeﬀding Perceptron Trees and bagging of such trees are
+discussed in Section 3. An experimental evaluation is conducted in Section 4. Fi-
+nally, conclusions and suggested items for future work are presented in Section 5.
+
+2 Related Work
+
+Standard decision tree learners such as ID3, C4.5, and CART [18,21] assume
+that all training examples can be stored simultaneously in main memory, and
+are thus severely limited in the number of examples they can learn from. In
+particular, they are not applicable to data streams, where potentially there is
+no bound on the number of examples and these arrive sequentially.
+
+Domingos et al. [6,14] proposed the Hoeﬀding tree as an incremental, anytime
+decision tree induction algorithm that is capable of learning from data streams,
+assuming that the distribution generating examples does not change over time.
+Hoeﬀding trees exploit the fact that a small sample can often suﬃce to choose
+a splitting attribute. This idea is supported by the Hoeﬀding bound, which
+quantiﬁes the number of observations (in our case, examples) needed to estimate
+some statistics within a prescribed precision (in our case, the goodness of an
+attribute). More precisely, the Hoeﬀding bound states that with probability 1−δ,
+the true mean of a random variable of range R will not diﬀer from the estimated
+mean after n independent observations by more than:
+
+(cid:2)
+
+ =
+
+R2 ln(1/δ)
+
+2n
+
+.
+
+A theoretically appealing feature of Hoeﬀding Trees not shared by other incre-
+mental decision tree learners (ID4 [22], ID5 [24]) is that it has sound guarantees
+of performance. Using the Hoeﬀding bound one can show that its output is
+asymptotically nearly identical to that of a non-incremental learner using in-
+ﬁnitely many examples. CVFDT [14] is an extension of the Hoeﬀding Tree to
+evolving data streams, but does not exhibit theoretical guarantees.
+
+Outside the data stream world, there is prior work on using perceptrons or
+similar classiﬁers in decision trees. Utgoﬀ [24] presented the Perceptron Decision
+Tree as a decision tree in which each leaf node uses the perceptron as a classiﬁer
+of the input instances. Bennett et al. [2] showed that maximizing margins in
+perceptron decision trees can be useful to combat overﬁtting. Zhou [26] proposed
+Hybrid Decision Trees as a hybrid learning approach combining decision trees
+with neural networks.
+
+Frank et al. [7] investigated using Model Trees for classiﬁcation problems.
+Model trees are decision trees with linear regression functions at the leaves.
+
+Fast Perceptron Decision Tree Learning from Evolving Data Streams
+
+301
+
+Logistic Model Trees [17] are model trees that use logistic regression instead
+of linear regression. They have been shown to be very accurate and compact
+classiﬁers, but their induction is very time-consuming.
+
+The LTree algorithm of Gama [8] embodies a general framework for learn-
+ing functional trees, multivariate classiﬁcation or regression trees that can use
+combinations of attributes at decision nodes, leaf nodes, or both.
+
+In the data streams literature, Ikonomovska et al. [15] presented FIMT, a
+fast incremental model tree for regression on static data streams. To deal with
+concept drift, Ikonomovska et al. [16] proposed FIRT-DD as an adaption of
+the FIMT algorithm to time-changing distributions. FIMT and FIRT-DD use a
+perceptron learner at the leaves to perform regression. Considering classiﬁcation
+methods for data streams, Bifet et al. [4] presented two new ensemble learning
+methods: one using bagging with decision trees of diﬀerent size and one using
+ADWIN, an adaptive sliding window method that detects change and adjusts the
+size of the window correspondingly. We revisit the latter approach in this paper.
+
+3 Perceptrons and Hoeﬀding Perceptron Trees
+
+In this section, we present the perceptron learner we use, and the Hoeﬀding Per-
+ceptron Tree based on it. We also consider bagging trees with change detection.
+
+3.1 Perceptron Learning
+We use an online version of the perceptron that employs the sigmoid activation
+function instead of the threshold activation function and optimizes the squared
+error, with one perceptron per class value.
+Given a data stream (cid:2)xi, yi(cid:3), where xi is an example and yi is its example
+class, the classiﬁer’s goal is to minimize the number of misclassiﬁed examples.
+Let hw(xi) be the hypothesis function of the perceptron for instance xi. We
+(yi − hw(xi))2 instead of the 0-1 loss
+use the mean-square error J(w) = 1
+2
+function, since it is diﬀerentiable.
+
+(cid:3)
+
+The classic perceptron takes a linear combination and thresholds it. The pre-
+dicted class of the perceptron is hw(xi) = sgn(wT xi), where a bias weight
+with constant input is included. Our hypothesis function hw = σ(wT x) in-
+stead uses the sigmoid function σ(x) = 1/(1 + e−x) since it has the property
+σ(cid:3)(x) = σ(x)(1− σ(x)). Thus, we can compute the gradient of the error function
+
+(cid:4)
+
+∇J = −
+
+(yi − hw(xi))∇hw(xi)
+
+where for sigmoid hypothesis
+
+i
+
+obtaining the following weight update rule
+
+∇hw(xi) = hw(xi)(1 − hw(xi))
+(cid:4)
+
+w = w + η
+
+(yi − hw(xi))hw(xi)(1 − hw(xi))xi
+
+i
+
+302
+
+A. Bifet et al.
+
+Because we work in a data stream scenario, rather than performing batch
+updates, we use stochastic gradient descent where the weight vector is updated
+after every example. As we deal with multi-class problems, we train one per-
+ceptron for each class. To classify an unseen instance x, we obtain the pre-
+dictions hw1(x), . . . , hwn(x) from the perceptrons, and the predicted class is
+arg maxclass hwclass(x). The pseudocode is shown in Figure 1.
+
+Perceptron Learning(Stream, η)
+1 for each class
+2
+
+do Perceptron Learning(Stream, class, η)
+
+Perceptron Learning(Stream, class, η)
+1  Let w0 and w be randomly initialized
+2 for each example (x, y) in Stream
+3
+4
+5
+6
+
+w = w + η · δ · x
+
+do if class = y
+
+then δ = (1 − hw (x)) · hw (x) · (1 − hw (x))
+else δ = (0 − hw (x)) · hw (x) · (1 − hw (x))
+
+Perceptron Prediction(x)
+1 return arg maxclass hw class (x)
+
+Fig. 1. Perceptron algorithm
+
+3.2 Hoeﬀding Perceptron Tree
+
+Hoeﬀding trees [6] are state-of-the-art in classiﬁcation for data streams and they
+perform prediction by choosing the majority class at each leaf. Their predictive
+accuracy can be increased by adding naive Bayes models at the leaves of the trees.
+However, Holmes et al. [12] identiﬁed situations where the naive Bayes method
+outperforms the standard Hoeﬀding tree initially but is eventually overtaken.
+They propose a hybrid adaptive method that generally outperforms the two
+original prediction methods for both simple and complex concepts. We call this
+method Hoeﬀding Naive Bayes Tree (hnbt). This method works by performing
+a naive Bayes prediction per training instance, and comparing its prediction
+with the majority class. Counts are stored to measure how many times the naive
+Bayes prediction gets the true class correct as compared to the majority class.
+When performing a prediction on a test instance, the leaf will only return a naive
+Bayes prediction if it has been more accurate overall than the majority class,
+otherwise it resorts to a majority class prediction.
+
+We adapt this methodology to deal with perceptrons rather than naive Bayes
+models. A Hoeﬀding Perceptron Tree (hpt) is a Hoeﬀding Tree that has a per-
+ceptron at each leaf. Similarly to hnbt, predictions by the perceptron are only
+used if they are more accurate on average than the majority class. It improves
+on hnbt in terms of runtime because it does not need to estimate the statistical
+distribution for numeric attributes and calculate density values based on the
+
+Fast Perceptron Decision Tree Learning from Evolving Data Streams
+
+303
+
+exponential function, and for discrete attributes it does not need to calculate
+divisions to estimate probabilities.
+
+Finally, a Hoeﬀding Naive Bayes Perceptron Tree (hnbpt) is a Hoeﬀding Tree
+that has three classiﬁers at each leaf: a majority class, naive Bayes, and a per-
+ceptron. Voting is used for prediction. It is slower than the Hoeﬀding Perceptron
+Tree and the Hoeﬀding Naive Bayes Tree, but it combines the predictive power
+of the base learners.
+
+3.3 Bagging Trees with ADWIN
+ADWIN [3] is a change detector and estimator that solves in a well-speciﬁed way
+the problem of tracking the average of a stream of bits or real-valued numbers.
+ADWIN keeps a variable-length window of recently seen items, with the prop-
+erty that the window has the maximal length statistically consistent with the
+hypothesis “there has been no change in the average value inside the window”.
+ADWIN is parameter- and assumption-free in the sense that it automatically
+detects and adapts to the current rate of change. Its only parameter is a conﬁ-
+dence bound δ, indicating how conﬁdent we want to be in the algorithm’s output,
+inherent to all algorithms dealing with random processes.
+
+Also important for our purposes, ADWIN does not maintain the window explic-
+itly, but compresses it using a variant of the exponential histogram technique.
+This means that it keeps a window of length W using only O(log W ) memory
+and O(log W ) processing time per item.
+
+ADWIN Bagging is the online bagging method of Oza and Russell [19] with
+the addition of the ADWIN algorithm as a change detector. When a change is
+detected, the worst classiﬁer of the ensemble of classiﬁers is removed and a new
+classiﬁer is added to the ensemble.
+
+4 Comparative Experimental Evaluation
+
+Massive Online Analysis (MOA) [13] is a software environment for implementing
+algorithms and running experiments for online learning from data streams. All
+algorithms evaluated in this paper were implemented in the Java programming
+language by extending the MOA software.
+
+We use the experimental framework for concept drift presented in [4]. Con-
+sidering data streams as data generated from pure distributions, we can model
+a concept drift event as a weighted combination of two pure distributions that
+characterizes the target concepts before and after the drift. This framework de-
+ﬁnes the probability that a new instance of the stream belongs to the new concept
+after the drift based on the sigmoid function.
+Deﬁnition 1. Given two data streams a, b, we deﬁne c = a ⊕W
+b as the data
+stream built by joining the two data streams a and b, where t0 is the point of
+change, W is the length of change, Pr[c(t) = b(t)] = 1/(1 + e−4(t−t0)/W ) and
+Pr[c(t) = a(t)] = 1 − Pr[c(t) = b(t)].
+In order to create a data stream with multiple concept changes, we can build new
+data streams joining diﬀerent concept drifts, i. e. (((a ⊕W0
+d) . . ..
+
+c) ⊕W2
+
+b) ⊕W1
+
+t0
+
+t0
+
+t1
+
+t2
+
+304
+
+A. Bifet et al.
+
+4.1 Datasets for Concept Drift
+Synthetic data has several advantages – it is easier to reproduce and there is
+little cost in terms of storage and transmission. For this paper we use the data
+generators most commonly found in the literature.
+SEA Concepts Generator. This artiﬁcial dataset contains abrupt concept
+drift, ﬁrst introduced in [23]. It is generated using three attributes, where
+only the two ﬁrst attributes are relevant. All the attributes have values be-
+tween 0 and 10. The points of the dataset are divided into 4 blocks with
+diﬀerent concepts. In each block, the classiﬁcation is done using f1 + f2 ≤ θ,
+where f1 and f2 represent the ﬁrst two attributes and θ is a threshold value.
+The most frequent values are 9, 8, 7 and 9.5 for the data blocks. In our
+framework, SEA concepts are deﬁned as follows:
+
+SEA7) ⊕W
+
+3t0
+
+SEA9.5)
+
+t0
+
+(((SEA9 ⊕W
+(cid:3)d
+
+SEA8) ⊕W
+(cid:3)d
+
+2t0
+
+i=1
+
+Rotating Hyperplane. This data was used as a testbed for CVFDT versus
+wixi ≥ w0 are labeled positive,
+VFDT in [14]. Examples for which
+wixi < w0 are labeled negative. Hyperplanes
+and examples for which
+are useful for simulating time-changing concepts, because we can change the
+orientation and position of the hyperplane in a smooth manner by changing
+the relative size of the weights.
+
+i=1
+
+Random RBF Generator. This generator was devised to oﬀer an alternate
+complex concept type that is not straightforward to approximate with a
+decision tree model. The RBF (Radial Basis Function) generator works as
+follows: A ﬁxed number of random centroids are generated. Each center has
+a random position, a single standard deviation, class label and weight. New
+examples are generated by selecting a center at random, taking weights into
+consideration so that centers with higher weight are more likely to be chosen.
+A random direction is chosen to oﬀset the attribute values from the central
+point. Drift is introduced by moving the centroids with constant speed.
+
+LED Generator. This data source originates from the CART book [5]. An im-
+plementation in C was donated to the UCI [1] machine learning repository
+by David Aha. The goal is to predict the digit displayed on a seven-segment
+LED display, where each attribute has a 10% chance of being inverted. The
+particular conﬁguration of the generator used for the experiments (led) pro-
+duces 24 binary attributes, 17 of which are irrelevant.
+
+4.2 Real-World Data
+The UCI machine learning repository [1] contains some real-world benchmark
+data for evaluating machine learning techniques. We consider three of the largest:
+Forest Covertype, Poker-Hand, and Electricity.
+Forest Covertype. Contains the forest cover type for 30 x 30 meter cells ob-
+tained from US Forest Service (USFS) Region 2 Resource Information Sys-
+tem (RIS) data. It contains 581, 012 instances and 54 attributes, and it has
+been used in several papers on data stream classiﬁcation [10,20].
+
+RBF(0,0)
+RBF(50,0.001)
+RBF(10,0.001)
+RBF(50,0.0001)
+RBF(10,0.0001)
+HYP(10,0.001)
+HYP(10,0.0001)
+SEA(50)
+SEA(50000)
+LED(50000)
+CovType
+Poker
+Electricity
+CovPokElec
+
+Acc.
+
+Perceptron
+Time
+1.83 72.69 ± 0.28
+2.67 65.33 ± 0.04
+1.82 74.11 ± 0.09
+2.64 69.34 ± 0.07
+1.85 73.92 ± 0.16
+1.55 92.87 ± 0.43
+1.56 93.70 ± 0.03
+1.17 87.15 ± 0.05
+1.31 86.85 ± 0.04
+6.64 72.76 ± 0.01
+12.21
+5.36
+0.53
+20.87
+
+81.68
+3.34
+79.07
+13.69
+
+Acc.
+
+Naive Bayes
+4.15 72.04 ± 0.06
+5.02 53.23 ± 0.05
+4.14 75.79 ± 0.06
+4.99 53.82 ± 0.04
+4.14 75.18 ± 0.09
+3.91 77.64 ± 3.74
+3.90 90.23 ± 0.76
+1.54 85.37 ± 0.00
+1.69 85.38 ± 0.00
+8.97 54.02 ± 0.00
+
+0.01
+0.01
+0.01
+0.01
+0.01
+0.01
+0.01
+0.00
+0.00
+0.02
+0.05 22.81
+9.25
+0.01
+0.01
+0.55
+0.06 56.52
+
+60.52
+59.55
+73.36
+24.34
+
+Acc.
+
+Hoeﬀding Tree
+5.84 86.75 ± 0.83
+0.01
+6.40 52.52 ± 0.17
+0.01
+5.80 83.72 ± 0.58
+0.01
+7.04 55.78 ± 0.33
+0.01
+5.94 83.59 ± 0.50
+0.01
+5.37 73.19 ± 2.60
+0.01
+4.99 76.87 ± 1.46
+0.01
+2.54 85.68 ± 0.00
+0.00
+2.71 85.59 ± 0.04
+0.00
+0.04 12.81 52.74 ± 0.15
+0.08 13.43
+5.46
+0.02
+0.01
+0.86
+0.11 42.82
+
+68.30
+73.62
+75.35
+72.63
+
+Mem.
+1.56
+1.50
+1.55
+1.86
+1.62
+1.60
+1.40
+0.56
+0.56
+4.98
+2.59
+1.11
+0.12
+10.03
+
+Fast Perceptron Decision Tree Learning from Evolving Data Streams
+
+305
+
+Table 1. Comparison of Perceptron, Naive Bayes and Hoeﬀding Tree. The best indi-
+vidual accuracies are indicated in boldface.
+
+Mem. Time
+
+Mem. Time
+
+69.04 Acc.
+
+0.12 RAM-Hours
+
+67.18 Acc.
+
+0.41 RAM-Hours
+
+73.31 Acc.
+
+37 RAM-Hours
+
+Poker-Hand. Consists of 1, 000, 000 instances and 11 attributes. Each record
+of the Poker-Hand dataset is an example of a hand consisting of ﬁve playing
+cards drawn from a standard deck of 52. Each card is described using two
+attributes (suit and rank), for a total of 10 predictive attributes. There is
+one class attribute that describes the “Poker Hand”.
+
+Electricity. is another widely used dataset described by M. Harries [11] and
+analysed by Gama [9]. This data was collected from the Australian New
+South Wales Electricity Market. In this market, prices are not ﬁxed and are
+aﬀected by demand and supply of the market. They are set every ﬁve min-
+utes. The ELEC dataset contains 45, 312 instances. The class label identiﬁes
+the change of the price relative to a moving average of the last 24 hours.
+
+We use normalized versions of these datasets, so that the numerical values are
+between 0 and 1. With the Poker-Hand dataset, the cards are not ordered, i.e.
+a hand can be represented by any permutation, which makes it very hard for
+propositional learners, especially for linear ones. We use a modiﬁed version,
+where cards are sorted by rank and suit, and have removed duplicates. This
+dataset loses about 171, 799 examples, and comes down to 829, 201 examples.
+
+These datasets are small compared to synthetic datasets we consider. Another
+important fact is that we do not know when drift occurs or indeed if there is
+any drift. We may simulate concept drift, joining the three datasets, merging
+attributes, and supposing that each dataset corresponds to a diﬀerent concept
+
+CovPokElec = (CoverType ⊕5,000
+
+581,012 Poker) ⊕5,000
+
+1,000,000 ELEC
+
+As all examples need to have the same number of attributes, we simply concate-
+nate all the attributes, and set the number of classes to the maximum number
+of classes of all the datasets.
+
+306
+
+A. Bifet et al.
+
+4.3 Results
+
+We use the datasets explained in the previous sections for evaluation. The exper-
+iments were performed on a 3 GHz Intel 64-bit machine with 2 GB of memory.
+The evaluation methodology used was Interleaved Test-Then-Train on 10 runs:
+every example was used for testing the model before using it to train. This inter-
+leaved test followed by train procedure was carried out on 10 million examples
+from the hyperplane and RandomRBF datasets, and one million examples from
+the SEA dataset. The parameters of these streams are the following:
+
+– RBF(x,v): RandomRBF data stream with x centroids moving at speed v.
+– HYP(x,v): Hyperplane data stream with x attributes changing at speed v.
+– SEA(v): SEA dataset, with length of change v.
+– LED(v): LED dataset, with length of change v.
+
+Tables 1, 2 and 3 report the ﬁnal accuracy, and speed of the classiﬁcation mod-
+els induced on the synthetic data and the real datasets: Forest CoverType,
+Poker Hand, Electricity and CovPokElec. Accuracy is measured as the
+ﬁnal percentage of examples correctly classiﬁed over the test/train interleaved
+evaluation. Time is measured in seconds, and memory in MB. The classiﬁca-
+tion methods used are the following: perceptron, naive Bayes, Hoeﬀding Naive
+Bayes Tree (hnbt), Hoeﬀding Perceptron Tree (hpt), Hoeﬀding Naive Bayes
+Perceptron Tree (hnbpt), and ADWIN bagging using hnbt, hpt, and hnbpt.
+
+The learning curves and model growth curves for the Led dataset are plotted
+in Figure 2. We observe that ht and hpt are the fastest decision trees. As the
+trees do not need more space to compute naive Bayes predictions at the leaves,
+hnbt uses the same memory as ht, and hpnbt uses the same memory as hpt. On
+accuracy, ht is the method that adapts more slowly to change, and during some
+time intervals hpt performs better than hnbt, but in other intervals performs
+worse. hnbpt is always the most or very close to the most accurate method as
+it is capable of making use of the decision of the majority class, naive Bayes and
+perceptron.
+
+Table 1 shows the accuracy, speed and memory usage of a naive Bayes learner,
+a perceptron with η = 1 and a classic Hoeﬀding Tree with majority class learn-
+ing at the leaves. As naive Bayes uses a Gaussian distribution to model numeric
+attributes, with diﬀerent variances for each class, it does not yield a linear sep-
+arator as the perceptron does. In general terms, we see that the perceptron and
+the Hoeﬀding Tree are the fastest methods, but the Hoeﬀding Tree needs more
+memory. Comparing using RAM-Hours, naive Bayes needs 3.5 times more RAM-
+Hours than the perceptron, and the Hoeﬀding Tree needs 89 more RAM-Hours
+than naive Bayes. Note that using η = 1 we obtain a very fast adaptive method,
+but for some datasets like Poker, the results are worse than obtained using a
+more conservative rate like η = 0.01. Choosing an optimal η remains an open
+problem for further research.
+
+Table 2 shows, for the Hoeﬀding tree models, their accuracy, speed and mem-
+ory. We see that hpt is much faster than hnbt, and more accurate in several
+streams. hnbpt is more accurate than hnbt and hpt, but it needs more time.
+
+Fast Perceptron Decision Tree Learning from Evolving Data Streams
+
+307
+
+)
+
+%
+
+(
+ 
+y
+c
+a
+r
+u
+c
+c
+A
+
+Accuracy
+
+80
+
+75
+
+70
+
+65
+
+60
+
+55
+
+50
+
+45
+
+40
+10.000 120.000 230.000 340.000 450.000 560.000 670.000 780.000 890.000 1.000.0
+
+Instances
+
+Memory
+
+5
+
+4,5
+
+4
+
+3,5
+
+3
+
+2,5
+
+2
+
+1,5
+
+1
+
+0,5
+
+)
+b
+M
+
+(
+ 
+y
+r
+o
+m
+e
+M
+
+0
+10.000 130.000 250.000 370.000 490.000 610.000 730.000 850.000 970.000
+
+Instances
+
+RunTime
+
+35
+
+30
+
+25
+
+20
+
+15
+
+10
+
+5
+
+)
+.
+c
+e
+s
+(
+ 
+e
+m
+T
+
+i
+
+htnbp
+htnb
+htp
+ht
+
+htnbp
+htnb
+htp
+ht
+
+htnbp
+htnb
+htp
+ht
+
+0
+10.000 120.000 230.000 340.000 450.000 560.000 670.000 780.000 890.000
+
+Instances
+
+Fig. 2. Accuracy, runtime and memory on the LED data with three concept drifts
+
+308
+
+A. Bifet et al.
+
+Table 2. Comparison of hnbt, hpt, and hnbpt algorithms. The best individual
+accuracies are indicated in boldface.
+
+hnbt
+Acc.
+
+Time
+9.03 90.78 ± 0.46
+RBF(0,0)
+10.98 57.70 ± 0.22
+RBF(50,0.001)
+9.07 87.24 ± 0.29
+RBF(10,0.001)
+RBF(50,0.0001) 11.62 69.00 ± 0.46
+9.28 88.47 ± 0.37
+RBF(10,0.0001)
+9.73 83.24 ± 2.29
+HYP(10,0.001)
+9.37 88.42 ± 0.36
+HYP(10,0.0001)
+3.70 86.63 ± 0.00
+SEA(50)
+4.51 86.44 ± 0.03
+SEA(50000)
+21.28 68.06 ± 0.10
+LED(50000)
+CovType
+24.73
+Poker
+9.81
+Electricity
+0.96
+CovPokElec
+68.37
+
+81.06
+83.05
+80.69
+83.41
+
+hpt
+Acc.
+
+Mem. Time
+
+8.04 90.33 ± 0.49
+1.57
+8.66 68.95 ± 0.31
+1.51
+8.03 87.61 ± 0.36
+1.56
+9.54 79.91 ± 0.42
+1.86
+8.20 89.37 ± 0.32
+1.63
+7.57 82.74 ± 1.13
+1.61
+7.08 82.59 ± 0.62
+1.40
+4.65 86.73 ± 0.01
+0.57
+4.85 86.41 ± 0.07
+0.57
+4.99 18.64 68.87 ± 0.07
+2.59 16.53
+8.40
+1.12
+0.12
+0.93
+10.05 49.37
+
+83.59
+74.02
+84.24
+73.33
+
+81.01 Acc.
+
+81.33 Acc.
+
+hnbpt
+Acc.
+
+Mem. Time
+2.30 10.77 91.07 ± 0.44
+2.20 11.32 68.65 ± 0.32
+2.28 10.77 87.98 ± 0.32
+2.72 12.45 79.88 ± 0.39
+2.38 10.98 89.74 ± 0.33
+2.34 11.45 84.54 ± 1.40
+2.04 11.30 88.40 ± 0.36
+5.49 87.41 ± 0.01
+1.23
+5.64 87.12 ± 0.07
+1.23
+6.00 24.99 70.04 ± 0.03
+3.46 22.16
+1.82 11.40
+1.07
+0.21
+13.53 69.70
+
+85.77
+82.93
+84.34
+83.28
+
+Mem.
+2.30
+2.20
+2.28
+2.72
+2.39
+2.34
+2.04
+1.24
+1.24
+6.00
+3.46
+1.82
+0.21
+13.53
+
+83.65 Acc.
+
+61.58 RAM-Hours
+
+68.56 RAM-Hours
+
+93.84 RAM-Hours
+
+Table 3. Comparison of ADWIN bagging with hnbt, hpt, and hnbpt. The best indi-
+vidual accuracies are indicated in boldface.
+
+ADWIN Bagging hnbt
+
+ADWIN Bagging hpt
+
+ADWIN Bagging hnbpt
+
+Acc.
+
+Acc.
+
+Acc.
+
+Mem Time
+
+Mem Time
+
+Mem
+Time
+88.84 93.70 ± 0.10 23.35 115.31 94.36 ± 0.07 23.98
+102.22 94.30 ± 0.07 16.22
+RBF(0,0)
+76.34 74.13 ± 0.40
+41.15 74.82 ± 0.26 2.27
+88.75 67.67 ± 0.16 0.12
+2.84
+RBF(50,0.001)
+80.65 90.36 ± 0.11 20.44 106.64 90.55 ± 0.10 19.73
+97.65 89.74 ± 0.09 12.97
+RBF(10,0.001)
+94.22 87.97 ± 0.11
+61.82 87.24 ± 0.14 9.66
+90.64 84.99 ± 0.17 1.33
+9.39
+RBF(50,0.0001)
+82.54 92.53 ± 0.12 21.56 109.59 93.01 ± 0.05 21.32
+RBF(10,0.0001) 100.21 91.97 ± 0.07 13.81
+69.23 91.45 ± 0.81
+31.86 91.20 ± 0.99 1.11
+90.77 89.92 ± 0.31 3.02
+2.43
+HYP(10,0.001)
+50.57 93.61 ± 0.24
+30.77 93.63 ± 0.21 0.08
+HYP(10,0.0001) 107.36 91.30 ± 0.21 8.22
+0.11
+59.19 88.60 ± 0.09 10.17
+54.09 88.08 ± 0.07 11.07
+44.48 88.22 ± 0.22 4.33
+SEA(50)
+54.07 88.65 ± 0.05 6.83
+53.44 87.85 ± 0.07 10.78
+41.03 88.61 ± 0.07 2.69
+SEA(50000)
+93.09 72.82 ± 0.03 14.84 130.56 73.02 ± 0.02
+150.62 73.14 ± 0.02 5.09
+8.45
+LED(50000)
+CovType
+1.25
+50.06
+0.80
+165.75
+Poker
+0.16
+37.14
+0.09
+57.40
+Electricity
+0.30
+0.13
+3.17
+2.59
+CovPokElec
+1.18 118.64
+363.70
+1.54
+
+1.66 115.58
+73.41
+0.21
+0.44
+3.55
+1.13 402.20
+
+87.88
+74.36
+86.44
+78.77
+
+85.73
+74.56
+84.36
+78.96
+
+86.33
+65.76
+85.22
+67.02
+
+84.53 Acc.
+
+84.04 Acc.
+
+85.91 Acc.
+
+1028.02 RAM-Hours
+
+957.38 RAM-Hours
+
+1547.33 RAM-Hours
+
+Comparing RAM-Hours, hpt needs 1.11 times more RAM-Hours than hnbt,
+and 2.54 more RAM-Hours than ht, and hnbpt needs 1.37 more than hpt.
+
+Table 3 reports the accuracy, speed and memory of ADWIN bagging using hnbt,
+hpt, and hnbpt. ADWIN bagging using hnbpt is the most accurate method, but
+it uses more time and memory than the other variants. In RAM-Hours, it needs
+1.62 times more than ADWIN bagging using hpt, and 1.51 times more than ADWIN
+bagging using hnbt. ADWIN bagging using hpt needs fewer resources than ADWIN
+bagging using hnbt.
+
+Comparing hnbpt from Table 2 with the single perceptron from Table 1, we
+obtain a 20% better accuracy, but at a cost of 780 times the amount of RAM-
+Hours. Comparing ADWIN bagging using hnbpt (Table 3) with a single hnbpt
+(Table 2) we obtain a 3% better accuracy, at 16.50 times the RAM-Hours.
+
+Concept drift is handled well by the proposed ADWIN bagging algorithms, exclud-
+ing the poor performance of the hpt-based classiﬁer on CovPokElec, which is
+
+Fast Perceptron Decision Tree Learning from Evolving Data Streams
+
+309
+
+due to the nature of the Poker dataset. Decision trees alone do not deal as well
+with evolving streaming data, as they have limited capability of adaption.
+
+A tradeoﬀ between RAM-Hours and accuracy could be to use single per-
+ceptrons when resources are scarce, and ADWIN bagging methods when more
+accuracy is needed. Note that to gain an increase of 24% in accuracy, we have to
+increase by more than 10, 000 times the RAM-Hours needed; this is the diﬀer-
+ence of magnitude between the RAM-Hours needed for a single perceptron and
+for a more accurate ADWIN bagging method.
+
+5 Conclusions
+
+We have investigated four perceptron-based methods for data streams: a single
+learner, a decision tree, a hybrid tree, and an ensemble method. These methods
+use perceptrons with a sigmoid activation function, optimizing the squared error,
+with one perceptron per class value. We observe that perceptron-based methods
+are competitive in accuracy and use of resources. We have introduced the use of
+RAM-Hours as a performance measure. Using RAM-Hours, it is easy to compare
+resources used by classiﬁer algorithms.
+
+As future work, we would like to build new methods based on the perceptron,
+with an adaptive learning rate. We think that in changing scenarios, using a
+ﬂexible learning rate may allow us to obtain more accurate methods, without
+incurring large additional runtime or memory costs.
+
+References
+
+1. Asuncion, A., Newman, D.: UCI machine learning repository (2007)
+2. Bennett, K., Cristianini, N., Shawe-Taylor, J., Wu, D.: Enlarging the margins in
+
+perceptron decision trees. Machine Learning 41(3), 295–313 (2000)
+
+3. Bifet, A., Gavald`a, R.: Learning from time-changing data with adaptive windowing.
+
+In: SDM (2007)
+
+4. Bifet, A., Holmes, G., Pfahringer, B., Kirkby, R., Gavald`a, R.: New ensemble meth-
+
+ods for evolving data streams. In: KDD, pp. 139–148 (2009)
+
+5. Breiman, L., Friedman, J.H., Olshen, R.A., Stone, C.J.: Classiﬁcation and Regres-
+
+sion Trees. Wadsworth, Belmont (1984)
+
+6. Domingos, P., Hulten, G.: Mining high-speed data streams. In: KDD, pp. 71–80
+
+(2000)
+
+7. Frank, E., Wang, Y., Inglis, S., Holmes, G., Witten, I.H.: Using model trees for
+
+classiﬁcation. Machine Learning 32(1), 63–76 (1998)
+
+8. Gama, J.: On Combining Classiﬁcation Algorithms. VDM Verlag (2009)
+9. Gama, J., Medas, P., Castillo, G., Rodrigues, P.P.: Learning with drift detec-
+tion. In: Bazzan, A.L.C., Labidi, S. (eds.) SBIA 2004. LNCS (LNAI), vol. 3171,
+pp. 286–295. Springer, Heidelberg (2004)
+
+10. Gama, J., Rocha, R., Medas, P.: Accurate decision trees for mining high-speed
+
+data streams. In: KDD, pp. 523–528 (2003)
+
+11. Harries, M.: Splice-2 comparative evaluation: Electricity pricing. Technical report,
+
+The University of South Wales (1999)
+
+310
+
+A. Bifet et al.
+
+12. Holmes, G., Kirkby, R., Pfahringer, B.: Stress-testing Hoeﬀding trees.
+
+In:
+Jorge, A.M., Torgo, L., Brazdil, P.B., Camacho, R., Gama, J. (eds.) PKDD 2005.
+LNCS (LNAI), vol. 3721, pp. 495–502. Springer, Heidelberg (2005)
+
+13. Holmes, G., Kirkby, R., Pfahringer, B.: MOA: Massive Online Analysis (2007),
+
+http://sourceforge.net/projects/moa-datastream
+
+14. Hulten, G., Spencer, L., Domingos, P.: Mining time-changing data streams. In:
+
+KDD, pp. 97–106 (2001)
+
+15. Ikonomovska, E., Gama, J.: Learning model trees from data streams. Discovery
+
+Science, 52–63 (2008)
+
+16. Ikonomovska, E., Gama, J., Sebasti˜ao, R., Gjorgjevik, D.: Regression trees from
+data streams with drift detection. In: Gama, J., Costa, V.S., Jorge, A.M., Brazdil,
+P.B. (eds.) DS 2009. LNCS, vol. 5808, pp. 121–135. Springer, Heidelberg (2009)
+
+17. Landwehr, N., Hall, M., Frank, E.: Logistic model trees. Machine Learning 59(1-2),
+
+161–205 (2005)
+
+18. Murthy, S.K.: Automatic construction of decision trees from data: A multi-
+
+disciplinary survey. Data Min. Knowl. Discov. 2(4), 345–389 (1998)
+
+19. Oza, N., Russell, S.: Online bagging and boosting. In: Artiﬁcial Intelligence and
+
+Statistics 2001, pp. 105–112. Morgan Kaufmann, San Francisco (2001)
+
+20. Oza, N.C., Russell, S.J.: Experimental comparisons of online and batch versions of
+
+bagging and boosting. In: KDD, pp. 359–364 (2001)
+
+21. Safavian, S.R., Landgrebe, D.: A survey of decision tree classiﬁer methodology.
+
+IEEE Transactions on Systems, Man and Cybernetics 21(3), 660–674 (1991)
+
+22. Schlimmer, J.C., Fisher, D.H.: A case study of incremental concept induction. In:
+
+AAAI, pp. 496–501 (1986)
+
+23. Street, W.N., Kim, Y.: A streaming ensemble algorithm (SEA) for large-scale clas-
+
+siﬁcation. In: KDD, pp. 377–382 (2001)
+
+24. Utgoﬀ, P.E.: Perceptron trees: A case study in hybrid concept representations. In:
+
+AAAI, pp. 601–606 (1988)
+
+25. Velte, T., Velte, A., Elsenpeter, R.: Cloud Computing, A Practical Approach.
+
+McGraw-Hill, Inc., New York (2010)
+
+26. Zhou, Z., Chen, Z.: Hybrid decision tree. Knowledge-based systems 15(8), 515–528
+
+(2002)
+
+

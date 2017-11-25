@@ -1,0 +1,794 @@
+ 
+
+Correspondence Clustering: An Approach to Cluster 
+
+Multiple Related Spatial Datasets 
+
+Vadeerat Rinsurongkawong and Christoph F. Eick 
+
+Department of Computer Science, University of Houston,  
+
+Houston, TX 77204-3010 
+
+{vadeerat,ceick}@cs.uh.edu 
+
+Abstract. Domain experts are frequently interested to analyze multiple related 
+spatial  datasets.  This  capability  is  important  for  change  analysis  and  contrast 
+mining. In this paper, a novel clustering approach called correspondence clus-
+tering  is  introduced  that  clusters  two  or  more  spatial  datasets  by  maximizing 
+cluster  interestingness  and  correspondence  between  clusters  derived  from  
+different datasets. A representative-based correspondence clustering framework 
+and clustering algorithms are introduced. In addition, the paper proposes a nov-
+el cluster similarity assessment measure that relies on re-clustering techniques 
+and  co-occurrence  matrices.  We  conducted  experiments  in  which  two  earth-
+quake  datasets  had  to  be  clustered  by  maximizing  cluster  interestingness  and 
+agreement between the spatial clusters obtained. The results show that corres-
+pondence  clustering  can  reduce  the  variance  inherent  to  representative-based 
+clustering  algorithms,  which  is  important  for  reducing  the  likelihood  of  false 
+positives in change analysis. Moreover, high agreements could be obtained by 
+only slightly lowering cluster quality. 
+
+Keywords: Spatial Data Mining, Mining Related Spatial Datasets, Variance in 
+Clustering, Representative-based Clustering Algorithms, Change Analysis. 
+
+1   Introduction 
+
+Domain experts are frequently interested to compare clustering results of two or more 
+related datasets. For example, meteorologists may  want to understand the change in 
+this year’s sea water temperature patterns with respect to those observed in previous 
+years.  Zoologists  may  attempt  to  relate  animals’  habitats  and  their  source  of  foods. 
+We  can  use  traditional  clustering  algorithms  to  cluster  each  dataset  separately  and 
+compare the results, but this approach frequently will not lead to good results due to 
+the following reasons: 
+
+1.  The clustering algorithms do not take into consideration the correspondences 
+
+between the datasets. 
+
+2.  The  randomness  inherent  in  most  clustering  algorithms  further  complicates 
+the correspondence analysis  of clusterings. For example,  K-means is sensi-
+tive to initialization, noise, and outliers.  
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part I, LNAI 6118, pp. 216–227, 2010. 
+© Springer-Verlag Berlin Heidelberg 2010 
+
+Correspondence Clustering: An Approach to Cluster Multiple Related Spatial Datasets 
+
+217 
+
+In this paper, we introduce a novel spatial clustering approach called correspondence 
+clustering. Correspondence clustering clusters two or more spatial datasets by taking 
+the correspondence between the different clustering into consideration. Therefore, the 
+obtained clusterings relate to one another; that is, the clustering of one dataset depends 
+on  the  clusterings  of  the  other  datasets.  Consequently,  variances  in  clusterings  
+produced by traditional clustering algorithms are reduced. Moreover, the hidden rela-
+tionships between related clusterings can be discovered. 
+Applications for correspondence clustering include: 
+
+1.  Change  analysis  [7]  where  changes  between  two  datasets  are  compared;  
+correspondence clustering reduces the likelihood of identifying false change 
+patterns by enhancing agreement between the clustering results for different 
+datasets. 
+
+2.  Regional co-location mining [2] that seeks for regions in which two types of 
+events  are  co-located;  for  example,  correspondence  clustering  can  find  
+regions where deep and severe earthquakes co-locate. 
+
+3.  Correspondence clustering can help dealing with missing values. For exam-
+ple,  when  identifying  clusters  with  high  ozone  concentration,  failures  of 
+ozone  measurement  equipments  result  in  missing  values.  Correspondence 
+clustering can  use past clusterings to  guide clustering  when  missing values 
+are present. 
+
+Challenges to develop a good correspondence clustering framework include: 
+
+1.  Techniques have to be developed to deal with the variance inherent to most 
+clustering algorithms. If it is not dealt properly, false changes, and false no-
+velties will be detected.  
+
+2.  Methods have to be developed that measure the correspondence between two 
+
+clusterings which is a non-trivial problem if object identity is not known.  
+
+3.  Clustering algorithms have to be extended to cluster multiple datasets jointly 
+considering  cluster  agreement  or  other  relationships  between  the  clustered 
+datasets.  
+
+4.  Measuring  cluster  correspondence  is  usually  quite  expensive,  and  efficient 
+
+techniques have to be developed to keep its overhead in check. 
+
+The main contributions of the presented paper include:  
+
+1.  A unique framework for correspondence clustering is introduced. 
+2.  Representative-based  correspondence  clustering  algorithms  that  allow  for 
+
+plug-in fitness functions are introduced. 
+
+3.  Novel  techniques  that  measure  the  agreement  between  two  clusterings  are 
+
+proposed.  
+
+2   Correspondence Analysis Framework 
+
+In  this  section,  we  propose  a  correspondence  analysis  framework.  Basically,  our 
+framework  is  designed  for  spatial  data,  especially  for  geo-referenced  datasets.  
+The challenges of discovering interesting patterns in spatial data include the complex-
+ity  of  spatial  data  types,  the  presence  of  hidden  spatial  relationships,  and  spatial  
+
+ 
+
+218 
+
+V. Rinsurongkawong and C.F. Eick 
+
+autocorrelation. Moreover, spatial space is continuous and contains many patterns at 
+different levels of granularities. 
+
+Let us assume that a set of related spatial datasets O={O1,…,On} are given. We are 
+interested  in  finding  interesting  relationship  among  these  datasets.  In  general,  
+our framework seeks for clustering results that maximize two objectives: (1) the inte-
+restingness  in  each  clustering,  (2)  the  correspondence  between  the  set  of  obtained 
+clusterings. Correspondence clustering is defined as follows. 
+
+Definition  1.  A  correspondence  clustering  algorithm  clusters  data  in  two  or  more 
+datasets  O={O1,…,On}  and  generates  clustering  results  X={X1,…,Xn}  such  that  for 
+1≤i≤n,  Xi  is  created  from  Oi  and  the  correspondence  clustering  algorithm  seeks  for 
+Xi’s  such  that  each  Xi  maximizes  interestingness  i(Xi)  with  respect  to  Oi  as  well  as 
+maximizes the correspondence Corr(X1,…,Xn) between itself and the other clusterings 
+Xj for 1≤j≤n, j≠ i. 
+
+In summary, correspondence clustering can be viewed as a multi-objective optimiza-
+tion problem in which the interestingness of clustering and their correspondence are 
+maximized. Moreover, different interestingness functions i and correspondence func-
+tions  Corr  can  be  used  for  different  correspondence  clustering  tasks.  In  the  next  
+section, a representative-based correspondence clustering approach is introduced. The 
+approach  allows  for  plug-in  fitness  functions  that  are  capable  to  capture  different 
+interestingness functions i and correspondence functions Corr. 
+
+3   Representative-Based Correspondence Clustering Algorithms 
+
+Since our representative-based correspondence clustering approach employs a region 
+discovery framework, we first introduce the region discovery framework. 
+
+3.1   Region Discovery Framework 
+
+The  region  discovery  framework  [1]  gears  towards  finding  scientifically  interesting 
+places in spatial datasets. The framework adapts clustering algorithms for the task of 
+region  discovery  by  allowing  plug-in  fitness  functions  to  support  variety  of  region 
+discovery applications corresponding to different domain interests. The goal of region 
+discovery is to find a set of regions X that maximize an externally given fitness func-
+tion q(X); q is assumed to have the following structure: 
+
+ (cid:1861)(cid:4666)(cid:1855)(cid:4667)(cid:3400)
+
+|(cid:1855)|(cid:3081)                      (1) 
+
+(cid:1869)(cid:4666)(cid:1850)(cid:4667)(cid:3404)∑
+
+(cid:3030)(cid:1488)(cid:3025)
+
+ (cid:1870)(cid:1857)(cid:1875)(cid:1853)(cid:1870)(cid:1856)(cid:4666)(cid:1855)(cid:4667)(cid:3404) ∑
+
+(cid:3030)(cid:1488)(cid:3025)
+
+where i(c) is the interestingness of a region c and |c| is the number of objects belong-
+ing  to  a  region  c  is  denoted by  |c|.  The  reward  associated  with  region  sizes  is  con-
+trolled by parameter β (β>1). 
+
+3.2   Representative-Based Correspondence Clustering Algorithms 
+
+In general, representative-based clustering algorithms seek for a subset of the objects 
+in  the  dataset⎯
+called  the  “representatives”—and  form  clusters  by  assigning  the  
+
+ 
+
+Correspondence Clustering: An Approach to Cluster Multiple Related Spatial Datasets 
+
+219 
+
+remaining  objects  to  the  closest  representative.  In  this  section,  representative-based 
+correspondence  clustering  algorithms  are  introduced.  The  proposed  algorithms  are 
+modifications  of  a  region  discovery  algorithm  named  CLEVER  [2].  CLEVER  is  a 
+representative-based  clustering  algorithm  that  applies  randomized  hill  climbing  to 
+maximize the fitness function q. Figure 1 gives the pseudo-code of CLEVER. 
+
+Inputs: Dataset O, k’, neighborhood-size, p, p’,β 
+Outputs: Clustering X, fitness q 
+Algorithm:  
+
+1.  Create a current solution by randomly selecting k’ representatives from O.  
+2.  Create p neighbors of the current solution randomly using the given neighborhood 
+
+3. 
+
+4. 
+
+definition.  
+If the best neighbor improves the fitness q, it becomes the current solution. Go back 
+to step 2.  
+If the fitness does not improve, the solution neighborhood is re-sampled by  
+generating p’ more neighbors. If re-sampling does not lead to a better solution,  
+terminate returning the current solution; otherwise, go back to step 2 replacing the 
+current solution by the best solution found by re-sampling.
+
+Fig. 1. Pseudo-code of CLEVER  
+
+Given two datasets O1 and O2, the goal of correspondence clustering is to discover 
+sets of clusterings  X1 and  X2 that  maximize the compound fitness function q̃(X1,X2). 
+The compound fitness function q̃(X1,X2) is defined as follows: 
+
+(cid:1869)(cid:3556)(cid:4666)(cid:1850)(cid:2869),(cid:1850)(cid:2870)(cid:4667)(cid:3404)(cid:4672)(cid:2009)(cid:3400)(cid:3435)(cid:1869)(cid:4666)(cid:1850)(cid:2869)(cid:4667)(cid:3397)(cid:1869)(cid:4666)(cid:1850)(cid:2870)(cid:4667)(cid:3439)(cid:4673)(cid:3397)(cid:3435)(cid:4666)1(cid:3398)(cid:2009)(cid:4667)(cid:3400)(cid:1829)(cid:1867)(cid:1870)(cid:1870)(cid:4666)(cid:1850)(cid:2869),(cid:1850)(cid:2870)(cid:4667)(cid:3439)      (2) 
+
+where q is a fitness function that assess the quality of X1 and X2. The correspondence 
+parameter  α  is  a  user-defined  parameter.  The  correspondence  function  Corr(X1,X2) 
+measures the correspondence between X1 and X2. 
+
+CLEVER is modified to maximize the compound fitness function q̃ instead of the 
+fitness  function  q.  Two  approaches  that  implement  correspondence  clustering  are 
+introduced  in  the  following:  (1)  The  Interleaved  approach  (C-CLEVER-I),  and  (2) 
+The  Concurrent  approach  (C-CLEVER-C).  The  algorithms  of  C-CLEVER-I  and  C-
+CLEVER-C are given in Figure 2 and 3, respectively.  
+
+The C-CLEVER-C uses the compound fitness function (equation 2) to cluster two 
+data sets concurrently. For the C-CLEVER-I, dataset O1 and O2 are clustered one at a 
+time—not concurrently— therefore, the compound fitness function (equation 2) sim-
+plifies to (3) and (4) when clustering the first and second dataset, respectively. 
+
+(cid:1869)(cid:3556)(cid:2869)(cid:4666)(cid:1850)(cid:2869)(cid:4667)(cid:3404)(cid:3435)(cid:2009)(cid:3400)(cid:1869)(cid:4666)(cid:1850)(cid:2869)(cid:4667)(cid:3439)(cid:3397)(cid:3435)(cid:4666)1(cid:3398)(cid:2009)(cid:4667)(cid:3400)(cid:1829)(cid:1867)(cid:1870)(cid:1870)(cid:4666)(cid:1850)(cid:2869),(cid:1850)(cid:2870)(cid:4667)(cid:3439) 
+(cid:1869)(cid:3556)(cid:2870)(cid:4666)(cid:1850)(cid:2870)(cid:4667)(cid:3404)(cid:3435)(cid:2009)(cid:3400)(cid:1869)(cid:4666)(cid:1850)(cid:2870)(cid:4667)(cid:3439)(cid:3397)(cid:3435)(cid:4666)1(cid:3398)(cid:2009)(cid:4667)(cid:3400)(cid:1829)(cid:1867)(cid:1870)(cid:1870)(cid:4666)(cid:1850)(cid:2869),(cid:1850)(cid:2870)(cid:4667)(cid:3439) 
+
+            (3) 
+
+            (4) 
+
+In general, there are  many possible choices in selecting  initial representatives of  C-
+CLEVER-I  and  C-CLEVER-C.  Our  current  implementation  supports  three  options: 
+The first option is to randomly select a subset of size k’ from O as in CLEVER. The 
+second option uses the final set of representative R from the previous iteration as the 
+
+ 
+
+220 
+
+V. Rinsurongkawong and C.F. Eick 
+
+initial set of representatives. The third option uses the set of representatives R’ of its 
+counterpart clustering X’ to compute a set of “nearby” representatives R taken from 
+the dataset O as follows:  
+
+1.  For each r’ in R’ determine its (1-)nearest neighbor in O obtaining a set R 
+2.  Remove duplicates from R.  
+
+There are many choices for termination condition (TCond). The possible choices are: 
+(1)  fix  the  number  of  iterations;  (2)  terminate  the  program  if  the  compound  fitness 
+function in the present iteration does not improve from the previous iteration. 
+
+Input: O1 and O2, TCond, k’, neighborhood-size, p, p’,α, β 
+Output: X1, X2, q(X1), q(X2), q̃(X1,X2), Corr(X1,X2) 
+Algorithm: 
+
+a set of representative R1:  
+
+(X1,R1) :=Run CLEVER(O1, q);  
+
+2.  Repeat until the Termination Condition TCond is met. 
+
+1.  Run CLEVER on dataset O1 with fitness function q and get clustering result X1 and 
+
+a.  Run CLEVER on dataset O2 with compound fitness function q̃2 that uses 
+
+the representatives R1 to calculate Corr(X1,X2): 
+(X2,R2) :=Run CLEVER(O2,R1, q̃2) 
+
+b.  Run CLEVER on dataset O1 with compound fitness function q̃1 that uses 
+
+the representatives R2 to calculate Corr(X1,X2): 
+(X1,R1) :=Run CLEVER(O1,R2, q̃1)
+
+Fig. 2. Pseudo-code of C-CLEVER-I 
+
+Input: O1 and O2, TCond, k’, neighborhood-size, p, p’, α, β 
+Output: X1, X2, q(X1), q(X2), q̃(X1,X2), Corr(X1,X2) 
+Algorithm: 
+
+1.  Run CLEVER on dataset O1 with fitness function q and get clustering result X1 and 
+
+2.  Run CLEVER on dataset O2 with fitness function q and get clustering result X2 and 
+
+a set of representative R1:  
+
+(X1,R1) :=Run CLEVER(O1, q);  
+
+a set of representative R2:  
+
+(X2,R2) :=Run CLEVER(O2, q);  
+
+3.  Repeat until the Termination Condition TCond is met. 
+
+a.  Run CLEVER on datasets O1 and O2 concurrently maximizing the  
+
+compound fitness function q̃: 
+(X1,R1,X2,R2):=Run CLEVER(O1,R1,O2,R2, q̃)
+
+Fig. 3. Pseudo-code of C-CLEVER-C 
+
+4   Agreement Assessment by Forward and Backward  
+
+Re-clustering Techniques and Co-occurrence Matrices 
+
+Using agreement between two clusterings X1 and X2 is a popular choice for a corres-
+pondence function. In applications such as change analysis [7] or co-location mining 
+[2],  domain  experts  want  to  discover  clusterings  that  are  good  and  agree  at  least  to 
+some  extent.  In  such  case,  Agreement(X1,X2)  would  be  used  as  the  correspondence 
+
+ 
+
+Correspondence Clustering: An Approach to Cluster Multiple Related Spatial Datasets 
+
+221 
+
+function.  In  addition,  domain  experts  might  be  interested  to  discover  regions  with 
+disagreement between the two datasets in anti-co-location or novelty detection. In the 
+later case, Corr(X1,X2) can be defined as (1-Agreement(X1,X2)). For the remaining of 
+the paper, Agreement(X1,X2) will be used as correspondence function Corr(X1,X2); in 
+the section we will introduce a measure to assess agreement. 
+
+First,  we  introduce  re-clustering  techniques  that  use  the  clustering  model  of  one 
+clustering to cluster the data in another dataset. In case of representative-based clus-
+tering, the cluster models are sets of representatives. Given two clusterings X1 and X2 
+of  two  datasets  O1  and  O2  and  two  sets  of  representatives  of  R1  and  R2  of  the  two 
+clusterings X1 and X2, forward and backward re-clusterings can be created using the 
+representatives of one dataset to cluster the other dataset. More formally:  
+
+Definition  2.  Let  O  be  a  dataset  and  R  be  an  arbitrary  set  of  representatives.  Then 
+χREC(O,R) denotes the result of re-clustering dataset O using the set of representatives 
+R. The clusters of χREC(O,R) are created by assigning objects o∈O to the closest rep-
+resentative r∈R obtaining |R| clusters. 
+Definition  3.  χREC(O2,R1)  is  called  forward  re-clustering  and    χREC(O1,R2)  is  called 
+backward re-clustering.  
+
+To assess cluster similarity, the similarity between two representative-based cluster-
+ings  X1  and  X2  is  computed  by  comparing  X1  with  χREC(O1,R2)  and  X2  with 
+χREC(O2,R1).To assess the similarity of two clusterings, we construct a co-occurrence 
+matrix MX for each clustering X of O as follows: 
+
+1. 
+
+If oj and oi belong to the same cluster in X, entries (i,j) and (j,i) of MX are set 
+to 1. 
+If oi is not an outlier in X, set (i,i) in MX to 1 
+
+2. 
+3.  The remaining entries of MX are set to 0 
+
+Let  MX  and  MX’  be  two  co-occurrence  matrices  that  have  been  constructed  for  two 
+clusterings X and X’ of the same dataset O; then the similarity between X and X’ can 
+be computed as follows:  
+
+(cid:1845)(cid:1861)(cid:1865)(cid:4666)(cid:1850),(cid:1850)’(cid:4667)(cid:1556)(cid:4666)(cid:3015)(cid:3048)(cid:3040)(cid:3029)(cid:3032)(cid:3045) (cid:3042)(cid:3033) (cid:3032)(cid:3041)(cid:3047)(cid:3045)(cid:3036)(cid:3032)(cid:3046) (cid:4666)(cid:3036),(cid:3037)(cid:4667) (cid:3050)(cid:3036)(cid:3047)(cid:3035) (cid:3036)≤(cid:3037) (cid:3036)(cid:3041) (cid:3014)(cid:3273) (cid:3028)(cid:3041)(cid:3031) (cid:3014)(cid:3273)(cid:4593) (cid:3047)(cid:3035)(cid:3028)(cid:3047) (cid:3029)(cid:3042)(cid:3047)(cid:3035) (cid:3028)(cid:3045)(cid:3032) (cid:2869) (cid:3036)(cid:3041) (cid:3014)(cid:3273) (cid:3028)(cid:3041)(cid:3031) (cid:3014)(cid:3273)(cid:4593)(cid:4667)
+(cid:4666)(cid:3015)(cid:3048)(cid:3040)(cid:3029)(cid:3032)(cid:3045) (cid:3042)(cid:3033) (cid:3032)(cid:3041)(cid:3047)(cid:3045)(cid:3036)(cid:3032)(cid:3046)(cid:4666)(cid:3036),(cid:3037)(cid:4667) (cid:3050)(cid:3036)(cid:3047)(cid:3035) (cid:3036)≤(cid:3037) (cid:3047)(cid:3035)(cid:3028)(cid:3047) (cid:3030)(cid:3042)(cid:3041)(cid:3047)(cid:3028)(cid:3036)(cid:3041) (cid:3028) (cid:2869) (cid:3036)(cid:3041) (cid:3014)(cid:3273) (cid:3042)(cid:3045) (cid:3014)(cid:3273)(cid:4593) (cid:3042)(cid:3045) (cid:3028) (cid:2869) (cid:3036)(cid:3041) (cid:3029)(cid:3042)(cid:3047)(cid:3035)(cid:4667)  
+(cid:1827)(cid:1859)(cid:1870)(cid:1857)(cid:1857)(cid:1865)(cid:1857)(cid:1866)(cid:1872)(cid:4666)(cid:1850)1,(cid:1850)2(cid:4667) (cid:3404) (cid:3020)(cid:3036)(cid:3040)(cid:4666)(cid:3025)(cid:3117),(cid:3102)(cid:3267)(cid:3254)(cid:3252)(cid:4666)(cid:3016)(cid:3117),(cid:3019)(cid:3118)(cid:4667)(cid:4667) (cid:2878) (cid:3020)(cid:3036)(cid:3040)(cid:4666)(cid:3025)(cid:3118),(cid:3102)(cid:3267)(cid:3254)(cid:3252)(cid:4666)(cid:3016)(cid:3118),(cid:3019)(cid:3117)(cid:4667)(cid:4667)
+
+Sim(X,X’) in equation (5) is a generalization of the popular Rand Index [8] that ad-
+ditionally  takes  outliers  into  consideration.  Finally,  we  define  agreement  between 
+clustering X1 and X2, by comparing the clusterings of the two datasets with their re-
+spective forward and backward re-clusterings as follows:  
+
+(5) 
+
+        (6) 
+The  advantage  of  the  proposed  agreement  assessment  method  based  on  re-
+clustering techniques and co-occurrence matrices is that it can deal with: (1) datasets 
+with  unknown  object  identity,  (2)  different  number  of  objects  in  two  datasets,  (3) 
+
+(cid:2870)
+
+ 
+
+222 
+
+V. Rinsurongkawong and C.F. Eick 
+
+different number of clusters in the two clusterings. Therefore, we claim that it is suit-
+able for most types of spatial data. 
+
+5   Experiments 
+
+In the first experiment, we show that correspondence clustering provides comparable 
+or  better  results  than  the  traditional  clustering.  Moreover,  the  experimental  results 
+show  that  by  enhancing  agreement  between  two  corresponding  datasets,  correspon-
+dence clustering produces clusterings that have lower variance than a traditional clus-
+tering algorithm. In the second experiment, we evaluate and compare different cluster 
+initialization strategies for correspondence clustering. 
+
+5.1   Earthquake Dataset and Interestingness Function 
+
+We run our experiments on an earthquake dataset that is available on website of the 
+U.S.  Geological  Survey  Earthquake  Hazards  Program  http://earthquake.usgs.gov/. 
+The  data  includes  the  location  (longitude,  latitude),  the  time,  the  severity  (Richter 
+magnitude) and the depth (kilometers) of earthquakes. We uniformly sampled earth-
+quake  events  from  January  1986  to  November  1991  as  dataset  O1  and  earthquake 
+events between December 1991 and January 1996 as dataset O2. Each dataset contains 
+4132 earthquakes. 
+
+Suppose that a domain expert interests in finding regions where deep and shallow 
+earthquakes are in close proximity; that is, he/she is interested in regions with a high 
+variance  for  the  attribute  earthquake  depth.  The  following  interestingness  function 
+captures the domain expert’s notion of interestingness.  
+
+(cid:1861)(cid:4666)(cid:1855)(cid:4667)(cid:3404)(cid:4688)
+
+(cid:3023)(cid:3028)(cid:3045)(cid:4666)(cid:3016),(cid:3053)(cid:4667)(cid:3409)(cid:1872)(cid:1860)
+(cid:3023)(cid:3028)(cid:3045)(cid:4666)(cid:3030),(cid:3053)(cid:4667)
+(cid:1867)(cid:1872)(cid:1860)(cid:1857)(cid:1870)(cid:1875)(cid:1861)(cid:1871)(cid:1857)(cid:4689) 
+                    (cid:1848)(cid:1853)(cid:1870)(cid:4666)(cid:1855),(cid:1878)(cid:4667)(cid:3404) (cid:2869)|(cid:3030)|(cid:2879)(cid:2869)∑ (cid:4666)(cid:1878)(cid:4666)(cid:1867)(cid:4667)(cid:3398)(cid:2020)(cid:3053)(cid:4667)(cid:2870)
+
+0
+(cid:3023)(cid:3028)(cid:3045)(cid:4666)(cid:3016),(cid:3053)(cid:4667)(cid:3398) (cid:1872)(cid:1860)(cid:4673)(cid:3086)
+(cid:4672)(cid:3023)(cid:3028)(cid:3045)(cid:4666)(cid:3030),(cid:3053)(cid:4667)
+(cid:3042)(cid:1488)(cid:3030)
+
+where 
+
+ 
+
+            (7) 
+
+ 
+
+ 
+
+      (8) 
+
+  
+
+The attribute of interest z(o) is depth of earthquake o; |c| is the number of objects in 
+region c and µ z is the average value of z in region c; th≥1 is the reward threshold that 
+captures what degree of earthquake depth variance the domain expert find news wor-
+thy; in general, regions with i(c)=0 are considered outliers. Finally, η with ∞>η>0 is 
+the reward function form parameter.  
+
+5.2   Experiment Investigating Variance Reduction 
+
+We run the interleaved approach of the representative based correspondence cluster-
+ing,  C-CLEVER-I,  and  the  traditional  clustering  algorithm,  CLEVER,  and  compare 
+the results with respect to cluster quality and agreement.  
+
+First we run CLEVER on dataset O1 and O2 five times to generate five clusterings 
+for  each  dataset.  Then  we  run  C-CLEVER-I  for  five  iterations  with  α=1.0e-4  and  
+ 
+
+ 
+
+Correspondence Clustering: An Approach to Cluster Multiple Related Spatial Datasets 
+
+223 
+
+α=2.0e-6 for five times each. Figure 4 summarizes the experiments conducted. Each 
+circle  represents  each  clustering.  The  dashed  lines  between  Clustering  X1  and  X2  in 
+CLEVER show that fitness values (q(X1)+q(X2)), and Agreement(X1,X2) of CLEVER 
+are computed from all twenty five possible pairs of X1 and X2. When correspondence 
+clustering  is  used,  those  values  are  only  computed  for  the  five  pairs  of  clusterings 
+obtained by C-CLEVER-I (one for each run; indicated by solid lines with two ways 
+arrows).  For  each  clustering  of  C-CLEVER-I,  the  representatives  from  the  previous 
+iteration of its own clustering are used as initial representatives of the present itera-
+tion. The parameter settings of CLEVER and C-CLEVER-I are shown in Table 1 and 
+Table  2.  All  parameters  for  CLEVER  and  C-CLEVER-I  are  set  to  the  same  values 
+except  for  the  values  of  p  and  p’.  Since  C-CLEVER-I  is  run  for  five  iterations  for 
+each pair of clustering X1 and X2, for a fair comparison, we set the p and p’ of CLEV-
+ER to be five times higher than C-CLEVER-I. The experiment is evaluated by fitness 
+function (equation (1)), agreement (equation (6)) and similarity (equation (5)). Table 
+3 shows average values of all the experimental results. The computation time meas-
+ures the average wall clock time in milliseconds used by the algorithms to generate a 
+pair of clusterings X1 and X2. We use similarity measure Sim(X,X’) in equation (5) to 
+assess variance between two clusterings generated using the same dataset. In general, 
+the algorithm that produces higher Sim(X,X) creates clusterings that are more similar 
+in different runs, thus, exhibiting lower variance. 
+
+Table 1. Parameter settings of CLEVER 
+
+(cid:69)=2.0
+Neighborhood size = 3
+
+TCond = 5 iterations
+Neighborhood size = 3
+
+p=100
+Probabilities for add, delete, and replace representatives : 0.2, 0.2, 0.6
+
+(cid:83)(cid:182)=100
+
+(cid:75)=2.0
+
+th=1.2
+
+Table 2. Parameter settings of C-CLEVER-I 
+
+(cid:69)=2.0
+Probabilities for add, delete, and replace representatives : 0.2, 0.2, 0.6
+
+(cid:83)(cid:182)=20 (cid:75)=2.0
+
+p=20
+
+th=1.2
+
+ 
+
+ 
+
+Fig. 4. Illustration of the experiment 
+
+ 
+
+ 
+
+ 
+
+224 
+
+V. Rinsurongkawong and C.F. Eick 
+
+Table 3. Comparison of average results of CLEVER and C-CLEVER-I 
+
+ 
+
+Fitness q(X1) 
+Fitness q(X2) 
+q(X1) + q(X2) 
+Agreement(X1,X2) 
+Sim(X1,X1) 
+Sim(X2,X2) 
+Computation Time 
+
+CLEVER 
+ 
+1896492 
+1756189 
+3652681 
+0.332909 
+0.665973 
+0.344895 
+5.48E+06 
+
+C-CLEVER-I 
+(α=1.0e-5) 
+1896821 
+1713519 
+3610341 
+0.349231 
+0.703770 
+0.623614 
+2.18E+06 
+
+C-CLEVER-I 
+(α=2.0e-6) 
+1870152 
+1685332 
+3555485 
+0.776172 
+0.663314 
+0.619446 
+2.30E+06 
+
+ 
+
+From  Table  3,  C-CLEVER-I  with  α=1.0e-5  produces  higher  fitness  values  for 
+clustering X1 and but lower fitness values of X2 than CLEVER. For Agreement(X1,X2) 
+and  Sim(X1,X1),  C-CLEVER-I  with  α=1.0e-5  produces  slightly  higher  values  than 
+CLEVER but for Sim(X2,X2), C-CLEVER-I produces significantly higher value than 
+CLEVER.  From  this  point  of  view,  the  higher  values  of  Sim(X1,X1)  and  Sim(X2,X2) 
+indicate  than  each  run  of  C-CLEVER-I  creates  more  similar  clustering  results  for 
+each  clustering  X1  and  X2  which  means  that  C-CLEVER-I  produces  lower  variance 
+than  CLEVER.  With  α=2.0e-6,  C-CLEVER-I  is  forced  to  emphasize  agreement. 
+Therefore,  the  fitness  values  of  clustering  X1  and  X2  of  C-CLEVER-I  are  slightly 
+lower than CLEVER but Agreement(X1,X2), and Sim(X2,X2) of C-CLEVER-I are sig-
+nificantly higher than CLEVER. Moreover, C-CLEVER-I computes its results about 
+half of the runtime CLEVER uses. 
+
+From the experimental results, we conclude that correspondence clustering can re-
+duce  the  variance  inherent  to  representative-based  clustering  algorithms.  Since  the 
+two datasets are related to each other, using one dataset to supervise the clustering of 
+the  other  dataset  can  lead  to  more  reliable  clusterings  by  reducing  variance  among 
+clusterings that would have resulted from using traditional representative-based clus-
+tering algorithms, as they are more susceptible to initial representatives and outliers. 
+Moreover, obtaining higher agreement could be accomplished with only a very slight 
+decrease in cluster quality. 
+
+5.3   Experiment for Representative-Based Correspondence Clustering with 
+
+Different Methods of Initial Representative Settings 
+
+We  run  experiments  to  compare  results  of  three  initialization  strategies  for  C-
+CLEVER-I; the three tested strategies are as follows : (1) random representatives (C-
+CLEVER-I-R), (2) representatives from the nearest neighbor of representatives of the 
+counterpart  clustering  (C-CLEVER-I-C),  and  (3)  the  final  representatives  from  the 
+previous  iteration  are  used  as  the  initial  representatives  for  the  next  iteration  (C-
+CLEVER-I-O).  For  each  option  of  the  initial  representative  setting  techniques,  five 
+pairs of clustering X1 and X2 are generated, similar to the previous experiment. Table 
+4 shows parameter settings used in the experiments. The average values of the expe-
+rimental results are shown in Table 5.  
+ 
+
+ 
+
+Correspondence Clustering: An Approach to Cluster Multiple Related Spatial Datasets 
+
+225 
+
+Table 4. Parameter settings of C-CLEVER-I  
+
+TCond = 5 iterations 
+Neighborhood size = 3 
+
+α=2.0e-8  β=2.8 
+Probabilities for add, delete, and replace representatives : 0.2, 0.2, 0.6 
+
+p’=20  η=2.0 
+
+p=20 
+
+th=1.2  
+
+Table 5. Comparison of average results of C-CLEVER-I with different means of initial repre-
+sentative settings 
+
+ 
+Compound Fitness q̃(X1,X2)  
+Fitness q(X1) 
+Fitness q(X2) 
+q(X1) + q(X2) 
+Agreement(X1,X2) 
+Computation Time 
+
+C-CLEVER-I-C 
+9.857655 
+2.3E+08 
+2.14E+08 
+4.44E+08 
+0.977259 
+3.23E+06 
+
+C-CLEVER-I-O 
+10.10406 
+2.66E+08 
+2.17E+08 
+4.82E+08 
+0.459206 
+2.72E+06 
+
+C-CLEVER-I-R 
+9.952686 
+2.46E+08 
+2.13E+08 
+4.59E+08 
+0.771505 
+7.10E+06 
+
+ 
+ 
+
+From  Table  5,  C-CLEVER-I-C  produces  clusterings  with  the  highest  agreement 
+but the lowest compound  fitness  value. This is because C-CLEVER-I-C  uses initial 
+representatives  that  are  closest  to  the  representatives  of  its  counterpart  clustering. 
+Then  C-CLEVER-I-C  generates  clusterings  X1  and  X2  that  are  very  similar  which 
+results in very high agreement. Though, the agreement is very  high, the  low  fitness 
+values lead to the low compound fitness value. For C-CLEVER-I-O, the initial repre-
+sentatives used are the final representatives from the previous iteration. In contrast to 
+C-CLEVER-I-C,  with  α=2.0e-8,  C-CLEVER-I-O  favors  increasing  fitness  values 
+rather than increasing agreement between the two clusterings. This is indicated by the 
+highest fitness values but the lowest agreement value. As for C-CLEVER-I-R, it pro-
+duces comparable fitness values and intermediate agreement value but consumes the 
+highest computation time. This is due to the fact that C-CLEVER-I-R randomizes its 
+initial  representatives,  which  allows  the  algorithm  to  explore  the  dataset  more  tho-
+roughly than the others but in return, it needs more time to find the solution. 
+
+6   Related Work 
+
+Correspondence clustering relates to coupled clustering, and co-clustering which both 
+cluster more than one dataset at the same time. Coupled clustering [3] is introduced to 
+discover  relationships  between  two  textual  datasets  by  partitioning  the  datasets  into 
+corresponding clusters where each cluster in one dataset is matched with its counter-
+part in the other dataset. Consequently, the coupled clustering requires that the num-
+ber  of  clusters  in  two  datasets  be  equal.  In  general,  the  coupled  clustering  ignores 
+intra-dataset  similarity  and  concentrates  solely  on  inter-dataset  similarity.  Our  ap-
+proach, on the other hand, provides no limitation on number of clusters. It considers 
+both intra-dataset and inter-dataset similarities. The intra-dataset similarity is included 
+through interestingness measures and the inter-dataset similarity is included through 
+correspondences in sets of representatives. 
+
+Co-clustering has been successfully used for applications in text mining [4], mar-
+ket-basket data analysis, and bioinformatics [5]. In general, the co-clustering clusters 
+two datasets with different schemas by rearranging the datasets. In brief, datasets are 
+
+ 
+
+226 
+
+V. Rinsurongkawong and C.F. Eick 
+
+represented as a matrix with one dataset is organized into rows while the other dataset 
+is organized into columns. Then, the co-clustering partitions rows and columns of the 
+data  matrix and creates clusters  which are  subsets of the original  matrix. In case of 
+spatial data mining, re-organizing the data into data matrix causes spatial relationships 
+related  to  location  of  data  points  to  be  lost:  clusters  are  no  longer  guaranteed  to  be 
+contiguous. Accordingly, co-clustering is not applicable to spatial clustering.  
+
+Correspondence clustering is also related to evolutionary clustering [6] that is used 
+for multi-objective clustering. Evolutionary clustering clusters streaming data based on 
+two criteria: the clustering quality of present data and its conformity to historical data.  
+
+In  conclusion,  the  three  reviewed  clustering  techniques  cluster  data  based  on  dis-
+tances alone whereas the correspondence clustering approach allows to cluster multiple 
+datasets based on a domain expert’s definition of interestingness and correspondence. 
+Consequently, correspondence clustering is more general and can serve a much larger 
+group of applications. For example, none of the three approaches can be used for the 
+earthquake clustering problem we used in the experimental evaluation; in the experi-
+ment, clusters are formed by maximizing the variance of a continuous variable and not 
+by minimizing the distances between objects that belong to the same cluster.  
+
+7   Conclusion 
+
+In this paper, we introduce a novel clustering approach called correspondence clustering 
+that clusters two or more related spatial datasets by maximizing cluster interestingness 
+and correspondence between clusters for the different datasets. A representative-based 
+correspondence  clustering  framework  is  introduced  and  two  representative-based  cor-
+respondence  clustering  algorithms  are  proposed.  We  conducted  experiments  in  which 
+two datasets had to be clustered by maximizing cluster interestingness and agreement 
+between the spatial clusters obtained. The results show that correspondence clustering 
+can reduce the variance inherent to representative-based clustering algorithms. Moreo-
+ver, high agreements could be obtained by only slightly lowering clustering quality. In 
+general, correspondence clustering is beneficial for many applications, such as change 
+analysis, co-location mining and applications that are interested in analyzing particular, 
+domain-specific relationships between two or more datasets. 
+
+In addition, the paper proposes a novel agreement assessment measure that relies 
+on  re-clustering  techniques  and  co-occurrence  matrices.  The  agreement  assessment 
+technique  proposed  is  applicable  for  (1)  datasets  with  unknown  object  identity,  (2) 
+different  number  of  objects  in  two  datasets,  (3)  different  number  of  clusters  in  two 
+clusterings. Therefore, it is suitable for most types of spatial data. 
+
+References 
+
+1.  Ding, W., Jiamthapthaksin, R., Parmar, R., Jiang, D., Stepinski, T., Eick, C.F.: Towards Re-
+gion  Discovery  in  Spatial  Datasets.  In:  Proceedings  of  12th  Pacific-Asia  Conference  on 
+Knowledge Discovery and Data Mining (2008) 
+
+2.  Eick,  C.F., Parmar,  R.,  Ding,  W.,  Stepinki,  T.,  Nicot,  J.-P.: Finding  Regional  Co-location 
+Patterns for Sets of Continuous Variables in Spatial Datasets. In: Proceedings of 16th ACM 
+SIGSPATIAL  International  Conference  on  Advances  in  Geographic  Information  Systems 
+(2008) 
+
+ 
+
+Correspondence Clustering: An Approach to Cluster Multiple Related Spatial Datasets 
+
+227 
+
+3.  Marx, Z., Dagan, I., Buhmann, J.M., Shamir, E.: Coupled Clustering: A Method for Detect-
+
+ing Structural Correspondence. Journal of Machine Learning Research 3, 747–780 (2002) 
+
+4.  Dhillon, I.S.: Co-clustering Documents and Words using Bipartite Spectral Graph Partition-
+ing. In: Proceedings of 7th ACM SIGKDD International Conference on Knowledge Discov-
+ery and Data Mining (2001) 
+
+5.  Cheng, Y., Church, C.M.: Biclustering of Expression Data. In: Proceedings of 8th Interna-
+
+tional Conference on Intelligent Systems for Molecular Biology (2000) 
+
+6.  Chakrabarti, D., Kumar, R., Tomkins, A.: Evolutionary Clustering. In: Proceedings of 12th 
+ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (2006) 
+7.  Chen, C.S., Rinsurongkawong, V., Eick, C.F., Twa, M.D.: Change Analysis in Spatial Data 
+by Combining Contouring Algorithms with Supervised Density Functions. In: Proceedings 
+of 13th Pacific-Asia Conference on Knowledge Discovery and Data Mining (2009) 
+
+8.  Rand, W.: Objective Criteria for the Evaluation of Clustering Methods. Journal of the Amer-
+
+ican Statistical Association 66, 846–850 (1971) 
+
+ 
+
+

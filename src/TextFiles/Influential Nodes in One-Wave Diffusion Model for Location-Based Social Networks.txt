@@ -1,0 +1,686 @@
+Inﬂuential Nodes in a One-Wave Diﬀusion
+Model for Location-Based Social Networks(cid:2)
+
+Hao-Hsiang Wu1,2 and Mi-Yen Yeh2
+
+1 Graduate Institute of Networking and Multimedia,
+
+National Taiwan University, Taipei, Taiwan
+
+2 Institute of Information Science, Academia Sinica, Taipei, Taiwan
+
+{haohsiangwu,miyen}@iis.sinica.edu.tw
+
+Abstract. Taking the Foursquare data as an example, this paper inves-
+tigates the problem of ﬁnding inﬂuential nodes in a location-based social
+network (LBSN). In Foursquare, people can share the location they vis-
+ited and their opinions to others via the actions of checking in and writing
+tips. These check-ins and tips are likely to inﬂuence others on visiting the
+same places. To study the inﬂuence behavior in LBSNs, we ﬁrst propose
+the attractiveness model to compute the inﬂuence probability among
+users. Then, we design a one-wave diﬀusion model, where we focus on
+the direct impact of the initially selected individuals on their ﬁrst degree
+neighbors. Base on these two models, we propose algorithms to select the
+k inﬂuential nodes that maximize the inﬂuence spread in the complete-
+graph network and the network where only the links with friendship are
+preserved. We empirically show that the k inﬂuential nodes selected by
+our proposed methods have higher inﬂuence spread when compared to
+other methods.
+
+1
+
+Introduction
+
+Due to the advances in wireless communication and positioning technologies,
+people can surf the Internet and share their locations through mobile devices
+almost anytime, anywhere. This fosters the emergence of location-based social
+networks (LBSNs), where people can interact with each other while sharing their
+location information. Example applications include Foursquare1 and Gowalla2.
+The main diﬀerence between an LBSN and a general social network is that
+the former introduces a new dimension of physical location that brings social
+networks to reality and bridges the gap between the physical world and online
+social networking services [1]. In an LBSN, the act of users sharing their current
+locations is called check-in. By a check-in action at certain locations, people can
+
+(cid:2) The research in this paper was supported in part by the National Science Council
+of Taiwan, R.O.C., under Contracts NSC100-2221-E-001-023 and NSC101-2221-E-
+001-013. All opinions, ﬁndings, conclusions and recommendations in this paper are
+those of the authors and do not necessarily reﬂect the views of the funding agency.
+https://foursquare.com
+http://blog.gowalla.com
+
+1
+
+2
+
+J. Pei et al. (Eds.): PAKDD 2013, Part II, LNAI 7819, pp. 61–72, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+62
+
+H.-H. Wu and M.-Y. Yeh
+
+also associate it with other additional information such as their comments about
+the place, the visiting time and their companions.
+
+Prior studies on an LBSN usually focus on the human movement behavior
+analysis by mining their trajectories of visited locations, such as user movement
+prediction [2,3] and travel recommendations [4,5]. As an LBSN is also a kind of
+social networks that is currently a popular medium for people to share location
+information, we are interested in how people inﬂuence each other on the check-
+in behavior, how people will be attracted by other’s comments on the shared
+locations and who are potentially inﬂuential in an LBSN to spread the location
+information. The answers of these problems are important to the location-based
+advertising applications because they can help enlarge the visibility and adoption
+of the products they promote. To the best of our knowledge, none of the existing
+works discuss ﬁnding inﬂuential nodes in an LBSN.
+
+In this paper, taking the Foursquare data as an example, we propose to ﬁnd
+the inﬂuential nodes in an LBSN. Foursquare is an LBSN application that pro-
+vides a platform for users to share with friends or the public about their locations,
+which is called venues, by doing the check-in action through any GPS-equipped
+handhold devices. In addition, users can write comments, which is called tips, for
+each venue. By viewing the tips of others, a user is possibly attracted by some of
+them. Moreover, each user can add their interested tips to his/her todo list, and
+mark them as done if they did visit the corresponding venues. This information
+is useful for us to inference the potential inﬂuential users of the entire network
+especially when we do not have other explicit information of the inﬂuence be-
+havior due to the privacy issues of Foursquare. Now, our challenges of ﬁnding
+inﬂuential nodes in an LBSN become the following two: How to leverage the
+available information to inference the inﬂuence probability between users? How
+to ﬁnd the inﬂuential nodes under a suitable information diﬀusion model?
+
+We begin with the modeling of the inﬂuence probability among users. To
+be more speciﬁc, we compute the likelihood that user ui is attracted by user
+uj’s tips according to the proposed attractiveness model, which is based on the
+popularity of the mutual venues they have been visited and the popularity of tips
+written by uj. In addition, we design the one-wave diﬀusion model, where we
+focus on the direct impact of the initially selected individuals on their ﬁrst degree
+neighbors. With the attractiveness model and the one-wave diﬀusion model, we
+further design algorithms to select k inﬂuential nodes that maximize the inﬂuence
+spread in the complete-graph network, where a link weighted by an inﬂuential
+probability is built between every pair of nodes. In addition, to scale down the
+search space, we also consider to ﬁnd inﬂuential nodes in the friendship network,
+where only the link between two nodes having friendship is left, and compare
+the results to the nodes found in the complete-graph network. By collecting
+the historical tip data of Foursquare, we evaluate the eﬀectiveness of proposed
+models and algorithms. We report our ﬁndings on the inﬂuential nodes found in
+the tip data of New York and Los Angeles. The results show that the inﬂuence
+spread of the k nodes found in the friendship network is very close to the spread
+
+Inﬂuential Nodes in a One-Wave Diﬀusion Model
+
+63
+
+of those found in the complete-graph network under our attractiveness model
+and one-wave diﬀusion model.
+
+The remainder of the paper is organized as follows. We discuss the related work
+in Section 2. In Section 3, we introduce the attractiveness model to compute the
+inﬂuence probability between users. Section 4 presents the one-wave diﬀusion
+model and our proposed algorithms to ﬁnd the k inﬂuential nodes in LBSNs.
+We report the experiment results in Section 5. Section 6 concludes the paper.
+
+2 Related Work
+
+The inﬂuence maximization is to ﬁnd a set of k nodes that maximize the in-
+formation spread in a social network under some information diﬀusion model.
+Domingos and Richardson [6] were the ﬁrst to study the inﬂuence maximization
+problem to analyze the value of customers in business. Kempe et al. [7,8] formu-
+lated the problem as an optimization problem and proved it is NP-hard under the
+linear threshold model and the independent cascade model. Prior studies about
+ﬁnding inﬂuential nodes focused on general social networks without considering
+the features of location-based social networks. To the best of our knowledge, we
+are the ﬁrst to ﬁnd inﬂuential nodes in LBSNs.
+
+The linear threshold (LT) model and the independent cascade (IC) model
+are two generally studied information diﬀusion models. Kempe et al. [8] gave a
+comprehensive concept of these two models. Essentially, a node can be active
+or inactive. An inactive node may be inﬂuenced by any of its active neighbor
+according to a weight between them. The diﬀusion process starts with a set of
+active nodes while all other nodes are inactive. At each step, an active node
+remains active and the inactive one can become active only when the the total
+weight of its active neighbor exceeds a pre-selected threshold between 0 and 1.
+On the other hand, the independent cascade model works as follows. At each step
+of the diﬀusion process, only the newly active node has a chance to inﬂuence each
+of its inactive neighbors with a diﬀusion probability. When the inactive node is
+inﬂuenced successfully, it becomes active in the next step. Once an active node
+has tried to inﬂuence its neighbors in some step, it can never inﬂuence others in
+the following steps.
+
+Note that both the LT and IC models consider multiple waves of inﬂuence
+propagation from a node to the entire network. In contrast, our proposed diﬀu-
+sion model only considers one wave of the inﬂuence between any initially selected
+node to its neighbors. In other words, the diﬀusion process of our proposed diﬀu-
+sion model involves only one step. It is because we only care the direct inﬂuence
+of a node to others but not the second-hand inﬂuence.
+
+3 Modeling Attractiveness between Users
+
+3.1 User Scenario of Foursquare
+
+Foursquare is an location-based social networking application that provides a
+platform for users to share their locations, by doing the check-in action, with
+
+64
+
+H.-H. Wu and M.-Y. Yeh
+
+friends through any GPS-equipped handheld devices. A location is called venue
+in Foursquare. By locating the current position of a user as the center, the
+Foursquare application will provide the venues that fall in the neighborhood
+within some radius d, as shown in Fig. 1(a). All these venues are contributed by
+the Foursquare users and veriﬁed by the Foursquare administrators. Each venue
+on the map is marked by an icon showing its category. There are nine main types
+of categories: ”Arts & Entertainment”, ”College & University”, ”Food”, ”Profes-
+sional & Other Places”, ”Nightlife Locations”, ”Residences”, ”Great Outdoors”,
+”Shops & Services” and ”Travel & Transport”.
+
+In addition to check in at some venue, users can also write tips, namely the
+review comments, about the venue. Due to the interface design of Foursquare,
+when a user writes a tip of a certain venue, all other tips of the same venue will
+be listed out at the same page as shown in Fig. 1(b). Therefore, we can assume
+that the user will deﬁnitely be attracted by some of them. Note that these tips
+may come either from the friends or non-friends of the user. As the Foursquare
+application provides the venues within the neighborhood of radius d, the tips
+of these venues will also have chances to be seen by the user. In other words,
+any user may be attracted by the tips of venues in the neighborhood of radius
+d centered at his/her current location. Finally, when viewing the tips left by
+others, a user can add any interesting tips into his/her todo list. The user can
+further mark each todo tip to a done status if he/she completes the visit to the
+corresponding venue.
+
+(a) Venues of the same category in
+the d-neighborhood of vi
+
+(b) The tip list of some
+venue vk
+
+Fig. 1. User scenario of Foursquare
+
+3.2 The Attractiveness Model
+
+By collecting the Foursquare data, we would like to study the inﬂuence relation-
+ship among the users and build a model to study the inﬂuential power among
+users in the location-based social network. In our attractiveness model, an LBSN
+is modeled as a graph G = (V, E), where V denotes the set of nodes representing
+users, E is the link set representing the weighted connections between any two
+users. To be more speciﬁc, given two users ui and uj, the weight wi,j of the link
+
+Inﬂuential Nodes in a One-Wave Diﬀusion Model
+
+65
+
+between them is the likelihood that ui’s behavior on visiting some venues will be
+attracted by uj’s activities in Foursquare. In other words, wi,j is the inﬂuence
+probability of user uj to user ui. In the following, we show how to compute the
+wi,j value.
+
+First, we introduce a tip and its attributes we can collect from Foursquare.
+
+Deﬁnition 1 (A tip and its attributes). A tip, denoted as s, has the fol-
+lowing attributes: the user who writes this tip s.u, the category s.c, the recorded
+time s.t, the corresponding venue s.v, and the sum of the number of todos and
+(cid:2)
+the number of dones s.tdsum.
+
+As the act of adding a tip written by others into the todo list and marking it as
+done can be regarded as a positive feedback of a user to that tip [10], we can use
+this information to model how likely the later tips are attracted by the earlier
+ones. Due to the privacy settings of Foursquare, we cannot access the todo/done
+list of each user. Therefore, we cannot inference the attractiveness between users
+directly. However, for each tip, we can know its total number of todos and dones
+added and marked by diﬀerent users. If a tip has a large number of todos and
+dones, it means that it is focused by a lot of people. Implicitly, it also shows that
+the user who writes this tip has some inﬂuential power.
+
+According to the user scenario introduced in Section 3.1, a user ui, who visits
+venue vi and writes a tip for it at some time ti, may have a chance to see
+other tips existing before ti and be attracted by some of them for venues of the
+same category within the neighborhood of radius d centered at vi. We denote
+all the venues in the d-neighborhood of vi and having the same category of vi
+as Nd(vi). Suppose gk represents the probability that user ui reads the tip list
+of venue vk ∈ Nd(vi), as shown in Fig. 1(b). Among all the tips for vk, some
+of them existing before t may be written by user uj. As a result, user ui may
+have a probability pjk to be attracted by these tips. Then, we can compute the
+attractiveness of uj to ui, i.e., ui is attracted by at least one tip written by uj,
+for ui to write a tip at vi as follows.
+
+P (ui (cid:3) uj, Nd(vi)) = 1 − (cid:2)
+
+(gk ∗ (1 − pjk)).
+
+(1)
+
+Note that the above equation is under the convenient assumption that pjk and
+gk are independent for diﬀerent vk and diﬀerent user uj.
+
+To compute gk in Eq.(1), our intuition is that if a venue is hot and has a high
+chance to be viewed by a user, it may have a lot of tips, many of which certainly
+have a high number of todos and dones. As a result, we compute gk as follows.
+
+(cid:3)
+
+gk|vk∈Nd(vi) =
+
+(cid:3)
+
+s∈S(vk) s.tdsum
+
+s∈S(Nd(vi)) s.tdsum
+
+,
+
+(2)
+
+where S(vk) refers to all the tips for vk that are written before ui writes a tip
+si for vi at time ti and S(Nd(vi)) refers to all the tips written before ti for all
+venues in Nd(vi). Note that in case there are tips with zero sum of todos and
+dones, we can add one to s.tdsum of every tip in advance.
+
+66
+
+H.-H. Wu and M.-Y. Yeh
+
+Next, we compute pjk in Eq.(1) as follows.
+
+(cid:3)
+(cid:3)
+
+pjk =
+
+s∈Sj (vk) s.tdsum
+s∈S(vk) s.tdsum
+
+,
+
+(3)
+
+where Sj(vk) refers to tips in S(vk) that are written by uj. The intuition of this
+equation is that if a user uj has high attractiveness, not only the number of tips
+that uj writes is high but also the sum of todo and done numbers of these tips
+are high.
+puted as the expected value of P (ui (cid:3) uj, Nd(vi)) deﬁned in Eq.(1).
+
+Finally, the value wi,j , which is the inﬂuence probability of uj to ui, is com-
+
+(cid:4)
+
+wi,j =
+
+s∈Si
+
+P (ui (cid:3) uj, Nd(vi)),
+
+(4)
+
+where Si are tips written by user ui in our collected data set.
+
+It is noted that if wi,j > wi,k, then user uj is more attractive to user ui
+compared to user uk. In addition, when collecting the tip data of Foursquare,
+we can also know if two users are friends. Foursquare regularly recommends
+users for the tips of their friends. Also, users can actively search the tips writ-
+ten by their friends for venues adjacent to their interested places. Therefore,
+if P (ui (cid:3) uj, Nd(vi)) > 0 and ui and uj are friends in Foursquare, we set
+P (ui (cid:3) uj, Nd(vi)) = 1. This is to model that tips written by user ui must be
+attracted by those written earlier by ui’s friend uj.
+
+4 Finding Inﬂuential Nodes
+
+After introducing the attractiveness model, in this section, we propose one-wave
+diﬀusion model, which is used to model the tip information diﬀusion, followed
+by the algorithm of ﬁnding the k inﬂuential nodes that maximize the inﬂuence
+spread in an LBSN.
+
+4.1 One-Wave Diﬀusion Model
+
+In our attractiveness model, we show how to compute wi,j, which is the at-
+tractiveness, or the inﬂuence power of uj to ui and deﬁned in Eq.(4). Before
+running the diﬀusion process, we do normalization for these values and obtain
+the diﬀusion probability from uj to ui as follows.
+
+qi,j =
+
+wi,j
+
+wmax + wmin
+
+,
+
+(5)
+
+where wmax and wmin are the maximum and the minimum wi,j of the whole
+network.
+
+Inﬂuential Nodes in a One-Wave Diﬀusion Model
+
+67
+
+Algorithm 1 BaseLine (G, k)
+Input: G = (V, E), number of seeds k
+Output: A set R of k inﬂuential nodes
+1: R = ∅
+2: for i = 1 to k do
+3:
+4:
+
+for each node v ∈ V \R do
+
+ISv = Inf luenceSpread(v) /* A node will not be considered to be inﬂuenced
+by v if that node is already inﬂuenced by nodes in R.*/
+
+R = R ∪ argmaxv{|ISv|, v ∈ V \R}
+
+5:
+6: return R
+
+The diﬀusion process of the one-wave diﬀusion model works as follows. Given
+a start node, say vj , it inﬂuences each of its neighbors vi if qi,j > 0. The total
+number of the inﬂuenced nodes is regarded as the inﬂuence spread of vj. Please
+note that, for k seed nodes, we run the above process sequentially. Also, once
+a node is inﬂuenced by some seed, it cannot be further inﬂuenced by other
+seeds. Finally, instead of using the well-know IC or LT models in this study,
+our intuition of adopting the one-wave diﬀusion model is that we care only the
+inﬂuence spread of the initially selected seeds, but not that of the active nodes
+inﬂuenced by the seeds.
+
+4.2 Algorithms for Inﬂuence Maximization
+
+Given the one-wave diﬀusion model, in this section we show how to select k inﬂu-
+ential nodes that maximize the inﬂuential spread. Kempe et al. [8] has described
+a greedy algorithm to solve the k-seed selection problem, which we modify based
+on our one-wave diﬀusion model as shown in Algorithm 1.
+
+In Algorithm 1, the Inf luenceSpread function computes the inﬂuence spread
+of v according to the one-wave diﬀusion process and put the v with the largest
+inﬂuence spread into R as the solution. If there is a tie at line 5, the node with the
+smaller ID number wins. Because this is an exhausted search on a complete graph
+G (i.e., O(|V |2) links), the BaseLine approach is regarded as the benchmark but
+lacks eﬃciency. Instead, we seek if we can search inﬂuential nodes in a smaller
+space.
+
+One method is called GreedyAlgorithmOnFriends(GAOF) as shown in Algo-
+rithm 2. In GAOF, we search the inﬂuential nodes on a graph where only the
+friendship links are retained. To be more speciﬁc, we collect the friendship be-
+tween each pair of users from the Foursquare data, and remove the edge between
+two nodes who do not have friendship from G to generate Gf = {Vf , Ef}. First
+we compute the inﬂuence spread of each node, denoted as ISv, in Gf (Lines 2-3).
+Finally, we extract the k nodes as the result of GAOF(Lines 4-5). If there are
+tie at line 5, the node with the smaller ID number wins.
+
+68
+
+H.-H. Wu and M.-Y. Yeh
+
+Algorithm 2 GAOF (Gf , k)
+Input: Gf = (Vf , Ef ), number of seeds k
+Output: A set RGAOF of k inﬂuential nodes
+1: RGAOF = ∅
+2: for each node v ∈ Vf do
+3:
+4: for i = 1 to k do
+5:
+6: return RGAOF
+
+ISv = Inf luenceSpread(v) /* each node v has its own ISv */
+RGAOF = RGAOF ∪ argmaxv{|ISv|, v ∈ Vf\RGAOF}
+
+Algorithm 3 CGAOF (Gf , k)
+Input: Gf = (Vf , Ef ), number of seeds k
+Output: A set RCGAOF of k inﬂuential nodes
+1: RCGAOF = ∅
+2: R = ∅
+3: for each node v ∈ Vf do
+4:
+5:
+6: for i = 1 to 2k do
+7:
+8: for i = 1 to k do
+9:
+10: return RCGAOF
+
+ISv = Inf luenceSpread(v) /* each node v has its own ISv */
+compute av of node v
+R = R ∪ argmaxv{|ISv|, v ∈ Vf\R}
+RCGAOF = RCGAOF ∪ argmaxv{av, v ∈ argmaxv{|Sv|, v ∈ R\RCGAOF}}
+
+An further improvement of GAOF is called ClassifyingGreedyAlgorithmOn-
+Friends(CGAOF) as shown in Algorithm 3. Similar to GAOF, we compute the
+inﬂuence spread of each node in Gf (Lines 3-4). However, in contrast to GAOF
+extracting k nodes by using the inﬂuence spread only, CGAOF extracts k nodes
+by considering three extra criteria: |ISv|, |Sv| and av, which denotes the number
+of inﬂuence spread of v, the number of tips written by v, and
+
+(cid:3)
+
+i∈Vf
+
+av =
+
+{wi,v | node i is inﬂuenced by node v, i (cid:4)= v}
+
+|ISv|
+
+,
+
+(6)
+
+respectively. We set av = 0 when |ISv| = 0. If a node v has a high av value, it
+means the attractiveness of this user to his/her friends is higher. In CGAOF,
+we extract the nodes by comparing |ISv| and |Sv| (Lines 8-9). If there is a tie
+at line 7 and 9, the node with the smaller ID number wins. The intuition of this
+algorithm is that we think high |Sv| and high av are also important features
+to compare the inﬂuence power of two nodes having only a small diﬀerence in
+inﬂuence spread. The node with high |Sv| will have more chances to inﬂuence
+other nodes while the node of av implies this user usually writes more attractive
+tips.
+
+Inﬂuential Nodes in a One-Wave Diﬀusion Model
+
+69
+
+4.3 Complexity Analysis
+
+In this section, we analyze the complexity of each algorithm. The complexity
+of the one-wave diﬀusion process of a node v, that is Inf luenceSpread(v), is
+O(Dv), where Dv denotes the degree of v in G. Thus the complexity of BaseLine
+is O(k|V |Dv), where it extracts k inﬂuential nodes and runs |V | times of the
+diﬀusion process for k nodes and selects the node with the largest inﬂuence
+spread. The complexity of getting RGAOF from Algorithm 2 is O(|V |Dvf +k|V |),
+where Dvf denotes the degree of some node v in Gf , and the algorithm extracts
+k nodes with the highest inﬂuence spread in k|V | time (Algorithm 2: Line 4,
+5). The complexity of getting RCGAOF from Algorithm 3 is O(|V |Dvf + k|V | +
+k3), where it selects 2k nodes with the highest inﬂuence spread in O(k|V |) and
+selects the highest |Sv| from 2k nodes, then selects the highest av nodes from
+these the highest |Sv| nodes, and continuously runs the selecting process k times
+(Algorithm 3: Line 8, 9). Because Gf only reserves the edges between two nodes
+that have friendship from G, Dvf (cid:5) Dv. As a result, the time cost of GAOF
+and CGAOF is much smaller compared to BaseLine when |V | (cid:6) k.
+
+5 Performance Study
+
+We conducted experiments on two real data sets collected from Foursquare to
+evaluate the eﬀectiveness of our proposed models and algorithm. All experiments
+were run on a workstation with an Intel Xeon E5530 2.40 GHz CPU and 70GB
+RAM using C.
+
+5.1 Settings
+
+By crawling the Fousquare data, we obtained 47218 users who wrote tips for
+the venues in New York City (NYC) and 30196 users who wrote tips for the
+venues in Los Angeles City (LAC). There were about 410,000 tips from 2008/5
+to 2011/7 in the NYC dataset and about 260,000 tips from 2009/2 to 2011/7 in
+the LAC dataset. The d used for Nd(vi) was set to 1 KM.
+
+We compared the proposed three methods, BaseLine, GAOF, CGAOF, with
+three other methods: FriendCentrality (FC), TipsCentrality (TC), and Random
+on selecting the k seeds for inﬂuence maximization. We compute the inﬂuence
+degree, the number of inﬂuenced nodes divided by the total number of nodes
+in a network, of the k seeds selected by diﬀerent methods. The FC and TC
+methods always selected k nodes having the largest number of friends and the
+largest number of tips, respectively, as the seeds. For the Random method, it
+just randomly selected k nodes as seeds. We run FC, TC, and Random several
+times to get their average inﬂuence degree. Please note that BaseLine, TC, FC
+and Random methods selected seeds from the complete network G. Only GAOF
+and CGAOF select k seeds from the network with only friendship links existed,
+i.e., Gf . In addition, for all methods, only users writing at least 50 tips were
+considered as the candidate of seeds. There were 754 candidates nodes in LAC
+and 1137 in NYC. This was to reduce the search space and speed up the initial
+seed selection in the two large networks.
+
+70
+
+H.-H. Wu and M.-Y. Yeh
+
+(a) NYC
+
+(b) LAC
+
+Fig. 2. The inﬂuence degree of each algorithm
+
+5.2 Degree of Inﬂuence Maximization
+
+Fig. 2 shows the inﬂuence degree of the 25 seeds chosen by diﬀerent methods.
+Note that although the ﬁve approaches selected diﬀerent sets of k seeds from
+either G or Gf , the inﬂuence degrees here were examined for each set of k on G.
+In general, the inﬂuence degree increased as the number of seeds increased on
+both data sets. The inﬂuence degrees of Baseline were the highest because the
+inﬂuential nodes were selected on the whole network G. The inﬂuence degrees of
+GAOF and CGAOF were lower compared to Baseline, but still of high enough
+values. On the NYC data set as shown in Fig. 2(a), the inﬂuence degree of
+the 25 nodes selected by CGAOF was high to 86.3% of that of Baseline, and
+that of GAOF was high to 85.5%. On the LAC data set as shown in Fig. 2(b),
+the inﬂuence degree of the 25 nodes selected by CGAOF was high to 78.5% of
+that of the BaseLine method and that of GAOF was high to 73.5%. TC, FC,
+and Random had poor performance on the inﬂuence degrees for both data sets
+showing that users who wrote the most tips or had the most friends were not
+necessary the most inﬂuential nodes. Instead, ﬁnding the inﬂuential nodes on Gf
+was a good alternative when the time cost was an primary issue. Finally, when k
+increased from 1 to 25, we found that CGAOF was better than GAOF in general
+because it considered both the number of tips written and the inﬂuential spread
+of a user simultaneously. Sometimes CGAOF was worse probably because Gf
+had some users writing many tips to attract their friends while these tips might
+not attract non-friends in G, where the inﬂuence degree was examined.
+
+5.3 Independent Inﬂuence Spread among Friends and All Nodes
+
+Here, we run the Inf luenceSpread(v) of each v independently on G using the
+Baseline approach and on Gf using GAOF. We selected the top 25 nodes of the
+highest inﬂuence degree values. Fig. 3(a) and 3(b) show the inﬂuence degrees of
+
+Inﬂuential Nodes in a One-Wave Diﬀusion Model
+
+71
+
+(a) Inﬂuence among friends
+
+(b) Inﬂuence among all users
+
+Fig. 3. The inﬂuence ability of each node in LAC and NYC
+
+LAC NYC
+
+# of candidate nodes
+1137
+Avg. # of tips of candidate nodes 102.2 97.9
+Avg. degree per node in G
+30195 47217
+Avg. degree per node in Gf
+28.7
+48.9
+
+754
+
+Fig. 5. The statistics of Gf and G
+
+Fig. 4. Similarity between the set
+of the top k highest inﬂuence abil-
+ity nodes in G and the set of
+the top k highest inﬂuence ability
+nodes in Gf
+
+the top 25 nodes selected from Gf and G, respectively, on both the NYC and
+LAC data sets. We denoted the set of 25 nodes on Gf as A and that on G as
+|A∩B|
+|A∪B| . The higher the Jaccard
+B and computed the Jaccard index J(A, B) =
+index represented that the two sets were more similar to each other.
+
+Fig. 4 shows the Jaccard indexes of A and B on both the NYC and LAC data
+sets. We observed there were overlaps between the two sets. Moreover, the top
+1 inﬂuential node were even the same for the NYC data. We show the statistics
+of Gf and G in Fig. 5. It shows that although the average number of degree
+per node in Gf was much smaller than that of G, Gf was still useful to ﬁnd
+the subset(about 20%-30% with k=25 in our experiments) of the top k highest
+inﬂuence ability nodes in G. As we mention in Section 4.3, Dv (cid:6) Dvf and
+|V | (cid:6) k in our experiments, so it was very useful to improve the eﬃciency. Due
+to our attractiveness model, if a node has friends rarely or never wrote tips,
+then the node could hardly or not inﬂuence its friends. Fig. 5 shows that the
+candidate nodes in NYC and LAC wrote the same number of tips, but NYC had
+
+72
+
+H.-H. Wu and M.-Y. Yeh
+
+a higher average number of Dvf compared to LAC. This means that the average
+number of friends of users in the LAC data was smaller compared to the NYC
+data such that the inﬂuence degree among friends in LAC was smaller. We also
+think that the inﬂuence degree may become a reason that if users in G have
+more friends writing tips in the same area, then it should be more eﬃcient to
+use the Gf to ﬁnd the inﬂuential nodes in G.
+
+6 Conclusions
+
+In this paper, taking the Foursquare data as an example, we studied the prob-
+lem of ﬁnding inﬂuential nodes in location-based social networks. Based on the
+popularity of the mutual venues visited and the popularity of the tips written,
+we built the attractiveness model to compute the inﬂuence probability between
+two users. Furthermore, a one-wave diﬀusion model was designed to focus the
+direct impact of the initial seeds on their ﬁrst degree neighbors. With these two
+models, we proposed algorithms to ﬁnd the k inﬂuential nodes in LBSNs, on
+both a complete-graph network and a friendship network. Under our attractive-
+ness and one-wave diﬀusion models, we empirically showed that the k inﬂuential
+nodes selected by our proposed methods in the the complete-graph and friend-
+ship networks had higher inﬂuence spread when compared to other methods.
+
+References
+
+1. Zheng, Y., Zhou, X.: Computing with Spatial Trajectories (2011)
+2. Cho, E., Myers, S.A., Leskovec, J.: Friendship and Mobility: User Movement in
+
+Location-Based Social Network. In: Int. Conf. on KDD, pp. 1082–1090 (2011)
+
+3. Noulas, A., Scellato, S., Mascolo, C., Pontil, M.: An Empirical Study of Geographic
+
+User Activity Patterns in Foursquare. In: Int. Conf. on ICWSM (2011)
+
+4. Ye, M., Yin, P., Lee, W.C., Lee, D.L.: Exploiting Geographical Inﬂuence for Col-
+laborative Point-of-Interest Recommendation. In: Int. Conf. on SIGIR, pp. 325–334
+(2011)
+
+5. Zheng, Y., Zhang, L., Xie, X., Ma, W.Y.: Mining interesting locations and travel
+
+sequences from GPS trajectories. In: Int. Conf. on WWW, pp. 791–800 (2009)
+
+6. Domingos, P., Richardson, M.: Mining the Network Value of Customers. In: Int.
+
+Conf. on KDD, pp. 57–66 (2001)
+
+7. Kempe, D., Kleinberg, J.M., Tardos, ´E.: Inﬂuential Nodes in a Diﬀusion Model
+for Social Networks. In: Caires, L., Italiano, G.F., Monteiro, L., Palamidessi, C.,
+Yung, M. (eds.) ICALP 2005. LNCS, vol. 3580, pp. 1127–1138. Springer, Heidelberg
+(2005)
+
+8. Kempe, D., Kleinberg, J., Tardos, E.: Maximizing the Spread of Inﬂuence through
+
+a Social Network. In: Int. Conf. on KDD, pp. 137–146 (2003)
+
+9. Granovetter, M.: Threshold Models of Collective Behavior. American Journal of
+
+Sociology 83, 1420–1443 (1978)
+
+10. Vasconcelos, M.A., Ricci, S.M.R., Almeida, J.M., Benevenuto, F., Almeida, V.A.F.:
+Tips, Dones and Todos: Uncovering User Proﬁles in Foursquare. In: Int. Conf. on
+WSDM, pp. 653–662 (2012)
+
+

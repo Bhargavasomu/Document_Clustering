@@ -1,0 +1,881 @@
+Hierarchical Graph Summarization: Leveraging Hybrid
+
+Information through Visible and Invisible Linkage
+
+Rui Yan1, Zi Yuan2, Xiaojun Wan3, Yan Zhang1,(cid:2), and Xiaoming Li1
+
+1 School of Electronics Engineering and Computer Science, Peking University, China
+
+2 School of Computer Science and Engineering, Beihang University, China
+3 Institute of Computer Science and Technology, Peking University, China
+
+{r.yan,wanxiaojun,lxm}@pku.edu.cn,
+
+ziyuan@cse.buaa.edu.cn, zhy@cis.pku.edu.cn
+
+Abstract. Graph-based ranking algorithm has been recently exploited for sum-
+marization by using sentence-to-sentence relationships. Given a document set
+with linkage information to summarize, different sentences belong to different
+documents or clusters (either visible cluster via anchor texts or invisible cluster by
+semantics), which enables a hierarchical structure. It is challenging and interest-
+ing to investigate the impacts and weights of source documents/clusters: sentence
+from important ones are deemed more salient than the others. This paper aims to
+integrate three types of hierarchical linkage into traditional graph-based methods
+by proposing Hierarchical Graph Summarization (HGS). We utilize a hierarchi-
+cal language model to measure the sentence relationships in HGS. We develop
+experimental systems to compare 5 rival algorithms on 4 instinctively different
+datasets which amount to 5197 documents. Performance comparisons between
+different system-generated summaries and manually created ones by human edi-
+tors demonstrate the effectiveness of our approach in ROUGE metrics.
+
+Keywords: Summarization, Hierarchical Graph, Visible and Invisible Linkage.
+
+1 Introduction
+
+In the era of information explosion, people need new information to update their knowl-
+edge whilst information on Web is updating extremely fast. Multi-document summa-
+rization has been proposed to address such dilemma by producing a summary delivering
+the majority of information content from a document corpus, and the short summary is
+necessarily helpful to facilitate users to quickly understand the large number of docu-
+ments. Automated multi-document summarization has drawn much attention in recent
+years. In the communities of information retrieval and natural language processing, a
+series of conferences on automatic text summarization have advanced the summariza-
+tion techniques and produced a couple of experimental online systems.
+
+Graph-based ranking algorithms have been recently exploited for summarization by
+making use of sentence-to-sentence relationships and played an important role with the
+exponential document growth on the Web. In general, traditional graph summarization
+
+(cid:2) Corresponding author.
+
+P.-N. Tan et al. (Eds.): PAKDD 2012, Part II, LNAI 7302, pp. 97–108, 2012.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2012
+
+98
+
+R. Yan et al.
+
+utilizes plain linkage among sentences without considering higher-level information be-
+yond the sentence-level information, which is insufﬁcient. Given a document set with
+linkage information to summarize, different sentences belong to different documents
+and clusters, either clustered by visible linkage (e.g., anchor texts) or invisible linkage
+(e.g., semantic cohesion), which enables a hierarchical text structure. It is challenging
+and interesting to investigate the impacts and weights of source documents/clusters:
+different documents and clusters usually have different importance for users to under-
+stand the document set. Sentence from important documents/clusters are deemed more
+salient than the trivial ones. In brief, simultaneous consideration of three-layer hierar-
+chical linkage has not been investigated under a uniﬁed framework.
+
+In order to address above insufﬁciency, we aim to model these three levels of
+hierarchical linkage, i.e., sentence-to-sentence, sentence-to-document and document-
+to-cluster relationships, into traditional graph-based summarization, and we name this
+approach as Hierarchical Graph Summarization (HGS). We propose a hierarchical lan-
+guage model to measure the sentence relationships for the ranking process in HGS.
+Document/cluster-level information through visible and invisible linkage is used for
+smoothing: neighboring text information is proved to be useful [11]. We will ﬁrst in-
+vestigate the presence of visible and invisible linkage for clustering.
+
+Visible Linkage. A web document is connected to other web documents by explicit
+links via anchor texts, which are denoted as visible linkage.
+
+Invisible Linkage. A web document is connected to other web documents through
+implicit semantic coherence, denoted as invisible linkage.
+
+The contributions of this paper are as follows:
+• The 1st contribution is to utilize the instinctively explicit linkage among web
+documents, which is a natural understanding of enormous web data organization. We
+distinguish such visible linkage from invisible linkage by semantic cohesion and utilize
+both information into clustering.
+• The 2nd contribution is to incorporate a three-level hierarchical linkage structure
+into a uniﬁed language smoothing model, which is used to measure sentence relation-
+ships by utilizing both document-level and cluster-level information simultaneously.
+
+We start by reviewing previous work in Section 2. In Section 3 we describe the basic
+graph summarization and describe our proposed HGS in Section 4. We conduct empiri-
+cal evaluations in Section 5, including performance comparisons and result discussion.
+Finally we draw conclusions in Section 6.
+
+2 Related Work
+
+Multi-document summarization (MDS) has drawn much attention in recent years. In
+general, MDS can either be extractive or abstractive. The former assigns salient scores
+to semantic units (e.g. sentences, paragraphs) of documents indicating the importance
+and then extracts top ranked ones, while the latter demands information fusion(e.g.
+sentence compression and reformulation). Here we focus on extractive summarization.
+To date, various extraction-based methods have been proposed for generic multi-
+document summarization. MEAD [3] is an implementation of the centroid-based
+
+Leveraging Hybrid Information through Visible and Invisible Linkage
+
+99
+
+method that scores sentences based on features such as cluster centroids, position, and
+TF.IDF, etc. NeATS [6] adds new features such as topic signature and term cluster-
+ing to select important content. Themes (or topics, clusters) in documents have been
+discovered and used for sentence selection [10,14,13].
+
+Most recently, the graph-based ranking methods have been proposed to rank sen-
+tences/passages based on “votes” or “recommendations” between each other. TextRank
+[9] and LexPageRank [2] use algorithms similar to PageRank and HITS to compute
+sentence importance. Cluster information such as document-level information has been
+incorporated in the graph model to better evaluate sentences [12].
+
+Generally, summarization considers content characteristics such as coverage,
+diversity [1,17,5], and all these characteristics require a calculation of sentence linkage
+measurement. To the best of our knowledge, currently, neither the instinctively visible
+linkage of anchor texts from web document organizations is utilized for summarization,
+nor the three-layer hierarchical linkage has been investigated simultaneously in a uni-
+ﬁed language model to measure sentence relationships. HGS approach can naturally and
+simultaneously take into account these two advantages in graph-based summarization.
+
+3 Basic Graph Summarization
+
+The basic graph summarization is essentially a way of deciding the importance of a
+vertex within a linkage graph based on global information recursively drawn from the
+entire graph, using the Markov Random Walk Model (MRW). The basic idea is that of
+“voting” or “recommendation” between the vertices, where each vertex is a sentence.
+A link between two vertices is considered as a vote cast from one vertex to the other
+vertex. The score associated with a vertex is determined by the votes that are cast for it,
+and the score of the vertices casting these votes.
+
+Formally, given a document set D, let G = (V, E) be a graph to reﬂect the relation-
+ships between sentences in the document set, as shown in Figure 1 (Part A). V is the
+set of vertices and each vertex si in V is a sentence in the document set. E is the set
+of edges, which is a subset of V × V . Each edge eij in E is associated with an afﬁnity
+weight f (si → sj) between sentences si and sj (i (cid:3)= j). Sentence s is generated from
+the language model Θs. The afﬁnity weight is measured by Kullback-Leibler divergence
+of si and sj, contained in a decreasing logistic function L(x) = 1
+1+ex to map the dis-
+tance into interval [0,1] as proposed in [16,17]. That is, f (si → sj) = L(DKL(sj||si)),
+where DKL(sj||si) is:
+
+DKL(sj||si) =
+
+p(w|Θsj )log
+
+(cid:2)
+
+w∈W
+
+p(w|Θsj )
+p(w|Θsi )
+
+(1)
+
+W is the set of words in our vocabulary and w denotes a word. The language model of
+Θs will be discussed in details later. If Θsi and Θsj are very close, the KL-divergence
+would be small and f (si → sj) would be high, which intuitively makes sense.
+Given f (si → sj), the transition probability from si to sj is then deﬁned by normal-
+
+izing the corresponding afﬁnity weight as follows.
+
+p(si → sj) =
+
+f (si→sj )
+k=1 f (si→sk)
+
+(cid:2)|V |
+
+(cid:3)
+
+0,
+
+,
+
+(cid:4)
+
+if
+
+f (cid:3)= 0
+otherwise
+
+(2)
+
+R. Yan et al.
+
+100
+Note that p(si → sj) is asymmetric and it measures the afﬁnity from si to sj. We
+let f (si → si) = 0 to avoid self transition. We use the row-normalized matrix M =
+[Mij]|V |×|V | where Mij = p(si → sj) to describe G with each entry corresponding
+to the transition probability and all zero elements are replaced by a smoothing factor
+empirically set to 1/|V |.
+
+Based on the matrix M, the saliency score Ψ (si) for sentence si can be deduced from
+those of all other sentences linked with it and it can be formulated in a recursive form
+as in the PageRank algorithm as follows:
+
+Ψ (si) = μ · (cid:2)
+
+Ψ (sj) · Mji +
+
+1 − μ
+|V |
+
+all j(cid:4)=i
+
+(3)
+
+For implementation, the initial scores of all sentences are set to 1 and the iteration al-
+gorithm in Equation (3) is adopted to compute the new scores of the sentences. Usually
+the convergence of the iteration algorithm is achieved when the difference between
+the scores computed at two successive iterations for any sentences falls below a given
+threshold (0.0001 in this study). μ is the damping factor usually set to 0.85, as in the
+PageRank algorithm. We then apply the Maximum Marginal Relevance (MMR) mech-
+anism for redundancy removal, similar to the method used in [11].
+
+We see that according to the KL-divergence scoring method, our main tasks are to
+estimate Θs. Since s can be regarded as a short document, we can use any standard
+method to estimate Θs. Here, we use Dirichlet prior smoothing [18] to estimate Θs as
+follows:
+
+c(w, s) + μs · p(w|B)
+
+· p(w|B)
+
+p(w|Θs) =
+
+c(w, s)
+|s| + μs
+
++
+
+μs
+
+|s| + μs
+
+=
+
+|s| + μs
+
+(4)
+where |s| is the length of s, c(w, s) is the count of word w in s, p(w|B) is a background
+model used as smoothing factor. Generally p(w|B) is estimated by the whole document
+set D, i.e., using
+
+w(cid:2)∈W c(w(cid:2),D) . μs is the smoothing parameter.
+
+However, note that as the length of a sentence is very short, smoothing is critical for
+addressing the term sparseness problem for sentences. The globalized smoothing from
+the whole corpus is coarse-grained. Therefore, we move on to estimate the ﬁne-grained
+p(w|Θs) from multiple-layers by the hierarchical graph summarization.
+
+c(w,D)
+
+(cid:2)
+
+4 Hierarchical Graph Summarization
+
+4.1 Overview
+
+In the basic graph summarization, all sentences are indistinguishable, i.e., the sentences
+are treated uniformly. As we mentioned in Section 1, there may be many factors that can
+have impact on the importance analysis of the sentences. This study aims to examine
+the impact of hierarchical linkage on graph summarization, by incorporating sentence-
+to-document relationship, as well as visible and invisible document clustering.
+
+Besides 1) the basic pair-wise sentence-to-sentence relationship, the hierarchical
+graph includes 2) sentence-to-document relationship, 3) document-to-cluster relation-
+ship from visible linkage and 4) document-to-cluster relationship from invisible link-
+age by semantic clustering. We number these four types of linkage correspondingly
+
+Leveraging Hybrid Information through Visible and Invisible Linkage
+
+101
+
+Fig. 1. Illustration of the hierarchical linkage graph. A circle denotes a sentence and a square
+denotes a document. Different lines denote different types of linkage, which are marked with
+Number 1-4. Some lines are omitted due to the space limits.
+
+in Fig. 1. As can be seen, the lowest layer is just the traditional link graph between
+sentences that has been well studied in previous work. The upper layer represents the
+documents. The dashed lines between these two layers indicate the conditional inﬂu-
+ence between the sentences and the documents: a link is established when the sentence
+is from the document. Documents are connected due to visible lines by anchor text
+arrows and are also grouped by invisible semantic clusters.
+
+4.2 Incorporating Hierarchical Linkage
+
+Sentence-to-Document Links. To incorporate the document-level information and the
+sentence-to-document relationship, the document-based graph model is proposed based
+on the two-layer link graph including both sentences and documents in Fig. 1.(Part B):
+the language model of sentence s is smoothed by the source document.
+
+Visible Document-to-Cluster Links. Web documents are linked to each other through
+anchor texts and we keep such structural information. We start “walking” from a par-
+ticular web document to all connected web documents until all linked documents are
+visited. These documents are clustered together as visible clusters, and the document
+within the visible cluster forms a visible document-to-cluster relationship.
+
+Invisible Document-to-Cluster Links. Web documents can be clustered according to
+their semantic coherence, and the distance is calculated by the standard cosine similarity
+measurement. We use the popular clustering algorithms of K-means to produce the
+invisible semantic cluster. Given a document set, it is hard to predict the actual cluster
+number, and thus we empirically set the number k of expected clusters as k=
+where |D| is the number of documents.
+Linkage Integration. After we introduce three types of hierarchical links, the estima-
+tion of the background language model ΘB should be based on the source document
+
+(cid:5)|D|,
+
+102
+
+R. Yan et al.
+
+and source cluster where the sentence comes from, according to [8], the background
+model can be now written as:
+
+p(w|B) =
+
+c(w, d) + μcp(w|C)
+
+|d| + μc
+
+=
+
+c(w, d)
+|d| + μc
+
++
+
+μc
+
+|d| + μc
+
+· p(w|C)
+
+We take Equation (5) into Equation (4) and obtain the ﬁnal representation:
+
+(5)
+
+(6)
+
+p(w|Θs) =
+
+=
+
+· |s|
+|s| +
+· p(w|s) +
+μsμc
+
+|s|
+
+c(w, s)
+|s| + μs
+|s| + μs
++
+
+(|s| + μs)(|d| + μc)
+
+(cid:7)
+· p(w|C)
+
+μs
+
+|s| + μs
+
+·
+
+(cid:6)
+
+c(w, d)
+|d| + μc
+μs|d|
+
+μc
+
+|d| + μc
+
+· |d|
+|d| +
+· p(w|d)
+
+(|s| + μs)(|d| + μc)
+
+· p(w|C)
+
+μc can be interpreted as our conﬁdence on the prior of how cluster information weighs.
+Thus setting μc=|d| means that we put equal weights on the document-level and the
+cluster-level information. μc=0 yields no consideration of cluster-level information and
+μs=0 yields simple consideration of plain sentence relationships.
+
+After simple calculation, we notice that the sum of all coefﬁcients in Equation (6)
+
+equals to 1, and hence we change Equation (6) into a more concise format of
+
+p(w|Θs) = α · p(w|s) + β · p(w|d) + γ · p(w|C)
+
+(7)
+α, β, γ all belong to [0,1] and α + β + γ=1. The cluster representation of p(w|C) can
+be rewritten as a combination of visible cluster p(w|Cv) and invisible cluster p(w|Civ)
+controlled by λ:
+
+p(w|C) = λ · p(w|Civ) + (1 − λ) · p(w|Cv)
+
+(8)
+
+Special Cases:
+
+(1) β=0 and γ=0: only plain relationship between two sentences are considered;
+(2) β (cid:3)=0, γ=0: plain linkage and document-to-sentence relationship included;
+(3) γ (cid:3)=0, λ=0 means no invisible clustering impact from visible linkage;
+(4) γ (cid:3)=0, λ=1 means no visible clustering impact from invisible linkage.
+
+4.3 Estimation of Document/Cluster Importance
+
+Documents and clusters are not equally important. Our assumption is that the sentences
+in an important document or cluster should be ranked higher and more likely to be
+chosen into the summary. The importance of documents (or clusters) is measured the
+relevance to the whole corpus. We examine such impact by incorporating the document
+importance and cluster importance into calculation of sentence linkage and ranking.
+
+The function π(d) aims to evaluate the importance of document d in the document
+set D. The following two methods are developed to evaluate the document importance.
+πkl: It uses the transformed KL-Divergence value between the document d and the
+
+whole document set D as the importance score of the document:
+
+πkl(d) = L(DKL(d||D))
+
+(9)
+
+Leveraging Hybrid Information through Visible and Invisible Linkage
+
+103
+
+πpr: It constructs a weighted graph between documents and uses the PageRank algo-
+rithm to compute the rank scores of the documents as the importance scores of the
+documents. The link structure among documents is established by the inherent visible
+linkage. The equation for iterative computation is the same with Equation (3).
+
+The function φ(C) evaluates the importance of cluster C (both visible and invisible)
+
+in the document set D. Similarly we have two methods to evaluate cluster weights.
+
+φkl: It uses the transformed KL-Divergence value between the cluster C and the
+
+whole document set D as the importance score of the cluster:
+
+φkl(C) = L(DKL(C||D))
+
+φpr: We add the PageRank scores of all the documents within the cluster C, i.e.,
+
+φpr(C) =
+
+πpr(d)
+
+(cid:2)
+
+d∈C
+
+(10)
+
+(11)
+
+By incorporating document and cluster importance, Equation (7) can be rewritten as
+Equation (12), substituting the unweighted p(w|d) and p(w|C). p(w|Θs) is estimated
+for all sentences and applied into Equation (1), (2), (3) to calculate the hierarchical
+sentence relationships and to rank sentences within the multiple-layer graph.
+p(w|Θs) = α · p(w|s) + β · [π(d)p(w|d)] + γ · [φ(C)p(w|C)]
+
+(12)
+
+5 Experiments and Evaluation
+
+5.1 Dataset
+
+We use the data in [16] to test HGS on the real world datasets, which amounts to 5197
+documents from various major news sites (such as BBC, CNN and Xinhua News, etc.).
+Our data includes 4 subjects, and each belongs to a different category of Rule of Inter-
+pretation (ROI) [4]. Reference summaries are created by editors [16].
+
+Table 1. Detailed basic information of 4 datasets
+
+Subjects
+
+1.Inﬂuenza A
+2.BP Oil Spill
+
+3.Haiti Earthquake
+
+4.Michael Jackson Death
+
+#Sentences #Documents #Visible Links #RefSum (Avg. Length)
+
+115026
+63021
+12073
+37819
+
+2557
+1468
+247
+925
+
+5108
+2493
+115
+1627
+
+5 (83)
+6 (76)
+2 (32)
+3 (64)
+
+5.2 Evaluation Metrics
+
+The ROUGE measure is widely used for evaluation [7]: the DUC contests usually ofﬁ-
+cially employ ROUGE for automatic summarization evaluation. In ROUGE evaluation,
+the summarization quality is measured by counting the number of overlapping units,
+such as N-gram, word sequences, and word pairs between the candidate summaries CS
+
+104
+
+R. Yan et al.
+
+and the reference summaries RS. There are several kinds of ROUGE metrics, of which
+the most important one is ROUGE-N with 3 sub-metrics: precision, recall and F-score.
+
+ROUGE-N-R =
+
+ROUGE-N-P =
+
+ROUGE-N-F =
+
+Count (N-gram)
+
+(cid:2)
+
+N-gram∈S
+(cid:2)
+
+Countmatch(N-gram)
+
+(cid:2)
+S∈RS
+(cid:2)
+S∈RS
+(cid:2)
+S∈CS
+(cid:2)
+S∈CS
+2 × ROUGE-N-P × ROUGE-N-R
+ROUGE-N-P + ROUGE-N-R
+
+Countmatch(N-gram)
+
+N-gram∈S
+(cid:2)
+
+N-gram∈S
+(cid:2)
+
+N-gram∈S
+
+Count (N-gram)
+
+S denotes a summary. N in these metrics stands for the length of N-gram and N-
+gram∈RS denotes the N-grams in reference summary while N-gram∈CS denotes the
+N-grams in the candidate summary. Countmatch(N-gram) is the maximum number of N-
+gram in the candidate summary and in the set of reference summaries. Count(N-gram) is
+the number of N-grams in reference summaries or candidate summaries.
+
+According to [7], among all sub-metrics, unigram-based ROUGE (ROUGE-1) has
+been shown to agree with human judgment most and bigram-based ROUGE (ROUGE-
+2) ﬁts summarization well. We report three ROUGE F-measure scores: ROUGE-1,
+ROUGE-2, and ROUGE-W, where ROUGE-W is based on the weighted longest com-
+mon subsequence. The weight W is set to be 1.2 in our experiments by ROUGE package
+(version 1.55). The higher the ROUGE scores, the similar the two summaries are.
+
+5.3 Algorithms for Comparison
+
+Pre-processing. Given a collection of documents, we ﬁrst decompose them into sen-
+tences. Then the stop-words are removed and words stemming is performed. After these
+steps, we implement the following widely used summarization algorithms as baseline
+systems. They are designed for traditional summarization without hierarchical linkage.
+For fairness we conduct the same preprocessing for all algorithms.
+
+Random: The method selects sentences randomly for each document collection.
+Centroid: The method applies MEAD algorithm [3] to extract sentences according
+to the following parameters: centroid value, positional value, and ﬁrst-sentence overlap.
+GMDS: The plain graph MDS proposed by [11] ﬁrst constructs a sentence connec-
+tivity graph based on cosine similarity and then selects important sentences based on
+the concept of eigenvector centrality.
+
+PGMDS: Wan et al. present a two-layer pair-wise graph summarization methods in
+[12], utilizing sentence-to-sentence and sentence-to-document linkage without a con-
+sideration of simultaneous document-to-cluster links.
+
+HGS: HGS is an algorithm with three-layer hierarchical linkage information and at
+
+the same time, both visible and invisible document clustering are performed.
+
+RefSum: As we have used separate reference summaries from human evaluators, we
+not only provide ROUGE evaluations of the competing systems but also of the reference
+summaries against each other, which provides a good indicator of not only the upper
+bound ROUGE score that any system could achieve.
+
+Leveraging Hybrid Information through Visible and Invisible Linkage
+
+105
+
+5.4 Overall Performance Comparison
+
+We use a cross validation manner among 4 datasets, i.e., to train parameters on one
+subject set and to examine the performance on the others. After 4 training-testing pro-
+cesses, we take the average F-score performance in terms of ROUGE-1, ROUGE-2 and
+ROUGE-W on all sets. The details are listed in Tables 2∼5.
+
+Table 2. Overall performance comparison
+on Inﬂuenza A. ROI
+
+category: Science.
+
+∗
+
+Table 3. Overall performance comparison
+on BP Oil Leak. ROI category: Accidents.
+
+Systems R-1 R-2 R-W 95%-conf.
+RefSum 0.491 0.112 0.159 0.44958
+Random 0.197 0.039 0.081 0.75694
+Centroid 0.241 0.050 0.094 0.45073
+GMDS 0.252 0.059 0.098 0.33269
+PGMDS 0.303 0.060 0.099 0.53123
+0.298 0.063 0.101 0.53459
+
+HGS
+
+Systems R-1 R-2 R-W 95%-conf.
+RefSum 0.517 0.135 0.183 0.48618
+Random 0.202 0.041 0.096 0.64406
+Centroid 0.259 0.052 0.098 0.34743
+GMDS 0.267 0.057 0.102 0.43877
+PGMDS 0.273 0.061 0.107 0.77245
+0.299 0.058 0.111 0.39236
+
+HGS
+
+Table 4. Overall performance comparison
+on Haiti Earthquake. ROI category: Disasters.
+
+Table 5. Overall performance comparison
+on Jackson Death. ROI category: Legal Cases.
+
+Systems R-1 R-2 R-W 95%-conf.
+RefSum 0.528 0.139 0.167 0.30450
+Random 0.206 0.043 0.093 0.75694
+Centroid 0.252 0.050 0.099 0.43045
+GMDS 0.251 0.058 0.098 0.33694
+PGMDS 0.275 0.055 0.106 0.64198
+0.307 0.060 0.115 0.67312
+
+HGS
+
+Systems R-1 R-2 R-W 95%-conf.
+RefSum 0.482 0.115 0.163 0.47052
+Random 0.189 0.039 0.084 0.52426
+Centroid 0.255 0.048 0.089 0.21045
+GMDS 0.267 0.055 0.095 0.30070
+PGMDS 0.281 0.063 0.107 0.67825
+0.294 0.059 0.113 0.42148
+
+HGS
+
+∗
+
+ROI: news categorization deﬁned by Linguistic Data Consortium (http://www.ldc.upenn.edu/projects/tdt4/annotation).
+
+From the results in Table 2 to Table 5, we have following observations:
+• Generally Random has the worst performance.
+• The results of Centroid are better than those of Random, mainly because the Cen-
+troid method takes into account positional value and ﬁrst-sentence overlap, which facil-
+itate main aspects summarization. However, the ﬂat clustering-based summarization is
+proved to be less useful [15].
+• The GMDS system outperforms centroid-based summarization methods. This is
+due to the fact that PageRank-based framework ranks the sentence using eigenvector
+centrality which implicitly accounts for information subsumption among all sentences.
+• In general, the PGMDS algorithm outperforms GMDS system. It indicates that the
+two-layer hierarchical summarization is more useful than plain graph summarization
+and richer linkage structure indeed facilitates graph summarization.
+• HGS under our proposed framework outperforms baselines, indicating that the
+overall properties we use for three layers of hierarchical linkage are beneﬁcial for sum-
+marization tasks.
+
+106
+
+R. Yan et al.
+
+Fig. 2. α: weight of sentence-to-sentence links Fig. 3. β: weight of sentence-to-document links
+
+Fig. 4. γ: weight of document-to-cluster links
+
+Fig. 5. λ: tradeoff of visible/invisible cluster
+
+Having proved the effectiveness of our proposed methods, we carry the next move
+to identify how different layers of information take effects to enhance the quality of a
+summary in parameter tuning of α, β, γ and λ.
+
+5.5 Parameter Tuning
+
+Keeping other parameters ﬁxed, we vary one parameter at a time to examine the changes
+of its performance from all 4 datasets. The ﬁrst group of key parameters in our frame-
+work is α, β and γ where α + β + γ=1. Every time we tune a parameter at a step of 0.1
+and vary the other two for the best performance to achieve. Experimental results indi-
+cate the sentence-level relationship have stable but little impact on the summarization
+performance (illustrated in Fig. 2). The positive inﬂuence of documents and clusters
+are conﬁrmed in Fig. 3 and Fig. 4 when β (cid:3)=0 and γ (cid:3)=0. Compared with document-
+level information, cluster-level information has a relatively weaker inﬂuence. Excessive
+use of higher level information impairs performance. Over smoothing from source texts
+might make the language models divergent from the original ones. We set α=0.3, β=0.5,
+γ=0.2 in our experiments.
+
+Leveraging Hybrid Information through Visible and Invisible Linkage
+
+107
+
+Another key parameter in our framework is λ in Equation (8) to measure the tradeoff
+between visible and invisible cluster information. We gradually change λ from 0 to 1 at
+the step of 0.1 to examine the effect in Fig. 5. The combination of visible and invisible
+cluster outperforms the performance in isolation (λ=1 or 0). It is understandable that
+these two clustering metrics denote separate document organization methods and intro-
+duce different smoothing backgrounds. In general, a larger weight from visible cluster
+is preferable (λ=0.3).
+
+Finally we examine the impact of document and cluster weights and the results are
+summarized in Table 6. From Table 6, we conclude that to distinguish the weight of
+documents and clusters is useful to measure sentence relationships because the usage
+of both weights brings prominent improve compared with π(d)=OFF and φ(C)=OFF.
+We ﬁnd that document weight by πpr(d) is much better than πkl(d), indicating that the
+web organization structure is helpful to ﬁnd the centric documents within the corpus.
+The usage of πkl(d) has been proved in [12]. We also try different combinations of
+φ(C) for visible and invisible clusters. φkl means both clusters are weighed by KL-
+Divergence, and φpr means both clusters are weighed by PageRank score. φkl+pr means
+using KL-Divergence for visible clusters and using PageRank for invisible clusters,
+while φpr+kl means using PageRank score for visible clusters and using KL-Divergence
+for invisible clusters. We have an interesting ﬁnding that for visible clusters organized
+by anchor texts, the weights measured by PageRank seems to make more sense than
+using semantic coherence, and vice versa. Therefore, in general, the performance of
+φpr+kl is the most plausible weighting strategy.
+
+Table 6. The impact of document weights and cluster weights, measured by KL-Divergence (kl),
+PageRank score (pr) and their different combinations
+
+ON
+
+φpr
+
+OFF
+
+φkl φpr+kl φkl+pr
+
+@
+φ
+@@π
+πpr 0.282 0.289 0.291 0.286 0.266
+πkl 0.268 0.271 0.273 0.265 0.254
+OFF
+0.237
+
+0.242
+
+6 Conclusions
+
+In this paper we propose a Hierarchical Graph Summarization method, incorporat-
+ing hybrid linkage information from multiple levels simultaneously into traditional
+graph summarization models. We utilize sentence-to-sentence relationship, sentence-
+to-document relationship and document-to-cluster relationship. We also investigate the
+web document structural information by explorations of visible and invisible doc-
+ument clusters, and the visible clusters earn heavier weights than invisible clusters
+(λ=0.3). Further more, we distinguish document/cluster by measuring their correspond-
+ing weights, calculating KL-Divergence and PageRank scores.
+
+Abundant experiments are conducted on 4 real datasets, comparing 5 rival algo-
+rithms. Experimental results demonstrate the effectiveness of our proposed HGS. The
+beneﬁts of visible and invisible clustering are also conﬁrmed. Documents and clusters
+
+108
+
+R. Yan et al.
+
+should be distinguished by their signiﬁcance. We also ﬁnd that the semantic coherence
+for invisible clustering has not shown as promising effects as visible clustering does.
+
+Acknowledgments. This work was partially supported by HGJ 2010 Grant
+2011ZX01042-001-001 and NSFC with Grant No. 61073081. Xiaojun Wan was sup-
+ported by NSFC with Grant No.61170166, and Rui Yan was supported by the MediaTek
+Fellowship.
+
+References
+
+1. Allan, J., Gupta, R., Khandelwal, V.: Temporal summaries of new topics. In: Proceedings of
+
+the 24th Annual International ACM SIGIR Conference, pp. 10–18 (2001)
+
+2. Erkan, G., Radev, D.R.: Lexpagerank: Prestige in multi-document text summarization. In:
+
+Proceedings of EMNLP 2004, pp. 1–7 (2004)
+
+3. Fukumoto, F., Suzuki, Y.: Extracting key paragraph based on topic and event detection: to-
+
+wards multi-document summarization. In: NAACL-ANLP 2000, pp. 31–39 (2000)
+
+4. Kumaran, G., Allan, J.: Text classiﬁcation and named entities for new event detection. In:
+Proceedings of the 27th Annual International ACM SIGIR Conference, pp. 297–304 (2004)
+5. Li, L., Zhou, K., Xue, G.-R., Zha, H., Yu, Y.: Enhancing diversity, coverage and balance for
+
+summarization through structure learning. In: WWW 2009, pp. 71–80 (2009)
+
+6. Lin, C.-Y., Hovy, E.: From single to multi-document summarization: a prototype system and
+
+its evaluation. In: Proceedings of ACL 2002, pp. 457–464 (2002)
+
+7. Lin, C.-Y., Hovy, E.: Automatic evaluation of summaries using N-gram co-occurrence statis-
+
+tics. In: Proceedings of NAACL-HLT 2003, pp. 71–78 (2003)
+
+8. Mei, Q., Zhai, C.: Generating Impact-Based Summaries for Scientiﬁc Literature. In: Pro-
+
+ceedings of ACL 2008, pp. 816–824 (2008)
+
+9. Mihalcea, R., Tarau, P.: A language independent algorithm for single and multiple document
+
+summarization. In: Proceedings of IJCNLP 2005, pp. 19–24 (2005)
+
+10. Shen, C., Wang, D., Li, T.: Topic aspect analysis for multi-document summarization. In:
+
+Proceedings of CIKM 2010, pp. 1545–1548 (2010)
+
+11. Wan, X., Xiao, J.: Single document keyphrase extraction using neighborhood knowledge. In:
+
+Proceedings of AAAI 2008, pp. 855–860 (2008)
+
+12. Wan, X.: An Exploration of document impact on graph-based multi-document summariza-
+
+tion. In: Proceedings of EMNLP 2008, pp. 755–762 (2008)
+
+13. Wan, X., Xiao, J.: Graph-based multi-modality learning for topic-focused multi-document
+
+summarization. In: Proceedings of IJCAI 2009, pp. 1586–1591 (2009)
+
+14. Wang, D., Zhu, S., Li, T., Gong, Y.: Multi-document summarization using sentence-based
+
+topic models. In: Proceedings of ACL/AFNLP 2009 (Short Papers), pp. 297–300 (2009)
+
+15. Wang, D., Li, T.: Document update summarization using incremental hierarchical clustering.
+
+In: Proceedings of CIKM 2010, pp. 279–288 (2010)
+
+16. Yan, R., Wan, X., Otterbacher, J., Kong, L., Li, X., Zhang, Y.: Evolutionary timeline summa-
+rization: a balanced optimization framework via iterative substitution. In: Proceedings of the
+34th Annual International ACM SIGIR Conference, pp. 745–754 (2011)
+
+17. Yan, R., Nie, J.-Y., Li, X.: Summarize what you are interested in: an optimization framework
+
+for interactive personalized summarization. In: EMNLP 2011, pp. 1342–1351 (2011)
+
+18. Zhai, C., Lafferty, J.D.: A Study of Smoothing Methods for Language Models Applied to Ad
+
+Hoc Information Retrieval. In: Proceedings of SIGIR 2001, pp. 334–342 (2001)
+
+

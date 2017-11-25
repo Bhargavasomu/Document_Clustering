@@ -1,0 +1,1480 @@
+Super-Graph Classiﬁcation
+
+Ting Guo1 and Xingquan Zhu2
+
+1 Centre for Quantum Computation & Intelligent Systems, FEIT,
+
+University of Technology, Sydney, NSW 2007, Australia
+
+2 Dept. of Computer & Electrical Engineering and Computer Science,
+
+Florida Atlantic University, Boca Raton, FL 33431, USA
+
+ting.guo-1@student.uts.edu.au, xzhu3@fau.edu
+
+Abstract. Graphs are popularly used to represent objects with depen-
+dency structures, yet all existing graph classiﬁcation algorithms can only
+handle simple graphs where each node is a single attribute (or a set of
+independent attributes). In this paper, we formulate a new super-graph
+classiﬁcation task where each node of the super-graph may contain a
+graph (a single-attribute graph), so a super-graph contains a set of inter-
+connected graphs. To support super-graph classiﬁcation, we propose a
+Weighted Random Walk Kernel (WRWK) which generates a product
+graph between any two super-graphs, and uses the similarity (kernel
+value) of two single-attribute graph as the node weight. Then we cal-
+culate weighted random walks on the product graph to generate kernel
+value between two super-graphs as their similarity. Our method enjoys
+sound theoretical properties, including bounded similarity. Experiments
+conﬁrm that our method signiﬁcantly outperforms baseline approaches.
+
+Keywords: Graph classiﬁcation, kernel, super-graph.
+
+1
+
+Introduction
+
+Many applications, such as social networks and citation networks, commonly
+use graph structure to represent data entries (i.e. nodes) and their structural
+relationships (i.e. edges). When using graphs to represent objects, all existing
+frameworks rely on two approaches to describe node content (1) node as a
+single attribute: each node has only one attribute (single-attribute node). A
+clear drawback of this representation is that a single attribute cannot precisely
+describe the node content [6]. This representation is commonly referred to as
+a single-attribute graph (Fig.1 (A)). (2) node as a set of attributes: use a
+set of independent attributes to describe the node content (Fig.1 (B)). This
+representation is commonly referred to as an attributed graph [2,3,8].
+
+Indeed, in many applications, the attributes/properties used to describe the
+node content may be subject to dependency structures. For example, in a citation
+network each node represents one paper and edges denote citation relationships.
+It is insuﬃcient to use one or multiple independent attributes to describe detailed
+information of a paper. Instead, we can represent the content of each paper as
+a graph with nodes denoting keywords and edges representing contextual corre-
+lations between keywords (e.g. co-occurrence of keywords in diﬀerent sentences
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part I, LNAI 8443, pp. 323–336, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+324
+
+T. Guo and X. Zhu
+
+a1
+
+a3
+
+a2
+
+a4
+
+a2
+
+(A)
+
+a1
+
+a2
+
+a1
+
+a2
+
+a5
+
+a1
+
+a4
+
+a5
+
+(B)
+
+a1
+
+a3
+
+a5
+
+a2
+
+a1
+
+a1
+
+a5
+
+a2
+
+a1
+
+a6
+
+a4
+
+a5
+
+(C)
+
+a2
+
+a1
+
+a5
+
+a3
+
+a1
+
+a6
+
+Fig. 1. (A): a single-attribute graph; (B): an attributed graph; and (C): a super-graph
+
+or paragraphs). As a result, each paper and all references cited in this paper
+can form a super-graph with each edge between papers denoting their citation
+relationships. In this paper, we refer to this type of graph, where the content of
+the node can be represented as a graph, as a “super-graph”. Likewise, we refer
+to the node whose content is represented as a graph, as a “super-node”.
+
+To build learning models for super-graphs, the mainly challenge is to properly
+calculate the distance between two super-graphs.
+• Similarity between two super-nodes: Because each super-node is a graph,
+the overlapped/intersected graph structure between two super-nodes reveals
+the similarity between two super-nodes, as well as the relationship between
+two super-graphs. Traditional hard-node-matching mechanism is unsuitable for
+super-graphs which require soft-node-matching.
+• Similarity between two super-graphs: The complex structure of super-
+graph requires that the similarity measure considers not only the structure simi-
+larity, but also the super-node similarity between two super-graphs. This cannot
+be achieved without combining node matching and graph matching as a whole
+to assess similarity between super-graphs.
+
+The above challenges motivate the proposed Weighted Random Walk Kernel
+(W RW K) for super-graphs. In our paper, we generate a new product graph
+from two super-graphs and then use weighted random walks on the product
+graph to calculate similarity between super-graphs. A weighted random walk
+denotes a walk starting from a random weighted node and following succeeding
+weighted nodes and edges in a random manner. The weight of the node in the
+product graph denotes the similarity of two super-nodes. Given a set of labeled
+super-graphs, we can use an weighted product graph to establish walk-based
+relationship between two super-graphs and calculate their similarities. After that,
+we can obtain the kernel matrix for super-graph classiﬁcation.
+
+2 Problem Deﬁnition
+
+Deﬁnition 1. (Single-attribute Graph) A single-attribute graph is repre-
+sented as g = (V, E, Att, f ), where V = {v1, v2,··· , vn} is a ﬁnite set of vertices,
+E ⊆ V × V denotes a ﬁnite set of edges, and f : V → Att is an injective function
+from the vertex set V to the attribute set Att = {a1, a2,··· , am}.
+
+Deﬁnition 2. (Super-graph and Super-node) A super-graph is represented
+
+as G = (V,E,G,F ), where V = {V1, V2,··· , VN} is a ﬁnite set of graph-structured
+
+Super-Graph Classiﬁcation
+
+325
+
+(cid:4)(cid:1)(cid:14)(cid:1)(cid:7)(cid:6)(cid:9)(cid:9)(cid:8)(cid:10)
+
+(cid:4)(cid:1)(cid:14)(cid:1)(cid:7)(cid:6)(cid:13)(cid:10)(cid:8)(cid:11)
+
+(cid:16)(cid:3)(cid:15)(cid:5)(cid:15)(cid:2)(cid:4)(cid:1)(cid:14)(cid:1)(cid:7)(cid:6)(cid:12)(cid:8)(cid:7)(cid:12)
+
+(cid:2)
+Fig. 2. W RW K on the super-graphs (G, G
+) and the single-attribute graphs (g1, g2,
+g3), where g1⊗2 and g1⊗3 are the single-attribute product graphs for (g1, g2) and (g1, g3),
+(cid:2)
+respectively, and G⊗ is the super product graph for (G, G
+). (θ1, ϕ1) and (Θ, Φ) are the
+adjacency and attribute matrices for g1 and G, respectively. ¯w1⊗2 and w are the weight
+vectors for g1⊗2 and G⊗, respectively. Each element of w is equal to the W RW K of
+two super-nodes (as dotted arrows show). A random walk on single-attribute product
+graph, say g1⊗3, is equivalent to performing simultaneous random walks on graphs g1
+and g3, respectively. Assume that v1(a1) means node v1 with attribute a1 in g1. The
+walk v1(a1) → v3(a5) → v4(a1) in g1 can match the walk v1(cid:2)(cid:2) (a1) → v3(cid:2)(cid:2) (a5) → v2(cid:2)(cid:2) (a1)
+in g3. The corresponding walk on the single-attribute product graph g1⊗3 is: v11(cid:2)(cid:2) (a1) →
+v33(cid:2)(cid:2) (a5) → v42(cid:2)(cid:2) (a1). k(g1, g2) and k(g1, g3) are the kernels. k(g1, g2) < k(g1, g3) means
+(cid:2)
+g3 is more similar to g1 than g2. Likewise, K(G, G
+
+(cid:2)
+) is the W RW K of G and G
+
+.
+
+nodes. E ⊆ V × V denotes a ﬁnite set of edges, and F : E → G is an injective
+function from E to G, where G = {g1, g2,··· , gM} is the set of single-attribute
+
+graphs. A node in the super-graph, which is represented by a single-attribute
+graph, is called a Super-node.
+
+Formally, a single-attribute graph g = (V, E, Att, f ) can be uniquely described
+by its attribute and adjacency matrices. The attribute matrix ϕ is deﬁned by
+
+ϕri = 1 ⇔ ai ∈ f (vr), otherwise ϕri = 0. The adjacency matrix θ is deﬁned by
+θij = 1 ⇔ (vi, vj) ∈ E, otherwise θij = 0. Similarly, the adjacency matrix Θ of
+an super-graph G = (V,E,G,F ) is deﬁned by Θij = 1 ⇔ (Vi, Vj ) ∈ E, otherwise
+Θij = 0. However, because of the complicated structure of super-graph, we
+cannot use an unique matrix to describe its super-node information. To calculate
+conveniently as this article shows later, an super attribute matrix Φ ∈ RN×S is
+deﬁned for super-graph G, where N = |V| and S = |Attg1 ∪ Attg2 ∪ ···∪ AttgM|.
+Φri = 1 ⇔ ai ∈ Attgr , otherwise Φri = 0. Examples of the attribute and
+
+adjacency matrices for a single-attribute graph and a super-graph are shown in
+the top right corner of Fig. 2.
+
+A super-graph Gi is a labeled graph if a class label L(Gi) ∈ Y = {y1, y2,··· , yx}
+
+is assigned to Gi. A super-graph Gi is either labeled (GL
+
+i ) or unlabeled (GU
+
+i ).
+
+Deﬁnition 3. (Super-graph Classiﬁcation) Given a set of labeled super-
+graphs DL = {GL
+
+2 ,···}, the goal of super-graph classiﬁcation is to learn
+
+1 , GL
+
+326
+
+T. Guo and X. Zhu
+
+a discriminative model from DL to predict some previously unseen super-graphs
+DU = {GU
+
+2 ,···} with maximum accuracy.
+
+1 , GU
+
+3 Weighted Random Walk Kernel
+Deﬁning a kernel on a space X paves the way for using kernel methods [7] for
+classiﬁcation, regression, and clustering. To deﬁne a kernel function for super-
+graphs, we employ a random walk kernel principle [4].
+
+Our Weighted Random Walk Kernel (W RW K) is based on a simple idea:
+Given a pair of super-graphs (G1 and G2), we can use them to build a product
+graph, where each node of the product graph contains attributes shared by super-
+nodes in G1 and G2. For each node in the product graph, we can assign a weight
+value (which is based on the similarity of the two super-nodes generating the
+current node). Because a weighted product node means the common weight of
+the node appeared in both G1 and G2, we can perform random walks through
+these nodes to measure the similarity by counting the number of matching walks
+(the walks through nodes containing intersected attribute sets) and combining
+weights of the nodes. The larger the number, the more similar the two super-
+graphs are. Adding weight value to the random walk is meaningful. It provides
+a solution to take graph matching of super-nodes into consideration to calculate
+the similarity between super-graphs. We consider the similarity between any
+two super-nodes as the weight value instead of just using 1/0 hard-matching.
+The node similarities between diﬀerent super-nodes represent the relationship
+between two graphs in a more precise way, which, in turn, helps improve the
+classiﬁcation accuracy. Accordingly, we divide our kernel design into two parts
+based on the similarity of super-nodes and super-graphs.
+
+3.1 Kernel on Single-Attribute Graphs
+
+We ﬁrstly introduce the weighted random walk kernel on single-attribute graphs.
+
+Deﬁnition 4. (Single-Attribute Product Graph) Given two single-attribute
+graphs g1 = (V1, E1, Att1, f1) and g2 = (V2, E2, Att2, f2), their single-attribute
+product graph is denoted by g1⊗2 = (V
+
+) (g⊗ for short), where
+
+, Att
+
+, E
+
+, f
+
+∗
+
+∗
+
+∗
+
+∗
+= {v|v =< v1, v2 >, v1 ∈ V1, v2 ∈ V2};
+= {e|e = (u
+∗
+= Att1 ∪ Att2;
+∗
+= {f
+
+(cid:5) ∈ V
+(cid:5)
+=< u1, u2 >, v
+u
+(v)|f
+∗
+
+∗
+=< v1, v2 >, (u1, v1) ∈ E1, (u2, v2) ∈ E2};
+(v) = f (v1) ∩ f (v2), v =< v1, v2 >, v1 ∈ V1, v2 ∈ V2}.
+
+) (cid:7)= φ, f
+
+) (cid:7)= φ,
+
+(cid:5) ∈ V
+
+), u
+
+(u
+
+, f
+
+, v
+
+∗
+∗
+
+– V
+– E
+
+– Att
+∗
+– f
+
+∗
+
+(cid:5)
+
+(v
+
+(cid:5)
+
+(cid:5)
+
+∗
+
+(cid:5)
+
+, v
+
+(cid:5)
+
+∗
+
+In other words, g⊗ is a single-attribute graph where a vertex v is the inter-
+section between a pair of nodes in g1 and g2. There is an edge between a pair of
+vertices in g⊗, if and only if an edge exists in corresponding vertices in g1 and
+g2, respectively. An example is shown in Fig. 2 (g1⊗2). In the following, we show
+that an inherent property of the product graph is that performing a weighted
+
+Super-Graph Classiﬁcation
+
+327
+
+random walk on the product graph is equivalent to performing simultaneous
+random walks on g1 and g2, respectively. So the single-attribute product graph
+provides an eﬀective way to count the number of walks combining weight values
+on nodes between graphs without expensive graph matching.
+
+To generate g⊗’s adjacency matrix θ⊗ from g1 and g2 by using matrix opera-
+
+tions, we deﬁne the Attributed Product as follow:
+Deﬁnition 5. (Attributed Product) Given matrices B ∈ Rn×n, C ∈ Rm×m
+and H ∈ Rn
+, the attributed product B (cid:2) C ∈ Rnm×nm and the column-
+stacking operator vec(H) ∈ Rn
+
+are deﬁned as
+
+m
+
+(cid:2)×m
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+B (cid:2) C = [vec(B∗1C1∗) vec(B∗1C2∗) ··· vec(B∗nCm∗)],
+
+vec(H) = [H
+
+(cid:6)
+∗1 H
+
+(cid:6)
+∗2
+
+··· H
+
+(cid:6)
+
+(cid:6)
+∗n]
+
+,
+
+where H∗i and Hj∗ denote ith column and jth row of H, respectively.
+
+Based on Def. 5, the adjacency matrix θ⊗ of the single-attribute product graph
+
+g⊗ can be directly derived from g1(θ1, ϕ1) and g2(θ2, ϕ2) as follow:
+
+(cid:6)
+θ⊗ = (θ1 (cid:2) θ2) (cid:3) vec(ϕ1ϕ
+2 )
+
+(1)
+
+⎤
+⎥⎥⎦ ,
+
+where
+
+⎡
+⎢⎢⎣
+
+B (cid:3)
+
+⎤
+⎥⎥⎦ =
+
+⎡
+⎢⎢⎣
+
+x1
+...
+xn
+
+B11 ∧ x1 ··· B1n ∧ x1
+
+Bn1 ∧ xn ··· Bnn ∧ xn
+
+...
+
+. . .
+
+...
+
+“∧” is a conjunction operation (a ∧ b = 1 iﬀ a = 1 and b = 1).
+
+To better assess the similarity between two single-attribute graphs, we assign
+each node a weight value, with weight indicating the importance of a node in the
+graph. So a weighted random walk can be calculated by multiply all the weight
+values of the nodes along the walk. Then we can calculate the weighted random
+walk counting by using matrix operation. More speciﬁcally, for the adjacency ma-
+x]ij of this nth power matrix gives the num-
+trix θx of a graph gx, each element [θz
+ber of walks of length z from vi to vj in gx. If we have the weight vector of gx as
+(cid:10) θx)z]ij corresponds to the total
+¯wx = [w1, w2, ...wn]
+weight value of all random walks with length z from vi to vj in gx, where “(cid:10)”
+
+(cid:6)
+. Each element [( ¯wx ¯w
+x
+
+(cid:6)
+
+denotes element-wise multiplication (the same as “.*” operator in Matlab). For
+simplicity, we set an uniform distributions for all the statistical weights of nodes
+n . So the weight vector ¯w denote the weights over the vertices of g⊗ gen-
+as wi = 1
+erated from g1 and g2 with the node sizes of n1 and n2, respectively, where
+
+¯w = [
+
+1
+
+n1n2
+
+,
+
+1
+
+n1n2
+
+,··· ,
+
+1
+
+n1n2
+
+(cid:6) ∈ Rn1n2
+
+]
+
+According to Eq. (1), performing a weighted random walk on the single-
+attribute product graph g⊗ is equivalent to performing random walks on graphs
+g1 and g2 simultaneously. After g⊗ is generated, Weighted Random Walk Kernel
+
+328
+
+T. Guo and X. Zhu
+
+(WRWK), which computes the similarity between g1 and g2, can be deﬁned with
+a sequence of weights δ = δ0, δ1,··· (δi ∈ R and δi ≥ 0 for all i ∈ N):
+
+n1n2(cid:8)
+
+k(g1, g2) = ρ
+
+(cid:9) ∞(cid:8)
+
+δz ( ¯w ¯w
+
+(cid:6) (cid:10) θ⊗)z
+
+(cid:10)
+
+(2)
+
+i,j=1
+
+z=0
+
+ij
+
+where n1 and n2 are the node sizes of g1 and g2, respectively. ρ is the control
+parameter used to make the kernel function convergence. As a result, kernel
+values are upper bounded (the proof is given in Section 5). For simplicity, we
+(cid:6) (cid:10) θ⊗ the weighted adjacency matrix of
+set ρ = 1
+single-attribute product graph.
+
+n1n2 . We call Γ⊗ = ¯w ¯w
+
+To compute the W RW K for single-attribute graph, as deﬁned in Eq. (2), a
+diagonalization decomposition method [4] can be used. Because Γ⊗ is a sym-
+metric matrix, the diagonalization decomposition of Γ⊗ exists: Γ⊗ = T HT −1,
+where the columns of T are its eigenvectors, and H is a diagonal matrix of cor-
+responding eigenvalues. The kernel deﬁned in Eq. (2) can then be rewritten as:
+
+(cid:9) ∞(cid:8)
+
+n1n2(cid:8)
+
+(cid:10)
+δz (T HzT −1)
+
+k(g1, g2) = ρ
+
+i,j=1
+
+z=0
+
+By setting δz = λz/z! in Eq. (3), and use ex =
+
+(cid:10)
+
+= ρ
+
+∞(cid:8)
+
+n1n2(cid:8)
+
+δz Hz) T −1
+
+(cid:9)
+T (
+(cid:11)∞
+z=0 xz/z!, we have,
+(cid:13)
+(cid:12)T eλH T −1
+
+i,j=1
+
+z=0
+
+ij
+
+ij
+
+(3)
+
+ij
+
+(4)
+
+n1n2(cid:8)
+
+k(g1, g2) = ρ
+
+i,j=1
+
+The diagonalization decomposition can greatly expedite W RW K kernel com-
+
+putation. An example of W RW K kernel is shown in Fig. 2.
+
+3.2 Kernel on Super-Graphs
+
+The W RW K of single-attribute graph helps calculate the similarity between two
+graphs, so it can be used to calculate the similarity between two super-nodes.
+Given a pair of super-graphs G1 and G2, assume we can generate a new product
+graph G⊗ whose nodes are generated by super-nodes in G1 and G2, and weight
+value of each node is the similarity between the super-nodes which generate this
+node, then the same process shown in Section 3.1 can be used to calculate the
+W RW K for super-graphs G1 and G2 to denote their similarity.
+Deﬁnition 6. (Super Product Graph) Given two super-graphs G1 = (V1,E1,
+G1,F1) and G2 = (V2,E2,G2,F2), their Super Product Graph is denoted by
+G1⊗2 = (V∗
+– V∗
+– E∗
+– G∗
+– F∗
+
+,F∗
+) (G⊗ for short), where
+= {V |V =< V1, V2 >, V1 ∈ V1, V2 ∈ V2};
+= {e|e = (V, V
+), V ∈ V∗
+,F∗
+(cid:5)
+(cid:5)
+V =< V1, V2 >, V
+2 >, (V1, V
+= G1 ∪ G2;
+= {F∗
+(V )|F∗
+
+(V ) = F (V1) ∩ F (V2), V =< V1, V2 >, V1 ∈ V1, V2 ∈ V2}.
+
+) (cid:7)= φ,
+2 ) ∈ E2};
+1 ) ∈ E1, (V2, V
+(cid:5)
+(cid:5)
+
+(V ) (cid:7)= φ,F∗
+
+(cid:5) ∈ V∗
+(cid:5)
+1 , V
+
+, V
+=< V
+
+,G∗
+
+,E∗
+
+(cid:5)
+
+(V
+
+(cid:5)
+
+Super-Graph Classiﬁcation
+
+329
+
+An example of super product graph is shown in Fig. 2 (G⊗). Similar to Eq. (1),
+the adjacency matrix Θ⊗ of the super product graph G⊗ can be directly derived
+from G1(Θ1, Φ1) and G2(Θ2, Φ2) as follows:
+
+(cid:6)
+Θ⊗ = (Θ1 (cid:2) Θ2) (cid:3) vec(Φ1Φ
+2 )
+
+(5)
+
+Because we use the similarity between two super-nodes as the weight value
+of the node in the super product graph, the kernel value may increase inﬁnitely
+with the increasing size of the super-graph. So for super-graph kernel, we add a
+control variable η to limit the range of the super-graph kernel value. Then the
+Weighted Random Walk Kernel, which computes the similarity between G1 and
+G2, can be deﬁned with a sequence of weights σ = σ0, σ1,··· (σi ∈ R and σi ≥ 0
+for all i ∈ N):
+
+(cid:9) ∞(cid:8)
+
+N1N2(cid:8)
+
+(cid:10)
+
+K(G1, G2) = η
+
+σz (w w(cid:6) (cid:10) Θ⊗)z
+
+(6)
+
+(7)
+
+i,j=1
+
+z=0
+
+ij
+
+where N1 and N2 are the node sizes of G1 and G2, respectively, and
+
+w = [k(g1, g1) k(g1, g2) ··· k(gN1, gN2)]
+
+(cid:6)
+
+Similar to WRWK of single-attribute graphs in Eq. (4), the WRWK on super-
+
+graphs can be calculated by setting σz = γz/z!, we have,
+(cid:16)
+
+N1N2(cid:8)
+
+(cid:14)(cid:15)T eγ (cid:2)H (cid:15)T −1
+
+ij
+
+K(G1, G2) = η
+
+where w w(cid:6) (cid:10) Θ⊗ = (cid:15)T (cid:15)H(cid:15)T −1. To ensure kernel function convergence, we set
+
+i,j=1
+
+η =
+
+1
+
+N1N2
+
+1−N 2
+N1N2 γe2λ
+
+1 N 2
+2
+
+e
+
+(8)
+
+where γ is the parameter of W RW K on super-graphs, and λ is the parameter
+of W RW K on single-attribute graphs which is given in previous sub-section. The
+W RW K of super-graphs is also upper bounded with proof showing in Section 5.
+
+4 Super-Graph Classiﬁcation
+
+The W RW K provides an eﬀective way to measure the similarity between super-
+graphs. Given a number of labeled super-graphs, we can use their pair-wise sim-
+ilarity to form an kernel matrix. Then generic classiﬁers, such as Support Vector
+Machine (SVM), Decision Tree (DT), Naive Bayes (NB) and Nearest Neighbour
+(NN), can be applied to the kernel matrix for super-graph classiﬁcation.
+
+Algorithm 1 shows the framework of using W RW K to train a classiﬁer.
+
+5 Theoretical Study
+
+Theorem 1. The Weighted Random Walk Kernel function is positive deﬁnite.
+
+330
+
+T. Guo and X. Zhu
+
+Algorithm 1. WRWK Classiﬁer Generation
+Input: Labeled super-graph set DL, Kernel parameters λ and γ
+Output: Classiﬁer ζ
+Initialize: Kernel matrix M ← [ ]
+1: for any two super-graphs Ga and Gb in DL do
+2: w ← [ ]
+3:
+4:
+5:
+6:
+7:
+8:
+
+q ← (x − 1)Nb + y
+if Attx ∩ Atty = φ then
+
+for any gx in Ga and gy in Gb do
+
+···
+
+else
+
+1
+
+1
+
+nxny
+
+nxny
+
+wq ← 0
+nx ny , ¯w ← [
+ρ ← 1
+wq ← k(gx, gy)
+
+nxny ], θ⊗ ← (θx (cid:2) θy) (cid:3) vec(ϕxϕ
+(cid:4)
+y )
+
+1
+
+// k(gx, gy) is calculated by eq. (4)
+
+// q is the element index of w
+
+9:
+
+10:
+11:
+
+end if
+end for
+η ← 1
+
+1−N 2
+
+e
+
+γe2λ
+
+NaNb
+
+NaNb
+
+aN 2
+b
+12:
+13: Mab ← K(Ga, Gb)
+14: end for
+15: ζ ← TrainClassiﬁer(C, M , ¯L)
+
+, Θ⊗ ← (Θa (cid:2) Θb) (cid:3) vec(ΦaΦ
+(cid:4)
+b )
+
+// K(Ga, Gb) is calculated by eq. (7)
+
+/* C is the learning algorithm. ¯L is the class label vector of DL */
+
+Proof. As the random walk-based kernel is closed under products [4] and the
+W RW K can be written as the limit of a polynomial series with positive coeﬃ-
+cients (as Eqs. (4) and (7)), the W RW K function is positive deﬁnite.
+
+Theorem 2. Given any two single-attribute graphs g1 and g2, the weighted ran-
+dom walk kernel of these two graphs is bounded by 0 < k(g1, g2) < eλ, where λ
+is the parameter of the weighted random walk kernel.
+
+Proof. Because k(g1, g2) is a positive deﬁnite kernel by Theorem 1, so k(g1, g2) >
+0. Then we only need to show that the upper bound of k(g1, g2) is eλ.
+
+Based on the deﬁnition of WRWK, assume the node sizes of two single-
+attribute graphs g1 and g2 are n1 and n2, respectively, the number of random
+walks on g1 ⊗ g2 must be not greater than that of the complete connect graph gc
+which has n1 × n2 nodes. We assume that gc = g
+(cid:5)
+2 are with
+(cid:5)
+(cid:5)
+n1 and n2 nodes respectively. So we have k(g1, g2) < k(g
+1, g
+2). More speciﬁcally,
+n1n2(cid:8)
+(cid:12)
+( ¯w
+
+(cid:5)
+2, where g
+
+(cid:5)
+1 and g
+
+(cid:9) ∞(cid:8)
+
+(cid:5)(cid:6) (cid:10) θ
+
+n1n2(cid:8)
+
+⊗ g
+
+∞(cid:8)
+
+= ρ
+
+(cid:5)
+⊗)z
+
+k(g
+
+{δz
+
+δz ( ¯w
+
+(cid:5)
+2) = ρ
+
+(cid:5)
+1, g
+
+(cid:10)
+
+(cid:5)
+1
+
+(cid:13)
+
+¯w
+
+¯w
+
+(cid:5)
+
+(cid:5)
+
+}
+
+ij
+
+i,j=1
+
+z=0
+
+(cid:5)
+
+i,j=1
+
+z=0
+(cid:6)
+
+Because ρ = 1
+
+, and gc is a complete connect
+graph, where the diagonal elements are equal to 0 and other element in the
+adjacency matrix are equal to 1.
+
+n1n2 , ¯w
+
+n1n2 ,
+
+n1n2 ]
+
+= [
+
+1
+
+1
+
+(cid:5)(cid:6) (cid:10) θ
+(cid:5)
+⊗)z
+n1n2 ,··· ,
+
+1
+
+ij
+
+Super-Graph Classiﬁcation
+
+331
+
+So
+
+Then
+
+n1n2(cid:8)
+
+(cid:12)
+
+i,j=1
+
+(cid:5)
+
+(cid:5)(cid:6) (cid:10) θ
+
+¯w
+
+( ¯w
+
+(cid:5)
+1, g
+
+(cid:5)
+2) =
+
+k(g
+
+1
+
+(cid:13)
+
+(cid:5)
+⊗)z
+∞(cid:8)
+
+[δz(
+
+n1n2
+
+z=0
+
+ij = (
+
+=
+
+1
+
+n1n2
+
+Because δz = λz
+
+z! , we have
+
+(1 − 1
+n1n2
+
+n1n2 − 1
+1n2
+n2
+2
+n1n2 − 1
+n2
+1n2
+2
+∞(cid:8)
+
+)
+
+[δz(
+
+z=0
+
+)(z−1)(1 − 1
+n1n2
+
+)
+
+)(z−1)(1 − 1
+n1n2
+
+)]
+
+n1n2 − 1
+n2
+1n2
+2
+
+)(z−1)]
+
+(cid:5)
+1, g
+
+(cid:5)
+2) =
+
+k(g
+
+1
+
+n1n2
+
+(1 − 1
+n1n2
+
+)
+
+∞(cid:8)
+
+z=0
+
+[
+
+λz
+z!
+
+(
+
+1
+
+n1n2
+
+(1 − 1
+n1n2
+
+)(
+
+n2
+1n2
+n1n2 − 1
+2
+
+=
+
+(cid:11)∞
+
+Because ex =
+
+z=0 xz/z!, we have
+
+λ(n1n2−1)
+
+(cid:5)
+1, g
+
+(cid:5)
+2) = e
+
+n2
+1
+
+n2
+2 < eλ
+
+k(g1, g2) < k(g
+
+n1n2 − 1
+n2
+1n2
+2
+∞(cid:8)
+[
+
+)
+
+λz
+z!
+
+z=0
+
+)(z−1)]
+
+n1n2 − 1
+n2
+1n2
+2
+
+(
+
+)z]
+
+Theorem 3. The weighted random walk kernel between super-graphs G1 and G2
+is bounded by 0 < K(G1, G2) < eγe2λ−2λ, where λ and γ are weighted random
+walk kernel parameters for single-attribute graph and super-graph, respectively.
+
+Similar to Theorem 2, Theorem 3 can be derived.
+
+6 Experiments and Analysis
+
+6.1 Benchmark Data
+
+DBLP Dataset: DBLP dataset consists of bibliography data in computer sci-
+ence (http://arnetminer.org/citation/). Each record in DBLP is a scientiﬁc publica-
+tion with a number of attributes such as abstract, authors, year, venue, title,
+and references. To build super-graphs, we select papers published in Artiﬁcial
+Intelligence (AI: IJCAI, AAAI, NIPS, UAI, COLT, ACL, KR, ICML, ECML
+and IJCNN) and Computer Vision (CV: ICCV, CVPR, ECCV, ICPR, ICIP,
+ACM Multimedia and ICME) ﬁelds to form a classiﬁcation task. The goal is
+to predict which ﬁeld (AI or CV) a paper (i.e. a super-graph) belongs to by
+using the abstract of each paper (i.e. a super-node) and abstracts of references
+(i.e. other super-nodes), as shown in Fig. 3. An edge (undirected) between two
+super-nodes indicates a citation relationship between two papers. For each pa-
+per, we use fuzzy cognitive map (E-FCM) [5] to convert paper abstract into a
+graph (which represents relations between keywords with weights over a thresh-
+old (i.e. edge-cutting threshold)). This graph representation has shown better
+performance than simple bag-of-words representation [1]. We select 1000 papers
+
+332
+
+T. Guo and X. Zhu
+
+0.005
+
+0.038
+
+0.017
+
+0.020
+
+0.011
+
+0.006
+
+0.031
+
+0.012
+
+0.059
+
+0.008
+
+0.007
+
+0.011
+0.006
+
+A
+
+0.028
+
+0.006
+
+B
+
+Node
+
+interpret
+
+describe
+
+query
+
+provide
+
+constraint
+
+satisfiability
+
+tree
+
+tool
+
+(a)
+
+(b)
+
+Fig. 3. An example of using super-graph representation for scientiﬁc publications. The
+left ﬁgure shows that each paper cites a number of references. For each paper (or each
+reference), its abstract can be converted as a graph. So each paper denotes a super-node,
+and the citation relationships between papers form a super-graph. The ﬁgure to the right
+shows a graph representation of paper abstract with each node denoting a keyword. A:
+The weight values between nodes indicate correlations between keywords. B: by using
+proper threshold, we can convert each abstract as an undirected unweighted graph.
+
+Fig. 4. Super-graph and comparison graph representations. A super-graph (A) can be
+represented as an attributed graph by discarding edges in each super-super as shown
+in (B). We also simplify a super-graph as a set of single-attribute graphs by retaining
+only one attribute in each super-node, as shown in (C).
+
+(500 in each class), each of which contains 1 to 10 references, to form 1000
+super-graphs.
+
+Beer Review Dataset: The online beer review dataset consists of review data
+for beers (http://beeradvocate.com/). Each review in the dataset is associated with
+some attributes such as appearance score, aroma score, palate score, and taste
+score (rating of the product varies from 1 to 5), and detailed review texts. Our
+goal is to classify each beer to the right style (Ale vs. Not Ale) by using customer
+reviews. The graph representation for reviews is similar to the sub-graphs in
+DBLP dataset. Each review is represented as a super-node. The edge between
+super-nodes are built using following method: Because a review has four rating
+scores in appearance, aroma, palate, and taste, we use these four scores as a
+feature vector for each review. If two reviews’s distance in the feature space
+(Euclidean distance) is less than 2, an edge is used to link two reviews (i.e
+super-nodes). We choose 1000 beer products, half from Ale and the rest is from
+Large and Hybrid Style, to form 1000 super-graphs for classiﬁcation.
+
+Super-Graph Classiﬁcation
+
+333
+
+(a)
+
+(b)
+
+Fig. 5. Classiﬁcation accuracy on DBLP and Beer review datasets w.r.t. diﬀerent
+classiﬁcation methods (NB, DT, SVM, and NN). For DBLP dataset, the number of
+super-nodes in each super-graph varies within 1-10 and the edge-cutting threshold
+for single-attribute graph is 0.001. For Beer Review dataset, the number of super-
+nodes in each super-graph varies within 30-60 and the edge-cutting threshold is 0.001.
+W RW K uses super-graph representation (Fig.4(A)), RW K1 and RW K2 use tradi-
+tional random walk kernel method with attributed graph representation (Fig. 4(B))
+and single-attribute graph representation (Fig. 4(C)), respectively.
+
+6.2 Experimental Settings
+
+Baseline Methods: Because no existing method can handle super-graph classi-
+ﬁcation, for comparison purposes, we use two approaches to generate traditional
+graph representations from each super-graph: (1) randomly selecting one at-
+tribute (i.e one word) in each super-node (and ignoring all other words) to form
+a single-attribute graph, as shown in Fig. 4 (C). We repeat random selection for
+ﬁve times with each time generating a set of single-attribute graphs from super-
+graphs. Each single-attribute graph set is used to train a classiﬁer and their
+majority voted accuracy on test super-graphs is reported in the experiments.
+(2) We use the attribute set of the single-attribute graph in each super-node
+as multi-attributes of the super-node to generate an attributed graph (which is
+equal to removing all the edges from the super-graph as shown in Fig. 4 (B)).
+For all the two graph representations, we use the traditional random walk kernel
+(RW K) to measure the similarity between any two graphs [4].
+
+We use 10 times 10-fold cross-validation classiﬁcation accuracy to measure and
+compare the algorithm performance. To train classiﬁers from graph data, we use
+Naive Bayes (NB), Decision Tree (DT), Support Vector Machines (SVM) and
+Nearest Neighbor algorithm (NN). Majority examples are based on the kernel
+parameter settings: λ = 100 and γ = 100.
+
+6.3 Results and Analysis
+
+Performance on Standard Benchmarks: In Fig. 5, we report the classi-
+ﬁcation accuracy on the benchmark datasets. The experimental results show
+that W RW K constantly outperforms traditional RW K method, regardless of
+the type of graph representations used by RW K. This is mainly because in
+traditional graph representations each node only has one attribute or a set of
+independent attributes, whereas single-attribute nodes (or multiple independent
+attributes) cannot precisely describe the node content. For super-graphs, the
+
+334
+
+T. Guo and X. Zhu
+
+(a)
+
+(b)
+
+(c)
+
+(d)
+
+Fig. 6. Classiﬁcation accuracy on Beer review dataset w.r.t. diﬀerent datasets and
+classiﬁcation methods (NB, DT, SVM, and NN). Figures correspond to three types
+of super-graph structure on Beer review. Data 1 : the number of super-nodes in each
+super-graph is 2-30 and the edge-cutting threshold is 0.00001. Data 2 : the number of
+super-nodes in each super-graph is 30-60 and the edge-cutting threshold is 0.001. Data
+3 : the number of super-nodes in each super-graph is > 60 and the threshold is 0.1.
+
+graph associated to each super-node provides an eﬀective way to describe the
+node content. In W RW K method, we consider the similarity between any two
+super-nodes as the weight value instead of just using 1/0 hard matching to rep-
+resent whether there is an intersection of attribute sets between two nodes. The
+soft matching node similarities between super-nodes captures the relationship
+between two graphs in a more precise way. This, in turn, helps improve the
+classiﬁcation accuracy.
+Performance under diﬀerent Super-Graph Structures: To demonstrate
+the performance of our W RW K method on super-graphs with diﬀerent char-
+acteristics, we construct super-graphs on Beer review dataset by using diﬀerent
+super-node sizes and diﬀerent structures of single-attribute graph (the struc-
+ture of the single-attribute node is controlled by the edge-cutting threshold) as
+shown in Fig. 6 (a)-(d). The result shows that our W RW K method is stable on
+super-graphs with diﬀerent structures.
+Performance w.r.t. Changes in Super-Nodes and Walks: The proposed
+weighted random walk kernel relies on the similarity between super-nodes and
+the common walks between two super-graphs to calculate the graph similarity.
+This raises a concern on whether super-node similarity or walk similarity (or
+both) plays a more important role in assessing the super-graph similarity.
+
+In order to resolve this concern, we design the following experiments. In the
+ﬁrst set of experiments (Fig. 7 (a) and (b)), we ﬁx super-graph edges, and change
+edges inside super-nodes, which will impact on the super-node similarities. If this
+results in signiﬁcant changes, it means that super-node similarity plays a more
+important role. In the second set of experiments (Fig. 7 (c)), we ﬁx super-nodes
+but vary the edges in super-graphs (by randomly removing edges), which will
+impact on the common walks between super-graphs. If this results in signiﬁcant
+changes, it means that walk plays a more important role than super-nodes.
+
+Fig. 7 (a) and (b) report the algorithm performance with respect to the edge-
+cutting threshold. The accuracy decreases dramatically with the increase of the
+edge-cutting threshold for both datasets. When the edge-cutting threshold is
+set to 0.0001 on DBLP and 0.00001 on Beer Review, the single-attribute graph
+
+Super-Graph Classiﬁcation
+
+335
+
+Performance on Beer data set
+
+73
+
+68
+
+%
+ 
+y
+c
+a
+r
+u
+c
+c
+A
+
+63
+
+0
+
+NB
+DT
+SVM
+NN
+
+25
+
+Average number of cutting edges
+
+50
+
+75
+
+100
+
+(a)
+
+(b)
+
+(c)
+
+Fig. 7. The performance w.r.t. diﬀerent edge-cutting thresholds on DBLP and Beer
+Review datasets by using W RW K method. In (a) and (b), the node size of super-
+graph varies from 0-10 on DBLP dataset and 30-60 on Beer Review dataset. The
+x-axis shows the value of the edge-cutting threshold and the average node degree in its
+corresponding single-attribute graph is reported in the parentheses. In (c), the average
+number of edges cut from each super-graph varies from 0 to 100.
+
+in each super-node is almost a complete graph and four methods achieve the
+highest classiﬁcation accuracy. As the threshold is set to 0.01 on DBLP and 0.1
+on Beer review, the single-attribute graph in each super-node is very small and
+contains very few edges. As a result, the accuracies are just around 65%. This
+demonstrates that W RW K heavily relies on the structure information of each
+super-node to assess the super-graph similarities.
+
+Fig. 7 (c) reports the algorithm performance by ﬁxing the super-nodes but
+gradually removing edges in the super-graph of Beer review dataset (as Fig. 5
+(b)). Similar to the result in Fig. 7 (a) and (b), the classiﬁcation accuracy de-
+creases when edges are continuously removed from the super-graph (even if the
+super-nodes are ﬁxed). From Figs. 7, we ﬁnd that graph structure of super-graph
+is as important as that of super-nodes. This is mainly attributed to the fact that
+our weighted random walk kernel relies on both super-node similarity and walks
+in the super-graph to calculate graph similarities.
+
+7 Conclusion
+
+In this paper, we formulated a new super-graph classiﬁcation problem. Due to
+the inherent complex structure representation, all existing graph classiﬁcation
+methods cannot be applied for super-graph classiﬁcation. In the paper, we pro-
+posed a weighted random walk kernel which calculates the similarity between two
+super-graphs by assessing (a) the similarity between super-nodes of the super-
+graphs, and (b) the common walks of the super-graphs. Our key contribution
+is twofold: (1) a weighted random walk kernel considering node and structure
+similarities between graphs; and (2) an eﬀective kernel-based super-graph clas-
+siﬁcation method with sound theoretical basis.
+
+336
+
+T. Guo and X. Zhu
+
+References
+
+1. Angelova, R., Weikum, G.: Graph-based text classiﬁcation: learn from your neigh-
+
+bors. In: ACM SIGIR, pp. 485–492 (2006)
+
+2. Cai, Y., Cercone, N., Han, J.: An attribute-oriented approach for learning classiﬁ-
+
+cation rules from relational databases. In: ICDE, pp. 281–288 (1990)
+
+3. Cheng, H., Zhou, Y., Yu, J.X.: Clustering large attributed graphs: A balance between
+
+structural and attribute similarities. ACM TKDD 5(2) (2011)
+
+4. G¨artner, T., Flach, P.A., Wrobel, S.: On graph kernels: Hardness results and eﬃcient
+
+alternatives. In: COLT, pp. 129–143 (2003)
+
+5. Luo, X., Xu, Z., Yu, J.: Building association link network for semantic link on web
+
+resources. IEEE Trans. Autom. Sci. Eng. 8(3), 482–494 (2011)
+
+6. Riesen, K., Bunke, H.: Graph classiﬁcation and clustering based on vector space
+
+embedding. World Scientiﬁc Publishing Co., Inc. (2010)
+
+7. Sch¨olkopf, B., Smola, A.J.: Learning with kernels. MIT Press (2002)
+8. Xu, Z., Ke, Y., Wang, Y., Cheng, H., Cheng, J.: A model-based approach to at-
+
+tributed graph clustering. In: ACM SIGMOD, pp. 505–516 (2012)
+
+

@@ -1,0 +1,1349 @@
+MassBayes: A New Generative Classiﬁer
+
+with Multi-dimensional Likelihood Estimation
+
+Sunil Aryal and Kai Ming Ting
+
+Gippsland School of Information Technology
+{sunil.aryal,kaiming.ting}@monash.edu
+
+Monash University, Australia
+
+Abstract. Existing generative classiﬁers (e.g., BayesNet and AnDE)
+make independence assumptions and estimate one-dimensional likeli-
+hood. This paper presents a new generative classiﬁer called MassBayes
+that estimates multi-dimensional likelihood without making any explicit
+assumptions. It aggregates the multi-dimensional likelihoods estimated
+from random subsets of the training data using varying size random
+feature subsets. Our empirical evaluations show that MassBayes yields
+better classiﬁcation accuracy than the existing generative classiﬁers in
+large data sets. As it works with ﬁxed-size subsets of training data, it has
+constant training time complexity and constant space complexity, and it
+can easily scale up to very large data sets.
+
+Keywords: Generative classiﬁer, Likelihood estimation, MassBayes.
+
+1
+
+Introduction
+
+The learning task in classiﬁcation is to learn a model from a labelled training set
+that maps each instance to one of the predeﬁned classes. The model learned is
+then used to predict a class label for each unseen test instance. Each instance x
+
+is represented by a d-dimensional vector (cid:2)x1, x2,··· , xd(cid:3) and given a class label
+y ∈ {y1, y2,··· , yc}, where c is the total number of classes. The training set D is
+a collection of labelled instances {(x(i), y(i))} (i = 1, 2,··· , N ).
+
+The generative approach of classiﬁer learning models the joint distribution
+
+p(x, y) and predicts the most probable class as:
+
+ˆy = arg max
+
+y
+
+p(x, y)
+
+Using the product rule, the joint probability can be factorised as:
+
+p(x, y) = p(y) × p(x|y)
+
+(1)
+
+(2)
+
+Generative classiﬁers learn either the joint distribution p(x, y) or the likelihood
+p(x|y). However, estimating p(x, y) or p(x|y) directly from data using existing
+data modelling techniques is diﬃcult. Density estimators such as Kernel Density
+Estimation [1], k-Nearest Neighbour [1] and Density Estimation Trees [2] are
+impractical in large data sets due to their high time and space complexities. The
+research has thus focused on learning one-dimensional likelihood to approximate
+p(x, y) in diﬀerent ways.
+
+J. Pei et al. (Eds.): PAKDD 2013, Part I, LNAI 7818, pp. 136–148, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+MassBayes: A New Generative Classiﬁer
+
+137
+
+Existing generative classiﬁers allow limited probabilistic dependencies among
+attributes and assume some kind of conditional independence. Diﬀerent gener-
+ative classiﬁers make diﬀerent assumptions and allow diﬀerent level of depen-
+dencies. They learn a network (or its simpliﬁcation) of probabilistic relationship
+between the attributes and estimate the likelihood at each node given its par-
+ents from D (i.e., one-dimensional likelihood estimation). The joint distribution
+p(x, y) is estimated as the product of likelihood of each attribute given their
+parents in the network:
+
+ˆp(x, y) = p(x1|π1) × p(x2|π2) × ··· × p(xd|πd) × p(y|πy)
+
+(3)
+
+where πi is parent(xi) and πy is parent(y).
+
+Though these one-dimensional
+
+likelihood generative classiﬁers have been
+shown to perform well [3,4,5,6,7], we hypothesize that a multi-dimensional like-
+lihood generative classiﬁer will produce even better results.
+
+In this paper, we propose an ensemble approach to estimate multi-dimensional
+likelihood without making any explicit assumption about attribute indepen-
+dence. The idea is to construct an ensemble of t multi-dimensional likelihood
+
+estimators using random sub-samples Di ⊂ D (i = 1, 2,··· , t). Each estimator
+estimates the multi-dimensional likelihood using a random subset of d attributes
+from Di. The average estimation from t estimators provides a good approxima-
+tion of p(x|y). We call the resulting generative classiﬁer MassBayes. It has con-
+stant space complexity and constant training time complexity because it employs
+a ﬁxed-size training subset to build each of the t estimators.
+
+The rest of the paper is structured as follows. Section 2 provides a brief
+overview of well-known generative classiﬁers. The proposed method is described
+in Section 3 followed by the implementation details in Section 4. The empirical
+evaluation results are presented in Section 5. Finally, we provide conclusions and
+directions for future research in Section 6.
+
+2 Existing Generative Classiﬁers
+
+Naive Bayes (NB) [3] is the simplest generative approach that estimates p(x, y)
+by assuming that the attributes are statistically independent given y:
+
+ˆp(x, y)N B = p(y)
+
+d(cid:2)
+
+i=1
+
+p(xi|y)
+
+(4)
+
+Despite the strong independence assumption, it has been shown that NB pro-
+duces impressive results in many application domains [3,4]. Its simplicity and
+clear probabilistic semantics have motivated researchers to explore diﬀerent ex-
+tensions of NB to improve its performance by relaxing the unrealistic assumption.
+BayesNet [5] learns a network of probabilistic relationship among the at-
+tributes including the class attribute from the training data. Each node in the
+network is independent of its non-descendants given the state of its parents. At
+each node, the conditional probabilities with respect to its parents are learned
+from D. The joint probability p(x, y) is estimated as:
+
+138
+
+S. Aryal and K.M. Ting
+
+ˆp(x, y)BayesN et = p(y|πy)
+
+d(cid:2)
+
+i=1
+
+p(xi|πi)
+
+(5)
+
+Learning an optimal network requires searching over a set of every possible
+network, which is exponential in d. It is intractable in high-dimensional problems
+[8]. NB is the simplest form of a Bayesian network, where each attribute is
+dependent on y only.
+
+In another simpliﬁcation of BayesNet, AnDE [7] relaxes the independence
+assumption by allowing dependency between y and a ﬁxed number of privileged
+attributes or super-parents. The other attributes are assumed to be independent
+given the n super-parents and y. AnDE with n = 0, A0DE, is NB. AnDE avoids
+the expensive searching in learning probabilistic dependencies by constructing an
+ensemble of n-dependence estimators. The joint probability p(x, y) is estimated
+as:
+
+(cid:3)
+
+(cid:2)
+
+ˆp(x, y)AnDE =
+
+p(xs, y)
+
+s∈Sn
+
+j∈{1,2,···,d}\s
+
+p(xj|xs, y)
+
+(6)
+
+where Sn is the collection of all subsets of size n of the set of d attributes
+{1, 2,··· , d}; and xs is a n-dimensional vector of values of x deﬁned by s.
+
+It has been shown that A1DE and A2DE produce better predictive accuracy
+than the other state-of-the-art generative classiﬁers [6,7]. However, it only allows
+(cid:7)
+dependencies on a ﬁxed number of attributes and y. Because of the high time
+complexity of O
+, where
+v is the average number of values for an attribute [7], only A2DE or A3DE is
+feasible even for a moderate number of dimensions. Furthermore, selecting an
+appropriate value of n for a particular data set requires a search.
+
+1 and space complexity of O
+
+(cid:5)
+(cid:6)
+vn+1
+n+1
+
+(cid:5)
+n+1
+
+(cid:4)
+N
+
+(cid:4)
+c
+
+d
+
+(cid:6)(cid:7)
+
+d
+
+AnDE and many other implementations of BayesNet require all the attributes
+to be discrete. The continuous-valued attributes must be discretised using a
+discretisation method before building a classiﬁer.
+
+3 MassBayes: A New Generative Classiﬁer
+
+Rather than aggregating an ensemble of n-dependence single-dimensional like-
+lihood estimators, we propose to aggregate an ensemble of t multi-dimensional
+likelihood estimators where each likelihood is estimated using diﬀerent random
+subsets of d attributes from data. The likelihood p(x|y) is estimated as:
+
+ˆp(x|y) =
+
+1
+t
+
+(cid:3)
+
+g∈Gt
+
+p(xg|y)
+
+(7)
+
+where Gt is a collection of t subsets of varying sizes of d attributes; and xg is a
+|g|-dimensional vector of values of x deﬁned by g; and 1 ≤ |g| ≤ d.
+Each p(xg|y) is estimated using a random subset of training instances D ⊂ D,
+where |D| = ψ < N .
+
+(8)
+
+ˆp(xg|y) =
+
+|
+
+|Dy,xg
+|Dy|
+
+1
+
+(cid:2)
+(cid:3)
+d
+n
+
+is a binomial coeﬃcient of n out of d.
+
+MassBayes: A New Generative Classiﬁer
+
+139
+
+where |Dy,xg
+class y in D and |Dy| is the number of instances belonging to class y in D.
+
+| is the number of instances having attribute values xg belonging to
+
+Rather than relying on a speciﬁc discretisation method in the preprocess-
+ing step, we propose to build a model directly from data, akin to an adaptive
+multi-dimensional histogram, to determine xg which adapts to the local data
+distribution. The feature space partitioning we employed (to be discussed in
+Section 4) produces large regions in sparse area and small regions in the dense
+area of the data distribution.
+Let T (·) be a function that divides the feature space into non-overlapping
+regions and T (x) be the region where x falls. In a multi-dimensional space, each
+instance in D can be isolated by splitting only on few dimensions i.e., only a
+subset of d attributes (g ⊂ {1, 2,··· , d}) is used to deﬁne T (x). Hence, |Dy,xg
+| is
+the number of instances belonging to class y in the region T (x). Let p(T (x)|y) be
+the probability of region T (x) when only class y instances in D are considered.
+
+p(T (x)|y) = ˆp(xg|y) =
+
+|
+
+|Dy,xg
+|Dy|
+
+(9)
+
+(10)
+
+The new generative classiﬁer, called MassBayes, estimates the joint distribution
+as:
+
+t(cid:3)
+
+(cid:3)
+
+ˆp(x, y)MassBayes = p(y)
+
+1
+t
+
+g∈Gt
+
+p(xg|y) = p(y)
+
+p(Ti(x)|y)
+
+1
+t
+
+i=1
+
+Fig. 1. Diﬀerent regions from diﬀerent Ti(·) (i = 1, 2, ··· , 5) that cover x
+
+The average probability of t diﬀerent regions Ti(x) (i = 1, 2,··· , t), con-
+structed using Di ⊂ D, provides a good estimate for p(x|y) as it estimates
+
+the multi-dimensional likelihood by considering the distribution in diﬀerent lo-
+cal neighbourhood of x in the data space. An illustrative example is provided in
+Figure 1. Note that, the estimator employed in MassBayes is not a true density
+estimator as it does not integrate to 1.
+
+MassBayes has the following characteristics in comparison with AnDE:
+
+1. In each estimator, AnDE estimates one-dimensional
+
+likelihood given a
+ﬁxed number of super-parents and y, whereas MassBayes estimates multi-
+dimensional likelihood using varying number of dimensions.
+
+(cid:6)
+. But, MassBayes allows the ﬂex-
+
+2. In AnDE, the ensemble size is ﬁxed to
+
+ibility for users to set the ensemble size.
+
+(cid:5)
+
+d
+n
+
+140
+
+S. Aryal and K.M. Ting
+
+3. AnDE requires continuous-valued attributes to be discretised before build-
+ing the model. The performance of AnDE is aﬀected by the discretisation
+technique used. In contrast, MassBayes builds models directly from data.
+It can be viewed as a dynamic multi-dimensional discretisation where the
+information loss is minimised by averaging over multiple models.
+
+4. Each model in MassBayes is built with training subset of size ψ < N which
+gives rise to the constant training time. In contrast, each model in AnDE is
+trained using the entire training set.
+
+5. AnDE is a deterministic algorithm whereas MassBayes is a randomised al-
+
+gorithm.
+
+6. Like AnDE, MassBayes is a generative classiﬁer without search.
+
+Implementation
+
+4
+In order to partition the feature space to deﬁne the regions Ti(·), we use the
+
+implementation described by Ting and Wells (2010) using a binary tree called
+h:d-tree [9]. A parameter h deﬁnes the maximum level of sub-division. The
+maximum height of a tree is h × d.
+Let the data space that covers the instances in D be Δ. The data space
+Δ is adjusted to become δ using a random perturbation conducted as follows.
+For each dimension j, a split point vj is chosen randomly within the range
+maxj(Δ) − minj(Δ). Then, the new range δj along dimension j is deﬁned as
+[vj − r, vj + r], where r = max(vj − minj(Δ), maxj (Δ) − vj). The new range on
+A subset D is constructed from D by sampling ψ instances without replace-
+ment. The sampling process is restarted with D when all the instances are used.
+The random adjustment of the work space and random sub-sampling, as de-
+scribed earlier, ensure that no two trees are identical.
+
+all dimensions deﬁnes the adjusted work space for the tree building process.
+
+The dimension to split is selected from a randomised set of d dimensions in
+a round-robin manner at each level of a tree. A tree is constructed by splitting
+the work space into two equal-volume half spaces at each level. The process
+is then repeated recursively on each non-empty half-space. The tree building
+process stops when there is only one instance in a node or the maximum height
+is reached.
+At the leaf node, the number of instances in the node belonging to each class
+is stored. Figure 2 shows a typical example of an implementation of T (·) as an
+h:d-tree for h = 2 and d = 2. The dotted lines enclosed the instances in D and
+the solid lines enclosed the adjusted work space which has ranges δ1 and δ2 on
+x1 and x2 dimensions. R1, R2, R3, R4 and R5 represent diﬀerent regions in T (·)
+depending on the data distribution in D. Region R1 is deﬁned by splitting the
+work space in x1 dimension only, g = {1}, whereas the other four regions use
+dimensions x1 and x2, i.e., g = {1, 2}.
+In the original implementation by Ting and Wells (2010) for mass estimation,
+each tree is built to the maximum height of h × d resulting in equal-size regions
+regardless of the data distribution [9]. In our implementation, in order to adapt
+
+MassBayes: A New Generative Classiﬁer
+
+141
+
+Fig. 2. An example of an h:d-tree for h = 2 and d = 2
+
+to the data distribution, the tree building stops early once the instances are
+separated. We use the same algorithm as used by Ting and Wells (2010) to
+
+generate h:d-trees to represent Ti(·) in [9] with the required modiﬁcation.
+
+The procedures to generate t trees from a given data set D are provided in
+
+Algorithms 1 and 2.
+
+The maximum height of each tree is hd, and ψ instances have to be assigned
+to either of the two child nodes at each level of a tree. Hence, the total training
+time complexity to construct t trees is O(thdψ). There are a maximum of ψ
+(as ψ < 2hd in general) leaf nodes in each tree. The total space complexity is
+O(t(d + c)ψ).
+
+The time and space complexities of two variants of NB (NB-KDE that es-
+
+timates p(xi|y) through kernel density estimation [4]; and NB-Disc that esti-
+mates p(xi|y) through discretisation [10]), AnDE and MassBayes are presented in
+
+Table 1. Both training time complexity and space complexity of MassBayes are
+
+Table 1. Time and space complexities of diﬀerent generative classiﬁers
+
+Classiﬁers
+NB-KDE [4]
+NB-Disc [6]
+
+Training time
+O(N d)
+(cid:3)(cid:5)
+O(N d)
+(cid:2)
+
+(cid:4)
+
+AnDE [7]
+
+O
+
+N
+
+d
+
+n+1
+
+Testing time
+O(cmd)
+O(cd)
+(cid:2)
+(cid:3)(cid:3)
+(cid:2)
+d
+cd
+n
+
+O
+
+Space
+O(cmd)
+(cid:5)
+O(cdv)
+(cid:3)
+vn+1
+n+1
+
+d
+
+(cid:4)
+(cid:2)
+c
+
+O
+
+MassBayes
+
+O(thdψ)
+
+O(thd)
+
+O (t(d + c)ψ)
+
+N : total number of training instances, m: average number of training instances in a
+class, d: number of dimensions, c: number of classes, v: average number of discrete values
+of an attribute, n: number of super-parents, t: number of trees, h: level of divisions,
+and ψ: sample size.
+
+142
+
+S. Aryal and K.M. Ting
+
+independent of N . Note that the complexities for NB-Disc and AnDE do not
+include the additional discretisation needed in the preprocessing.
+
+Algorithm 1. BuildTrees(D, t, ψ, h)
+Inputs: D - input data, t - number of trees, ψ - sub-sampling size, h - number of
+times an attribute is employed in a path.
+Output: F - a set of t h:d-trees
+1: H ← h × d {Maximum height of a tree}
+2: Initialize F
+3: for i = 1 to t do
+4:
+5:
+6:
+7:
+8: end for
+9: return F
+
+D ← sample(D, ψ) {strictly without replacement}
+(min,max) ← InitialiseWorkSpace(D)
+A ← {Randomised list of d attributes.}
+F ← F ∪ SingleTree(D, min, max, 0, A)
+
+Algorithm 2. SingleTree(D, min, max, (cid:6), A)
+Inputs: D - input data, min & max - arrays of minimum and maximum values for
+each attribute that deﬁne a work space, A - a randomised list of d attributes, (cid:3) -
+current height level.
+Output: an h:d-tree
+1: Initialize N ode(·)
+2: while ((cid:3) < H and |D| > 1) do
+q ← nextAttribute(A, (cid:3)) {Retrieve an attribute from A based on height level.}
+3:
+4: midq ← (maxq + minq)/2
+Dl ← f ilter(D, q < midp)
+5:
+Dr ← f ilter(D, q ≥ midq)
+6:
+if (|Dl| = 0 ) or (|Dr| = 0) then {Reduce range for single-branch node.}
+7:
+8:
+9:
+10:
+11:
+12:
+end if
+13:
+{Build two nodes: Lef t and Right as a result of a split into two half-spaces.}
+14:
+temp ← maxq; maxq ← midq
+15:
+Lef t ← SingleTree(Dl, min, max, (cid:3) + 1, A)
+16:
+17: maxq ← temp; minq ← midq
+Right ← SingleTree(Dr, min, max, (cid:3) + 1, A)
+18:
+19:
+terminate while loop
+20: end while
+21: classCount ← updateClassCount(D)
+22: return Node(Lef t, Right, SplitAtt ← q, SplitV alue ← midq, classCount)
+
+if (|Dl| > 0 ) then maxq ← midq
+else minq ← midq
+end if
+(cid:3) ← (cid:3) + 1
+continue at the start of while loop
+
+MassBayes: A New Generative Classiﬁer
+
+143
+
+5 Empirical Evaluation
+
+This section presents the results of the experiments conducted to evaluate the
+performance of MassBayes against seven well known contenders: two variants of
+NB (NB-KDE and NB-Disc), BayesNet, three variants of AnDE (A1DE, A2DE,
+A3DE) and decision tree J48 (i.e., the WEKA [11] version of C4.5 [12]).
+
+MassBayes was implemented in Java using the WEKA platform [11] which also
+has implementations of NB, BayesNet, A1DE and J48. For A2DE and A3DE,
+we used the WEKA implementations provided by the authors of AnDE.
+
+All the experiments were conducted using a 10-fold cross validation in a Linux
+machine with 2.27 GHz processor and 100 GB memory. The average accuracy
+(%) and the average runtime (seconds) over a 10-fold cross validation were re-
+ported. A two-standard-error signiﬁcance test was conducted to check whether
+the diﬀerence in accuracies of two classiﬁers was signiﬁcant. A win or loss was
+counted if the diﬀerence was signiﬁcant; otherwise, it was a draw.
+
+Ten data sets with N > 10000 were used. All the attributes in the data sets are
+numeric. The properties of the data sets are provided in Table 2. The RingCurve,
+Wave and OneBig data sets were three synthetic data sets and the rest were
+real-world data sets from UCI Machine Learning Repository [13]. RingCurve
+and Wave are subsets of the RingCurve-Wave-TriGaussian data set used in [9]
+and OneBig is the data set used in [14].
+
+Table 2. Properties of the data sets used
+
+Data sets
+CoverType
+581012
+MiniBooNE 129596
+68000
+58000
+20000
+
+OneBig
+Shuttle
+Wave
+
+#N #d #c
+7
+2
+10
+7
+2
+
+10
+50
+20
+8
+2
+
+Data sets
+RingCurve
+Letters
+Magic04
+Mamograph
+Pendigits
+
+#N #d #c
+2
+26
+2
+2
+10
+
+20000
+20000
+19020
+11183
+10992
+
+2
+16
+10
+6
+16
+
+For AnDE, BayesNet and NB-Disc, data sets were discretised by a supervised
+discretisation technique based on minimum entropy [15] as suggested by the
+authors of AnDE before building the classiﬁcation models.
+
+Two variants of MassBayes were used: MassBayes with (ψ = 5000) and
+(ψ = N ). The other two parameters t and h were set as default
+
+(cid:4)
+
+MassBayes
+to 100 and 10, respectively.
+
+For BayesNet, the parameter ‘maximum number of parents’ was set to 100
+to examine whether a large number of parents produces better results; and the
+parameter ‘initialise as Naive Bayes’ was set to ‘false’ to initialise an empty
+network structure. The default values were used for the rest of the parameters.
+All the other classiﬁers were executed with the default parameter settings.
+
+144
+
+S. Aryal and K.M. Ting
+
+Table 3. Average classiﬁcation accuracies (%) over a 10-fold cross validation
+
+Data Mass Mass
+A3
+Bayes
+DE
+78.21
+88.16
+∗
+91.11 N/A
+∗
+100.00 N/A
+99.94
+95.11
+99.99
+78.51
+85.08
+98.51
+98.80
+
+(cid:2)
+sets Bayes
+94.00
+92.68
+100.00
+99.89
+96.63
+100.00
+100.00
+85.72
+98.69
+99.45
+
+99.89
+95.63
+100.00
+100.00
+85.53
+98.71
+99.28
+
+CoverType
+MiniBooNE
+OneBig
+Shuttle
+Letters
+RingCurve
+Wave
+Magic04
+Mamograph
+Pendigits
+
+A2
+DE
+80.81
+91.48
+99.81
+99.94
+94.31
+99.99
+78.51
+84.57
+98.37
+98.82
+
+NB-
+
+A1 Bayes
+DE
+72.89
+89.58
+99.69
+99.85
+88.81
+99.99
+78.51
+83.00
+98.42
+97.84
+
+87.79
+90.25
+99.99
+99.93
+86.97
+99.99
+78.51
+83.46
+98.54
+96.81
+
+NB-
+Net KDE Disc
+66.61
+86.29
+99.97
+94.36
+73.94
+99.48
+78.51
+78.27
+97.62
+87.9
+
+66.72
+86.07
+99.98
+92.68
+74.21
+99.27
+77.91
+76.13
+97.86
+88.64
+
+J48
+92.39
+90.47
+99.84
+99.97
+87.92
+99.91
+99.79
+85.01
+98.57
+96.56
+
+∗
+
+Did not complete because of integer overﬂow error.
+
+Table 4. Win:Loss:Draw counts of MassBayes over the other contenders in terms of
+classiﬁcation accuracy based on the two-standard-error signiﬁcance test
+
+(cid:2)
+MassBayes
+MassBayes
+
+A3DE A2DE A1DE BayesNet NB-KDE NB-Disc
+10:0:0
+10:0:0
+
+10:0:0
+10:0:0
+
+4:1:3
+3:2:3
+
+7:1:2
+6:2:2
+
+7:1:2
+6:3:1
+
+7:0:3
+7:0:3
+
+Table 5. Average runtime (seconds) over a 10-fold cross validation
+
+A3
+DE
+45.6
+
+(cid:2)
+Data sets Bayes
+1075.8
+431.1
+113.9
+48.5
+18.9
+4.4
+4.9
+10.9
+4.7
+7.3
+
+CoverType
+MiniBooNE
+OneBig
+Shuttle
+Letters
+RingCurve
+Wave
+Magic04
+Mamograph
+Pendigits
+
+A2 A1 Bayes
+Mass Mass
+DE DE
+Bayes
+4.9
+45.7
+13.9
+5.9
+33.7 N/A 231.3
+10.5 N/A
+11.6
+3.9
+0.5
+0.7
+1.8
+0.8
+2.6
+11.5
+0.2
+0.2
+0.2
+0.2
+0.2
+0.2
+0.7
+0.5
+0.2
+0.2
+0.2
+0.3
+5.7
+0.9
+0.4
+
+387.9
+308.9
+432.5
+6.8
+4.9
+0.3
+0.2
+0.7
+0.3
+1.8
+
+NB- NB-
+Net KDE Disc
+3.2
+2.1
+0.8
+0.4
+0.4
+0.2
+0.1
+0.2
+0.2
+0.2
+
+96.3
+831.6
+253.0
+1.5
+2.5
+2.4
+2.5
+8.8
+0.5
+1.6
+
+8.0
+5.5
+2.3
+2.1
+3.9
+3.1
+3.6
+
+J48
+7:1:2
+6:2:2
+
+J48
+3690.7
+323.8
+15.1
+4.2
+7.3
+0.4
+0.6
+3.4
+0.4
+1.2
+
+Table 3 shows the average classiﬁcation accuracies of MassBayes
+
+and Mass-
+Bayes in comparison to the other contenders. The results of the two-standard-
+and MassBayes
+error signiﬁcance test in Table 4 show that both MassBayes
+produced better classiﬁcation accuracy than the other contenders in most data
+sets.
+
+(cid:4)
+
+(cid:4)
+
+MassBayes: A New Generative Classiﬁer
+
+145
+
+BayesNet
+A3DE
+NB-KDE
+MassBayes′
+A2DE
+A1DE
+NB-Disc
+MassBayes
+
+4500
+
+1000
+
+100
+
+10
+
+1
+
+o
+i
+t
+a
+r
+ 
+e
+m
+
+i
+t
+n
+u
+R
+
+BayesNet
+NB-KDE
+MassBayes′
+A3DE
+A2DE
+A1DE
+NB-Disc
+MassBayes
+
+o
+i
+t
+a
+r
+ 
+y
+r
+o
+m
+e
+M
+
+1500
+
+100
+
+10
+
+1
+
+1
+
+10
+Training size ratio
+
+75 150
+
+(a) Runtime
+
+1500
+
+1
+
+10
+Training size ratio
+
+75 150
+
+1500
+
+(b) Space
+
+Fig. 3. Scale-up test: MassBayes versus existing generative classiﬁers. The base for
+training size ratio is 7000 instances and the bases for runtime ratio and memory ratio
+are the training time and memory required to save a classiﬁcation model for 7000
+instances. Axes are on logarithmic scales of base 10.
+
+MassBayes produced slightly poorer results than A2DE, A3DE, BayesNet and
+J48 in CoverType. This was because the default sample size was not enough to
+yield a good estimate. The accuracy was increased up to 84.62% with ψ = 20000
+and 88.66% with ψ = 50000. More samples are required to grow the trees further
+to model the distributions well if the class distributions in the feature space
+are complex. Figure 4(a) shows the improvement in accuracy of MassBayes in
+CoverType when the sample size was increased.
+
+Table 5 presents the average runtime. In terms of runtime, MassBayes was
+an order of magnitude faster than A2DE in MiniBooNE; BayesNet in Cover-
+Type, MiniBooNE and OneBig; NB-KDE in MiniBooNE and OneBig; and J48
+in CoverType and MiniBooNE. It was of the same order of magnitude as A3DE,
+A2DE, BayesNet, NB-KDE and J48 in many cases and an order of magnitude
+was an order of magnitude slower
+slower than NB-Disc and A1DE. MassBayes
+than the other contenders in many data sets. However, it was of the same order
+of magnitude as A3DE in Letters; A2DE in MiniBooNE; BayesNet and NB-KDE
+in MiniBooNE and OneBig; and J48 in CoverType and MiniBooNE.
+
+(cid:4)
+
+Note that the reported runtime results for AnDE, BayesNet and NB-Disc
+did not include the discretisation time that must be done as a preprocessing
+step, which give the existing generative classiﬁers (except NB-KDE) an unfair
+advantage over MassBayes. The discretisation time can be substantially large in
+large data sets. For example, the discretisation took 52 seconds in the largest
+data set, CoverType. This discretisation time alone was more than the total
+runtime of MassBayes. Thus, MassBayes in eﬀect runs faster than all existing
+generative classiﬁers on equal footing.
+
+In order to examine the scalability of the classiﬁers in terms of training time
+and space requirements with the increase in training size N , we used the 48-
+dimensional (42 irrelevant attributes with constant values) RingCurve-Wave-
+Tri-Gaussian data set previously employed by Ting and Wells (2010) in [9]. The
+training data size was increased from 7000 to 70000, half-a-million, 1 million and
+
+146
+
+S. Aryal and K.M. Ting
+
+100
+
+90
+
+80
+
+70
+
+y
+c
+a
+r
+u
+c
+c
+A
+
+Accuracy
+Runtime Ratio
+
+Accuracy
+Runtime Ratio
+
+50
+
+40
+
+30
+
+20
+
+10
+
+o
+i
+t
+a
+R
+ 
+e
+m
+
+i
+t
+n
+u
+R
+
+100
+
+90
+
+80
+
+y
+c
+a
+r
+u
+c
+c
+A
+
+200
+
+50
+
+10
+
+o
+i
+t
+a
+R
+ 
+e
+m
+
+i
+t
+n
+u
+R
+
+60
+
+0.5 50 100
+
+200
+
+300
+
+1
+581
+
+70
+
+10
+
+Sample size (ψ) in thousands
+
+(a) Sample size (ψ)
+
+1
+500 1000
+
+50
+
+100
+
+Number of trees (t)
+
+(b) Trees (t)
+
+Fig. 4. Eﬀect of parameters ψ and t on the classiﬁcation accuracy and runtime of
+MassBayes in the CoverType data set. The base for the runtime ratio while varying
+ψ and t is the total runtime (training and testing over a 10-fold cross validation) for
+ψ = 500 and t = 10, respectively. The horizontal axis of t and the vertical axis of
+runtime ratio in (b) are on logarithmic scales of base 10.
+
+10 million by a factor of 1, 10, 75, 150 and 1500, respectively. Figure 3 shows the
+increase in classiﬁcation model building time and memory space required to store
+the classiﬁcation model for diﬀerent generative classiﬁers. Note that the discreti-
+sation time was not included in the presented results. The discretisation time
+increases linearly with the increase in training data size. This additional time for
+discretisation will increase the training time of AnDE, BayesNet and NB-Disc.
+MassBayes had constant training time and constant space requirements.
+
+In order to examine the sensitivity of the parameters ψ, t and h in classiﬁca-
+tion accuracy and runtime of MassBayes, we conducted a set of experiments by
+varying one parameter and ﬁxing the other two to the default values. The result
+of the experiment varying ψ and t in the largest data set (CoverType) is shown
+in Figure 4. The increase in runtime was plotted as a ratio to show the factor of
+runtime increased when the parameters were increased.
+
+In general, accuracy increased up to a certain point and remained ﬂat when
+each of the three parameters was increased. This indicates that the parameters
+of MassBayes are not too sensitive in terms of classiﬁcation accuracy if they are
+set to suﬃciently high values. The runtime increased linearly with t and sub-
+linearly with ψ. With ﬁxed sample size (ψ = 5000), increase in h after a certain
+point did not aﬀect the runtime because the tree building process stopped before
+reaching the maximum level h once the instances are separated.
+
+6 Conclusions and Future Work
+
+In this paper, we presented a new generative classiﬁer called MassBayes that
+approximates p(x|y) by aggregating multi-dimensional likelihoods estimated us-
+ing varying size subsets of features from random subsets of training data. In
+contrast, existing generative classiﬁers make assumptions about attribute inde-
+pendence and estimate single-dimensional likelihood only. Our empirical results
+
+MassBayes: A New Generative Classiﬁer
+
+147
+
+show that MassBayes produced better classiﬁcation accuracy than the existing
+generative classiﬁers in large data sets.
+
+In terms of runtime, it scales better than the existing generative classiﬁers in
+large data sets as it builds models in an ensemble using ﬁxed-size data subsets.
+The constant training time and space complexities make it an ideal classiﬁer for
+large data sets and data streams.
+
+Future work includes applying the proposed method in data sets with discrete
+and mixed attributes and investigating the eﬀectiveness of MassBayes in the data
+stream context. In this paper, we have rigorously assessed MassBayes with the
+state-of-the-art Bayesian classiﬁers. In the near future, we will assess its perfor-
+mance against some well-known discriminative classiﬁers and their ensembles.
+The feature space partitioning can be implemented in various ways. It would
+be interesting to investigate a more intelligent way of feature space partitioning
+rather than dividing at mid-point of a randomly selected dimension.
+
+Acknowledgement. This work is supported by the Air Force Research Labo-
+ratory, under agreement# FA2386-11-1-4112. Sunil Aryal is partially supported
+by Monash University Postgraduate Publications Award to write this paper. We
+would like to thank Geoﬀ Webb and the anonymous reviewers for their helpful
+comments.
+
+References
+
+1. Silverman, B.W.: Density Estimation for Statistics and Data Analysis. Chapmal
+
+& Hall/CRC (1986)
+
+2. Ram, P., Gray, A.G.: Density Estimation Trees. In: Proceedings of the 17th ACM
+SIGKDD International Conference on Knowledge Discovery and Data Mining, pp.
+627–635. ACM, New York (2011)
+
+3. Langley, P., Iba, W., Thompson, K.: An Analysis of Bayesian Classiﬁers. In: Pro-
+ceedings of the Tenth National Conference on Artiﬁcial Intelligence, pp. 399–406
+(1992)
+
+4. Langley, P., John, G.H.: Estimating continuous distribution in Bayesian classiﬁers.
+In: Proceedings of Eleventh Conference on Uncertainty in Artiﬁcial Intelligence
+(1995)
+
+5. Friedman, N., Geiger, D., Goldszmidt, M.: Bayesian Network Classiﬁers. Machine
+
+Learning 29, 131–163 (1997)
+
+6. Webb, G.I., Boughton, J.R., Wang, Z.: Not So Naive Bayes: Aggregating one-
+
+dependence estimators. Machine Learning 58, 5–24 (2005)
+
+7. Webb, G., Boughton, J., Zheng, F., Ting, K., Salem, H.: Learning by extrapola-
+tion from marginal to full-multivariate probability distributions: decreasingly naive
+Bayesian classiﬁcation. Machine Learning 86, 233–272 (2012)
+
+8. Chickering, D.M.: Learning Bayesian Networks is NP-Complete. In: Fisher, D.,
+Lenz, H.J. (eds.) Learning from Data: Artiﬁcial Intelligence and Statistics V, pp.
+121–130. Springer, Heidelberg (1996)
+
+9. Ting, K.M., Wells, J.R.: Multi-Dimensional Mass Estimation and Mass-Based Clus-
+
+tering. In: Proceedings of IEEE ICDM, pp. 511–520 (2010)
+
+148
+
+S. Aryal and K.M. Ting
+
+10. Dougherty, J., Kohavi, R., Sahami, M.: Supervised and Unsupervised Discretiza-
+tion of Continuous Features. In: Proceedings of the 12th International Conference
+on Machine Learning, pp. 194–202. Morgan Kaufmann (1995)
+
+11. Hall, M., Frank, E., Holmes, G., Pfahringer, B., Reutemann, P., Witten, I.H.: The
+
+WEKA Data Mining Software: An Update. SIGKDD Explorations 11(1) (2009)
+
+12. Quinlan, R.: C4.5: Programs for Machine Learning. Morgan Kaufmann Publishers,
+
+San Mateo (1993)
+
+13. Frank, A., Asuncion, A.: UCI Machine Learning Repository. University of
+(2010),
+
+Information and Computer Sciences
+
+California,
+http://archive.ics.uci.edu/ml
+
+Irvine, School of
+
+14. Nanopoulos, A., Theodoridis, Y., Manolopoulos, Y.: Indexed-based density biased
+sampling for clustering applications. IEEE Transaction on Data and Knowledge
+Engineering 57(1), 37–63 (2006)
+
+15. Fayyad, U.M., Irani, K.B.: Multi-interval discretization of continuous valued at-
+tributes for classiﬁcation learning. In: Proceedings of 14th International Joint Con-
+ference on Artiﬁcial Intelligence, pp. 1034–1040 (1995)
+
+

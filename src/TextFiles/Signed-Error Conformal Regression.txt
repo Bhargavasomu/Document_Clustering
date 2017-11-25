@@ -1,0 +1,1020 @@
+Signed-Error Conformal Regression
+
+Henrik Linusson, Ulf Johansson, and Tuve L¨ofstr¨om
+
+School of Business and Informatics, University of Bor˚as, Bor˚as, Sweden(cid:2)
+
+{henrik.linusson,ulf.johansson,tuve.lofstrom}@hb.se
+
+Abstract. This paper suggets a modiﬁcation of the Conformal Predic-
+tion framework for regression that will strenghten the associated guaran-
+tee of validity. We motivate the need for this modiﬁcation and argue that
+our conformal regressors are more closely tied to the actual error distri-
+bution of the underlying model, thus allowing for more natural interpre-
+tations of the prediction intervals. In the experimentation, we provide an
+empirical comparison of our conformal regressors to traditional confor-
+mal regressors and show that the proposed modiﬁcation results in more
+robust two-tailed predictions, and more eﬃcient one-tailed predictions.
+
+Keywords: Conformal Prediction, prediction intervals, regression.
+
+1
+
+Introduction
+
+Conformal Prediction (CP) [1] is a framework for producing reliable conﬁdence
+measures associated with the predictions of an underlying classiﬁcation or regres-
+sion model. Given a conﬁdence level δ ∈ (0, 1), a conformal predictor outputs
+prediction regions that, in the long run, contain the true target value with a
+probability of at least 1 − δ. Unlike Bayesian models, CP does not rely on any
+knowledge of the a priori distribution of the problem space; and, compared to
+the PAC learning framework, CP is much more resiliant to noise in the data.
+
+Clearly, the motivation for using CP is the fact that the resulting predici-
+ton regions are guaranteed to be valid. With this in mind, it is vital to fully
+understand what validity means in a CP context. Existing literature (e.g. [1])
+provides a thorough explanation of how the validity concept relates to conformal
+classiﬁcation, but leaves something to be desired regarding conformal regression.
+In this paper, we identify an inherent but non-obvious weakness associated
+with the most common type of inductive conformal regressor — conformal regres-
+sors where the nonconformity score is based on the absolute error of a predictive
+regression model (Abs. Error CP Regression, or AECPR). Speciﬁcally we show
+that when the underlying model has a skewed error distribution, AECPR pro-
+duces unbalanced prediction intervals — prediction intervals with no guarantee
+regarding the distribution of errors above and below the prediction interval —
+
+(cid:2) This work was supported by the Swedish Foundation for Strategic Research through
+the project High-Performance Data Mining for Drug Eﬀect Detection (IIS11-0053)
+and the Knowledge Foundation through the project Big Data Analytics by Online
+Ensemble Learning (20120192).
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part I, LNAI 8443, pp. 224–236, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+Signed-Error Conformal Regression
+
+225
+
+and argue that this limits the expressiveness of AECPR models. We suggest to
+instead produce two one-tailed conformal predictors, one for the low end of the
+prediction interval and one for the high end. The only modiﬁcation needed is to
+use a nonconformity score based on the signed error of the underlying model.
+Once we have these two conformal predictors, they can either be used to output
+valid one-tailed predictions, or combined to create two-tailed prediction intervals
+that exhibit a stronger guarantee of validity than standard AECPR prediction
+intervals. In addition, we show that the suggested approach is more robust, i.e.,
+less sensitive to outliers. In particular when δ is small, AECPR may be seriously
+aﬀected by outliers, resulting in very conservative (large) prediction intervals.
+
+2 Background
+
+CP was originally introduced in [2], and further developed in [3], as a trans-
+ductive approach for associating classiﬁcation predictions from Support Vector
+Machine models with a measure of conﬁdence. Vovk, Gammerman & Shafer pro-
+vide a comprehensive guide on conformal classiﬁcation in [1], and Shafer & Vovk
+provide an abridged tutorial in [4]. Since its introduction, CP has been frequently
+applied to predictive modeling and used in combination with several diﬀerent
+classiﬁcation and regression algorithms, including Ridge Regression [5] k-Nearest
+Neighbors [6], Artiﬁcial Neural Networks [7, 8] and Evolutionary Algorithms [9].
+In [10] and [5], Papadopoulos proposes a modiﬁed version of CP based on
+inductive inference called Inductive Conformal Prediction (ICP). In ICP, only
+one predictive model is generated, thus avoiding the relative computational in-
+eﬃciency of (transductive) conformal predictors.
+
+Conformal predictors have been applied to a number of problems where con-
+ﬁdence in the predictions is of concern, including prediction of space weather
+parameters [8], estimation of software project eﬀort [11], early diagnostics of
+ovarian and breast cancers [12], diagnosis of acute abdominal pain [13] and as-
+sessment of stroke risk [14].
+
+2.1 Conformal Prediction
+
+Given a set of training examples Z = ((x1, y1), ...(xl, yl)), and a previously un-
+seen input pattern xj , the general idea behind CP is to consider each possible
+target value ˜y and determine the likelihood of observing (xj , ˜y) in Z.
+
+To measure the likelihood of observing (xj, ˜y) in Z, a conformal predictor
+i to each instance in the extended set ˆZ =
+ﬁrst assigns a nonconformity score α˜y
+Z ∪ {(xj , ˜y)}. This nonconformity score is a measure of the strangeness of each
+instance (xi, yi) ∈ ˆZ compared to the rest of the set, and is, in a predictive
+
+modeling scenario, often based on the predictions from a model generated using
+a traditional machine learning algorithm, referred to as the underlying model of
+the conformal predictor. The underlying model is trained using ˆZ as training
+data, and the nonconformity score for an instance (xi, yi) ∈ ˆZ is deﬁned as the
+
+level of disagreement (according to some error measure) between the prediction
+of the underlying model ˆyi and the true label yi.
+
+226
+
+H. Linusson, U. Johansson, and T. L¨ofstr¨om
+
+The nonconformity score α˜y
+
+j is compared to the nonconformity scores of all
+other instances in ˆZ to determine how unusual (xj , ˜y) is according to the non-
+conformity measure used. Speciﬁcally, we calculate the p-value of ˜y using
+
+(cid:2)
+
+(cid:3)
+
+#
+
+p(˜y) =
+
+zi ∈ ˆZ | ai ≥ a˜y
+
+j
+
+l + 1
+
+.
+
+(1)
+
+A key property of conformal prediction is that if p(˜y) is below some threshold
+δ, the likelihood of ˜y being the true label for xj is at most δ if ˆZ is i.i.d. If we
+select δ to be very low, e.g., 0.05, we can thus conclude that if p(˜y) < 0.05 it is
+at most 5% likely that ˜y is the true label for xj. These p-values are calculated for
+each tentative label ˜y, and the conformal predictor outputs a prediction region
+containing each label ˜y for which p(˜y) > δ; i.e., a set of labels that contains the
+
+true label of xj with probability 1−δ. Given that we already know the probability
+of any prediction region containing the true output for a test instance xj , the
+goal in CP is not to maximize this probability, but rather to minimize the size
+of the prediction regions. In essence, CP performs a form of hypothesis testing.
+For each label ˜y, we want to reject the null hypothesis that (xj , ˜y) is conforming
+with Z, and for every ˜y we are able to reject, we reduce the size of the prediction
+region, thus increasing the eﬃciency of the conformal predictor.
+
+Since (xj, ˜y) is included in the training data for the underlying model, the
+model needs to be retrained for each tentative label ˜y; as such, this form of CP
+suﬀers from a rather poor computational complexity. ICP, as described in the
+next subsection, solves this problem by dividing the data set into two disjunct
+subsets: a proper training set and a calibration set.
+
+2.2 Inductive Conformal Prediction
+
+An ICP needs to be trained only once, using the following scheme:
+
+1. Divide the training set Z = {(x1, y1), ...(xl, yl)} into two disjoint subsets:
+
+– a proper training set Z
+– a calibration set Z
+
+(cid:3)(cid:3)
+
+(cid:3)
+2. Train the underlying model hZ using Z
+3. For each calibration instance (xi, yi) ∈ Z
+
+(cid:3)
+
+= {(x1, y1), ..., (xm, ym)} and
+= {(xm+1, ym+1), ..., (xm+q, ym+q)}
+
+as training data.
+(cid:3)(cid:3)
+:
+
+– let hZ predict the output value for xi so that ˆyi = hZ(xi) and
+– calculate the nonconformity score ai using the nonconformity function.
+
+For a novel (test) instance we simply supply the input pattern xj to the under-
+j using our nonconformity function. The p-value of
+j to the nonconformity
+
+lying model and calculate α˜y
+each tentative label ˜y is then calculated by comparing α˜y
+scores of the calibration set:
+
+(cid:2)
+
+#
+
+p(˜y) =
+
+zi ∈ Z
+
+(cid:3)(cid:3) | ai ≥ a˜y
+
+j
+
+q + 1
+
+(cid:3)
+
++ 1
+
+,
+
+(2)
+
+where q is the size of the calibration set. If p(˜y) < δ, it is at most δ% likely that
+˜y is the true output of xj, and ˜y is thus excluded from the prediction region.
+
+Signed-Error Conformal Regression
+
+227
+
+2.3 Inductive Conformal Regression
+
+In regression it is not possible to consider every possible output value ˜y, so we
+cannot explicity calculate the p-value for each and every ˜y. Instead a conformal
+regressor must eﬀectively work in reverse. First, the size of the (1− δ)-percentile
+nonconformity score, αs(δ), is determined; second, the nonconformity function is
+used to calculate the magnitude of error that would result in xj being given a
+nonconformity score at most αs(δ); i.e., the conformal regressor determines the
+largest error that would be commited by the underlying model when predicting
+yj with probability 1 − δ. To perform conformal regression, we ﬁrst deﬁne a
+
+nonconformity function, typically using the absolute error, see e.g., [5–8]:
+
+αi = |yi − ˆyi|
+
+.
+
+(3)
+
+j such that P (αˆy
+
+Then, given a signiﬁcance level δ and a set of calibration scores S, the goal
+
+j > αi ∈ S) ≤ δ; i.e., the largest nonconformity
+is to ﬁnd αˆy
+score — and, due to the deﬁnition of (3), also the largest absolute error — with
+probability 1−δ. To do this, we simply sort the calibration scores in a descending
+order, and deﬁne the prediction interval as
+
+j = (ˆyj − αs(δ), ˆyj + αs(δ)),
+ˆY δ
+
+(4)
+where s(δ) = (cid:6)δ(q + 1)(cid:7), i.e., the index of the (1 − δ)-percentile in the sorted list
+of nonconformity scores. Since the underlying model’s error is at most αs(δ) with
+probability 1− δ, the resulting interval covers the true target yj with probability
+1 − δ. Note that when using (3) and (4) the conformal regressor will, for any
+speciﬁc signiﬁcance level δ, always produce prediction intervals of the same size
+for every xj; i.e., it does not consider the diﬃculty of a certain instance xj .
+Papadopoulos et al. [5] suggest that prediction intervals can be normalized using
+some estimation of the diﬃculty of each instance, e.g., by using a separate model
+for estimating the error of the underlying predictor. In this paper, we will not
+consider normalized nonconformity scores, but leave them for future work.
+
+3 Method
+
+AECPR will, as described in the Background, always produce ’symmetrical’
+prediction intervals where the underlying model’s prediction is the center of
+the interval, and the distance from the interval’s center to either boundary is
+equal to αs(δ), i.e., the absolute error from the calibration set associated with
+the signiﬁcance level 1 − δ. If the errors of the underlying model are symmetri-
+cally distributed — i.e., the underlying model is equally likely to underestimate
+and overestimate the true output — AECPR will always yield optimal inter-
+val boundaries in the sense that neither boundary is overly optimistic nor overly
+pessimistic in relation to the error distribution of the model (as estimated on the
+calibration set). However, when the error distribution of the underlying model is
+skewed, it is possible for one of the boundaries to become overly optimistic, while
+
+228
+
+H. Linusson, U. Johansson, and T. L¨ofstr¨om
+
+the other becomes overly pessimistic, simply because the errors committed in
+one direction will inﬂuence the nonconformity scores, and consuequently the pre-
+diction intervals, in both directions. Figure 1 shows an example of a skewed error
+distribution, where the AECPR nonconformity scores of the underlying model (a
+neural network) fail to capture the model’s tendency to produce smaller negative
+errors (overestimation) and larger positive errors (underestimation).
+
+Fig. 1. Error distribution of an ANN on the Boston Housing data set. The signed error
+(solid line) approximates the skewed distribution of the ANN’s error rate, while the
+absolute error (dashed line) assumes a symmetrical distribution when mirrored onto
+the negative range as per equations (3) and (4).
+
+AECPR is proven valid [5], and thus there is no need to suspect that the
+mismatch between absolute error nonconformity scores and skewed error distri-
+butions would lead to invalid prediction intervals; however, it is necessary to be
+very speciﬁc about what validity means in the context of AECPR. Given that
+AECPR operates on the magnitude of the underlying model’s error, the validity
+applies to the magnitude of errors and nothing else; i.e., AECPR guarantees that
+the absolute error of the underlying model is no larger than αs(δ) with probability
+1− δ. However, without considering the underlying model’s tendency to commit
+positive or negative errors, AECPR cannot provide information regarding how
+δ is distributed above and below the prediction interval.
+
+Without this information, it is not possible for a user of AECPR to distinctly
+assess the validity of the prediction boundaries. To illustrate, consider a 95%-
+conﬁdence prediction interval on the form (−1, 1). If asked to assess the likelihood
+of the true value yj being greater than 1, one is easily tempted to assume a
+probability of 2.5%, since intuitively, the probability of yj being greater than
+the interval’s upper boundary should be about the same as the probability of yj
+being less than the interval’s lower boundary. The true answer however, is that
+AECPR can only guarantee that there is at most a 5% probability of yj being less
+than −1, and at most a 5% probability of yj being greater than 1, since we have
+
+Signed-Error Conformal Regression
+
+229
+
+no information of the probabilities of the true value being higher or lower than
+the prediction interval’s upper and lower boundaries respectively. In the following
+subsections, we expand on this argument, and propose a straightforward method
+for producing prediction intervals that possess a stronger guarantee of validity for
+the individual boundaries than for the full interval, while maintaining eﬃciency.
+
+3.1 Validity of Interval Boundaries
+
+If ˆY = ( ˆYlow, ˆYhigh) is a valid prediction region at δ = d, the one-tailed predic-
+tions (−∞, ˆYhigh) and ( ˆYlow, +∞) must also be valid prediction regions at δ = d,
+as they both cover at least the same error probability mass covered by ˆY . How-
+ever, without any knowledge of how the error probability d is distributed above
+and below ˆY it is not possible to assume that one speciﬁc one-tailed prediction
+is valid at any δ < d. Hence, we can, in fact, only be conﬁdent in the one-tailed
+predictions with probability 1− d, i.e., if ˆY = ( ˆYlow, ˆYhigh) is valid at δ = d, then
+(−∞, ˆYhigh) and ( ˆYlow, +∞) are valid at δ = d, but may be invalid at δ < d.
+On the other hand, if (−∞, ˆYhigh) and ( ˆYlow, +∞) are both known to be valid
+at δ = d
+2 , we know by deﬁnition that either of these one-tailed predictions will
+be incorrect with probability at most d
+2 . Thus, if the two one-tailed predictions
+are combined into a prediction interval ˆYc = ( ˆYlow, ˆYhigh), we can guarantee
+that ˆYc will be wrong in a speciﬁc direction with probability at most d
+2 , and
+in total with probability at most d. Now, we are able to express not only a
+conﬁdence 1 − d for the interval, but also a greater conﬁdence 1 − d
+2 for the
+individual boundaries. Hence, if (−∞, ˆYhigh) and ( ˆYlow, +∞) are valid at δ = d
+2 ,
+then ˆYc = ( ˆYlow, ˆYhigh) must be valid at δ = d. This follows from the fact that
+when two one-tailed predictions are combined into a two-tailed interval, the
+probability of the resulting interval being wrong is the sum of the probabilities
+of the boundaries being wrong.
+
+c,j compared to ˆY δ
+| ≈ | ˆY δ
+
+c,j
+
+j
+
+j
+
+j
+
+j
+
+Using AECPR, prediction intervals with boundaries guaranteed at δ
+c,j. This is of course rather impractical — as | ˆY 0.5δ
+
+2 can be
+constructed simply by creating a prediction region ˆY 0.5δ
+, and outputting it as a
+| ≥ | ˆY δ
+|,
+combined interval ˆY δ
+we’re not only ’increasing’ the guarantee of validity for the individual boundaries
+in ˆY δ
+j , we’re also eﬀectively guaranteeing that our prediction in-
+terval is unnecessarily large! We would much rather output a combined interval
+such that | ˆY δ
+|. To accomplish this, we are required to reduce the size of
+the predicted boundaries ˆYlow and ˆYhigh. We note the following: if the underlying
+model’s predictions tend to underestimate the true output values, we are only re-
+quired to adjust the upper boundary of the prediction intervals for them to remain
+valid; similarly, if the underlying model’s predictions tend to overestimate, we are
+only required to adjust the lower boundary. Hence when predicting ˆYlow we only
+need to consider the negative errors made by the underlying predictor; and, when
+predicting ˆYhigh, we only need to consider the positive errors made by the under-
+lying predictor. That is, we can construct the interval boundaries by considering
+only about half of the errors commited by the underlying model, thus reducing the
+
+230
+
+H. Linusson, U. Johansson, and T. L¨ofstr¨om
+
+expected size of each boundary while maintaining validity in the one-tailed pre-
+dictions. This follows directly from the semantics of validity we are applying to the
+lower and upper boundary predictions — in both cases, we are only interested in
+guaranteeing validity in a single direction, i.e., for the upper boundary, we want to
+guarantee only that the probability of yj being greater than ˆYhigh is at most 1− δ
+2 ,
+and for the lower boundary we want to guarantee that the probability of yj being
+less than ˆYlow is at most 1 − δ
+2 . Thus, if we are interested in predicting the upper
+boundary of yj, we can deﬁne the nonconformity measure as αi = yi − ˆyi, i.e., a
+itive errors, and deﬁne the prediction interval as (−∞, ˆyj + αs( δ
+guarantee that the true value yj ≤ ˆyj + αs( δ
+2 ) with probability 1 − δ
+errors, i.e., αi = ˆyi − yi, output the prediction interval (ˆyj − αs( δ
+guarantee that yj ≥ ˆyj − αs( δ
+From this point, we are able to do one of two things: we can output either
+(−∞, ˆYhigh) or ( ˆYlow, +∞) as the prediction with conﬁdence 1 − δ
+2 ; or, we can
+combine the two one-tailed predictions, and guarantee the boundaries at 1 − δ
+2 ,
+and the interval at 1 − δ.
+
+nonconformity function that returns larger nonconformity scores with larger pos-
+2 )). In this case, we
+2 . Conversely,
+we can deﬁne the nonconformity score such that it increases with larger negative
+2 ), +∞), and
+
+2 ) with probability 1 − δ
+2 .
+
+3.2 Signed Error CPR
+
+To approximate the (potentially skewed) error distribution of the underlying
+model, we propose a nonconformity measure based on the signed error of the
+model; i.e., we deﬁne the nonconformity score as
+
+αi = yi − ˆyi .
+
+(5)
+
+Just as in AECPR, we sort α in a descending order — note though, that while
+the sorted α in AECPR contains the absolute errors from largest to smallest, the
+sorted α in SECPR ranges from maximum positive error to maximum negative
+error. The prediction interval for a novel instance xj is then formulated as
+
+ˆY δ
+j = (ˆyj + αlow( δ
+
+2 ), ˆyj + αhigh( δ
+
+2 )),
+
+(6)
+
+(cid:4)
+
+(cid:5)
+δ
+2 (q + 1)
+
+(cid:4)
+
+(1 − δ
+
+(cid:5)
+2 )(q + 1)
+
+2 ) =
+
+where high( δ
++1. In eﬀect, SECPR
+performs two simultaneous conformal predictions — one for each boundary of
+the interval. The boundaries are predicted with conﬁdence 1 − δ
+2 and, when
+combined, form a prediction interval with conﬁdence 1 − δ.
+
+and low( δ
+
+2 ) =
+
+3.3 Evaluation
+
+The two methods (AECPR and SECPR) were evaluated on 33 publicly available
+data sets from the UCI [15] and Delve [16] repositories. Before experimentation
+all output values were scaled to [0, 1], only to enhance interpretability in eﬃ-
+ciency comparisons — with the outputs scaled to [0, 1], the size of a prediction
+
+Signed-Error Conformal Regression
+
+231
+
+interval expresses the fraction of possible outputs covered by the interval. For
+each data set, 100 random sub-sampling tests were performed; in each iteration,
+a randomized subsample (20%) of the data set was used as the test set, and re-
+maining instances were used for training and calibration. The calibration set size
+× 0.1 + 199.
+was deﬁned as a function of the training set size: |Z
++ 1 hidden nodes
+were used as underlying models for the conformal predictors, where k is the
+number of input features of each data set. In each iteration, both AECPR
+and SECPR predictions were calculated from the same model and calibration
+instances.
+
+Standard multilayer perceptron neural networks with
+
+(cid:3)(cid:3)| = 100
+(cid:8)√
+k
+
+(cid:7)
+
+(cid:6)
+(cid:9)
+
+|Z|
+100
+
+4 Results
+Given any δ ∈ (0, 1), an ICR should produce valid prediction intervals — in
+reality however, predictions with low conﬁdence are rarely of interest. Thus, we
+choose to show the empirical validity and evaluate the eﬃciency of AECPR and
+SECPR at three commonly used conﬁdence levels: 99%, 95% and 90%.
+
+4.1 Validity of Intervals
+
+As illustrated in Table 1, both methods produce prediction intervals that cover
+the true targets of the test set at or very close to the predeﬁned signiﬁcance
+levels; thus, in terms of interval coverage both methods are, as expected, valid.
+
+Table 1. Mean coverage (portion of predictions that coincide with the true output of
+the test instances) for AECPR and SECPR at δ ∈ {0.01, 0.05, 0.10} on the 33 sets
+
+99%
+
+95%
+
+90%
+
+99%
+
+95%
+
+90%
+
+Abs Sign Abs Sign Abs Sign
+.990 .990 .950 .949 .902 .902
+abalone
+1.00 1.00 .943 .997 .920 .944
+anacalt
+bank8fh
+.989 .989 .950 .949 .900 .901
+bank8fm .990 .991 .950 .951 .902 .903
+bank8nh .989 .990 .951 .949 .901 .901
+bank8nm .990 .991 .950 .951 .900 .901
+.996 .992 .948 .958 .897 .897
+boston
+.992 .993 .952 .962 .904 .923
+comp
+.989 .993 .947 .954 .898 .904
+concrete
+.990 .990 .949 .949 .898 .903
+cooling
+deltaA
+.991 .991 .950 .951 .901 .902
+.990 .991 .951 .951 .901 .902
+deltaE
+.990 .994 .948 .951 .902 .906
+friedm
+.990 .991 .948 .950 .895 .897
+heating
+.991 .991 .952 .955 .903 .903
+istanbul
+.990 .990 .952 .951 .902 .902
+kin8fh
+kin8fm
+.990 .990 .951 .951 .901 .903
+
+Abs Sign Abs Sign Abs Sign
+.990 .990 .950 .950 .901 .902
+kin8nh
+.990 .990 .950 .950 .900 .901
+kin8nm
+.990 .991 .949 .948 .898 .901
+laser
+.991 .994 .951 .954 .905 .911
+mg
+.990 .994 .950 .952 .906 .907
+mortage
+.999 1.00 .997 .997 .994 .993
+plastic
+puma8fh
+.990 .990 .949 .950 .900 .902
+puma8fm .990 .990 .950 .950 .901 .902
+puma8nh .990 .990 .951 .951 .902 .903
+puma8nm .990 .990 .950 .950 .901 .902
+quakes
+.992 .995 .955 .970 .908 .934
+.990 .990 .948 .948 .899 .896
+stock
+.991 .993 .952 .952 .903 .910
+treasury
+.991 .994 .956 .957 .910 .913
+wineR
+.993 .993 .954 .963 .911 .913
+wineW
+.991 .994 .949 .954 .904 .908
+wizmir
+mean
+.991 .992 .952 .955 .905 .909
+.989 .989 .943 .948 .895 .896
+min
+
+232
+
+H. Linusson, U. Johansson, and T. L¨ofstr¨om
+
+4.2 Validity of Boundaries
+
+Here, we take a closer look at the coverage of the lower and upper boundaries of
+the intervals produced by AECPR and SECPR. Speciﬁcally, we expect AECPR
+and SECPR to have a clear diﬀerence in coverage of their one-tailed predictions
+( ˆYlow, +∞) and (−∞, ˆYhigh). We expect SECPR’s boundaries to be valid at
+1 − δ
+
+2 , and AECPR boundary coverage to vary between 1 − δ
+
+2 and 1 − δ.
+
+Table 2. Mean low/high coverage for AECPR and SECPR at δ ∈ {0.01, 0.05, 0.10}
+
+99%
+
+95%
+
+90%
+
+Abs
+
+Sign
+
+Abs
+
+Sign
+
+Abs
+
+Sign
+
+low high low high low high low high low high low high
+.999 .991 .995 .995 .989 .961 .974 .976 .968 .934 .949 .953
+abalone
+1.00 1.00 1.00 1.00 .943 1.00 .997 1.00 .920 1.00 .944 1.00
+anacalt
+.999 .990 .995 .995 .986 .964 .975 .974 .967 .933 .950 .951
+bank8fh
+bank8fm .997 .993 .995 .995 .981 .970 .975 .976 .958 .944 .952 .951
+1.00 .990 .995 .995 .995 .956 .974 .975 .981 .920 .950 .951
+bank8nh
+bank8nm .998 .992 .995 .995 .983 .967 .976 .974 .959 .941 .951 .950
+.999 .997 .994 .998 .993 .955 .975 .983 .967 .930 .950 .947
+boston
+.995 .997 .997 .996 .960 .992 .979 .983 .919 .985 .953 .970
+comp
+1.00 .989 .997 .996 .994 .953 .977 .976 .972 .927 .954 .950
+concrete
+1.00 .990 .996 .994 .997 .952 .976 .973 .984 .914 .954 .949
+cooling
+.995 .996 .996 .996 .971 .978 .976 .975 .946 .956 .952 .949
+deltaA
+.994 .996 .996 .995 .975 .976 .976 .976 .953 .949 .951 .951
+deltaE
+.995 .995 .996 .997 .978 .970 .974 .976 .956 .946 .951 .955
+friedm
+1.00 .990 .996 .995 .998 .951 .976 .974 .982 .913 .949 .947
+heating
+.995 .996 .996 .994 .976 .976 .977 .978 .947 .955 .952 .951
+istanbul
+.993 .997 .995 .995 .972 .980 .976 .975 .948 .954 .952 .951
+kin8fh
+.994 .996 .995 .995 .971 .979 .975 .976 .946 .955 .951 .952
+kin8fm
+.995 .995 .995 .994 .972 .979 .975 .975 .946 .954 .950 .951
+kin8nh
+.996 .994 .995 .995 .974 .975 .975 .975 .949 .952 .951 .950
+kin8nm
+.995 .995 .994 .997 .973 .976 .973 .975 .947 .952 .950 .950
+laser
+.996 .995 .996 .998 .978 .972 .977 .977 .952 .953 .955 .956
+mg
+1.00 .990 .998 .997 .998 .952 .976 .976 .995 .911 .955 .953
+mortage
+1.00 .999 1.00 1.00 1.00 .997 .998 .998 .998 .995 .996 .997
+plastic
+.995 .995 .995 .995 .972 .977 .974 .975 .946 .955 .950 .951
+puma8fh
+puma8fm .994 .996 .995 .995 .973 .977 .975 .975 .950 .951 .952 .950
+puma8nh .993 .997 .995 .995 .972 .980 .976 .975 .947 .955 .951 .952
+puma8nm .994 .995 .995 .995 .974 .976 .976 .975 .949 .952 .952 .950
+1.00 .992 .998 .997 1.00 .956 .991 .980 .998 .910 .979 .955
+quakes
+.996 .994 .995 .994 .978 .970 .974 .974 .957 .942 .948 .948
+stock
+1.00 .991 .996 .997 .999 .953 .973 .978 .993 .911 .956 .954
+treasury
+.994 .997 .997 .997 .976 .980 .977 .980 .952 .958 .955 .959
+wineR
+.996 .996 .996 .997 .984 .970 .978 .985 .961 .949 .955 .957
+wineW
+.994 .997 .997 .997 .974 .976 .976 .978 .954 .950 .954 .954
+wizmir
+mean
+.997 .994 .996 .996 .981 .971 .977 .978 .960 .946 .954 .955
+min
+
+.910
+
+.943
+
+.989
+
+.994
+
+.973
+
+.944
+
+Table 2 reveals that AECPR’s interval boundaries show only a small deviance
+from 1 − δ
+2 -validity on average (across all data sets). However, more often than
+not, one of the boundaries is overly optimistic and the other overly pessimistic to
+compensate, and the reason the two interval boundaries appear valid on average
+is the simple fact that they are alternatingly optimistic and pessimistic. We also
+note that, in the worst cases (e.g. the treasury data set), one of the boundaries
+is valid only at 1 − δ. In contrast, SECPR interval boundaries show coverage at
+or very near 1 − δ
+
+2 -validity in both the average and worst cases.
+
+Signed-Error Conformal Regression
+
+233
+
+To further illustrate, we let the Dδ
+
+p be the average coverage of the boundary
+(low or high) that has the highest average coverage for data set D (the most
+pessimistic boundary), and we let Dδ
+o be the average coverage of the boundary
+with the lowest average coverage for D (the most optimistic boundary). E.g.,
+for abalone, AECPR has D99
+o =
+0.995 and D99
+p for
+each δ, and for both AECPR and SECPR (Table 3).
+
+p = 0.999; and SECPR has D99
+o and ¯Dδ
+
+p = 0.995. We then calculate the mean coverage ¯Dδ
+
+o = 0.991 and D99
+
+Table 3. Mean optimistic and pessimistic boundary coverage of AECPR and SECPR
+
+¯D99
+o
+
+¯D90
+p
+AECPR .994 .997 .967 .985 .939 .966
+SECPR .996 .996 .977 .979 .952 .957
+
+¯D99
+p
+
+¯D95
+o
+
+¯D95
+p
+
+¯D90
+o
+
+In Table 3 we can clearly see that, as we argued in the Method, AECPR
+intervals show a tendency towards having an overly pessimistic boundary and
+an overly optimistic boundary, in such a way that the error probability δ above
+and below the interval is unevenly distributed. Furthermore, we are not given any
+information regarding the distribution of δ, and thus as noted in the Method and
+supported by the empirical evidence, AECPR can only guarantee the validity of
+its interval boundaries at 1 − δ.
+
+SECPR intervals can guarantee the interval boundaries at 1− δ
+
+2 ; so, this state-
+ment is supported by the empirical evidence. We also note that SECPR tends to
+produce balanced intervals — i.e., intervals where δ is evenly distributed above
+and below the prediction intervals. More importantly, even in the cases where
+the intervals are not perfectly balanced, we have already deﬁned the boundaries
+to be valid at 1 − δ
+2 .
+
+4.3 Eﬃciency
+
+We can choose to compare the interval sizes of AECPR and SECPR (Table 4)
+based on two diﬀerent criteria: either we compare intervals that share the same
+guarantee of validity for the full interval; or, we compare intervals that share
+the same guarantee of validity for the individual boundaries. That is, we either
+compare the 99% SECPR intervals to the 99% AECPR intervals, and so on,
+and remember that SECPR provides a stronger guarantee of validity for the
+boundaries than does AECPR; or, we compare the 90% SECPR intervals to the
+95% AECPR intervals, and so on, and remember that the two methods in this
+case provide the same guarantee for the one-tailed prediction boundaries.
+
+First, we consider predictions that share the same guarantee of validity for the
+full interval. Here, we note that on average SECPR produces tighter intervals
+than AECPR at the 99% conﬁdence level, due to SECPR taking into account the
+sign of the underlying model’s error. If the underlying model commits large errors
+in only one direction, only one of the interval boundaries predicted by SECPR
+is aﬀected, while both boundaries are aﬀected in AECPR. Thus, for data sets
+where the underlying model commits outlier errors — atypical errors that are of
+
+234
+
+H. Linusson, U. Johansson, and T. L¨ofstr¨om
+
+Table 4. Mean-median interval sizes for AECPR and SECPR at δ ∈ {0.01, 0.05, 0.10}
+
+99%
+
+95%
+
+90%
+
+99%
+
+95%
+
+90%
+
+Abs Sign Abs Sign Abs Sign
+.528 .486 .324 .322 .238 .248
+abalone
+1.77 1.00 1.18 .985 .728 .707
+anacalt
+bank8fh
+.543 .540 .379 .371 .295 .297
+bank8fm .266 .255 .191 .186 .152 .153
+bank8nh .793 .720 .452 .440 .327 .338
+bank8nm .390 .374 .224 .221 .158 .162
+1.11 .969 .712 .707 .488 .554
+boston
+comp
+.790 .685 .419 .405 .286 .303
+1.00 .933 .753 .780 .646 .673
+concrete
+1.07 .910 .787 .779 .655 .665
+cooling
+.269 .283 .162 .164 .126 .127
+deltaA
+.317 .333 .214 .215 .175 .175
+deltaE
+.289 .317 .210 .213 .175 .179
+friedm
+1.04 .952 .904 .840 .776 .752
+heating
+istanbul
+.503 .542 .338 .344 .274 .274
+.387 .383 .286 .287 .238 .239
+kin8fh
+kin8fm
+.163 .162 .119 .120 .099 .100
+
+Abs Sign Abs Sign Abs Sign
+.628 .631 .482 .482 .405 .407
+kin8nh
+.549 .551 .395 .396 .321 .323
+kin8nm
+.625 .605 .291 .281 .208 .215
+laser
+.787 .837 .513 .529 .401 .411
+mg
+1.15 .915 .895 .791 .663 .721
+mortage
+.993 .976 .983 .973 .975 .968
+plastic
+puma8fh
+.765 .768 .570 .571 .470 .472
+puma8fm .359 .361 .266 .266 .223 .224
+puma8nh .762 .756 .552 .554 .448 .451
+puma8nm .369 .365 .253 .255 .205 .207
+1.08 .871 .709 .639 .492 .527
+quakes
+.748 .733 .597 .604 .530 .530
+stock
+1.13 .889 .807 .763 .556 .649
+treasury
+.841 1.10 .556 .567 .448 .449
+wineR
+wineW
+.741 .756 .546 .552 .403 .394
+.507 .558 .418 .424 .383 .384
+wizmir
+.705 .652 .500 .486 .393 .402
+mean
+std dev
+.349 .260 .266 .242 .212 .216
+
+a much larger magnitude than typical errors — in only one direction, SECPR will
+produce tighter intervals than AECPR. It must be noted that while this applies
+to all signiﬁcance levels, most of the outlier errors will, for lower signﬁcance
+levels, be excluded from the prediction intervals anyway. Consuequently, at the
+95% conﬁdence level we observe a similar pattern, but the eﬀect is much less
+pronounced. At 90%, the eﬀect is all but gone, and SECPR is instead slightly less
+eﬀective than AECPR on almost all data sets. A Wilcoxon signed-ranks test at
+α = 0.05 shows that, in terms of eﬃciency, SECPR is signiﬁcantly better than
+AECPR for 99%-conﬁdence predictions, while AECPR is signiﬁcantly better
+than SECPR for 90%-conﬁdence predictions. Thus, at 90% conﬁdence or lower,
+we can expect that the strengthened guarantee of validity provided by SECPR
+is accompanied with a small but signiﬁcant decrease in eﬃciency.
+
+Second, we consider one-tailed predictions, speciﬁcally at the 95%-conﬁdence
+level (i.e., AECPR at 95%, SECPR at 90%); here, we can clearly see that SECPR
+produces tighter intervals than AECPR for all data sets. Hence, simply by ensur-
+ing that the boundaries are aﬀected only by the relevant errors of the underlying
+model, we can signiﬁcantly increase the eﬃciency of one-tailed predictions.
+
+5 Conclusions
+
+In this paper, we have shown that conformal regressors based on the absolute
+error of the underlying model produce unbalanced prediction intervals — inter-
+vals with no guarantee for the distribution of error above and below the intervals
+— and that this unbalance leads to prediction intervals with weak guarantees
+of validity for the individual interval boundaries. To address this issue, we have
+proposed a straightforward approach for producing prediction intervals based on
+
+Signed-Error Conformal Regression
+
+235
+
+the signed error of the underlying model (SECPR) that can provide a stronger
+guarantee of validity for the interval boundaries. Also, we have shown that
+SECPR is less sensitive to outlier errors than AECPR, resulting in more eﬃ-
+cient prediction intervals at the highest conﬁdence levels. Finally, we show that,
+when expected to provide the same guarantees of boundary validity as AECPR,
+SECPR produces much more eﬃcient prediction intervals than corresponding
+AECPR models.
+
+References
+
+1. Vovk, V., Gammerman, A., Shafer, G.: Algorithmic learning in a random world.
+
+Springer Verlag, DE (2006)
+
+2. Gammerman, A., Vovk, V., Vapnik, V.: Learning by transduction. In: Proceedings
+of the Fourteenth Conference on Uncertainty in Artiﬁcial Intelligence, pp. 148–155.
+Morgan Kaufmann Publishers Inc. (1998)
+
+3. Saunders, C., Gammerman, A., Vovk, V.: Transduction with conﬁdence and credi-
+bility. In: Proceedings of the Sixteenth International Joint Conference on Artiﬁcial
+Intelligence (IJCAI 1999), vol. 2, pp. 722–726 (1999)
+
+4. Shafer, G., Vovk, V.: A tutorial on conformal prediction. The Journal of Machine
+
+Learning Research 9, 371–421 (2008)
+
+5. Papadopoulos, H., Proedrou, K., Vovk, V., Gammerman, A.: Inductive conﬁdence
+machines for regression. In: Elomaa, T., Mannila, H., Toivonen, H. (eds.) ECML
+2002. LNCS (LNAI), vol. 2430, pp. 345–356. Springer, Heidelberg (2002)
+
+6. Papadopoulos, H., Vovk, V., Gammerman, A.: Regression conformal prediction
+with nearest neighbours. Journal of Artiﬁcial Intelligence Research 40(1), 815–840
+(2011)
+
+7. Papadopoulos, H.: Inductive conformal prediction: Theory and application to neu-
+
+ral networks. Tools in Artiﬁcial Intelligence 18, 315–330, 2 (2008)
+
+8. Papadopoulos, H., Haralambous, H.: Reliable prediction intervals with regression
+
+neural networks. Neural Networks 24(8), 842–851 (2011)
+
+9. Lambrou, A., Papadopoulos, H., Gammerman, A.: Reliable conﬁdence measures for
+medical diagnosis with evolutionary algorithms. IEEE Transactions on Information
+Technology in Biomedicine 15(1), 93–99 (2011)
+
+10. Papadopoulos, H.: Inductive conformal prediction: Theory and application to neu-
+
+ral networks. Tools in Artiﬁcial Intelligence 18, 315–330 (2008)
+
+11. Papadopoulos, H., Papatheocharous, E., Andreou, A.S.: Reliable conﬁdence intervals
+
+for software eﬀort estimation. In: AIAI Workshops, pp. 211–220. Citeseer (2009)
+
+12. Devetyarov, D., Nouretdinov, I., Burford, B., Camuzeaux, S., Gentry-Maharaj,
+A., Tiss, A., Smith, C., Luo, Z., Chervonenkis, A., Hallett, R., et al.: Conformal
+predictors in early diagnostics of ovarian and breast cancers. Progress in Artiﬁcial
+Intelligence 1(3), 245–257 (2012)
+
+13. Papadopoulos, H., Gammerman, A., Vovk, V.: Reliable diagnosis of acute abdominal
+
+pain with conformal prediction. Engineering Intelligent Systems 17(2), 127 (2009)
+
+236
+
+H. Linusson, U. Johansson, and T. L¨ofstr¨om
+
+14. Lambrou, A., Papadopoulos, H., Kyriacou, E., Pattichis, C.S., Pattichis, M.S.,
+Gammerman, A., Nicolaides, A.: Assessment of stroke risk based on morpholog-
+ical ultrasound image analysis with conformal prediction. In: Papadopoulos, H.,
+Andreou, A.S., Bramer, M. (eds.) AIAI 2010. IFIP AICT, vol. 339, pp. 146–153.
+Springer, Heidelberg (2010)
+
+15. Bache, K., Lichman, M.: UCI machine learning repository (2013),
+
+http://archive.ics.uci.edu/ml
+
+16. Rasmussen, C.E., Neal, R.M., Hinton, G., van Camp, D., Revow, M., Ghahra-
+mani, Z., Kustra, R., Tibshirani, R.: Delve data for evaluating learning in valid
+experiments (1996), http://www.cs.toronto.edu/~delve
+
+

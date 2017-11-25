@@ -1,0 +1,2547 @@
+Co-embedding of Structurally Missing Data by Locally
+
+Linear Alignment
+
+Takehisa Yairi
+
+Research Center for Advanced Science and Technology, University of Tokyo
+
+yairi@space.rcast.u-tokyo.ac.jp
+
+Abstract. This paper proposes a “co-embedding” method to embed the row and
+column vectors of an observation matrix data whose large portion is structurally
+missing into low-dimensional latent spaces simultaneously. A remarkable charac-
+teristic of this method is that the co-embedding is efﬁciently obtained via eigende-
+composition of a matrix, unlike the conventional methods which require iterative
+estimation of missing values and suffer from local optima. Besides, we extend
+the unsupervised co-embedding method to a semi-supervised version, which is
+reduced to a system of linear equations. In an experimental study, we apply the
+proposed method to two kinds of tasks – (1) Structure from Motion (SFM) and
+(2) Simultaneous Localization and Mapping (SLAM).
+
+1 Introduction
+
+Recently, the dimensionality reduction and matrix factorization techniques have been
+regarded as a signiﬁcant machine learning tool for feature extraction and data compres-
+sion, as both the size and dimensionality of data in most application are continuing to
+increase rapidly.
+
+A non-trivial issue in applying these techniques to actual problems is how to deal
+with missing data elements, as the real-world data, e.g., medical testing data, food pref-
+erence questionnaire data, purchase records, etc. usually contains missing parts. If the
+missing portion is relatively small, ad hoc treatment such as ﬁlling the missing ele-
+ments with constant values and inferring them from similar data is acceptable. A more
+sophisticated approach commonly used is to alternately estimate the missing values and
+conduct dimensionality reduction or matrix factorization until convergence. The method
+is known as EM (expectation maximization) algorithm in machine learning. However,
+if the missing portion is very large and has some structural pattern, these conventional
+approaches are expected to fail.
+
+Consider the following situation for an example. An observer is wandering around
+the town, carrying a wireless device (such as tablet PC). The device is assumed to be ca-
+pable of recording approximate relative directions to all detected wireless access points
+(APs). If the device could always communicate with all APs in the town wherever it is,
+the observation data could be represented as a complete matrix, whose (i, j)-th element
+is the relative direction to the j-th AP from the i-th observation position. Unfortunately,
+however, most of the elements are missing, because the wireless communication range
+is limited and affected by occlusion. Besides, the pattern of missing data is not ran-
+dom but structured, as whether a measurement is present or absent is dependent on the
+
+P.-N. Tan et al. (Eds.): PAKDD 2012, Part II, LNAI 7302, pp. 419–430, 2012.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2012
+
+420
+
+T. Yairi
+
+spatial relationship between the observer and AP. The conventional approaches are not
+suitable for this kind of missing data.
+
+In this paper, we propose the locally linear alignment co-embedding (LLACoE) that
+embeds both row and column vectors of a matrix-form observation data with largely
+and structurally missing elements into low-dimensional latent spaces respectively. A
+key idea is that a measurement yi,j can be approximated by some linear projection of
+the state vector of j-th object zj onto the subspace determined by the observer’s state
+xi. A remarkable feature of LLACoE is that it does not require iterative computation to
+estimate the missing values, but is efﬁciently solved by eigendecomposition or a system
+of linear equations.
+
+2 Related Works
+
+Dimensionality reduction is a major topic of machine learning, as well as classiﬁcation,
+regression and clustering. Especially, in the last decade, non-linear dimensionality re-
+duction (a.k.a. manifold learning) methods such as Isomap[7] and LLE[3] have been
+developed and become popular. In addition, matrix factorization or low-rank matrix ap-
+proximation techniques such as singular value decomposition (SVD) and non-negative
+factorization (NMF) have been widely used in a variety of datamining applications.
+
+A practical difﬁculty is that the real-world data is not only huge and high-dimensional,
+but also often incomplete due to various reasons. The simplest way of dealing with such
+incomplete data is to ﬁll the missing parts with some proper constant values, typically
+by zero. This approach will be reasonable enough, when the values are “missing” be-
+cause they are out of measurement ranges. However, the applicability of this method is
+obviously limited, because not all measurement data have such a property. Besides, it is
+sometimes nontrivial to ﬁnd a proper constant value, even when it is applicable.
+
+A more sophisticated and popular approach is to estimate the missing values and
+conduct dimensionality reduction or matrix factorization alternately until it converges.
+In computer vision (CV), PCAMD (PCA with missing data) methods[5] such as alter-
+nate least squares (ALS) and Wiberg’s algorithm[1] have been utilized for the structure
+from motion (SFM), in which a 3-dimensional surface model of target object is esti-
+mated from a sequence of 2-dimensional images. In machine learning (ML), this kind
+of iterative algorithm is generally formalized as the EM algorithm. In fact, it was shown
+that PPCA (probabilistic PCA) with EM algorithm can deal with incomplete data[4].
+Also in NMF, some iterative algorithms that alternately estimating missing values and
+factorizing a matrix into two low-rank ones have been recently developed[6]. While this
+iterative estimation approach works ﬁne if the missing part is relatively small, the con-
+vergence property and solution quality become drastically worse as the missing portion
+becomes larger. Besides, even if the missing data has some pattern or structure which
+contains information of latent low-dimensional spaces, it does not have any mechanism
+to utilize the information. In summary, these conventional approaches implicitly assume
+small and randomly generated missing elements.
+
+In contrast, our method utilizes only existing elements of the matrix data, which
+means it is not necessary to ﬁll the absent elements with constants, nor to estimate them
+alternately. In addition, it takes advantage of the pattern of missing data, based on the
+
+Co-embedding of Structurally Missing Data by Locally Linear Alignment
+
+421
+
+idea that existing (i.e. not missing) elements are roughly linear to their corresponding
+latent vectors.
+
+3 Problem Deﬁnition
+In this paper, we deal with a M × N data matrix Y = [yi,j]i=1,...,M,j=1,...,N . It should
+be noted that (i, j)-th element yi,j is a D-dimensional vector in general.1 As Y contains
+missing elements, we introduce a set of Boolean indicator variables {qi,j} to specify
+whether each element is existing or missing. That is to say,
+
+(cid:2)
+
+qi,j =
+
+0
+1
+
+(if(i, j)-th element yi,j is missing)
+(otherwise)
+
+(1)
+
+Now we pursue two goals at the same time:
+1. Obtain a set of n-dimensional row latent vectors X = [x1, . . . , xM ](cid:2)
+2. Obtain a set of m-dimensional column latent vectors Z = [z1, . . . , zN ](cid:2)
+
+the dimension of Y ’s row vectors.
+
+ing the dimension of Y ’s column vectors.
+
+by reducing
+
+by reduc-
+
+where, n << N · D and m << M · D. It should be noted that our purpose is not to
+approximate or reconstruct Y by the product of X and Z(cid:2)
+, but to embed the row and
+column vectors of Y to low dimensional latent spaces respectively. It can be called as
+simultaneous dimensionality reduction or co-embedding.
+We can give another view to this problem. First, assume that a measurement yi,j is
+generated by an unknown function of an observer’s latent state xi ∈ Rn and an item’s
+latent state zj ∈ Rm, i.e.,
+
+yi,j = g(xi, zj) + ei,j
+
+(2)
+where ei,j is the noise. Our goal is to estimate sets of {xi} (i = 1, . . . , M ) and {zj}
+(j = 1, . . . , N ), when a partial set of {yi,j} is given. Note that function g itself is not
+necessarily estimated.
+
+Now we make an assumption that the presence of an observation yi,j has a locality
+as to zj. Roughly speaking, this assumption states “if there exists i such that qi,j =
+qi,j(cid:2) = 1, then zj and zj(cid:2) are close to each other”.
+
+While this assumption seems to be very restrictive, there are many problems which
+hold this property in fact. For example, in the case of mobile wireless device and access
+points mentioned in section 1, this assumption is expected to be valid because the device
+at a position xi can communicate only with APs in its neighborhood. It is also the case
+with SLAM (simultaneous localization and mapping) problem[8] in mobile robotics,
+where xi is the robot’s pose and zj is the j-th landmark’s position. Another example is
+the SFM (structure from motion) problem in computer vision, where xi is the relative
+spatial relationship between the camera and target object, zj is the j-th visual feature’s
+1 Although Y should be regarded as a M × N × D tensor in this sense, we treat it as a matrix
+whose element is a vector because it makes us understand the subsequent discussion more
+easily.
+
+422
+
+T. Yairi
+
+3D coordinates in the body frame, and yi,j is its 2D coordinates on the camera screen.
+Obviously, if j-th and j
+-th features are observed at the same time, they are expected to
+close to each other.
+
+(cid:3)
+
+The assumption may be valid even in collaborative ﬁltering. If we consider the Net-
+ﬂix rating data set, xi is the preference of the i-th user, and zj is the j-th movie. If a
+user watched two movies, they are likely to be in the same genre.
+
+4 Locally Linear Alignment Co-embedding
+
+In this section, we introduce the proposed method named LLACoE (locally linear align-
+ment co-embedding).
+
+4.1 Basic Idea
+
+We consider the above assumption “if there exists i such that qi,j = qi,j(cid:2) = 1, then zj
+and zj(cid:2) are close to each other” holds. Then, if qi,j = 1 or yi,j is not missing, a linear
+approximation below is possible in its neighborhood, i.e.,
+
+yi,j = g(xi, zj) + ei,j ≈ G(xi)[z(cid:2)
+
+j , 1](cid:2) = G(xi) ˜zj
+
+(3)
+
+where G(xi) stands for a projection matrix determined by xi, and ˜zj is a homogeneous
+coordinates of zj.
+
+Assume that xi implies observer’s latent state at time i, while zj implies j-th object’s
+state or position. Then the above approximation states that when observer’s state is xi,
+its observation data is formed by linear projections of all observable objects j ∈ Vi into
+the observation subspace G(xi) determined by xi. In other words, each observation
+data at a time can be regarded as linear projections of a piece (fragment) of the whole
+world’s state into a low-dimensional perception space.
+Now, our ﬁrst goal is to reconstruct the latent states of all objects, i.e., {zj} by
+aligning the pieces of observation data. Intuitively, it is similar to jigsaw puzzles or
+reconstruction of fragmentary fossils. Since the alignment operation of each piece re-
+ﬂects the observer’s state, xi is also expected to be reconstructed. In the remaining of
+this section, we will explain how to realize this rough idea.
+
+4.2 Unsupervised Locally Linear Alignment Co-embedding
+First we consider reconstructing the column latent vectors {zj}. The assumption in the
+previous section means that zj is approximately linear (more strictly, afﬁne) to yi,j if
+qi,j = 1. We use this local linearity property in a reverse way. That is to say, we think
+of approximating zj by an afﬁne transformation of yi,j when qi,j = 1:
+
+ˆzi,j ≡ Ti[y(cid:2)
+
+i,j , 1](cid:2) = Ti ˜yi,j
+
+(4)
+
+where Ti is an alignment transformation matrix common for yi,j (j = 1, . . . , N ) as
+long as qi,j = 1. ˜yi,j is the homogeneous coordinates of yi,j. It would be reasonable to
+decide the ﬁnal estimate of zj by averaging all the temporary estimates as:
+
+Co-embedding of Structurally Missing Data by Locally Linear Alignment
+
+423
+
+(cid:3)M
+(cid:3)M
+
+i=1 qi,j ˆzi,j
+
+i=1 qi,j
+
+ˆzj =
+
+M(cid:4)
+
+i=1
+
+=
+
+˜qi,j ˆzi,j
+
+(5)
+
+(cid:3)M
+
+i=1 qi,j is the normalized observability indicator.
+
+where, ˜qi,j = qi,j/
+Now our main concern is how we can obtain the optimal set of alignment matri-
+ces {Ti} (i = 1, . . . , M ). A reasonable way is to choose them so that { ˆzi,j} (i =
+1, . . . , M )– the estimates of zj for all i coincide with each other. This idea can be
+realized by minimizing the following cost function Φaln with respect to {Ti}:
+
+Φaln =
+
+1
+2
+
+N(cid:4)
+
+j=1
+
+(cid:4)
+i(cid:4)=i(cid:2)
+
+˜qi,j ˜qi(cid:2),j(cid:5) ˆzi,j − ˆzi(cid:2),j(cid:5)2
+
+(6)
+
+Although we omit the detailed derivation here, by introducing some auxiliary matri-
+(cid:3)N
+ces and vectors such as vj = [˜q1,j ˜y(cid:2)
+1 , . . . , v(cid:2)
+, Di =
+j=1 ˜qi,j ˜yi,j ˜y(cid:2)
+, Eq.(6) can be re-
+
+M,j], V = [v(cid:2)
+i,j, D = diag(D1, . . . , DM ), T = [T1, . . . , TM ](cid:2)
+
+1,j, . . . , ˜qM,j ˜y(cid:2)
+
+N ](cid:2)
+
+written as:
+
+Φaln(T ) = T r(T (cid:2)(D − V (cid:2)V )T )
+
+(7)
+Note that this is a trace of a matrix quadratic form of T , and that Z = [z1, . . . , zN ](cid:2)
+can be obtained as Z = V T .
+
+As the minimization of Φaln has a trivial solution T = 0 if there are no constraints,
+
+we impose a constraint :
+
+Z(cid:2)Z = T (cid:2)(V (cid:2)V )T = I
+
+(8)
+
+The solution of this constrained minimization is obtained as Topt = [u2, . . . , um+1]
+where u2, um+1 are the second smallest and (m + 1)-smallest eigenvectors of the
+generalized eigenvalue problem:
+
+(D − V (cid:2)V )u = λ(V (cid:2)V )u
+
+(9)
+
+Then we obtain ˆZ = V Topt.
+
+Next we consider reconstructing the row latent vectors X = [x1, . . . , xM ](cid:2)
+
+. As
+each alignment transformation matrix Ti obtained in the previous step is supposed to
+characterize the corresponding row latent vector, estimates of {xi} are obtained by
+reducing the dimension of vec(Ti) to n, where vec(Ti) is a column vector obtained
+by reshaping the elements of matrix Ti. Note that {vec(Ti)} contain no missing ele-
+ments, unlike the original observation matrix Y . We employed the simple SVD for the
+dimensionality reduction this time, while other advanced non-linear methods are also
+applicable.
+The above cost function and the solution of column latent vectors {zj} originate
+from Verbeek and Roweis’s method for non-linear PCA and CCA[9]. However, they
+did not deal with the missing elements nor simultaneous dimensionality reduction of
+column and row vectors. Therefore, our method is different from theirs.
+
+424
+
+T. Yairi
+
+4.3 Regularization
+
+In actual applications, we can often improve the estimation results by introducing task-
+speciﬁc regularization terms into the original cost function. Especially, when the row
+latent vector xi corresponds to the observer’s state at time i, each pair of xi and xi+1
+and corresponding pair of alignment matrices Ti and Ti+1 are expected to be close to
+each other. This soft constraint can be realized by introducing a regularization term for
+smoothing successive rows of X expressed as,
+
+Φsmo = T r(T (cid:2)(S(cid:2)S)T )
+
+(10)
+
+where S is a matrix that computes the differences of pairs of successive elements in T .
+We minimize the weighted sum of cost functions Φaln + αsmo · Φsmo instead of Φaln
+under the same constraint.
+
+4.4 Semi-supervised Co-embedding
+
+In some application domains, a semi-supervised problem setting where the partial la-
+bel information about row and column latent vectors are available beforehand is more
+natural. For example, in the case of wireless device and access points story, it is no
+wonder that exact positions of observer are partially available by GPS. LLACoE can be
+extended to a semi-supervised version in a straightforward way.
+
+We denote the labeled data of j-th column latent vector zj as z∗
+
+j . We also deﬁne a
+Boolean variable δj to indicate whether the label information is available or not. That
+is to say,
+
+z∗
+j = zj (if δj = 1),
+
+0 (if δj = 0)
+
+(11)
+
+(12)
+
+Then we deﬁne the cost function for the label information as:
+
+δj(cid:5) ˆzj − z∗
+j (cid:5)2
+
+Φzlb ≡ N(cid:4)
+N ](cid:2)
+
+j=1
+
+By deﬁning Z∗ = [z∗
+as,
+
+1 , . . . , z∗
+Φzlb = T r((V T − Z∗)(cid:2)Jz(V T − Z∗))
+
+and Jz = diag(δ1, . . . , δN ), Eq.12 can be re-written
+
+(13)
+The whole cost function Φsem(T ) = Φaln + αsmo · Φsmo + αzlb · Φzlb can be easily
+minimized by solving a system of linear equations:
+
+Topt = (D + V (cid:2)(αzlbJz − I)V + αsmoS(cid:2)S)−1(αzlbV (cid:2)JzZ∗)
+
+(14)
+Introducing the label information of row latent vectors {x∗
+i } is similar to the above
+discussion, but much simpler. It is a general semi-supervised regression problem, where
+{vec( ˆTi)} are input vectors. While there are many advanced methods for the semi-
+supervised regression, this time we solved it simply by the ridge regression or least-
+squares linear regression with Tiknov regularization.
+
+Co-embedding of Structurally Missing Data by Locally Linear Alignment
+
+425
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+0
+
+−0.2
+
+−0.4
+
+−0.6
+
+−0.8
+
+−1
+−1
+
+ 8
+
+19
+
+20
+
+ 7
+
+17
+
+18
+
+13
+
+ 4
+
+12
+
+ 6
+
+ 3
+
+16
+
+ 9
+
+15
+
+ 5
+
+14
+
+ 2
+
+11
+
+10
+
+ 1
+
+−0.8
+
+−0.6
+
+−0.4
+
+−0.2
+
+0
+
+0.2
+
+0.4
+
+0.6
+
+0.8
+
+1
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+0
+
+−0.2
+
+−0.4
+
+−0.6
+
+−0.8
+
+−1
+−1
+
+ 8
+
+19
+
+ 7
+
+17
+
+ 4
+
+18
+
+13
+
+ 3
+
+ 9
+
+15
+
+ 5
+
+14
+
+11
+
+ 1
+
+−0.8
+
+−0.6
+
+−0.4
+
+−0.2
+
+0
+
+0.2
+
+0.4
+
+0.6
+
+0.8
+
+1
+
+(a) Complete Observation
+
+(b) Incomplete Observation
+
+Fig. 1. Examples of (a) complete and (b) incomplete observation in Exp.1. Numbers indicate
+vertices’s’ IDs
+
+ 6
+
+10
+
+16
+
+20
+
+ 1
+
+ 8
+
+12
+
+ 2
+
+18
+
+14
+
+ 4
+
+11
+
+13
+
+19
+
+ 3
+
+0
+
+−0.1
+
+−0.2
+
+0.25
+
+0.2
+
+0.15
+
+0.1
+
+0.05
+
+0
+
+−0.05
+
+−0.1
+
+−0.15
+
+−0.2
+
+−0.25
+
+0.3
+
+ 5
+
+17
+
+ 9
+
+ 7
+
+15
+
+0.2
+
+0.1
+
+0
+
+−0.1
+
+−0.2
+
+0.5
+
+0.4
+
+0.3
+
+0.2
+
+0.1
+
+0
+
+−0.1
+
+−0.2
+
+−0.3
+
+−0.4
+
+−0.5
+0.6
+
+ 3
+
+13
+
+11
+
+ 8
+
+10
+
+19
+
+ 1
+
+15
+ 7
+
+ 9
+
+17
+ 5
+
+20
+
+16
+
+ 6
+
+0.6
+
+0.4
+
+0.2
+
+0
+
+−0.2
+
+−0.4
+
+−0.4
+
+ 4
+14
+
+18
+
+ 2
+
+12
+
+0
+
+−0.2
+
+0.3
+
+0.2
+
+0.1
+
+0.4
+
+0.2
+
+(a) SVD
+
+(b) (Unsupervised) LLACoE
+
+Fig. 2. Reconstructed 3D model of dodecahedron with complete observation data
+
+0.25
+
+0.2
+
+0.15
+
+0.1
+
+0.05
+
+0
+
+−0.05
+
+−0.1
+
+−0.15
+
+−0.2
+0.4
+
+ 8
+
+20
+
+ 6
+
+19
+
+18
+
+12
+
+17
+
+ 7
+
+ 4
+
+13
+
+16
+
+ 5
+
+ 2
+
+14
+
+15
+
+ 9
+
+10
+
+ 3
+
+11
+
+ 1
+
+0.2
+
+0
+
+−0.2
+
+0
+
+−0.2
+
+−0.4
+
+−0.4
+
+0.4
+
+0.3
+
+0.2
+
+0.1
+
+0
+
+−0.1
+
+−0.2
+
+−0.3
+0.4
+
+ 7
+
+15
+
+17
+
+19
+
+20
+
+ 8
+
+ 9
+
+13
+
+ 3
+
+ 4
+
+16
+
+18
+
+ 5
+
+ 6
+
+ 1
+
+11
+
+10
+
+14
+
+12
+
+ 2
+
+0.4
+
+0.2
+
+0.2
+
+0
+
+−0.2
+
+0.2
+
+0.1
+
+0
+
+−0.1
+
+−0.4
+
+−0.3
+
+−0.2
+
+0.5
+
+0.4
+
+0.3
+
+0.2
+
+0.1
+
+0
+
+−0.1
+
+−0.2
+
+−0.3
+
+−0.4
+
+−0.5
+
+0.5
+
+ 1
+
+11
+
+ 9
+
+ 3
+
+15
+
+0
+
+ 2
+
+10
+
+14
+
+16
+
+ 4
+
+ 5
+
+17
+
+13
+
+ 7
+
+19
+
+−0.5
+
+−0.4
+
+−0.6
+
+12
+
+ 6
+
+18
+
+20
+
+ 8
+
+0.6
+
+0.4
+
+0.2
+
+0
+
+−0.2
+
+(a) ALS (18.9 sec)
+
+(b) Wiberg (16.4 sec)
+
+(c) LLACoE (0.17 sec)
+
+Fig. 3. Reconstructed 3D model of dodecahedron with incomplete observation data with com-
+putational time. All algorithms are implemented in Matlab and conducted by a Dell Precision
+T1500.
+
+426
+
+T. Yairi
+
+5 Experiment
+
+5.1 Experiment 1: Structure from Motion Task
+
+First, we applied the proposed co-embedding method to the structure from motion
+(SFM) task in computer vision domain, and compared it with conventional methods.
+
+Assume that we look at a dodecahedron from a randomly chosen direction, identify
+all visible vertices, then obtain their 2-dimensional coordinates on camera image as
+the observation data [yi,1, . . . , yi,N ], where N = 20 because a dodecahedron has 20
+vertices. We repeat this procedure for M = 100 times, and obtain the observation data
+Y . The goal of this task is to reconstruct a 3-dimensional model of dodecahedron, or
+estimate 3-D coordinates {zj} of 20 vertices in the body frame.
+
+For comparison, we ﬁrst conducted this experiment under the condition that all ver-
+tices are always visible, i.e., Y has no missing elements (Fig.1 (a)). In this case, ordi-
+nary SVD is applicable. In fact, a perfect 3-D model is reconstructed by SVD as Fig.2
+(a). Unsupervised version of the proposed method (LLACoE) also succeeds in recon-
+structing it as Fig.2 (b).
+
+Next we impose the practical condition that observation elements of occluded ver-
+tices are lost (Fig.1 (b)). As a result, approx. 30 % of Y ’s elements are missing. In this
+case, we cannot use the ordinary SVD anymore, because ﬁlling the missing elements
+with some constants is obviously inappropriate. So we applied two PCAMD methods,
+i.e., alternate least squares (ALS) algorithm and Wiberg’s algorithm[1]. The resultant
+models are shown in Fig.3 (a)-(c). Although all three methods reconstructed the model
+successfully, LLACoE is much faster than others because it does not need iterations.
+
+5.2 Experiment 2: Mapping and Localization for Wireless Devices
+
+Next we applied LLCoE to a simultaneous localization and mapping (SLAM) problem
+with wireless devices in a simulated environment.
+
+In this task, we assume that 564 access points (APs) are distributed in a virtual cam-
+pus, and a walking observer with a wireless client device records the relative positions
+of detected APs periodically. Fig.4 illustrates the simulated environment (research cam-
+pus) and the ground truth map of APs. Some APs’ IDs are indicated for later evaluation.
+Fig.5 illustrates the ground truth trajectory of the observer and observation points. Num-
+ber of observation points is 310. In this task, the row latent vector xi (i = 1, . . . , 310)
+is the observer’s state (i.e., position and heading direction), whereas the column latent
+vector zj (j = 1, . . . , 564) is each AP’s position. Observation data yi, j is computed
+from a very noisy bearing and range information. For example, Fig.6 (a) and (b) are
+a ground truth map and a observed relative positions of detected APs at one time. We
+generated the observation data with:
+
+P r(qi,j = 1) =
+
+1
+
+1 + exp(0.15 · (di,j − 50))
+
+(15)
+
+where di,j is the distance between i-th observation point and j-th AP. As a result, the
+ratio of missing elements in Y becomes approx. 97 %. Fig.7 shows the distribution of
+missing (gray) and existing (white) elements in Y .
+
+Co-embedding of Structurally Missing Data by Locally Linear Alignment
+
+427
+
+300
+
+250
+
+200
+
+150
+
+100
+
+50
+
+0
+
+−50
+
+−100
+
+−150
+
+−200
+
+−150
+
+305
+
+245
+
+165
+
+ 85
+  5
+
+205
+
+125
+
+225
+
+285
+
+185
+
+ 25
+
+145
+
+265
+
+ 65
+
+105
+
+ 45
+
+−100
+
+−50
+
+0
+
+50
+
+100
+
+150
+
+Fig. 4. Simulated environment with 564 AP
+positions
+
+Fig. 5. Ground truth trajectory of observer
+
+558
+
+562
+
+559
+  4
+
+  5
+
+563
+479480
+
+564
+
+494
+
+ 39
+
+496
+
+487
+
+490
+
+ 26
+
+488
+
+497
+
+491
+
+492
+
+493
+
+495
+
+ 27
+
+489
+
+ 38
+
+ 30
+
+ 28
+
+ 29
+
+ 36
+
+ 35
+
+ 32
+
+ 31
+
+ 33  34
+
+ 37
+
+280
+
+260
+
+240
+
+220
+
+200
+
+180
+
+160
+
+140
+
+120
+
+100
+
+−100
+
+  7
+
+  8
+
+ 10
+
+  9
+
+  6
+
+ 11
+
+481
+
+483
+
+485
+
+482
+
+484
+
+486
+
+ 24
+
+ 21
+
+ 12
+
+ 23
+
+ 22
+
+ 25
+
+ 19
+
+ 17
+
+ 13
+
+ 16
+
+ 20
+
+ 18
+
+ 15
+
+ 14
+
+ 79
+
+ 71
+
+ 84
+
+ 80
+
+ 77
+
+ 83
+
+ 76
+
+ 72
+
+ 81
+
+ 78
+
+ 92
+
+ 94
+
+ 85
+
+ 93
+
+ 91
+
+ 86  87
+
+ 73
+ 74
+
+ 75
+
+ 95
+−80
+
+ 82
+
+103
+
+−60
+
+ 88 89 90
+
+113
+
+114
+
+−40
+
+80
+
+60
+
+40
+
+20
+
+0
+
+−20
+
+−40
+
+−60
+
+495
+
+ 30
+
+ 28
+
+ 29
+
+ 16
+
+ 14
+
+ 39
+
+ 38
+
+ 44
+
+ 40
+
+ 53
+
+ 43
+
+ 46
+
+ 48
+
+ 50
+
+ 45
+
+ 42
+ 44
+ 40
+ 41
+
+ 47
+
+ 49
+
+ 54
+
+ 53
+
+ 51
+
+ 52
+
+ 55 56
+ 58
+
+ 57
+
+ 61  63
+
+ 69 70
+
+ 66  68
+
+454
+
+450
+
+451
+
+452
+
+455
+453
+
+458
+
+456 457
+
+−20
+
+0
+
+20
+
+40
+
+462 463
+461
+
+466 467
+465
+
+468
+
+469
+
+472
+
+470
+
+471
+
+474
+
+473
+
+464
+
+478
+
+460
+
+477
+
+459
+
+60
+
+476
+
+80
+
+475
+
+−80
+
+−80
+
+−60
+
+−40
+
+−20
+
+0
+
+20
+
+40
+
+60
+
+80
+
+(a) Ground truth
+
+(b) Observed
+
+Fig. 6. Example of ground truth submap (a) and observed data (b). Observation is noisy and
+distant APs are missing. Circles show the approximate communicatable ranges.
+
+Unsupervised Localization and Mapping. First we applied the unsupervised version
+of LLACoE to estimate X and Z from Y without the smoothing regularization. Al-
+though the map of APs (Z) in Fig.8(a) is largely distorted, we can see the approximate
+relative relationships with neighbors are reconstructed to some extent. On the other
+hand, the trajectory of observer (X) in Fig.9(a) is reconstructed very well.
+
+428
+
+T. Yairi
+
+Fig. 7. Distribution of missing (gray) and existing (white) elements of observation data Y . About
+97% is missing.
+
+0.6
+
+0.4
+
+0.2
+
+0
+
+−0.2
+
+−0.4
+
+−0.6
+
+−0.8
+
+−1
+
+−1.2
+
+420 430440
+400
+
+410
+
+390
+320
+330
+380
+310
+
+120130
+160
+
+460470
+ 70
+
+ 60
+
+110
+100
+
+450
+ 40 50
+ 90
+
+520
+
+140150
+
+510
+370
+340350360
+300
+280290
+540
+180
+170
+550
+270
+190
+
+530
+260
+220
+250
+200
+230240
+210
+
+ 80
+500
+
+ 30
+
+ 20
+
+490
+
+480
+
+ 10
+
+560
+
+ 10
+
+ 20
+
+500
+
+ 80
+
+100
+
+110
+
+480
+
+560
+
+ 90
+
+ 40
+
+ 60
+
+ 50
+
+490
+ 30
+
+ 70
+
+450
+
+460
+
+520
+
+470
+
+430
+440
+
+120
+160
+
+130
+
+150
+
+170
+
+140
+
+180
+
+200210
+220 230240
+
+190
+
+270
+
+290
+
+260
+
+250
+530
+
+310
+320
+
+330
+
+280
+
+300
+
+550
+
+540
+
+340350
+360
+370
+510
+
+380
+
+390
+
+400
+
+410
+
+420
+
+0.04
+
+0.03
+
+0.02
+
+0.01
+
+0
+
+−0.01
+
+−0.02
+
+170
+
+150
+
+180
+
+140
+
+190
+200
+
+220
+
+270
+
+260
+
+240
+
+290
+
+210
+
+230
+
+250
+
+160
+120
+
+130
+
+100
+
+ 80
+
+500
+560
+ 20
+480490
+ 30
+520
+
+110
+ 40
+ 90
+
+ 60
+
+470
+
+440
+
+ 50
+450460
+430
+
+ 70
+
+400
+
+310
+
+ 10
+
+320
+
+420
+
+330
+
+410
+
+530
+
+280
+550
+
+300
+
+540
+
+340
+
+350
+360
+370
+510
+
+380
+390
+
+1.5
+
+1
+
+0.5
+
+0
+
+−0.5
+
+−1
+−1.5
+
+−1.4
+
+−0.6
+
+−0.4
+
+−0.2
+
+0
+
+0.2
+
+0.4
+
+0.6
+
+0.8
+
+1
+
+1.2
+
+−1
+
+−0.5
+
+0
+
+0.5
+
+1
+
+−0.03
+
+−0.03
+
+−0.02
+
+−0.01
+
+0
+
+0.01
+
+0.02
+
+0.03
+
+(a) LLACoE w/o smoothing
+
+(b) LLACoE with smoothing
+
+(c) LSI
+
+Fig. 8. Reconstructed maps by unsupervised methods
+
+0.1
+
+0.05
+
+105
+185
+
+285
+
+ 45 65
+
+225
+
+0
+
+305
+
+ 85
+  5
+
+265
+145
+ 25
+
+125
+
+205
+
+165
+
+245
+
+−0.05
+
+−0.1
+
+−0.15
+
+−0.2
+
+0.15
+
+0.1
+
+0.05
+
+0
+
+−0.05
+
+−0.1
+
+−0.15
+
+305
+
+165
+
+245
+
+225
+
+ 85
+  5
+
+285
+
+185
+
+105
+
+ 65
+ 45
+
+265
+145
+ 25
+
+125
+
+205
+
+0.04
+
+0.03
+
+0.02
+
+0.01
+
+0
+
+−0.01
+
+−0.02
+
+125
+
+205
+
+245
+165
+305
+225
+
+  5
+ 85
+
+ 25
+
+265
+145
+
+ 45
+
+ 65
+
+105
+
+185
+
+285
+
+−0.15
+
+−0.1
+
+−0.05
+
+0
+
+0.05
+
+0.1
+
+0.15
+
+−0.2
+
+−0.12
+
+−0.1
+
+−0.08 −0.06 −0.04 −0.02
+
+0
+
+0.02
+
+0.04
+
+0.06
+
+−0.03
+
+−0.03
+
+−0.02
+
+−0.01
+
+0
+
+0.01
+
+0.02
+
+0.03
+
+(a) LLACoE w/o smoothing
+
+(b) LLACoE with smoothing
+
+(c) LSI
+
+Fig. 9. Reconstructed trajectories by unsupervised methods
+
+Co-embedding of Structurally Missing Data by Locally Linear Alignment
+
+429
+
+300
+
+250
+
+200
+
+150
+
+100
+
+50
+
+0
+
+−50
+
+−100
+
+−150
+
+−200
+
+−150
+
+300
+
+250
+
+200
+
+150
+
+100
+
+50
+
+0
+
+−50
+
+−100
+
+−150
+
+−200
+
+−150
+
+ 10
+
+ 20
+
+ 80
+
+500
+
+560
+
+480
+
+490
+
+ 30
+
+520
+
+ 50
+
+ 70
+
+450
+
+460 470
+
+ 40
+
+ 90
+
+100
+
+110
+
+ 60
+
+120
+160
+
+130
+
+310320
+
+330
+
+150
+
+140
+
+170 180
+190
+220
+
+200
+
+290
+270
+
+260
+
+210
+
+230240
+
+300
+
+280
+
+250
+
+530
+
+440
+
+430
+
+400
+
+420
+
+410
+
+380390
+340
+
+510
+
+350360370
+540
+550
+
+−100
+
+−50
+
+0
+
+50
+
+100
+
+150
+
+300
+
+250
+
+200
+
+150
+
+100
+
+50
+
+0
+
+−50
+
+−100
+
+−150
+
+−200
+
+−150
+
+305
+
+245
+
+165
+
+205
+
+125
+
+ 25
+
+265
+
+145
+
+225
+
+ 85
+  5
+
+285
+
+185
+
+105
+
+ 65
+
+ 45
+
+−100
+
+−50
+
+0
+
+50
+
+100
+
+150
+
+(a) Map
+
+(b) Trajectory
+
+Fig. 10. Estimated map and trajectory by semi-supervised LLACoE
+
+ 10
+
+ 20
+
+ 80
+
+500
+
+560
+
+480
+
+490
+
+ 30
+
+490
+
+520
+
+480
+560
+
+ 10
+
+ 50
+ 30
+
+520
+
+450
+
+ 40
+
+ 20
+
+ 90
+
+ 70
+
+460 470
+
+ 60
+
+100
+
+500
+100
+
+110
+
+ 80
+
+120
+160
+
+130
+
+470
+ 40  50
+ 90
+110
+ 60 70
+450460
+430440
+120
+310320
+400
+330
+420
+130
+160
+
+310320330
+410
+140150
+170180
+290
+290
+300
+340350360370380390
+300
+260270 280
+200210
+510
+220230240250
+530540
+550
+280
+270
+
+260
+
+250
+
+530
+
+150
+
+140
+
+170 180
+190
+190
+220
+
+200
+
+210
+
+230240
+
+440
+
+430
+
+400
+
+420
+
+410
+
+380390
+340
+
+510
+
+350360370
+540
+550
+
+−100
+
+−50
+
+0
+
+50
+
+100
+
+150
+
+250
+
+200
+
+150
+
+100
+
+50
+
+0
+
+305
+165
+
+245
+
+  5
+ 85
+
+225
+
+−50
+
+205
+
+125
+
+−100
+
+−150
+
+−100
+
+285
+185
+
+105
+
+ 45 65
+
+ 25
+
+265
+145
+
+−50
+
+0
+
+50
+
+100
+
+(a) Map
+
+(b) Trajectory
+
+Fig. 11. Estimated map and trajectory by co-localization[2]
+
+Then we added the smoothing regularization term Φsmo described in section 4.3. We
+set the weight parameter value as αsmo = 0.2 here. The results are shown in Fig.8(b)
+and Fig.9(b). We can see that the reconstruction of X (map of APs) is much improved.
+For comparison, we applied latent semantic indexing (LSI) method as in [2] to the
+data. To do so, we converted the range measurements into signal strengths by a mono-
+tonically decreasing function. The results are much worse than those of LLACoE as
+shown in Fig.8(c) and Fig.9(c).
+
+Semi-supervised Localization and Mapping. We also tested the semi-supervised ver-
+sion of LLACoE in this experiment. We gave exact positions of 7 APs as the label in-
+formation z∗
+j , which are emphasized by circles in Fig.4. Partial label information of
+observation points xi were also provided within the “areas” indicated in Fig.5.
+
+Fig.10 (a) and (b) show the obtained map and trajectory, respectively. Owing to the
+
+label information, the absolute accuracy of estimated positions is much improved.
+
+430
+
+T. Yairi
+
+For comparison, we applied Pan’s co-localization algorithm based on graph regular-
+ization [2] to the range measurements. The resultant map and trajectory are shown in
+Fig.11 (a) and (b). Unfortunately, it completely failed in this experiment.
+
+6 Conclusion
+
+In this paper, we proposed a co-embedding method to embed the row and column
+vectors of an observation matrix data whose large portion is structurally missing into
+low-dimensional latent spaces simultaneously. The proposed method outperforms the
+conventional methods based on EM algorithm and ALS in computational cost and sta-
+bility, because it is solved by eigendecomposition of a symmetric matrix. We also a
+semi-supervised version of the proposed co-embedding method, which is solved by a
+system of linear equations. In the experiment, we evaluated the method on two kinds of
+tasks, and compared it with other methods. In future, we are going to apply this method
+to a variety of problems.
+
+References
+
+1. Okatani, T., Deguchi, K.: On the wiberg algorithm for matrix factorization in the presence of
+
+missing components. International Journal of Computer Vision 72(3), 329–337 (2007)
+
+2. Pan, J., Yang, Q.: Co-localization from labeled and unlabeled data using graph laplacian. In:
+
+Proceedings of IJCAI 2007, pp. 2166–2171 (2007)
+
+3. Roweis, S., Saul, L.: Nonlinear dimensionality reduction by locally linear embedding. Sci-
+
+ence 290, 2323–2326 (2000)
+
+4. Roweis, S.: Em algorithms for pca and spca. In: in Advances in Neural Information Processing
+
+Systems, pp. 626–632 (1998)
+
+5. Shum, H.Y., Ikeuchi, K., Reddy, R.: Principal component analysis with missing data and its
+application to polyhedral object modeling. IEEE Trans. Pattern Anal. Mach. Intell. 17(9),
+854–867 (1995)
+
+6. Sindhwani, V., Bucak, S.S., Hu, J., Mojsilovic, A.: One-class matrix completion with low-
+density factorizations. In: Proceedings of the 2010 IEEE International Conference on Data
+Mining, pp. 1055–1060 (2010)
+
+7. Tenenbaum, J.B., Silva, V.D., Langford, J.C.: A global geometric framework for nonlinear
+
+dimensionality reduction. Science 290, 2319–2323 (2000)
+
+8. Thrun, S., Burgard, W., Fox, D.: Probabilistic Robotics. MIT Press (2005)
+9. Verbeek, J., Roweis, S.T., Vlassis, N.: Non-linear cca and pca by alignment of local models.
+
+In: Procs. of NIPS (2004)
+
+

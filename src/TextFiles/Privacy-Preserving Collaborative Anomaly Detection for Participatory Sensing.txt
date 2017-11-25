@@ -1,0 +1,1093 @@
+Privacy-Preserving Collaborative Anomaly
+
+Detection for Participatory Sensing
+
+Sarah M. Erfani1, Yee Wei Law2, Shanika Karunasekera1,
+
+Christopher A. Leckie1, and Marimuthu Palaniswami2
+
+1 NICTA Victoria Research Laboratory,
+
+Department of Computing and Information Systems
+
+2 Department of Electrical and Electronic Engineering,
+
+The University of Melbourne, Australia
+
+{sarah.erfani,ywlaw,karusg,caleckie,palani}@unimelb.edu.au
+
+Abstract. In collaborative anomaly detection, multiple data sources
+submit their data to an on-line service, in order to detect anomalies with
+respect to the wider population. A major challenge is how to achieve
+reasonable detection accuracy without disclosing the actual values of
+the participants’ data. We propose a lightweight and scalable privacy-
+preserving collaborative anomaly detection scheme called Random Mul-
+tiparty Perturbation (RMP), which uses a combination of nonlinear and
+participant-speciﬁc linear perturbation. Each participant uses an indi-
+vidually perturbed uniformly distributed random matrix, in contrast to
+existing approaches that use a common random matrix. A privacy analy-
+sis is given for Bayesian Estimation and Independent Component Analy-
+sis attacks. Experimental results on real and synthetic datasets using an
+auto-encoder show that RMP yields comparable results to non-privacy
+preserving anomaly detection.
+
+Keywords: Privacy-preserving data mining, Anomaly detection, Col-
+laborative learning, Participatory sensing, Horizontally partitioned data.
+
+1
+
+Introduction
+
+Anomaly detection (also known as outlier detection) plays a key role in data
+mining for detecting unusual patterns or events in an unsupervised manner. In
+particular, there is growing interest in collaborative anomaly detection [1,2,3],
+where multiple data sources submit their data to an on-line service, in order to
+detect anomalies with respect to the wider population. For example, in partic-
+ipatory sensing networks (PSNs) [4], participants collect and upload their data
+to a central service to detect unusual events, such as the emergence of a source
+of pollution in environmental sensing, or disease outbreaks in public health mon-
+itoring. A major challenge for collaborative anomaly detection in this context
+is how to maintain the trust of participants in terms of both the accuracy of
+the anomaly detection service as well as the privacy of the participants’ data.
+In this paper, we propose a random perturbation scheme for privacy-preserving
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part I, LNAI 8443, pp. 581–593, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+582
+
+S.M. Erfani et al.
+
+anomaly detection, which is resilient to a variety of privacy attacks while achiev-
+ing comparable accuracy to anomaly detection on the original unperturbed data.
+There have been several studies on collaborative anomaly detection, where a
+number of participants want to build a global model from their local records,
+while none of the participants are willing to disclose their private data. Most
+existing work relies on the use of Secure Multiparty Computation (SMC) to
+generate the global model for anomaly detection [1,2]. While this approach can
+achieve high levels of privacy and accuracy, SMC incurs a high communication
+and computational overhead. Moreover, SMC based methods require the simul-
+taneous coordination of all participants during the entire training process, which
+limits the number of participants. Thus, an open research challenge is how to
+improve scalability while achieving high levels of accuracy and privacy.
+
+To address this challenge, we propose a privacy-preserving scheme for anomaly
+detection called Random Multiparty Perturbation (RMP). RMP supports the
+scenario where participants contribute their local data to a public service that
+trains an anomaly detection model from the combined data. This model can then
+be distributed to end-users who want to test for anomalies in their local data. In
+this paper, we focus on the use of an auto-associative neural network (AANN,
+also known as an autoencoder) as our anomaly detection model, although our
+scheme is also applicable to other types of anomaly detectors.
+
+In order for the participants of RMP to maintain the privacy of their data,
+we propose a form of random perturbation to be used by each participant. Pre-
+vious approaches to random perturbation in this context [5,6,7,3] require all
+participants to perturb their data in the same way, which makes this scheme
+potentially vulnerable to breaches of privacy if collusion occurs between rogue
+participants and the server. In contrast, RMP proposes a scheme in which each
+participant ﬁrst perturbs their contributed data using a unique, private random
+perturbation matrix. In addition, any end-user can apply the resulting anomaly
+detection model to their own local data by using a public perturbation matrix.
+This provides a scalable collaborative approach to anomaly detection, which en-
+sures a high level of privacy while still achieving a high level of accuracy to the
+end-users.
+
+The main contributions of this paper are as follows: (i) We propose a privacy-
+preserving model of collaborative anomaly detection based on random pertur-
+bation, such that each participant in training the anomaly detector can have
+their own unique perturbation matrix, while the resulting anomaly detection
+model can be used by any number of users for testing. (ii) In contrast to pre-
+vious methods, we give the ﬁrst privacy-preserving scheme for auto-associator
+anomaly detectors that does not require computationally intensive cryptographic
+techniques. (iii) We show analytically the resilience of our scheme to two types
+of attacks—Bayesian Estimation and Independent Component Analysis (ICA).
+(iv) We demonstrate that the accuracy of our approach is comparable to non-
+privacy preserving anomaly detection on various datasets.
+
+Privacy-Preserving Collaborative Anomaly Detection for PS
+
+583
+
+2 Related Work
+
+In general, privacy-preserving data mining (PPDM) schemes can be classiﬁed as
+syntactic or semantic. Syntactic approaches aim to prevent syntactic attacks, such
+as the table linkage attack. Semantic approaches aim to satisfy semantic privacy
+criteria, which are concerned with minimising the diﬀerence between adversarial
+prior knowledge and adversarial posterior knowledge about the individuals rep-
+resented in the database. While both approaches have the same goal, i.e., hiding
+the real values from the data miner, syntactic approaches typically take the en-
+tire database as input, whereas semantic approaches do not. Since in participa-
+tory sensing the participants are responsible for masking their own data before
+outsouring them to the data miner, semantic approaches are the only option here.
+In the following we review existing work on privacy-preserving back-propagation
+and anomaly detection in the
+learning, and
+highlight the major diﬀerences with our work. The majority of semantic PPDM
+approaches, either in the context of privacy-preserving back-propagation [8,9] or
+privacy-preserving anomaly detection [1,2], use Secure Multiparty Computation
+(SMC). SMC approaches suﬀer from high computational complexity. Moreover,
+they require the cooperation of all participants throughout the whole process of
+building the data mining models, and hence suﬀer a lack of scalability.
+
+collaborative
+
+context of
+
+Another approach to semantic PPDM is data randomisation, which refers to
+the randomised distortion or perturbation of data prior to analysis. Perturbing
+data elements, for example, by introducing additive or multiplicative noise, al-
+lows the server to extract the statistical properties of records without requiring
+the participants to allocate substantial resources or coordinate with the server
+during the training process. We now outline the main types of data perturbation
+methods: additive, multiplicative, and nonlinear transformation.
+
+Additive perturbation adds noise to the data [10,11]. Since independent ran-
+dom noise can be ﬁltered out [12,13], the general principle is that the additive
+noise should be correlated with the data [14,15].
+
+Multiplicative perturbation multiplies the data with noise. A typical approach
+is to use a zero-mean Gaussian random matrix as the noise for a distance-
+preserving transformation [5]. However, if the original data follows a multivariate
+Gaussian distribution, a large portion of the data can be reconstructed via at-
+tacks to distance-preserving transformations as proposed in [16,17].
+
+In general, distance-preserving transformations are good for accuracy but are
+susceptible to attacks that exploit distance relationships. In comparison, the
+random transformation approach [7], where the noise matrix is a random matrix
+with elements uniformly distributed between 0 and 1, is not distance-preserving
+and hence not susceptible to these attacks.
+
+Nonlinear transformations can be used to break the distance-preserving eﬀect
+of a distance-preserving transformation on some data points. For example, the
+function tanh approximately preserves the distance between normal data points,
+but collapses the distance between outliers [3]—it is hence suitable for anomaly
+detection. In RMP, we use the double logistic function for this purpose and for
+conditioning the probability density function (pdf) of the transformed data.
+
+584
+
+S.M. Erfani et al.
+
+The aforementioned works satisfy privacy requirements in the case where all
+participants are assumed to be semi-honest (i.e., are not colluding with other
+parties) and agree on using the same perturbation matrix. As discussed in Sec-
+tion 3.1, this assumption is restrictive in applications such as participatory sens-
+ing. A few works have tried to extend current randomisation approaches to a
+collaborative learning architecture [6,18]. For example, Chen et al.’s framework
+[6] is a multiparty collaborative mining scheme using a combination of additive
+and multiplicative perturbations. This scheme requires the participants to stay
+in touch for an extended period to generate the perturbation matrix, which is
+impractical for large-scale participatory sensing. Liu et al. [18] build a frame-
+work on top of [5], and allow each participant to perturb the training data with
+a distinct perturbation matrix. This scheme then regresses these mathematical
+relationships between training samples in a unique way, thereby preserving clas-
+siﬁcation accuracy. Although participants use private matrices, the underlying
+transformation scheme is still vulnerable to distance inference attacks [16,17].
+
+In summary, data randomisation is the most promising approach to PPDM
+in the paradigm of PSN. Unlike distance-preserving transformations, random
+transformation does not preserve Euclidean distances and inner products be-
+tween data distances, hence it thwarts distance inference attacks. However, if
+this method is applied to collaborative learning, all the participants must agree
+on the same perturbation matrix, and then collusion attacks may succeed. Fur-
+thermore, the mining models generated from the perturbed records are speciﬁc
+to the participants. For these reasons our RMP scheme uses a random transfor-
+mation and provides each participant with a private perturbation matrix. The
+perturbation matrices are tailored so that both data privacy and accuracy of
+the mining models are achieved. In addition, RMP generates models that can be
+adopted by any user, i.e, data contributors and non-contributors.
+
+3 RMP Privacy-Preserving Anomaly Detection Scheme
+
+In this section we present our Random Multiparty Perturbation (RMP) scheme,
+which considers a general participatory sensing architecture comprising three
+types of parties, namely, participants, the data mining server and end-users.
+
+3.1 Problem Statement and Design Principles
+
+We consider the case of a participatory sensing network that comprises a set of
+participants, C = {ci|i = 1, . . . , q}, a mining server S, and an arbitrary number
+of end-users U, as can be seen in Fig. 1. Each participant ci is an individual
+who captures data records for the same set of attributes, i.e., a horizontal parti-
+tion, and contributes the sampled records to S for training purposes. The server
+S is a third-party providing a data mining service to the participants. After
+receiving the contributed data records, the server trains an anomaly detector
+that generates a global classiﬁcation model M from the locally collected data.
+The end-users, U, could be the participants themselves or third parties such
+
+Privacy-Preserving Collaborative Anomaly Detection for PS
+
+585
+
+Participant
+
+Mining Server
+
+End-User
+
+X    >Y  
+1
+1
+Y    >Z 
+1
+1
+
+.
+ 
+.
+ 
+.
+
+Z
+1
+
+Z q
+
+M
+
+M
+
+Fig. 1. The RMP architecture
+
+as analysts trying to learn about the monitored phenomena. We share a similar
+underlying assumption with [4], in which the computational demands on the par-
+ticipants should be minimised, while the anomaly detection model should be in
+a form that can be disseminated and used by an arbitrary number of end-users,
+and not limited to the original participants or customised for a small number of
+end-users. In addition, we adopt a well established assumption in the literature
+that regards all parties as semi-honest entities, i.e., they follow the protocol. To
+make the scenario realistic, we assume that a small subset of the participants
+might collude with the server to infer other participants’ submitted records. De-
+signing a collaborative data mining scheme that fulﬁlls these requirements with
+low communication and computation costs while preserving the participants’
+privacy is an open problem.
+
+For privacy, we need to ensure that the attribute values in the participants’
+contributed records are properly masked: given the masked values, the server
+cannot infer the original values. However, this must be done without over-
+sacriﬁcing accuracy, i.e., the results of anomaly detection based on the masked
+data should be close to the corresponding result using the original data. Multi-
+plicative perturbation projects data to a lower dimensional space. The perturbed
+data matrix has a lower rank than the original data matrix, thereby forcing the
+attacker to solve an undetermined system of linear equations. However, this is
+not enough, and the following design principles are pertinent.
+
+Resilience to Distance Inference Attacks: The review of existing multiplica-
+tive perturbation schemes in Section 2 reveals that distance-preserving transfor-
+mations are susceptible to distance inference attacks [16,19]. The challenge is to
+ﬁnd a non-distance preserving transform that is suitable for certain data mining
+tasks. Random transformation [7] qualiﬁes as such a transform in that it does
+not preserve the dot product or Euclidean distance among transformed data
+points, yet it is suitable for anomaly detection.
+
+Resilience to Bayesian Estimation Attacks: Bayesian Estimation is a gen-
+eral attack that exploits the pdf of the original data. Gaussian data is particularly
+exploitable because it reduces a maximum a posteriori estimation problem into
+a simple convex optimization problem [17]. A suitable defense is to prevent this
+reduction by conditioning the pdf through a nonlinear transformation.
+
+586
+
+S.M. Erfani et al.
+
+Resilience to Collusion: Let Xi ∈ R
+n×mi be participant ci’s dataset, and
+T ∈ R
+w×n be a random matrix shared by all participants, where w < n. The
+participant ci perturbs its records as Zi = TXi. Since the constructed anomaly
+detector is perturbed, the perturbation matrix needs to be shared with all end-
+users. This approach of using a common T poses a serious privacy risk. If a
+rogue participant or end-user colludes with the server, the server can recover any
+participant’s original data using the breached perturbation matrix. The naive
+solution of generating an arbitrarily diﬀerent perturbation matrix Ti for each
+participant ci does not work, because building an accurate mining model requires
+consistency among the perturbation matrices. To overcome this challenge, RMP
+generates participant-speciﬁc perturbation matrices by perturbing T.
+
+3.2 The Scheme
+RMP is designed to address the design principles in the previous subsection. Let
+T be a w×n matrix (w < n) with U (0, 1)-distributed elements. Each participant
+ci generates a unique perturbation matrix
+
+(1)
+where each element in Δi is drawn from U (−α, α), and 0 < α < 1. Experimental
+results show that for small values of α, the accuracy loss in anomaly detection
+is small. Next, we describe RMP in full detail.
+
+˜Ti = T + Δi,
+
+In RMP, a participant transforms Xi to Zi in two stages:
+
+Stage 1: The participant transforms Xi to Yi , by applying a double logistic
+function to Xi element-wise:
+
+def= sgn(xk,l)[1 − exp(−βx2
+
+k,l)],
+
+yk,l
+
+(2)
+
+for k = 1, . . . , n, l = 1, . . . , mi , where sgn is the signum function. For suitable
+values of β and normalised values of xk,l (i.e., |xk,l| ≤ 1), the double logistic
+function approximates the identity function yk,l = xk,l well. To maximise this
+approximation, we equate the optimal value of β to the value that minimises the
+integral of the squared diﬀerence between the two functions:
+
+(cid:2)
+
+β(cid:2) = arg min
+β
+
+0
+
+1
+
+[1 − exp(−βx2) − x]2dx ≈ 2.81.
+
+The role of this nonlinear transformation is to condition the pdf of Yi to thwart
+Bayesian Estimation attacks, as detailed in Section 5.
+Stage 2: Using ˜Ti generated earlier, the participant transforms Yi to Zi :
+
+(3)
+The participant then sends Zi to the mining server S, which will receive the
+following from all the participants:
+
+Zi
+
+def= ˜Ti Yi .
+
+def= [Z1|Z2|···|Zq] .
+
+Zall
+
+Privacy-Preserving Collaborative Anomaly Detection for PS
+
+587
+
+The role of S is to learn an anomaly detection model encoding the underlying
+distribution of Zall. End-users given access to the model and T can then detect
+anomalies in their data with respect to the model. RMP is independent of the
+anomaly detection algorithm used, but the auto-associative neural network is
+used for our study and is discussed next.
+
+4 Anomaly Detection Service
+In our collaborative framework, the role of the server S is to learn an anomaly
+detection function, which can then be disseminated for use by the end-users. In
+particular, the learned anomaly detection function should encode a model of the
+underlying distribution of the (perturbed) training data provided by the partic-
+ipants. A given data record can then be tested using this model for anomalies.
+While our general framework can potentially use a wide variety of anomaly de-
+tection models, in this paper we use an auto-associative neural network (AANN)
+[20], also known as an auto-encoder, as the basis for our anomaly detection func-
+tion. We choose to use an AANN for our anomaly detection function because:
+(i) it can be trained in an unsupervised manner on either normal data alone, or
+a mixture of normal data with a small but unspeciﬁed proportion of anomalous
+data; (ii) it is capable of learning a wide variety of underlying distributions of
+training data; and (iii) the resulting anomaly detection function is compact and
+computationally eﬃcient—hence practical for dissemination to end-users.
+
+An AANN is a multi-layer feed-forward neural network that has the same
+number of output nodes as input nodes. Between the input and output layers, a
+hidden “bottleneck” layer of a smaller dimension than the input/output layers
+captures signiﬁcant features in the inputs through compression. Training the
+AANN means adjusting the weights of the network for each training record,
+so that the outputs closely match the inputs. In this way, the AANN learns a
+nonlinear manifold that represents the underlying distribution of the data. In a
+trained AANN, the reconstruction error (integrated squared error between the
+inputs and outputs) should be high for anomalies, but low for normal data. Let ei
+be the reconstruction error for training dataset Xi. If the reconstruction error for
+a test record is larger than the threshold θ = μ(ei) + 3σ(ei), where i = 1, . . . , q,
+the record is identiﬁed as an anomaly. Due to space constraints, the interested
+reader is referred to [20] for the details of the AANN training algorithm.
+
+5 Privacy Analysis
+
+In the statistical disclosure control and privacy-preserving data publishing liter-
+ature, the most popular semantic privacy criterion is diﬀerential privacy. Diﬀer-
+ential privacy is for answering queries to a database containing private data of
+multiple individuals. For the participatory sensing scenario where participants
+are data owners who publish data (instead of answering queries) about themselves
+alone, diﬀerential privacy is not a good ﬁt. Below, we propose an alternative (in-
+formal) privacy criterion.
+
+588
+
+S.M. Erfani et al.
+
+Linear multiplicative perturbation schemes aim to project a data matrix to
+a lower dimensional space so that an attacker has only an ill-posed problem in
+the form of an underdetermined system of linear equations ˜Tx = y to work
+with, where y is a projection of data vector x and the projection matrix ˜T is
+assumed known in the worst case. An underdetermined system cannot be solved
+for x exactly, but given suﬃcient prior information about x, an approximation
+of the true x might be attainable. In a known input-output attack, the attacker
+has some input samples (i.e., some samples of x) and all output samples (i.e.,
+all samples of y), and knows which input sample corresponds to which output
+sample [21,22,19]. In the collaborative learning scenario where the data miner
+may collude with one or more participants to unravel other participants’ data,
+the known input-output attack is an immediate concern. In the following, our
+privacy analysis is conducted with respect to two known input-output attacks,
+one based on Bayesian estimation, and one based on Independent Component
+Analysis (ICA). Suppose the attacker is targeting a particular participant by
+trying to solve Z = ˜TY = (T + Δ)Y for Y. In the analysis below, let z ∼ Z
+represent a column of Z, and y ∼ Y represent a column of Y.
+
+5.1 Attacks Based on Bayesian Estimation
+
+We consider two scenarios where ˜T is known and where ˜T is unknown.
+Scenario where ˜T is Known: For a worst-case analysis, we assume the at-
+tacker somehow knows ˜T exactly but not X. In a Bayesian formulation, the
+maximum a posteriori (MAP) estimate of y, given ˜T and z, is
+
+pY(y|z, ˜T) = arg max
+
+y∈Y pY(y),
+
+ˆy = arg max
+
+y
+
+(4)
+where Y = {y : z = ˜Ty} [17]. Note that MAP estimation is a more general
+approach than maximum likelihood estimation because the former takes a prior
+distribution (which in our case is pY) into account. If pY is an n-variate Gaus-
+sian with a positive deﬁnite covariance matrix, then (4) becomes a quadratic
+programming problem with solution [17, Theorem 1]:
+
+(cid:4)
+ˆy = ¯y + ΣY ˜T
+
+Σ
+
+Z (z − ˜T¯y),
+−1
+
+(5)
+
+where ¯y and ΣY are the sample mean vector and sample covariance matrix of
+Y respectively, and ΣZ is the sample covariance matrix of Z. Note that ΣY is
+positive deﬁnite, provided the covariance matrix is full rank and there are more
+(cid:4)
+samples of Y than dimensions of Y [23]. In this case, we can write ΣY = QQ
+,
+(cid:4)
+where Q is a nonsingular matrix. Furthermore, ΣZ = ˜TΣY ˜T
+. Since
+−1
+˜T is nonsingular, Σ
+Z and therefore the solution (5) exists.
+
+= ˜TQQ
+
+(cid:4) ˜T
+(cid:4)
+
+The analysis above suggests that to thwart MAP estimation, we cannot hope
+to generate ˜T such that ΣZ is singular. Instead, it is more productive to pre-
+vent MAP estimation from being reducible to a quadratic programming problem
+solvable by (5) in the ﬁrst place. RMP achieves this by nonlinearly transforming
+
+Privacy-Preserving Collaborative Anomaly Detection for PS
+
+589
+
+the original data. If X is a standard Gaussian random variable, then based on
+[24, Section 4.7], the pdf of Y = sgn(X)[1 − exp(−βX 2)] is
+
+pY (y) =
+
+1
+
+(cid:3)
+8πβ ln
+
+(cid:4)
+
+(cid:5)
+
+1
+
+1−|y|
+
+(cid:7)1− 1
+
+2β
+
+(cid:6)
+
+1
+
+1 − |y|
+
+,|y| < 1, y (cid:6)= 0.
+
+Unlike a standard Gaussian which is continuous everywhere and has a global
+maximum at x = 0, pY → ∞ at y = −1, 0, 1. Using pY or ln pY in (4) renders the
+optimisation problem non-convex, and numerically unstable near y = −1, 0, 1,
+which is problematic for numerical methods such as hill climbing and simulated
+annealing. Applying the same nonlinear transformation to Laplace-distributed
+data (sparse data) has the same eﬀect. Therefore, RMP’s nonlinear transfor-
+mation converts a potentially Gaussian (Laplace) data distribution to a non-
+Gaussian (non-Laplace) one that hampers the attacker’s solution of (4).
+
+1
+(1−y2)
+
+2π exp(− artanh(y)2
+√
+
+2
+
+The double logistic function is better than tanh, which is used in [3], in terms
+of thwarting MAP estimation attacks. If X is a standard Gaussian random vari-
+),|y| < 1.
+able, then the pdf of Y = tanh(X) is pY (y) =
+For |y| ≤ 0.9, the pdf above is convex. This means the attacker can solve (4) as
+a convex optimisation problem, when the data are perturbed using tanh.
+Scenario Where ˜T is Unknown: In the previous scenario, the attacker knows
+T and the relationship between T and ˜T (see Equation 1). We also consider
+the scenario where the attacker does not know ˜T. Note that even with precise
+knowledge of T and α, without further information, any matrix value between
+T − α1 and T + α1 can be an estimate of the victim’s matrix ˜T. According to
+wrong by at least (2 − √
+Lemma 1, for every element of ˜T, there is a 50% chance of guessing its value
+Lemma 1. Let D be the diﬀerence between two U (−α, α)-distributed random
+variables. Then for 0 ≤ d ≤ 2α, Pr[|D| ≥ d] = (2α − d)2/(4α2).
+Proof. Let A and B be two U (−α, α)-distributed random variables. Then the
+pdf of D = A − B is given by the convolution
+⎧⎪⎨
+⎪⎩
+
+(cid:13) −2α ≤ x < 0,
+(cid:13)
+0 ≤ x < 2α,
+elsewhere.
+
+(cid:12)
+(cid:12)
+1 + d
+2α
+1 − d
+
+pU(−α,α)(d + b)db =
+
+pD(d) =
+
+(cid:2) α
+
+−α
+
+1
+2α
+
+1
+2α
+1
+2α
+0
+
+2)α.
+
+2α
+
+To get Pr[|D| ≥ d] where 0 ≤ d ≤ 2α, we integrate the expression above from
+−2α to −d, and from d to 2α. With a little algebra we get Pr[|D| ≥ d] = (2α−d)2
+.
+
+4α2
+
+MAP estimation can be used to estimate both Y and ˜T. The MAP estimates
+of Y and ˜T, given Z, are the matrix values that maximise p ˜T,Y|Z( ˜T, Y|Z) =
+p ˜T( ˜T|Z)pY(Y|Z). The optimisation problem can be written as
+
+590
+
+S.M. Erfani et al.
+
+max
+˜T,Y
+
+p ˜T( ˜T)pY(Y) s.t. Z = ˜TY;
+
+or the following when p ˜T is substituted with Uw×n(T − α1, T + α1) and pY is
+
+assumed to be zero-mean Gaussian:
+
+m(cid:14)
+
+min
+˜T,Y
+
+j=1
+
+jΣ−1
+y(cid:4)
+
+Y yj s.t. Z = ˜TY, T − α1 (cid:11) ˜T (cid:11) T + α1.
+
+(6)
+
+In (6), yj (j = 1, . . . , m) are columns of Y. Note that in the equality constraint,
+both ˜T and Y are optimisation variables, so even the Gaussian assumption does
+not reduce (6) to a convex problem. As previously explained, RMP’s nonlinear
+transformation converts a potentially Gaussian (Laplace) data distribution to
+a non-Gaussian (non-Laplace) one. This hampers the attacker’s solution of not
+only (4) but also (6), which is a harder problem than (4).
+
+w×n and Y ∈ R
+
+5.2 Attacks Based on Independent Component Analysis (ICA)
+ICA can be used to estimate ˜T ∈ R
+n×m, knowing only their
+product Z = ˜TY, provided (i) w = n (the even-determined case) or w > n (the
+over-determined case); (ii) the attributes (rows of Y) are pairwise independent;
+(iii) at most one of the attributes are Gaussian; (iv) ˜T has full column rank.
+However, RMP enforces w < n. When w < n, the problem of ICA becomes
+overcomplete ICA (or underdetermined ICA). In this case, the mixing matrix ˜T
+is identiﬁable but the independent components are not [22]. Furthermore, when
+w ≤ (n + 1)/2, no linear ﬁlter can separate the observed mixture Z into two or
+more disjoint groups, i.e., recover any row of Y [5].
+
+6 Empirical Results
+
+In this section we evaluate the quality of our proposed privacy-preserving anomaly
+detection scheme RMP when used with an AANN. The main objective of our
+experiment is to measure the trade-oﬀ in accuracy of our AANN anomaly de-
+tection algorithm as a result of maintaining the participants’ privacy. Note that
+Lemma 1 provides a theoretical relationship between α and the privacy that can
+be achieved in terms of an attacker’s ability to estimate the value of a target
+victim’s perturbation matrix ˜T. Thus, in our empirical evaluation, we consider
+the eﬀect of diﬀerent levels of privacy in terms of α on the overall accuracy of
+anomaly detection. We use the Receiver Operating Characteristic (ROC) curve
+and the corresponding Area Under the Curve (AUC) to measure the perfor-
+mance of RMP. The eﬀectiveness and change in accuracy of RMP are evaluated
+by comparing against a non-privacy-preserving neural network, in which the raw
+data records are fed to the AANN for training and testing.
+
+Experiments are conducted on four real datasets from the UCI Machine Learn-
+ing Repository (all collected from sensor networks except the fourth): (i) Hu-
+man Activity Recognition using Smartphones (HARS), (ii) Opportunity activity
+
+Privacy-Preserving Collaborative Anomaly Detection for PS
+
+591
+
+Table 1. Comparing AUC values of RMP against non-privacy anomaly detection
+
+Dataset
+
+Abalone
+Banana
+Gas
+HARS
+Opportunity
+
+n
+
+8
+8
+168
+561
+242
+
+Raw
+
+1
+1
+0.99
+0.99
+0.99
+
+0.01
+
+0.95
+0.98
+0.98
+0.98
+0.99
+
+0.1
+
+0.92
+0.92
+0.98
+0.98
+0.98
+
+α
+
+0.2
+
+0.87
+0.81
+0.98
+0.97
+0.94
+
+0.4
+
+N/A
+N/A
+0.95
+0.96
+0.90
+
+0.6
+
+N/A
+N/A
+0.92
+0.95
+0.87
+
+Note: “Raw” indicates the non-privacy preserving anomaly detection on the non-perturbed data,
+
+and α values indicate the level of imposed noise in RMP anomaly detection.
+
+recognition (Opportunity), (iii) Gas Sensor Array Drift (Gas), (iv) Abalone. We
+also use the Banana synthetic dataset, generated from a mixture of overlap-
+ping Gaussians to resemble a pair of bananas in any two dimensions. We ran
+the experiment on the ﬁrst 1000 records of each dataset. Feature values in each
+dataset are normalised between [0, 1] and merged with 5% anomalous records,
+which are randomly drawn from U (0, 1). In each experiment a random subset of
+the dataset is partitioned horizontally among the participants in batches of 30
+records and submitted to the server for training.
+
+We deploy a three-layer AANN with the same number of input and output
+units, i.e., the number of units is set corresponding to the dataset attributes n.
+The number of hidden units for each dataset is set to about half of the input
+units (empirically we found that increasing the number of hidden units causes
+overﬁtting). All weights and biases in the neural network are initialised randomly
+in the range of [−0.1, 0.1]. The learning rate and momentum are set to 0.25 and
+0.85, respectively, and the number of training epochs range from 300 to 1000.
+
+Table 1 compares the results using an AANN anomaly detector on the un-
+perturbed data records (“Raw”) along with the corresponding results using the
+privacy preserving scheme of RMP. Accuracy in RMP is aﬀected by its two stages
+of transformation, i.e., applying the double logistic function and the random
+transformation, and the level of added noise α. As can be seen from the table,
+when data are perturbed with a marginal level of noise α = 0.01, the accuracy
+decreases slightly (about 1%). Hence, it shows that the transformations do not
+exert a signiﬁcant impact on the accuracy of anomaly detection. In the reported
+
+ROC curve for Abalone 
+
+ROC curve for Banana
+
+ROC curve for Opportunity 
+
+ 
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+e
+t
+a
+r
+ 
+
+e
+v
+
+i
+t
+i
+s
+o
+p
+e
+u
+r
+T
+
+ 
+
+0
+ 
+0
+
+0.2
+
+0.4
+
+0.6
+
+False positive rate
+
+ 
+
+Raw
+α =0.01
+α=0.1
+α =0.2
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+e
+t
+a
+r
+ 
+
+e
+v
+
+i
+t
+i
+s
+o
+p
+e
+u
+r
+T
+
+ 
+
+0.8
+
+1
+
+0
+ 
+0
+
+0.2
+
+ 
+
+Raw
+α =0.01
+α=0.1
+α =0.2
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+e
+t
+a
+r
+ 
+e
+v
+i
+t
+i
+s
+o
+p
+e
+u
+r
+T
+
+ 
+
+0.4
+
+0.6
+
+False positive rate
+
+0.8
+
+1
+
+0
+ 
+0
+
+0.2
+
+0.4
+
+0.6
+
+False positive rate
+
+Fig. 2. Abalone Dataset
+
+Fig. 3. Banana Dataset
+
+Fig. 4. Opportunity Dataset
+
+Raw
+α =0.01
+α=0.1
+α=0.2
+α=0.4
+α =0.6
+
+0.8
+
+1
+
+592
+
+S.M. Erfani et al.
+
+results in Table 1, the dimensionality of the datasets is reduced by r = 1, where
+r = n− w. Our empirical experiments show that the accuracy on datasets with a
+larger number of attributes n are less aﬀected by an increase of r, e.g., reducing
+n by 40% only decreases accuracy by about 1%. However, that is not the case for
+datasets with small n, e.g., the Abalone and Banana datasets, where reducing
+the data dimensionality by half might result in a 10% reduction in accuracy.
+
+The level of added noise to the perturbation matrices has a major inﬂuence on
+RMP accuracy. As α increases, so does the loss in accuracy, especially in datasets
+with smaller numbers of attributes. Since the accuracy loss is generally small,
+RMP is a highly eﬀective approach for privacy-preserving anomaly detection.
+
+7 Conclusion and Future Work
+
+In a typical participatory sensing scenario, participants send data to a data min-
+ing server; the server builds a model of the data; and end-users download the
+model for their own analyses. Collaborative anomaly detection refers to the case
+where the model is for anomaly detection. RMP is a privacy-preserving collabo-
+rative learning scheme that masks the participants’ data using a combination of
+nonlinear and linear perturbations, while maintaining detection accuracy. RMP
+protects the private data of participants using individual perturbation matrices,
+imposes minimal communication and computation overhead on the participants,
+and scales for an arbitrary number of participants or end-users. We show an-
+alytically how RMP is resilient to two common types of attacks: Bayesian Es-
+timation and ICA. Our experiments show that RMP yields comparable results
+to non-privacy preserving anomaly detection using AANN on a variety of real
+and synthetic benchmark datasets. As follow-up to this preliminary work, we
+are in the process of establishing a mathematical framework that relates α to
+accuracy loss and privacy level—this will allow us to determine α based on the
+intended trade-oﬀ between accuracy and privacy. We are also investigating the
+resilience of RMP, in conjunction with other supervised or unsupervised learning
+algorithms, to attacks exploiting sparse datasets, such as overcomplete ICA.
+
+Acknowledgments. NICTA is funded by the Australian Government as rep-
+resented by the Department of Broadband, Communications and the Digital
+Economy and the Australian Research Council through the ICT Centre of Ex-
+cellence program. Yee Wei Law is partly supported by ARC DP1095452 and the
+EC under contract CNECT-ICT-609112 (SOCIOTAL).
+
+References
+
+1. Dung, L.T., Bao, H.T.: A Distributed Solution for Privacy Preserving Outlier De-
+
+tection. In: Third International Conference on KSE, pp. 26–31 (2011)
+
+2. Vaidya, J., Clifton, C.: Privacy-preserving outlier detection. In: IEEE ICDM, pp.
+
+233–240 (2004)
+
+3. Bhaduri, K., Stefanski, M.D., Srivastava, A.N.: Privacy-preserving outlier detection
+through random nonlinear data distortion. IEEE TSMC, Part B 41, 260–272 (2011)
+
+Privacy-Preserving Collaborative Anomaly Detection for PS
+
+593
+
+4. Burke, J., Estrin, D., Hansen, M., Parker, A., Ramanathan, N., Reddy, S., Sri-
+vastava, M.B.: Participatory sensing. In: ACM SenSys 1st Workshop on World-
+Sensor-Web: Mobile Device Centric Sensor Networks and Applications (2006)
+
+5. Liu, K., Kargupta, H., Ryan, J.: Random projection-based multiplicative data
+perturbation for privacy preserving distributed data mining. IEEE TKDE 18(1),
+92–106 (2006)
+
+6. Chen, K., Liu, L.: Privacy-preserving multiparty collaborative mining with geo-
+
+metric data perturbation. IEEE TPDS 20(12), 1764–1776 (2009)
+
+7. Mangasarian, O.L., Wild, E.W.: Privacy-preserving classiﬁcation of horizontally
+
+partitioned data via random kernels. In: Proceedings of DMIN (2007)
+
+8. Bansal, A., Chen, T., Zhong, S.: Privacy preserving Back-propagation neural net-
+work learning over arbitrarily partitioned data. Neural Computing and Applica-
+tions 20, 143–150 (2010)
+
+9. Zhang, Y., Zhong, S.: A privacy-preserving algorithm for distributed training of
+neural network ensembles. Neural Computing and Applications 22, 269–282 (2012)
+10. Agrawal, R., Srikant, R.: Privacy-preserving data mining. ACM SIGMOD
+
+Record 29(2), 439–450 (2000)
+
+11. Agrawal, D., Aggarwal, C.C.: On the design and quantiﬁcation of privacy preserv-
+
+ing data mining algorithms. In: Proceedings of ACM PODS, pp. 247–255 (2001)
+
+12. Kargupta, H., Datta, S., Wang, Q., Sivakumar, K.: On the privacy preserving
+properties of random data perturbation technique. In: IEEE ICDM, pp. 99–106
+(2003)
+
+13. Huang, Z., Du, W., Chen, B.: Deriving private information from randomized data.
+
+In: Proceedings of ACM SIGMOD, pp. 37–48 (2005)
+
+14. Papadimitriou, S., Li, F., Kollios, G., Yu, P.S.: Time series compressibility and
+
+privacy. In: Proceedings of VLDB, pp. 459–470 (2007)
+
+15. Ganti, R.K., Pham, N., Tsai, Y.E., Abdelzaher, T.F.: Poolview: stream privacy
+for grassroots participatory sensing. In: Proceedings of ACM SenSys, pp. 281–294
+(2008)
+
+16. Liu, K., Giannella, C., Kargupta, H.: A survey of attack techniques on privacy-
+preserving data perturbation methods. In: Privacy-Preserving Data Mining.
+Springer (2008)
+
+17. Sang, Y., Shen, H., Tian, H.: Eﬀective reconstruction of data perturbed by random
+
+projections. IEEE Transactions on Computers 61(1), 101–117 (2012)
+
+18. Liu, B., Jiang, Y., Sha, F., Govindan, R.: Cloud-enabled privacy-preserving col-
+laborative learning for mobile sensing. In: Proceedings of SenSys, pp. 57–70 (2012)
+19. Giannella, C.R., Liu, K., Kargupta, H.: Breaching euclidean distance-preserving
+data perturbation using few known inputs. Data & Knowledge Engineering (2012)
+20. Rumelhart, D.E., Hinton, G.E., Williams, R.J.: Learning representations by back-
+
+propagating errors. Nature 323(6088), 533–536 (1986)
+
+21. Liu, K., Giannella, C., Kargupta, H.: An attacker’s view of distance preserv-
+ing maps for privacy preserving data mining. In: F¨urnkranz, J., Scheﬀer, T.,
+Spiliopoulou, M. (eds.) PKDD 2006. LNCS (LNAI), vol. 4213, pp. 297–308.
+Springer, Heidelberg (2006)
+
+22. Guo, S., Wu, X.: Deriving private information from arbitrarily projected data. In:
+Zhou, Z.-H., Li, H., Yang, Q. (eds.) PAKDD 2007. LNCS (LNAI), vol. 4426, pp.
+84–95. Springer, Heidelberg (2007)
+
+23. Dykstra, R.L.: Establishing the positive deﬁniteness of the sample covariance ma-
+
+trix. The Annals of Mathematical Statistics 41(6), 2153–2154 (1970)
+
+24. Grimmett, G.R., Stirzaker, D.R.: Probability and Random Processes, 3rd edn.
+
+Oxford University Press (2001)
+
+

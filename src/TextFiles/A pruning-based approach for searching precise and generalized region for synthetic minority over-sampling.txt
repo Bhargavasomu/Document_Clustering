@@ -1,0 +1,986 @@
+A Pruning-Based Approach for Searching Precise
+and Generalized Region for Synthetic Minority
+
+Over-Sampling
+
+Kamthorn Puntumapon and Kitsana Waiyamai
+
+Department of Computer Engineering, Faculty of Engineering
+
+Kasetsart University, Thailand, 10240
+
+kamthorn.puntumapon@gmail.com, fengknw@ku.ac.th
+
+Abstract. One solution to deal with class imbalance is to modify its class
+distribution. Synthetic over-sampling is a well-known method to modify class
+distribution by generating new synthetic minority data. Synthetic Minority Over-
+sampling TEchnique (SMOTE) is a state-of-the-art synthetic over-sampling al-
+gorithm that generates new synthetic data along the line between the minority
+data and their selected nearest neighbors. Advantages of SMOTE is to have de-
+cision regions larger and less speciﬁc to original data. However, its drawback is
+the over-generalization problem where synthetic data is generated into majority
+class region. Over-generalization leads to misclassify non-minority class region
+into minority class. To overcome the over-generalization problem, we propose an
+algorithm, called TRIM, to search for precise minority region while maintain-
+ing its generalization. TRIM iteratively ﬁlters out irrelevant majority data from
+the precise minority region. Output of the algorithm is the multiple set of seed
+minority data, and each individual set will be used for generating new synthetic
+data. Compared with state-of-the-art over-sampling algorithms, experimental re-
+sults show signiﬁcant performance improvement in terms of F-measure and AUC.
+This suggests over-generalization has a signiﬁcant impact on the performance of
+the synthetic over-sampling method.
+
+1 Introduction
+
+Imbalanced data has been identiﬁed as one of ten most challenging problems in data
+mining [14]. A dataset is considered imbalanced when its class distribution is skewed.
+The skewed class distribution can be represented as a binary class, i.e., minority and
+majority class. The minority class is the one having a much smaller proportion of class
+examples, whereas the majority class contains a much higher proportion of class exam-
+ples. In classiﬁcation, we want to correctly classify on the both classes. However, most
+traditional classiﬁers are biased towards the larger number of examples. For example,
+the C4.5 decision tree algorithm [10] assumes data is from a well balanced class dis-
+tribution. As a result, in cases of imbalanced class distribution, the algorithm is biased
+toward the majority class and treats the minority class as noise.
+
+Solutions to the imbalanced class problem can be broadly divided into two cate-
+gories [13]: algorithm level and data level. Data level solutions are independent of the
+
+P.-N. Tan et al. (Eds.): PAKDD 2012, Part II, LNAI 7302, pp. 371–382, 2012.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2012
+
+372
+
+K. Puntumapon and K. Waiyamai
+
+classiﬁcation algorithm; the preprocessed data can be used by any traditional classiﬁ-
+cation methods. SMOTE [3] is a state-of-the-art of synthetic over-sampling algorithm
+that generates synthetic data along the line between minority data members and their
+selected nearest neighbors. The advantage of SMOTE is to have decision regions larger
+and less speciﬁc to the original data [9]. However, it suffers from over-generalization
+where synthetic data is generated into the majority class region. The reason is that
+SMOTE selects its neighbors without regard to the majority class. This problem leads
+to misclassifying non-minority class examples into minority class region.
+
+Recently, many synthetic over-sampling methods [2–4, 7, 8] have been proposed to
+overcome the imbalanced class problem. Most of the proposed algorithms are based on
+SMOTE and directly select seed examples to generate new synthetic data. Borderline-
+SMOTE [7] directly selects seed examples based on the decision boundary. Borderline
+data is used as a seed example to generate new synthetic data. Safe-Level-SMOTE [2]
+directly positions synthetic data between two minority examples based on the number
+of minority data neighbors. However, these methods are not intended to solve the over-
+generalization problem. To the best of our knowledge, MSYN [4] is the ﬁrst synthetic
+over-sampling method that tries to overcome over-generalization. MSYN uses 1-NN’s
+margin to select a synthetic example. However, in case of a very small number of mi-
+nority data, MSYN has the same problem as other methods as well.
+
+In this paper, we propose an algorithm to overcome the over-generalization problem
+in imbalanced data. To avoid over-generalization, a greedy ﬁltering strategy is employed
+to search for precise and generalized sets of minority data. Individually, precise and
+generalized sets are then used as seed sets to generate synthetic minority data. TRIM
+is a preprocessing algorithm for synthetic over-sampling methods. Therefore, it can
+be used as a preprocessor for most existing synthetic over-sampling methods. In this
+paper, TRIM is used as a preprocessing step to generate synthetic minority data for
+SMOTE, called TRIM-SMOTE. The experimental results show signiﬁcant performance
+improvements in terms of F-measure and AUC over SMOTE. For F-measure, TRIM-
+SMOTE statistical signiﬁcance outperforms SMOTE in 26 out of 33 experiments. For
+AUC, TRIM-SMOTE signiﬁcance outperforms SMOTE in 22 out of 33 experiments.
+
+2 Related Work
+
+Studies using synthetic minority over-sampling [2–4, 7, 8] as a technique to balance
+class distribution in the literature are designed based on the Synthetic Minority Over-
+sampling TEchnique (SMOTE) [3]. SMOTE employs k-nearest neighbors (k-NN) as a
+range to couple two minority examples; new synthetic data is randomly generated along
+the line between the two minority examples. That is, SMOTE uses only minority data
+to generate new synthetic data without regard to the majority class. The way SMOTE
+generates new data can be interpreted as merging the two minority data into a disjunct
+with synthetic data. As a result, SMOTE makes decision regions larger and less speciﬁc
+to the original data. That is, the minority class is generalized and even over-generalized.
+There have been several other techniques to generate minority synthetic data; in this
+section we describe some signiﬁcant works relevant to the work here.
+
+A Pruning-Based Approach for Searching Precise and Generalized Region
+
+373
+
+Borderline-SMOTE (BSMOTE) [7] uses the basic assumption that data nearby the
+decision boundary has more chance to be misclassiﬁed than data far from the decision
+boundary. The author further proposed a criteria to identify borderline data based on
+k-NN; BSMOTE uses both minority and majority data in k-NN. The ratio of the num-
+ber of neighborhood minority examples is used as criterion to identify importance of
+borderline data. Only borderline data and their neighbors are used to generate synthetic
+data. As a result, synthetic data is generated in the overlapping region between two
+classes. Therefore, borderline SMOTE also suffers from over-generalization. The algo-
+rithm may cause severe over-generalization due to the focus sampling in the overlap
+area.
+
+Safe-Level-SMOTE (SSMOTE) [2] has been proposed to directly position synthetic
+examples instead of random positioning. The safe level criteria is based on the number
+of neighborhood minority data in k-NN. That is, the higher number of neighborhood
+minority data, the safer the position is. Since Safe-Level-SMOTE is based on SMOTE,
+new synthetic data are generate on a line between two minority examples. A new syn-
+thetic example is generated nearby a minority example that has higher number of neigh-
+borhood minority data.
+
+To the best of our knowledge, Margin-guided Synthetic Over-sampling (MSYN) [4]
+is the ﬁrst synthetic over-sampling method that claims to overcome over-generalization.
+MSYN uses 1-NN margin to estimate goodness of the synthetic data. The algorithm bias
+prefers synthetic data that has a large margin on both minority and majority classes.
+The synthetic data is ranked by the margin, MSYN then selects the top M values for
+use as synthetic minority data. MSYN trends to generate new synthetic data on a well
+separated region while avoiding the boundary region. Although MSYN can be used to
+avoid over-generalization, it uses all features to select a synthetic example. However,
+many existing classiﬁcation methods usually use several good features to classify data.
+In this work, we propose a method to select precise seed sets on particular features. The
+proposed method searches one feature space at a time to ﬁlter out irrelevant data while
+maintaining seed data.
+
+3 Methodology
+
+The goal of the TRIM algorithm is to avoid over-generalization. The basic idea is to
+identify sets of minority data having the best compromise between generalization and
+precision. The algorithm starts with a single set containing all the data. For each feature,
+every splitting point is identiﬁed and evaluated based on the TRIM criteria, described
+below. A splitting point is identiﬁed by taking the midpoint between two adjacent sorted
+values having different classes. The best splitting point will be used to split the data into
+two sets, i.e., left and right sets. Iteratively, each set of minority data is split into smaller
+sets until the stopping criterion is satisﬁed. The ﬁnal sets are minority datasets are used
+as seed data to generate synthetic data via SMOTE, namely TRIM-SMOTE.
+
+3.1 TRIM Criteria
+
+To avoid over-generalization, the seed data should be precise while maintaining their
+generalization. Therefore, the TRIM criteria, Equation (1), is used as a measure of
+
+374
+
+K. Puntumapon and K. Waiyamai
+
+precision and generalization. The higher the T RIM value, the more precise and gener-
+alized the seed data.
+
+|minority|2
+
+N
+
+T RIM =
+
+(1)
+where |minority| is the size of the minority data. To get better seed data, TRIM Gain
+(T − Gain) is evaluated against two splitting datasets, i.e, left and right sets. T − Gain
+is compared to T RIM . If T − Gain > T RIM , a better seed data is obtained by a
+binary splitting operation. Deﬁne |minoritylef t| and |minorityright| as the number
+of minority data in the left and right subsets; let N be the total number of examples,
+Nlef t, and Nright be the number of data in the left and right subsets. With this notation,,
+T − Gain can be calculated as
+
+T − Gain = max(
+
+|minoritylef t|2
+
+Nlef t
+
+,
+
+|minorityright|2
+
+Nright
+
+)
+
+(2)
+
+The equation (2) is designed to capture two characteristics of SMOTE. The ﬁrst charac-
+teristic is to generate new synthetic data from a couple of minority examples. Therefore,
+only minority data is used to evaluate precision. The second characteristic is synthetic
+data is always generated within the convex hull of the minority data. Therefore, another
+objective of T − Gain is to identify irrelevant majority data located outside the convex
+hull and ﬁlter them out.
+
+Fig. 1 shows a dataset containing two classes. Minority examples are shown as di-
+amonds, and majority examples are stars. The convex hull of the minority class is il-
+lustrated by a dashed line. The relevant majority data is A,B,C,D, and E. The rest
+of the majority data are irrelevant. The seed data lie within the solid line. Similar to
+decision trees, seed data are modeled with a hyper-rectangle. Thus, the irrelevant ma-
+jority data that locate inside the solid line will be mis-identiﬁed as relevant majority
+data.
+
+The standard maximum function is used in Equation 2 to focus on improvement of
+the seed set. The ﬁrst objective is to ﬁlter out irrelevant majority data located outside the
+convex hull of the minority data. We want to focus on improvement of seed data while
+ignore irrelevant data. The second objective is to identify which set of data is splitting
+seed data. To obtain a more precise seed data, some minority examples are split from
+the old seed data. The max is used to detect which of the subsets to use as splitting seed
+data. The splitting seed data is then compared against the old seed data to evaluate the
+improvement.
+
+3.2 TRIM Algorithm
+
+The TRIM algorithm uses a greedy approach to search for set of minority data while ﬁl-
+tering out irrelevant data. Although this approach does not guarantee ﬁnding the global
+optimum, it provides a good approximation to the optimal set. The following pseudo-
+code describes the algorithm.
+
+A Pruning-Based Approach for Searching Precise and Generalized Region
+
+375
+
+Fig. 1. The artiﬁcial dataset with its convex hull and seed set boundary after processing by TRIM
+
+Algorithm TRIM(D)
+Input: data D
+Output: list Seed
+
+1. add D to Leaf
+2. While Leaf and Candidate is not empty{
+3. For each Leaf {
+4.
+5.
+6.
+7.
+
+Initialize all splitting points S on Leafi
+calculate T RIM on Leafi
+For each S {
+accept the highest T − Gainmax that does not split any minority data at Smax
+
+splitting point
+}
+if (T − Gainmax > T RIM ) {
+split Leafi into Leaflef t and Leafright using Smax
+if (subsetlef t contains any minority data)
+add Leaflef t to Leaf
+if (subsetright contains any minority data)
+add Leafright to Leaf
+remove Leafi from Leaf
+} else {
+add Leafi to Candidate
+remove Leafi from Leaf
+
+8.
+9.
+10.
+11.
+12.
+13.
+14.
+15.
+16.
+17.
+18.
+}
+19.
+20. }
+21. For each Candidate {
+22.
+23.
+
+Initialize all splitting points S on Candidatei
+calculate T RIM on Candidatei
+
+K. Puntumapon and K. Waiyamai
+For each S {
+accept highest T − Gainmax at Smax splitting point
+}
+if (T − Gainmax > T RIM ) {
+split Candidatei into Candidatelef t and Candidateright using Smax
+if (Candidatelef t contains any minority data)
+add Candidatelef t to Leaf
+if (Candidateright contains any minority data)
+add Candidateright to Leaf
+remove Candidatei from Candidate
+} else {
+add Candidatei to Seed
+remove Candidatei from Candidate
+
+376
+
+24.
+25.
+26.
+27.
+28.
+29.
+30.
+31.
+32.
+33.
+34.
+35.
+36.
+}
+37.
+38. }
+39. }
+40. return Seed
+
+In line 1, the algorithm starts with a single set containing all data. The algorithm
+consists of two main steps which are irrelevant data ﬁltering and candidate splitting.
+The ﬁrst step, irrelevant data ﬁltering, is shown in lines 3-20. The main objective of
+this step is to ﬁlter out irrelevant majority data. The splitting point will be used with a
+constraint that is no minority data will be split into different set. This constraint ensures
+only irrelevant majority data is split in this step and the relevant majority data is used
+to splits minority data in the next step. Candidate splitting is performed in lines 21-39.
+This step focuses on splitting some minority data to get more precise seed data. Both
+split minority data and new seed data will be used in the 1st step of the next iteration.
+This process iterates until no more better splitting point is found.
+In lines 4-5 of the irrelevant data ﬁltering step, the algorithm starts by initializing
+available splitting points and T RIM value of the whole dataset. In lines 6-8, T − Gain
+is evaluated on every splitting point that splits all minority data into one set. In lines
+10-15, the data is split into two sets (left and right). All majority data will be ﬁltered
+out if they do not contain any minority examples. If no irrelevant data is found, the data
+is sent to the second step at line 17.
+
+In candidate splitting, the algorithm is similar to the ﬁltering step. However, this step
+focuses only on minority data, as shown in line 25. Notice that each seed data will
+be processed in both steps at least once. In order to maintain the generalization, the
+algorithm does not split minority data from majority data that are located outside the
+convex hull. To ensure this condition, all the irrelevant majority data are ﬁltered out in
+the ﬁltering step. Thus, the second step will split minority data based only on relevant
+majority and minority data.
+The higher the T − Gain in Equation (2), the more precise and generalized data
+is obtained. In line 35, seed data will be generated when T − Gain ≤ T RIM . This
+can be interpreted as meaning that no more precise and generalized data can be found.
+Although seed data is well-approximated, some seed data can be considered as noise.
+To ﬁlter out noise, a threshold minimum precision (minP recision) is used to select
+
+A Pruning-Based Approach for Searching Precise and Generalized Region
+
+377
+
+seed data. Deﬁne |minorityi| as the number of minority data in Seedi; Ni be the to-
+tal number of data in Seedi. The precision of Seedi (precisioni) can be expressed
+mathematically as shown in Equation (3).
+
+precisioni =
+
+|minorityi|
+
+Ni
+
+(3)
+
+The precision value of a seed is compared against minP recision. The seed set will be
+ﬁltered out if precision < minP recision. Intuitively, if we set minP recision too
+high, we lose some information. However, if we set minP recision too low, noise can
+happen in the seed data. We experimentally selected minP recision = 0.3 as suitable
+to preserve information while ﬁltering out noise.
+The TRIM algorithm calculates T − Gain on every splitting point. Deﬁne M as
+the number of attributes and N be number of data values. The maximum number of
+splitting points is N − 1, and the maximum number of iterations is N − 1 in the case
+where only one example data is split at each iteration. Hence, the time complexity of
+the algorithm is O(M N 2). However, in experiments the critical step was found to be
+data sorting, having complexity O(M N log(N )).
+
+4 Experimental Results
+
+In the following, the results of TRIM-SMOTE, SMOTE, and MSYN are compared us-
+ing 11 continuous datasets. All experiments were conducted using 10 random seeds
+on 10-fold cross validation with three levels of sampling, i.e., 100%, 300%, 500%. Two
+measurements, AUC [1] and F-measure [12], are used to evaluate performance. Each al-
+gorithm was used in at least 3,300 experiments. The experiments use WEKA’s C4.5 [6]
+as a classiﬁcation model with default conﬁguration, i.e., weka.classiﬁers.trees.J48 -C
+0.25 -M 2. For TRIM, minP recision was set to 0.3; parameters for the other algo-
+rithms were set exactly same as in their papers.
+
+Table 1. Experimental datasets
+
+Dataset
+letter-A
+
+arrhythmia-6
+
+libras-10
+glass-3
+
+#
+1
+2
+3
+4
+5 mfeat-fourier1
+6
+7 breastTissue-fad
+8
+9
+10
+11
+
+segment-path
+bloodTransfer
+
+haberman
+ionoshpere
+
+yeast-ME3
+
+#Attributes %Minority #Minority Data size
+
+16
+280
+90
+10
+76
+9
+10
+19
+4
+3
+35
+
+3.94
+5.53
+6.67
+7.9
+10.0
+10.9
+14.15
+14.28
+23.7
+26.4
+35.8
+
+789
+25
+24
+17
+200
+162
+15
+330
+178
+81
+126
+
+20000
+452
+360
+214
+2000
+1484
+106
+2310
+748
+306
+351
+
+378
+
+K. Puntumapon and K. Waiyamai
+
+In Table 1 the 11 UCI datasets [5] are sorted by percentage of minority class. The per-
+centages vary from 3.9% to 35.8%. Each dataset has ﬁve attributes, i.e., dataset’s name,
+number of attributes (#Attributes), percentage of minority data (%Minority), number of
+minority data (#Minority), and size of dataset (Data size). All datasets have binary class,
+i.e, minority class and majority class. However, the 1st - 8th datasets have more than
+two classes. Therefore, we used one class as the minority class, and grouped the others
+as a majority class. For example, yeast-ME3 contains two classes, i.e., ME3 and others.
+The ME3 and others are considered as minority and majority classes, respectively.
+
+To illustrate the impact of over-generalization, we examine results for the the segment-
+
+path and ionosphere datasets in term of AUC and F-Measure.
+
+Fig. 2. The negative impact of over-generalization in term of F-Measure and AUC on segment-
+path dataset
+
+Fig. 3. The negative impact of over-generalization in term of F-Measure and AUC on ionoshpere
+dataset
+
+As shown in Fig. 2, the three algorithms (decision tree C4.5, TRIM-SMOTE, and
+MSYN) exhibit comparable performance with respect to both AUC and F-measure.
+This can be interpretted to mean that performance improvement is not guaranteed by
+synthetic over-sampling methods. However, SMOTE is degraded on every percentage
+of sampling and its performance is worse when the sampling percentage increases.
+The reason is that MSYN and TRIM are designed to handle over-generalization while
+SMOTE suffers from this problem.
+
+A Pruning-Based Approach for Searching Precise and Generalized Region
+
+379
+
+In Fig. 3, every synthetic over-sampling method, i.e., SMOTE, MSYN, and TRIM-
+SMOTE yields lower performance with respect to F-measure when compared to C4.5.
+However, we obtained stable performance with MSYN and TRIM-SMOTE, i.e., 82.8%
+F-measure with 0.7% standardization. In contrast, SMOTE always yields lower perfor-
+mance on every increasing sampling percentage. In terms of AUC, decision tree C4.5,
+TRIM-SMOTE, and MSYN show comparable performance while SMOTE is always
+lower. These four graphs illustrate the negative impact of over-generalization.
+
+Table 2. Result in terms of F-measure in the experiments performs on eleven UCI datasets. A
+value will be underlined when the particular algorithm yield the highest F-measure among all
+four algorithms.
+
+Dataset
+
+%Minority #Minority %Sampling C4.5 SMOTE MSYN TRIM-SMOTE
+
+letter-A
+
+3.94
+
+arrhythmia-6
+
+5.53
+
+libras-10
+
+6.67
+
+glass-3
+
+7.9
+
+16
+
+25
+
+24
+
+17
+
+mfeat-fourier1
+
+10.0
+
+200
+
+yeast-ME3
+
+10.9
+
+162
+
+breastTissue-fad
+
+14.15
+
+15
+
+segment-path
+
+14.28
+
+330
+
+bloodTransfer
+
+23.7
+
+178
+
+haberman
+
+26.4
+
+81
+
+ionoshpere
+
+35.8
+
+126
+
+Win/Draw/Lose Signiﬁcant
+
+1st rank
+
+100% 94.7% 93.9% 94.3%
+300% 94.7% 92.3% 93.7%
+500% 94.7% 91.8% 93.7%
+100% 62.7% 58.1% 58.1%
+300% 62.7% 40.8% 40.9%
+500% 62.7% 36.2% 36.5%
+100% 57.1% 56.6% 56.2%
+300% 57.1% 52.7% 59.0%
+500% 57.1% 50.8% 56.8%
+100% 51.6% 35.0% 42.5%
+300% 51.6% 30.3% 39.8%
+500% 51.6% 29.6% 37.4%
+100% 97.4% 89.3% 98.1%
+300% 97.4% 79.7% 98.3%
+500% 97.4% 75.7% 98.3%
+100% 76.3% 76.3% 77.3%
+300% 76.3% 74.9% 76.0%
+500% 76.3% 75.0% 76.5%
+100% 41.6% 26.7% 38.2%
+300% 41.6% 34.8% 36.9%
+500% 41.6% 33.2% 34.7%
+100% 99.2% 93.8% 99.2%
+300% 99.2% 89.5% 99.2%
+500% 99.2% 85.1% 99.2%
+100% 46.9% 47.9% 48.3%
+300% 46.9% 47.4% 47.6%
+500% 46.9% 47.7% 47.0%
+100% 41.1% 49.5% 48.1%
+300% 41.1% 47.9% 50.1%
+500% 41.1% 45.6% 49.3%
+100% 83.3% 80.5% 84.2%
+300% 83.3% 75.5% 82.3%
+500% 83.3% 72.8% 81.7%
+17/7/9 26/0/7 17/6/10
+
+9
+
+0
+
+7
+
+95.2%
+95.2%
+94.8%
+64.3%
+64.1%
+69.6%
+57.0%
+60.3%
+65.6%
+47.7%
+47.9%
+43.8%
+96.7%
+96.9%
+96.7%
+77.4%
+76.3%
+78.4%
+36.9%
+39.4%
+42.0%
+99.2%
+99.3%
+99.3%
+48.5%
+48.6%
+47.8%
+51.1%
+48.2%
+48.1%
+82.5%
+83.4%
+82.5%
+
+NA
+20
+
+380
+
+K. Puntumapon and K. Waiyamai
+
+Performance of C4.5 (without sampling), SMOTE, MSYN, and TRIM-SMOTE on
+the eleven datasets in terms of F-measure and AUC are shown in Table 2 and 3. C4.5
+is used as a baseline to evaluate improvement or decreased performance of the three
+algorithms. The bottom rows provide a comparison of each of the three algorithms with
+TRIM-SMOTE. The row labeled (Win/Draw/Lose Signiﬁcant) summarizes the num-
+ber of cases where the algorithm signiﬁcant outperforms, equals, or performs worse
+than TRIM-SMOTE. To evaluate statistical signiﬁcant, Wilcoxon signed rank test [11]
+
+Table 3. Result in terms of AUC in the experiments performs on eleven UCI datasets. A value will
+be underlined when the particular algorithm yield the highest AUC among all four algorithms.
+
+Dataset
+
+%Minority #Minority %Sampling C4.5 SMOTE MSYN TRIM-SMOTE
+
+letter-A
+
+3.94
+
+arrhythmia-6
+
+5.53
+
+libras-10
+
+6.67
+
+glass-3
+
+7.9
+
+16
+
+25
+
+24
+
+17
+
+mfeat-fourier1
+
+10.0
+
+200
+
+yeast-ME3
+
+10.9
+
+162
+
+breastTissue-fad
+
+14.15
+
+15
+
+segment-path
+
+14.28
+
+330
+
+bloodTransfer
+
+23.7
+
+178
+
+haberman
+
+26.4
+
+81
+
+ionoshpere
+
+35.8
+
+126
+
+Win/Draw/Lose Signiﬁcant
+
+1st rank
+
+100%
+300%
+500%
+100%
+300%
+500%
+100%
+300%
+500%
+100%
+300%
+500%
+100%
+300%
+500%
+100%
+300%
+500%
+100%
+300%
+500%
+100%
+300%
+500%
+100%
+300%
+500%
+100%
+300%
+500%
+100%
+300%
+500%
+
+96.5% 96.8% 96.2%
+96.5% 96.3% 96.1%
+96.5% 96.2% 96.3%
+80.8% 82.7% 82.7%
+80.8% 73.7% 73.6%
+80.8% 71.8% 72.0%
+77.5% 79.8% 77.2%
+77.5% 80.5% 80.5%
+77.5% 83.0% 79.3%
+72.0% 64.2% 68.5%
+72.0% 64.3% 68.5%
+72.0% 67.9% 66.9%
+98.3% 98.0% 98.8%
+98.3% 96.7% 99.1%
+98.3% 96.1% 99.2%
+87.0% 89.4% 88.4%
+87.0% 90.3% 87.8%
+87.0% 91.4% 88.1%
+64.4% 57.8% 65.9%
+64.4% 65.8% 64.3%
+64.4% 65.4% 63.2%
+99.6% 98.8% 99.6%
+99.6% 97.9% 99.6%
+99.6% 96.9% 99.6%
+65.2% 65.8% 66.1%
+65.2% 65.4% 65.6%
+65.2% 65.7% 65.2%
+61.0% 65.4% 64.7%
+61.0% 63.8% 66.0%
+61.0% 61.6% 65.3%
+86.5% 85.1% 87.6%
+86.5% 81.3% 86.4%
+86.5% 78.9% 86.0%
+18/2/13 22/3/8 13/5/15
+
+8
+
+4
+
+8
+
+97.3%
+97.5%
+97.3%
+81.8%
+82.2%
+86.5%
+78.0%
+78.0%
+78.3%
+72.4%
+71.8%
+70.4%
+98.0%
+98.2%
+98.2%
+89.0%
+89.5%
+90.8%
+64.5%
+65.7%
+67.7%
+99.6%
+99.7%
+99.7%
+66.2%
+66.3%
+65.7%
+66.6%
+64.2%
+64.0%
+86.2%
+87.1%
+86.6%
+
+NA
+15
+
+A Pruning-Based Approach for Searching Precise and Generalized Region
+
+381
+
+with p-value greater than or equal to 95% evaluates on every cross validation result.
+The second row shows number of cases where the algorithm obtains the highest perfor-
+mance among all four algorithms. The result is underlined when it obtains the highest
+performance.
+
+Table 2 shows the experimental results evaluated using F-measure. The table shows
+that TRIM-SMOTE provided the best classiﬁcation in 20 of 33 cases, and was almost
+similar to C4.5. The table shows that SMOTE generally underperformed both C4.5 and
+TRIM-SMOTE. For datasets having a very small number of minority examples, namely,
+arrhythmia-6, libras-10, glass-3, and breastTissue-fad, SMOTE and MSYN show lower
+performance than C4.5, whereas TRIM-SMOTE is most similar to C4.5, showing more
+stable performance.
+
+Table 3 shows experimental results evaluated using AUC. The table shows that
+SMOTE generally underperformed both C4.5 and TRIM-SMOTE. For the datasets hav-
+ing a very small number of minority examples, namely, arrhythmia-6, glass-3, and
+breastTissue-fad, SMOTE and MSYN show lower performance than C4.5, whereas
+TRIM-SMOTE is most similar to C4.5, showing more stable performance. For libras-
+10 and yeast-ME3, SMOTE shows highest performance in terms of AUC, while TRIM-
+SMOTE yielded the highest F-measure. This can be explained by the fact that SMOTE
+randomly generates synthetic data on every minority data without regarding to major-
+ity data, whereas TRIM-SMOTE tries to maintain a precise and generalized set of seed
+data. As a result, TRIM-SMOTE produces comparable recall but higher precision while
+SMOTE gain higher recall but lower precision.
+
+These experimental results indicate that, of the four algorithms, SMOTE underper-
+forms C4.5 the most, and its performance declines as the sampling percentage increases.
+We observed stable performance for MSYN on large datasets but less than C4.5 for
+small datasets.
+
+5 Conclusions
+
+Synthetic minority over-sampling is a method that generates new minority examples to
+balance an imbalanced class distribution. The advantage is that synthetic data does not
+duplicate the original minority data. Therefore, the classiﬁcation model is not overﬁtted
+to synthetic data. Synthetic over-sampling has its own drawback: over-generalization.
+The problem is that the majority class region is confounded with synthetic minority
+examples. To overcome over-generalization, we propose an algorithm called TRIM as
+a preprocessing for synthetic over-sampling. TRIM searches for a set of precise mi-
+nority examples while maintaining their generalization. The precise seed set is used as
+an input to a synthetic minority over-sampling method. Thus, TRIM can be used as a
+preprocessing algorithm for many available synthetic over-sampling techniques such as
+SMOTE, BSMOTE, and MSYN. Prior to sampling, evaluation or interpretation of the
+seed data can also be conducted. Empirical results also show encouraging improvement
+over SMOTE and MSYN. TRIM-SMOTE is able to cope with the over-generalization
+problem more than MSYN. Its performance is stable on large dataset, and increased on
+small datasets. Experiments on multi-class and multivariate datasets are to be explored
+in the future study.
+
+382
+
+K. Puntumapon and K. Waiyamai
+
+References
+
+[1] Bradley, A.: The use of the area under the ROC curve in the evaluation of machine learning
+
+algorithms. Pattern Recognition 30(7), 1145–1159 (1997)
+
+[2] Bunkhumpornpat, C., Sinapiromsaran, K., Lursinsap, C.: Safe-Level-SMOTE: Safe-Level-
+Synthetic Minority Over-Sampling TEchnique for Handling the Class Imbalanced Problem.
+In: Theeramunkong, T., Kijsirikul, B., Cercone, N., Ho, T.-B. (eds.) PAKDD 2009. LNCS,
+vol. 5476, pp. 475–482. Springer, Heidelberg (2009),
+http://dblp.uni-trier.de/db/conf/pakdd/pakdd2009.html
+
+[3] Chawla, N.V., Bowyer, K.W., Hall, L.O., Kegelmeyer, W.P.: Smote: Synthetic minority
+
+over-sampling technique. Journal of Artiﬁcial Intelligence Research 16, 321–357 (2002)
+
+[4] Fan, X., Tang, K., Weise, T.: Margin-Based Over-Sampling Method for Learning from Im-
+balanced Datasets. In: Huang, J.Z., Cao, L., Srivastava, J. (eds.) PAKDD 2011, Part II.
+LNCS, vol. 6635, pp. 309–320. Springer, Heidelberg (2011)
+
+[5] Frank, A., Asuncion, A.: UCI machine learning repository (2010),
+
+http://archive.ics.uci.edu/ml
+
+[6] Hall, M., Frank, E., Holmes, G., Pfahringer, B., Reutemann, P., Witten, I.H.: The WEKA
+
+data mining software: An update. SIGKDD Explorations 11(1), 10–18 (2009)
+
+[7] Han, H., Wang, W.-Y., Mao, B.-H.: Borderline-SMOTE: A new over-sampling method in
+imbalanced data sets learning. In: Huang, D.-S., Zhang, X.-P., Huang, G.-B. (eds.) ICIC
+2005, Part I. LNCS, vol. 3644, pp. 878–887. Springer, Heidelberg (2005)
+
+[8] He, H., Bai, Y., Garcia, E.A., Li, S.: Adasyn: Adaptive synthetic sampling approach for
+
+imbalanced learning. In: IJCNN, pp. 1322–1328. IEEE (2008),
+http://dblp.uni-trier.de/db/conf/ijcnn/ijcnn2008.html
+
+[9] He, H., Garcia, E.A.: Learning from imbalanced data. IEEE Transactions on Knowledge
+
+and Data Engineering 21, 1263–1284 (2009)
+
+[10] Quinlan, J.R.: C4.5: programs for machine learning. Morgan Kaufmann Publishers Inc.,
+
+San Francisco (1993)
+
+[11] Ramsey, P.H., Hodges, J.L., Shaffer, J.P.: Signiﬁcance probabilities of the wilcoxon signed-
+
+rank test. Journal of Nonparametric Statistics 2(2), 133–153 (1993),
+http://www.informaworld.com/10.1080/10485259308832548
+
+[12] van Rijsbergen, C.J.: Information Retrieval, 2nd edn. Butterworths, London (1979)
+[13] Weiss, G.M.: Mining with rarity: a unifying framework. SIGKDD Explorations 6(1), 7–19
+
+(2004),
+http://dblp.uni-trier.de/db/journals/sigkdd/sigkdd6.html
+
+[14] Yang, Q., Wu, X.: 10 challenging problems in data mining research. International Journal
+
+of Information Technology and Decision Making 5(4), 597–604 (2006),
+http://dblp.uni-trier.de/db/journals/ijitdm/ijitdm5.html
+
+

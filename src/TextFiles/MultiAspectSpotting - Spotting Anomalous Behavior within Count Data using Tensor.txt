@@ -1,0 +1,1272 @@
+MultiAspectSpotting: Spotting Anomalous
+Behavior within Count Data Using Tensor
+
+Koji Maruhashi and Nobuhiro Yugami
+
+Fujitsu Laboratories Ltd.
+
+{maruhashi.koji,yugami}@jp.fujitsu.com
+
+Abstract. Methods for ﬁnding anomalous behaviors are attracting
+much attention, especially for very large datasets with several attributes
+with tens of thousands of categorical values. For example, security en-
+gineers try to ﬁnd anomalous behaviors, i.e., remarkable attacks which
+greatly diﬀer from the day’s trend of attacks, on the basis of intrusion
+detection system logs with source IPs, destination IPs, port numbers,
+and additional information. However, there are large amount of abnor-
+mal records caused by noise, which can be repeated more abnormally
+than those caused by anomalous behaviors, and they are hard to be
+distinguished from each other. To tackle these diﬃculties, we propose
+a two-step anomaly detection. First, we detect abnormal records as in-
+dividual anomalies by using a statistical anomaly detection, which can
+be improved by Poisson Tensor Factorization. Next, we gather the in-
+dividual anomalies into groups of records with similar attribute values,
+which can be implemented by CANDECOMP/PARAFAC (CP) Decom-
+position. We conduct experiments using datasets added with synthesized
+anomalies and prove that our method can spot anomalous behaviors
+eﬀectively. Moreover, our method can spot interesting patterns within
+some real world datasets such as IDS logs and web-access logs.
+
+Keywords: anomaly detection, tensor decomposition.
+
+1
+
+Introduction
+
+Our work is motivated by anomaly detection in datasets that have several at-
+tributes with tens of thousands of categorical values. We want to know the exis-
+tence of anomalous behavior by ﬁnding abnormal records, i.e., records strangely
+repeated or strangely less than expected. For example, an intrusion detection
+system (IDS) monitors network traﬃc for suspicious activity, and each record in
+IDS logs has attributes such as srcIP, dstIP, port, and type as shown in Table 1.
+A serious problem for analysts in charge of a company’s security system is that
+IDS logs contain too many records to investigate all of them precisely. Therefore,
+it is important not only to determine ordinary behaviors, i.e., the day’s trend of
+attacks which changes rapidly day-to-day, but also to spot anomalous behaviors,
+i.e., remarkable attacks which greatly diﬀer from ordinary behaviors of the day,
+which are worth investigating. We can build a model of records caused by ordi-
+nary behavior under the assumption that the majority of records are caused by
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part II, LNAI 8444, pp. 474–485, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+MultiAspectSpotting: Spotting Anomalous Behavior
+
+475
+
+Table 1. Example of a dataset. (a.a.a.a, b.b.b.b, 80, type X) were repeated two times.
+
+source IP (srcIP) destination IP (dstIP) port number (port) possible attack type (type)
+a.a.a.a
+a.a.a.a
+c.c.c.c
+
+type X (DOS attack)
+type X (DOS attack)
+type Y (port scan)
+
+b.b.b.b
+b.b.b.b
+d.d.d.d
+
+80
+80
+12345
+
+ordinary behavior, and distinguish anomalous behaviors from them. One possi-
+ble model is to assume the probability of an ordinary record which contains two
+attribute sets A and B as P (A)P (B), i.e., statistically independent, and to de-
+clare a record anomalous if their joint appearance P (A, B) is much higher than
+P (A)P (B). This is an intuition based on suspicious coincidence [1]. However,
+there are large amount of abnormal records caused by noise, e.g., false positives
+in IDS logs [2], and they can be repeated more abnormally than those caused
+by anomalous behaviors, and they are hard to be distinguished. We can assume
+that an anomalous behavior can aﬀect a group of records with similar attribute
+values, and can be distinguished from noise by gathering abnormal records into
+such a group. For example, many abnormal records with similar srcIP, dstIP,
+port, and type can be caused by a common remarkable attack, instead of false
+positives. However, a problem is that it becomes harder to detect abnormal
+records in such a group as the size of the group grow, because they become more
+likely to be ordinary behaviors, e.g., P (A)P (B) gets closer to P (A, B).
+
+To tackle these diﬃculties, we propose a two-step anomaly detection. In the
+ﬁrst step, we detect abnormal records as individual anomalies with a statistical
+anomaly detection that models the distribution of the numbers of records caused
+by ordinary behaviors as Poisson distribution. By making a stronger assumption
+of the distribution for ordinary behaviors, we try to detect abnormal records
+in larger groups more eﬀectively. This step can be improved by using Poisson
+Tensor Factorization (PTF) [3]. In the second step, we gather the individual
+anomalies into groups of records with similar attribute values. This step can be
+implemented by using CANDECOMP/PARAFAC (CP) Decomposition [4].
+
+Our main contributions are: (1) We propose a novel framework MultiAspectSpot-
+ting combining statistical anomaly detection with spotting groups of abnormal
+records. (2) By using datasets added with synthesized anomalies, we show our
+method can spot anomalous behaviors eﬀectively. (3) We show our method can
+spot interesting patterns in real world datasets like IDS logs and web-access logs.
+The remainder of this paper is organized as follows. We describe the related
+literature in Section 2 and introduce our method in Section 3. We describe
+the accuracy and scalability of our method in Section 4 and the experimental
+evaluation on real data in Section 5. In Section 6 we summarize our conclusions.
+
+2 Related Work
+
+2.1 Anomaly Detection in Categorical Datasets
+
+Anomaly detection has attracted wide interest in many applications such as se-
+curity, risk assessment, and fraud analysis [5]. Das et al. [6] proposed an anomaly
+
+476
+
+K. Maruhashi and N. Yugami
+
+pattern detection in noisy categorical datasets based on a rule-based anomaly
+detection [7]. They searched through all possible one or two component rules and
+detected anomalies whose counts were signiﬁcantly diﬀered from the expected
+counts determined by the training dataset. They used the conditional anomaly
+detection [8,6] as a deﬁnition of anomalies which is an alternative of suspicious
+coincidence proposed by Barlow [1]. However, they tried to ﬁnd groups of ab-
+normal records which signiﬁcantly diﬀered from the training dataset, whereas
+our problem is to spot groups of abnormal records which are most remarkable
+among all records in the dataset.
+
+2.2 Tensor Decomposition
+
+Tensor decomposition is a basic technique that has been widely studied and ap-
+plied to a wide range of disciplines and scenarios. CP Decomposition and Tucker
+Decomposition are two well-known approaches [4], and has been applied to study
+tensor streams [9]. Non-negative tensor factorizations have been proposed to re-
+tain the nonnegative characteristics of the original data [10], as natural expan-
+sions of non-negative matrix factorizations[11]. PTF is one such technique, that
+models sparse count data by describing the random variation via a Poisson dis-
+tribution [3]. Our work is also related to the Boolean Tensor Factorization [12],
+which uses Boolean arithmetic, i.e., deﬁning that 1 + 1 = 1. The problems of
+Boolean Tensor Factorization were proved to be NP-hard, and heuristics for
+these problems were presented [12]. Some implementations of tensor decompo-
+sition algorithms have been made publicly available, such as MATLAB Tensor
+Toolbox [13]. We combine some of these tensor decompositions eﬀectively to
+spot anomalous behaviors. Moreover, some works detected outliers in a low-
+dimensional space obtained by tensor decompositions [14], but outliers caused
+by anomalous behaviors were not distinguished from those caused by noise.
+
+3 Proposed Method
+
+3.1 Notation
+
+A tensor can be represented as a multi-dimensional array of scalars, and we
+call each scalar an entry. Its order is the dimensionality of the array, while each
+dimension is known as one mode. A tensor is rank one if it can be written as
+the outer product of vectors. The rank of a tensor is deﬁned as the smallest
+number of rank-one tensors that can generate the tensor as their sum, and we
+refer to each rank-one tensor as a component. Throughout, scalars are denoted
+by lowercase letters (a), vectors by boldface lowercase letters (v), matrices by
+boldface capital letters (A), and higher-order tensors by boldface Euler script
+letters (X ). The jth column of a matrix A is denoted by aj, and ith entry of
+a vector v is denoted by vi. We use multi-index notation so that a boldface
+i represents the index (i1...iM ) of a tensor of order M . The size of nth mode
+is denoted as In. The notation (cid:2) · (cid:2) refers to the square root of the sum of
+the squares of the entries, analogous to the matrix Frobenius norm. The outer
+product is denoted by ◦, and the inner product is denoted by (cid:4)·,·(cid:5).
+
+MultiAspectSpotting: Spotting Anomalous Behavior
+
+477
+
+3.2 Problem Setting
+
+Our problem can be deﬁned as follows: Given a dataset in which each record i
+has M categorical attributes and repeated xi times, how can we detect abnormal
+records repeated strangely more than or less than expected, caused by anomalous
+behaviors as distinguished from those caused by noise?
+
+We make two assumptions. (1) The majority of records are caused by ordinary
+behavior, and we can build a model with minimal harm caused by anomalous
+behaviors and noise. (2) A group of abnormal records with similar attribute
+values is likely to be caused by a common anomalous behavior.
+
+3.3 MultiAspectSpotting Framework
+
+In this paper, we focus on statistical anomaly detection based on the assumption
+“Normal data instances occur in high probability regions of a stochastic model,
+while anomalies occur in the low probability regions of the stochastic model” [5].
+However, a simple statistical anomaly detection is insuﬃcient to spot interesting
+anomalies eﬀectively because we cannot distinguish abnormal records caused
+by anomalous behaviors from those caused by noise. To tackle this diﬃculty,
+we propose a novel framework MultiAspectSpotting that can spot anomalous
+behaviors by conducting two-step diﬀerent tensor decompositions (Fig. 1):
+1. Create a tensor X in which mth mode corresponds to mth attribute of a
+dataset and entries of X indicating the numbers of corresponding records.
+Then calculate anomaly score of each record by conducting PTF, and pick up
+records with larger anomaly scores than a threshold t as individual anoma-
+lies. We make a strong assumption that the distribution of the number of
+records caused by ordinary behaviors is a mixture of R Poisson distributions,
+to detect individual anomalies in larger groups eﬀectively (see Section 3.4).
+2. Create a binary tensor B in which 1s indicate individual anomalies, and spot
+groups of individual anomalies of the maximum number of S as anomalous
+behaviors by conducting CP Decomposition (see Section 3.5).
+
+Deciding threshold t to pick up individual anomalies in the ﬁrst step is very
+important. Our strategy is to set the ratio of noise records Z, and to decide
+threshold t so that the ratio Z of distinct records is picked up as individual
+anomalies. We assume that a speciﬁc ratio of records are caused by noise, and
+that the number of records caused by anomalous behavior is relatively small. If
+no groups are spotted in the second step, we conclude that the dataset is not
+aﬀected by anomalous behaviors.
+
+Now we do not have a clear strategy of the parameter settings of R, S, and Z,
+and there is a big room for improvement of our framework. However, in Section 4
+we show we can achieve better results by using R > 1 or S > 0 than using R = 1
+(assuming a single Poisson distribution) or S = 0 (without the second step).
+Moreover, we show the selection of Z does not dramatically aﬀect the results of
+spotting anomalous behaviors.
+
+478
+
+K. Maruhashi and N. Yugami
+
+INPUT
+
+IP URL User …
+C …
+IP2 U1
+IP3 U3
+D …
+:
+
+:
+
+:
+
+:
+
+Step1
+User
+
+IP
+
+X
+URL
+
+Step2
+User
+
+IP
+
+B
+URL
+
+≈
+
+≈
+
+P
+
+C
+
+=
+
+=
+
+(3)
+
+p1
+λ1
+
+p1
+(1)
+
+p1
+
+(2)
+
++ … +
+
+(3)
+
+pR
+λR
+
+(2)
+
+pR
+(1)
+
+pR
+
+(3)
+
+c1
+
+(3)
+
+cS
+
++ … +
+
+(2)
+
+c1
+(1)
+
+c1
+
+(2)
+
+cS
+(1)
+
+cS
+
+OUTPUT
+
+Anomaly
+Group #
+
+IP URL User …
+
+1
+
+2
+
+:
+
+IP1 U2
+IP3 U2
+IP4 U3
+IP4 U5
+:
+
+:
+
+C …
+D …
+E …
+E
+
+:
+
+:
+
+Fig. 1. The MultiAspectSpotting framework. Step 1: Conduct Poisson Tensor Fac-
+torization. Step 2: Create binary tensor indicating individual anomalies and conduct
+additional tensor decomposition.
+
+3.4 A Statistical Anomaly Detection Approach
+
+We describe details of the ﬁrst step. The probability of the number of records of
+i to be xi in a ﬁxed interval of time can be modeled as the Poisson distribution
+in which the cumulative probability function is
+
+F (xi, μi) =
+
+xi(cid:2)
+
+k=0
+
+μk
+i
+k!
+
+−µi,
+
+e
+
+(1)
+
+where μi is the Poisson parameter equal to the expected number of the records
+of i caused by ordinary behaviors. Anomaly score is calculated as
+
+anomaly score(xi, μi) =
+
+(cid:3)
+
+(−1) ∗ log(F (xi, μi))
+(−1) ∗ log(1 − F (xi, μi))
+
+(xi ≤ μi),
+(xi > μi).
+
+(2)
+
+We consider a distinct record of i to be an individual anomaly if the anomaly
+score is higher than a threshold t. Also, F (xi, μi) can be easily computed with
+the incomplete gamma function. As μi is the expected number of records of i,
+we can estimate μi as
+
+μi = λp(1)
+i1
+
+··· p(M)
+iM ,
+
+(3)
+
+where λ is total number of records and p(m)
+im is the probability of mth value to
+be im, under the assumption of independence among the attributes. p(m)
+im can be
+estimated as p(m)
+im is the number of records of which mth
+value is im. Alternatively, we can assume the distribution as the mixture of R
+Poisson distributions. The Poisson parameters can be estimated as
+
+im /λ, where N (m)
+
+im = N (m)
+
+μi =
+
+R(cid:2)
+
+r=1
+
+λrp(1)
+ri1
+
+··· p(M)
+riM ,
+
+(4)
+
+under the assumption of independence among the distributions, where λr is the
+expected total number of records emerged from rth distribution and p(m)
+rim is the
+
+MultiAspectSpotting: Spotting Anomalous Behavior
+
+479
+
+probability of mth value to be im in rth distribution. We can estimate λr and
+p(m)
+rim for all i and r by conducting PTF, which calculates each parameter so as to
+i μi − xilogμi [3].
+minimize the generalized Kullback-Leibler divergence, i.e.,
+The details of PTF are outside the scope of this paper. Note that PTF of R = 1
+is equivalent to calculating the parameters of equation (3).
+
+(cid:4)
+
+3.5 Spotting Anomalous Behaviors by Tensor Decomposition
+
+In the second step, we try to ﬁnd S product sets Ds = {(i1, . . . , iM )|im ∈
+s ∀m = 1, . . . , M} where d(m)
+d(m)
+is sth set of values of mth attribute (s =
+1, . . . , S), such that each product set contains as many individual anomalies as
+possible. We propose DenseSpot, a tensor decomposition approach (Algorithm 1).
+DenseSpot construct a binary tensor B of order M in which an entry bi is
+
+s
+
+(cid:3)
+
+bi =
+
+1 (anomaly score(xi, μi) > t),
+0 (otherwise).
+
+The aim of DenseSpot is to obtain a rank-S tensor
+
+C =
+
+S(cid:2)
+
+s=1
+
+s ◦ ... ◦ c(M)
+c(1)
+
+s
+
+(5)
+
+(6)
+
+s
+
+s
+
+s
+
+(cid:4)S
+
+which minimize (cid:2)B−C(cid:2), where c(m)
+are binary vectors. However, the decision ver-
+sion of this problem is a NP-hard problem similar to Boolean Tensor Factoriza-
+tion [12]. Thus, DenseSpot ﬁrst obtains a rank-S tensor ˆC =
+s ◦ ...◦ ˆc(M)
+which minimize (cid:2)B − ˆC(cid:2), where ˆc(m)
+are real-value vectors. This is a relaxation
+problem of the above problem, and we can obtain a solution by conducting CP
+Decomposition [4]. After that, DenseSpot checks entries in sth component of ˆC
+corresponding to individual anomalies (i1, . . . , iM ) and puts 1 on imth element
+of c(m)
+if the entries are greater than a threshold h. Finally, DenseSpot selects
+h, which minimizes (cid:2)B − C(cid:2) and returns those C calculated by the h. We can
+easily calculate (cid:2)B −C(cid:2)2 as (cid:2)B(cid:2)2 − 2(cid:4)B,C(cid:5) +(cid:2)C(cid:2)2. A set d(m)
+can be created by
+selecting value 1 entries of c(m)
+
+s=1 ˆc(1)
+
+s
+
+s
+
+.
+
+s
+
+Also, Boolean Tensor Factorization [12] might be a good solution for this.
+Even though this could improve the eﬃciency of our method, we explain how
+our simple heuristics can perform better than baseline methods in Section 4.
+
+4 Evaluation of Accuracy and Scalability
+
+In this section, we present experimental results on the accuracy and scalability of
+our methods. The running example in this section comes from network traﬃc logs
+that consist of packet traces in an enterprise network (LBNL/ICSI Enterprise
+Tracing Project 1). We abbreviate them as LBNL logs. Each trace in the logs is a
+
+1
+
+http://www.icir.org/enterprise-tracing/
+
+480
+
+K. Maruhashi and N. Yugami
+
+Algorithm 1. DenseSpot
+Input: A binary tensor B
+Input: Maximum number S of anomalies to spot
+Input: A set of thresholds H = {h1, ..., hd}
+Output: Rank-S tensor C =
+
+(cid:2)S
+
+(M )
+s
+
+(1)
+
+s ◦ ... ◦ c
+s.t. minimize (cid:4)B − ˆC(cid:4)
+
+s=1 c
+
+(M )
+s
+
+(1)
+
+s ◦ ... ◦ ˆc
+
+s=1 ˆc
+
+1 ˆC ← (cid:2)S
+2 for j = 1 to d do
+s=1 c
+3
+
+C(j) ← (cid:2)S
+forall the (i1...iM ) of 1 entries in B do
+
+s ◦ ... ◦ c
+
+(m)
+where c
+s
+
+(M )
+s
+
+(1)
+
+(m)
+where c
+s
+
+are binary vectors
+(cid:2)CP Decomposition
+
+are Im-length vectors of all 0
+
+4
+
+5
+
+6
+
+7
+
+8
+
+for s = 1 to S do
+
+if ˆc(1)
+si1
+
+...ˆc(M )
+siM
+
+≥ hj then c(1)
+
+si1
+
+← 1, ..., c(M )
+
+siM
+
+← 1
+
+end
+
+end
+
+9 end
+10 jmin ← arg min
+11 return C(jmin)
+
+j
+
+(cid:4)B − C(j)(cid:4)
+
+triplet of {source IPs (srcIP), destination IPs (dstIP), and port number (port)},
+which can be represented as a 3-mode tensor. First, we evaluate the accuracy
+of spotting anomalous behaviors by using 10 largest LBNL logs added with
+synthesized anomalies. Then we evaluate the scalability by using many LBNL
+logs of various numbers of records.
+
+MultiAspectSpotting is implemented in the MATLAB language, and we use
+implementations of PTF (cp apr) and CP Decomposition (cp als), publicly avail-
+able in MATLAB Tensor Toolbox [13]. All the experiments are performed on a
+64-bit Windows XP machine with four 2.8GHz cores and 8GB of memory.
+
+4.1 Putting Synthesized Anomalies on Datasets
+
+We create some synthesized anomalies and add into 10 largest LBNL logs, and
+evaluate how eﬀectively our method can spot these anomalies. These LBNL
+logs have about 900, 000 to 9, 000, 000 records and 15, 000 to 50, 000 distinct
+records, with 1, 400 to 4, 500 srcIPs, 1, 400 to 4, 800 dstIPs and 5, 400 to 24, 000
+ports. Each distinct record is repeated about 50 to 350 times in average, and the
+standard deviation is about 1, 000 to 22, 000.
+
+Given parameters of volume V , density D and maximum number P , we create
+N groups of abnormal records as follows: (1) For each group, we randomly select
+three values s,d,p between 0 and 1, and decide the number of srcIPs and dstIPs
+and ports in accordance with the ratio of three selected values, so that sdp is
+not lower than V , e.g., the number of srcIPs is (cid:10)s(V /(sdp))1/3(cid:11) where (cid:10)·(cid:11) is the
+ceiling function. (2) (cid:10)V D(cid:11) distinct records are randomly selected for each group,
+and (3) the number of each record is decided randomly between 1 and P . We
+test for V = 50, D = 0.1, 0.3, 0.5, 0.7, 0.9, P = 500, and N = 10.
+
+MultiAspectSpotting: Spotting Anomalous Behavior
+
+481
+
+4.2 Methods Compared
+
+We compare the accuracies in spotting synthesized anomalies among the follow-
+ing methods:
+
+MASP-Multi MultiAspectSpotting with R = 10 and S = 20.
+MASP-Single MultiAspectSpotting with R = 1 and S = 20, which is equiva-
+lent to modeling the probabilities of the numbers of the records caused by
+ordinary behaviors as a single Poisson distribution.
+
+DS-Only Conducting just DenseSpot of S = 20 by picking up all distinct
+
+records as individual anomalies.
+
+SC-DS Using a measure of suspicious coincidence proposed by Barlow [1]. For
+each record, we calculate the ratio r = P (A, B)/(P (A)P (B)) where P (A)
+and P (B) are probabilities of a record having attribute sets A and B (e.g.,
+{srcIP}, {dstIP, port}), and P (A, B) is the joint probability. The anomaly
+score of the record is deﬁned as the minimum value of r among those of
+all possible combinations of A and B. We pick up individual anomalies and
+conduct DenseSpot as the same as MultiAspectSpotting.
+
+Note that we have tried several methods similar to SC-DS, such as those
+using the maximum value of r, or those considering records with lower r as
+anomalous, or those using the ratio r = P (A, B, C)/(P (A)P (B)P (C)) where
+P (A),P (B),P (C) and P (A, B, C) correspond to attributes A, B and C, but
+these variations have obtained far worse results than SC-DS (not shown).
+
+4.3 Accuracy of Spotting Synthesized Anomalies
+
+We apply the above methods to LBNL logs added with synthesized anomalies
+and compare a group of records spotted by each method with a group of syn-
+thesized anomalies. We conduct chi-square tests of independence, which assess
+whether these two groups are independent of each other. In short, given these
+two group, we calculate χ2 = n(a(n−e−g +a)−(e−a)(g−a))2/(e(n−e)g(n−g))
+where n is the total number of distinct records, a is the number of common dis-
+tinct records between two groups, e and g are the numbers of distinct records of
+two groups. If χ2 is greater than a value of p-value at 0.05 of the chi-squared dis-
+tribution for 1 degree of freedom, we conclude that the method has successfully
+spotted the synthesized anomalous group.
+
+Fig. 2 is the number of groups spotted by each method. MASP-Multi and
+MASP-Single can spot many more groups than DS-Only, which suggests the
+statistical anomaly detection in the ﬁrst step works eﬃciently. However, SC-DS
+is worse than DS-Only, which suggests the measure of suspicious coincidence
+is not good at detecting the anomalies we consider in this paper. Moreover,
+MASP-Multi is better than MASP-Single, which indicates we can model ordinary
+behaviors better by using a mixture of Poisson distributions. Overall, the more
+density grows, the better MASP-Multi and MASP-Single can spot than DS-
+Only and SC-DS. Moreover, the results of MASP-Multi and MASP-Single do
+not dramatically diﬀer between Z = 0.01 (Fig. 2 left) and Z = 0.1 (Fig. 2 right),
+especially for higher density such as P = 0.7, 0.9.
+
+482
+
+K. Maruhashi and N. Yugami
+
+(cid:1)
+
+(cid:84)
+(cid:81)
+(cid:86)
+(cid:80)
+(cid:83)
+(cid:72)
+(cid:69)
+(cid:70)
+(cid:85)
+(cid:68)
+(cid:70)
+(cid:85)
+(cid:70)
+(cid:69)
+(cid:4)
+
+(cid:1)
+
+(cid:18)(cid:17)
+
+(cid:25)
+
+(cid:23)
+
+(cid:21)
+
+(cid:19)
+
+(cid:17)
+
+(cid:1)
+
+(cid:46)(cid:34)(cid:52)(cid:49)(cid:14)(cid:46)(cid:86)(cid:77)(cid:85)(cid:74)
+(cid:46)(cid:34)(cid:52)(cid:49)(cid:14)(cid:52)(cid:74)(cid:79)(cid:72)(cid:77)(cid:70)
+(cid:37)(cid:52)(cid:14)(cid:48)(cid:79)(cid:77)(cid:90)
+(cid:52)(cid:36)(cid:14)(cid:37)(cid:52)
+
+(cid:17)(cid:15)(cid:18)
+
+(cid:17)(cid:15)(cid:20)
+
+(cid:17)(cid:15)(cid:22)
+
+(cid:69)(cid:70)(cid:79)(cid:84)(cid:74)(cid:85)(cid:90)
+
+(cid:17)(cid:15)(cid:24)
+
+(cid:17)(cid:15)(cid:26)
+
+(cid:1)
+
+(cid:18)(cid:17)
+
+(cid:1)
+
+(cid:84)
+(cid:81)
+(cid:86)
+(cid:80)
+(cid:83)
+(cid:72)
+(cid:69)
+(cid:70)
+(cid:85)
+(cid:68)
+(cid:70)
+(cid:85)
+(cid:70)
+(cid:69)
+(cid:4)
+
+(cid:1)
+
+(cid:25)
+
+(cid:23)
+
+(cid:21)
+
+(cid:19)
+
+(cid:17)
+
+(cid:1)
+
+(cid:1)
+
+(cid:46)(cid:34)(cid:52)(cid:49)(cid:14)(cid:46)(cid:86)(cid:77)(cid:85)(cid:74)
+(cid:46)(cid:34)(cid:52)(cid:49)(cid:14)(cid:52)(cid:74)(cid:79)(cid:72)(cid:77)(cid:70)
+(cid:37)(cid:52)(cid:14)(cid:48)(cid:79)(cid:77)(cid:90)
+(cid:52)(cid:36)(cid:14)(cid:37)(cid:52)
+
+(cid:17)(cid:15)(cid:18)
+
+(cid:17)(cid:15)(cid:20)
+
+(cid:17)(cid:15)(cid:22)
+
+(cid:69)(cid:70)(cid:79)(cid:84)(cid:74)(cid:85)(cid:90)
+
+(cid:17)(cid:15)(cid:24)
+
+(cid:17)(cid:15)(cid:26)
+
+Fig. 2. Vertical axis: average number of spotted groups. Horizontal axis: density of
+groups of synthesized anomalies. (left) Z = 0.01. (right) Z = 0.1.
+
+4.4 Details of Accuracy
+
+We detail the eﬀectiveness of each step. For the ﬁrst step, we show the area
+under the ROC curve (AUC) of each method in detecting distinct synthesized
+anomalies out of all distinct records at various settings of Z (Fig. 3 left). Overall,
+AUCs of MASP-Multi and MASP-Single are better than those of SC-DS, and
+do not become much worse as density grow, whereas AUCs of SC-DS become
+much worse. These indicate that this statistical anomaly detection is a better
+strategy at least in detecting anomalies described here. There are no signiﬁ-
+cant diﬀerences between MASP-Multi and MASP-Single in view of AUCs. For
+the second step, we select as many records with the highest anomaly scores as
+the total number of individual anomalies DenseSpot has detected, which we call
+TopRecords. We compare the precision of detecting synthesized anomalies out
+of individual anomalies between DenseSpot and TopRecords. The precision of
+DenseSpot and TopRecords are calculated as p/k and q/k, where p is the total
+number of distinct synthesized anomalies that DenseSpot has detected, q is the
+number of those TopRecords has selected, and k is the total number of indi-
+vidual anomalies that DenseSpot has detected. Fig. 3 (right) shows precisions
+on each method (Z = 0.01). The precisions of DenseSpot are much better than
+those of TopRecords on MASP-Multi and MASP-Single for higher density. This
+means the synthesized anomalies do not have very high anomaly scores among
+individual anomalies, whereas DenseSpot can pick up these synthesized anoma-
+lies, especially for higher density. Additionally, the precisions of DenseSpot on
+MASP-Multi are better than those on MASP-Single, which indicates that the
+diﬀerence in the number of Poisson distributions in the ﬁrst step strongly aﬀects
+the second step, even though diﬀerences in AUCs are very small. In addition, the
+precisions of DenseSpot are worse than those of TopRecords on SC-DS, possibly
+due to the poor accuracy of the suspicious coincidence in the ﬁrst step.
+
+4.5 Scalability
+
+We conduct experiments for scalability on 123 diﬀerent LBNL logs with various
+numbers of records, from less than 100 to more than 9, 000, 000. As shown in
+Fig. 4, computation time of PTF (left) and DenseSpot (right) increases linearly
+
+MultiAspectSpotting: Spotting Anomalous Behavior
+
+483
+
+(cid:18)(cid:15)(cid:17)
+
+(cid:17)(cid:15)(cid:26)
+
+(cid:17)(cid:15)(cid:25)
+
+(cid:17)(cid:15)(cid:24)
+
+(cid:17)(cid:15)(cid:23)
+
+(cid:17)(cid:15)(cid:22)
+
+(cid:1)
+
+(cid:36)
+(cid:54)
+(cid:34)
+
+(cid:1)
+
+(cid:79)
+(cid:80)
+(cid:74)
+(cid:84)
+(cid:74)
+(cid:68)
+(cid:70)
+(cid:83)
+(cid:81)
+
+(cid:17)(cid:15)(cid:22)
+
+(cid:17)(cid:15)(cid:21)
+
+(cid:17)(cid:15)(cid:20)
+
+(cid:17)(cid:15)(cid:19)
+
+(cid:17)(cid:15)(cid:18)
+
+(cid:17)(cid:15)(cid:17)
+
+(cid:1)
+
+(cid:17)(cid:15)(cid:24)
+
+(cid:17)(cid:15)(cid:26)
+
+(cid:1)
+
+(cid:46)(cid:34)(cid:52)(cid:49)(cid:14)(cid:46)(cid:86)(cid:77)(cid:85)(cid:74)
+(cid:46)(cid:34)(cid:52)(cid:49)(cid:14)(cid:52)(cid:74)(cid:79)(cid:72)(cid:77)(cid:70)
+(cid:52)(cid:36)(cid:14)(cid:37)(cid:52)
+
+(cid:17)(cid:15)(cid:18)
+
+(cid:17)(cid:15)(cid:20)
+
+(cid:17)(cid:15)(cid:22)
+
+(cid:69)(cid:70)(cid:79)(cid:84)(cid:74)(cid:85)(cid:90)
+
+(cid:17)(cid:15)(cid:24)
+
+(cid:17)(cid:15)(cid:26)
+
+(cid:46)(cid:34)(cid:52)(cid:49)(cid:14)(cid:46)(cid:86)(cid:77)(cid:85)(cid:74)
+(cid:46)(cid:34)(cid:52)(cid:49)(cid:14)(cid:52)(cid:74)(cid:79)(cid:72)(cid:77)(cid:70)
+(cid:52)(cid:36)(cid:14)(cid:37)(cid:52)
+(cid:17)(cid:15)(cid:20)
+
+(cid:17)(cid:15)(cid:22)
+
+(cid:17)(cid:15)(cid:18)
+
+(cid:69)(cid:70)(cid:79)(cid:84)(cid:74)(cid:85)(cid:90)
+
+Fig. 3. (left) Average AUC of each method. Vertical axis: average AUC. Horizontal
+axis: density of groups of anomalous records. (right) The precision of DenseSpot (solid
+lines) and TopRecords (dotted lines) as described in Section 4 (Z = 0.01). Vertical axis:
+average of the precision. Horizontal axis: density of groups of anomalous records.
+
+(cid:18)(cid:22)(cid:17)
+
+(cid:18)(cid:17)(cid:17)
+
+(cid:22)(cid:17)
+
+(cid:62)
+(cid:84)
+(cid:60)
+(cid:1)
+(cid:70)
+(cid:78)
+
+(cid:74)
+(cid:85)
+
+(cid:17)
+(cid:17)
+
+(cid:49)(cid:53)(cid:39)(cid:1)(cid:84)(cid:68)(cid:66)(cid:77)(cid:66)(cid:67)(cid:74)(cid:77)(cid:74)(cid:85)(cid:90)
+
+(cid:37)(cid:70)(cid:79)(cid:84)(cid:70)(cid:52)(cid:81)(cid:80)(cid:85)(cid:1)(cid:84)(cid:68)(cid:66)(cid:77)(cid:66)(cid:67)(cid:74)(cid:77)(cid:74)(cid:85)(cid:90)
+
+(cid:62)
+(cid:84)
+(cid:60)
+(cid:1)
+(cid:70)
+(cid:78)
+
+(cid:74)
+(cid:85)
+
+(cid:23)
+
+(cid:21)
+
+(cid:19)
+
+(cid:17)
+(cid:17)
+
+(cid:18)
+(cid:19)
+N N Z × Iapr
+
+(cid:20)
+(cid:89)(cid:1)(cid:18)(cid:17) (cid:25)
+
+(cid:22)
+
+N1 × Ials
+
+(cid:18)(cid:17)
+(cid:89)(cid:1)(cid:18)(cid:17) (cid:21)
+
+Fig. 4. Computation time have high correlation with N N Z × Iapr on PTF of R = 10
+(left) and N 1 × Ials on DenseSpot of S = 20 (right), where N N Z is the number of
+non-zeros (N N Z) in X , Iapr is the number of inner iterations of cp apr, N 1 is the
+number of 1s in B, and Ials is number of iterations of cp als. Vertical axis: computation
+time (s). Horizontal axis: N N Z × Iapr (left), N 1 × Ials (right).
+
+along with the number of non-zero entries in the tensor (entries of 1 for Dens-
+eSpot) multiplied by the number of iterations of cp apr and cp als. These results
+are consistent with these alternating optimization algorithms implemented for
+sparse tensor [4,3] and suggest that these two steps of our framework scale lin-
+early along with the number of distinct records in the dataset.
+
+5 Empirical Results on Real Data
+
+We present our experimental results on two sets of real world data: intrusion
+detection system logs and web-access logs (R = 20, S = 20, and Z = 0.1). We
+cannot mention the names of the companies from whom we have obtained these
+datasets because of the business relationship. Table 2 summarizes these datasets.
+
+5.1 Intrusion Detection System Logs
+
+We apply our method to IDS logs of a crowd system of an IT company. We
+analyze inbound logs on Dec 2011, that is, suspicious packets sent from outside
+
+484
+
+K. Maruhashi and N. Yugami
+
+Table 2. Summary of Datasets
+
+IDS logs
+web-access logs
+
+24 hours
+
+mode#1
+
+mode#3
+22,733 srcIPs 3,171 dstIPs 11,310 ports
+
+mode#2
+
+362 types
+462 IPs 40,465 URLs 51,960 UserIDs
+
+mode#4 # of records
+228,852
+462,271
+
+Table 3. Summary of the groups of individual anomalies spotted by MultiAspectSpot-
+ting. We show the unique number of values of each attribute along with the total
+number of distinct records (#records), the average of repeated times of each distinct
+record (ave. num.), the average of Poisson parameters (eve. exp.), and description.
+
+(a) IDS logs
+
+No. #srcIP #dstIP #port #type #records ave. num. ave. exp. description
+
+1
+2
+3
+4
+5
+
+1
+53
+1
+1
+5
+
+No. #hour
+5
+2
+1
+6
+1
+
+1
+2
+3
+4
+5
+
+60
+1
+1
+34
+1
+
+1
+1
+45
+1
+1
+
+1
+1
+1
+1
+7
+
+60
+53
+45
+34
+33
+
+22.52
+5.26
+1.00
+20.41
+262.42
+
+2.65 FingerPrint
+0.00 FTP Login Fail
+0.00 Malicious Javascript
+2.17 TCP Invalid ﬂags
+
+41.23 Scanning to Web Server
+
+(b) web-access logs
+
+#IP #URL #UserID #records ave. num. eve. exp. description
+
+1
+1
+13
+2
+1
+
+3
+5
+1
+1
+1
+
+1
+2
+1
+1
+12
+
+15
+13
+13
+12
+12
+
+4.07
+43.23
+7.92
+408.83
+6.08
+
+0.00 weather-checking
+1.85 point-gathering
+0.02 photo-uploading
+66.48 photo-uploading
+
+0.04 advertisement-viewing
+
+the crowd system. Each record represents a report which has attributes of {source
+IP (srcIP), destination IP (dstIP), port number (port), and attack type (type)}.
+Table 3(a) summarizes the ﬁve largest groups of anomalous records spotted
+by our method. The descriptions are characteristics of these groups guessed by
+a specialist knowledgeable about the IDS of this crowd system. These include
+several kinds of attacks: attacks from many srcIPs including suspicious FTP
+login trials(#2), attacks on many dstIPs (#1,#4), attacks on many port numbers
+(#3), and attacks from several srcIPs of various attack types (#5). For example,
+the group #3 indicates that an outside IP has attacked many port numbers of
+an inside IP with a speciﬁc attack type, and that these attacks are remarkable
+because they are very rare events. Moreover, it is hard for analysts to notice the
+existence of this group of attacks because the number of records of this group is
+almost 0.02% of the total number of records within this dataset.
+
+5.2 Web Access Logs
+
+We also apply our method to web-access logs of a web-service company on Jan 10,
+2013. Each record has attributes of {hour, IP, URL, and UserID} which means
+an access on the URL by the UserID from the IP at the hour of a day. The
+engineers at this company want to ﬁnd any strange accesses within web-access
+logs and surprising or illegal usage of their web pages.
+
+Table 3(b) summarizes the ﬁve largest groups of anomalous records spotted
+by our method, with descriptions of characteristics of these groups guessed by
+a specialist knowldgeable about the web site. For example, the group #2 is a
+point-gathering group, in which two users have strangely accessed a set of URLs
+
+MultiAspectSpotting: Spotting Anomalous Behavior
+
+485
+
+many times from a IP continuously from 16 pm to 17 pm of this day. By accessing
+these URLs, users can obtain points that can be exchanged for some gifts, so the
+user who accesses just for gathering points illegally is suspicious.
+
+6 Conclusion
+
+We proposed a novel framework MultiAspectSpotting that can eﬀectively spot
+anomalous behaviors by leveraging a two-step approach of a diﬀerent kind of
+tensor decomposition. Experimental results of synthesized anomalies show our
+method can spot groups of individual anomalies more eﬀectively than some base-
+line methods and can be improved by using PTF. The eﬀectiveness of our method
+is achieved thanks to the combination of the accuracy of statistical anomaly de-
+tection in the ﬁrst step and the ability of gathering individual anomalies in
+the second step, even though it might become harder for our method to model
+ordinary behaviors as the number of the attributes grows, i.e., the dataset be-
+comes sparser. Moreover, experimental results on real world data proved that
+our method could spot interesting patterns within IDS logs and web-access logs.
+
+References
+
+1. Barlow, H.B.: Unsupervised learning. Neural Computation 1, 295–311 (1989)
+2. Julisch, K., Dacier, M.: Mining intrusion detection alarms for actionable knowledge.
+
+In: KDD, pp. 366–375 (2002)
+
+3. Chi, E.C., Kolda, T.G.: On tensors, sparsity, and nonnegative factorizations. SIAM
+
+J. Matrix Analysis Applications 33(4), 1272–1299 (2012)
+
+4. Kolda, T.G., Bader, B.W.: Tensor decompositions and applications. SIAM Re-
+
+view 51(3), 455–500 (2009)
+
+5. Chandola, V., Banerjee, A., Kumar, V.: Anomaly detection: A survey. ACM Com-
+
+put. Surv. 41(3) (2009)
+
+6. Das, K., Schneider, J.G., Neill, D.B.: Anomaly pattern detection in categorical
+
+datasets. In: KDD, pp. 169–176 (2008)
+
+7. Wong, W.K., Moore, A.W., Cooper, G.F., Wagner, M.M.: Rule-based anomaly
+pattern detection for detecting disease outbreaks. In: AAAI/IAAI, pp. 217–223
+(2002)
+
+8. Das, K., Schneider, J.G.: Detecting anomalous records in categorical datasets. In:
+
+KDD, pp. 220–229 (2007)
+
+9. Sun, J., Tao, D., Papadimitriou, S., Yu, P.S., Faloutsos, C.: Incremental tensor
+
+analysis: Theory and applications. TKDD 2(3) (2008)
+
+10. Shashua, A., Hazan, T.: Non-negative tensor factorization with applications to
+
+statistics and computer vision. In: ICML, pp. 792–799 (2005)
+
+11. Lee, D.D., Seung, H.S.: Algorithms for non-negative matrix factorization. In: NIPS,
+
+pp. 556–562 (2000)
+
+12. Miettinen, P.: Boolean tensor factorizations. In: ICDM, pp. 447–456 (2011)
+13. Bader, B.W., Kolda, T.G., et al.: Matlab tensor toolbox version 2.5. Available
+
+online (January 2012), http://www.sandia.gov/~tgkolda/TensorToolbox/
+
+14. Hayashi, K., Takenouchi, T., Shibata, T., Kamiya, Y., Kato, D., Kunieda, K.,
+Yamada, K., Ikeda, K.: Exponential family tensor factorization for missing-values
+prediction and anomaly detection. In: ICDM, pp. 216–225 (2010)
+
+

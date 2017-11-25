@@ -1,0 +1,792 @@
+Unsupervised Analysis of Web Page Semantic
+Structures by Hierarchical Bayesian Modeling
+
+Minoru Yoshida1, Kazuyuki Matsumoto1, Kenji Kita1, and Hiroshi Nakagawa2
+
+1 Institute of Technology and Science, University of Tokushima
+
+2-1, Minami-josanjima, Tokushima, 770-8506, Japan
+
+{mino,matumoto,kita}@is.tokushima-u.ac.jp
+
+2 Information Technology Center, University of Tokyo
+
+7-3-1, Hongo, Bunkyo-ku, Tokyo 113-0033, Japan
+
+nakagawa@dl.itc.u-tokyo.ac.jp
+
+Abstract. We propose a Bayesian probabilistic modeling of the seman-
+tic structures of HTML documents. We assume that HTML documents
+have logically hierarchical structures and model them as links between
+blocks. These links or dependency structures are estimated by sampling
+methods. We use hierarchical Bayesian modeling where each block is
+given labels such as “heading” or “contents”, and words and layout fea-
+tures (i.e., symbols and HTML tags) are generated simultaneously, based
+on these labels.
+
+Keywords: Hierarchical Bayesian modeling, Web document analysis,
+Gibbs sampling.
+
+1
+
+Introduction
+
+In this study, we propose a new model for HTML documents that can extract
+document structures from them. Document structures are hierarchical structures
+of documents that decompose documents into smaller parts recursively. For ex-
+ample, scientiﬁc papers typically consist of several sections, each of which can
+be decomposed into subsections. In addition, titles, abstracts, and so on, are
+included in the document structure.
+
+Web document analysis is a challenge to extract such document structures
+from HTML documents. Web documents can be decomposed into subdocuments,
+typically with their headings representing titles of each subdocuments. Figure
+1 shows an example of subdocuments found in the web page shown in Figure
+2, where each subdocument is presented as a heading. For example, in this
+document, “Age: 25” is a subdocument with the heading “Age” and content
+“25”. Our purpose is to extract such lists of subdocuments such that those in
+the same list have parallel relations (such as “TEL:...” and “FAX:...” in Figure
+1.) Note that there are “nested” lists – the element starting with “Contact:”
+contains another list “TEL:...” and “FAX:...”.
+
+We assume generative models for documents. The most basic way to col-
+lect parallel subdocuments is to use clustering algorithms such as K-means.
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part II, LNAI 8444, pp. 572–583, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+Unsupervised Analysis of Web Page Semantic Structures
+
+573
+
+John Smith’s Page
+
+Age: 25
+
+Sex: Male
+
+Research Interest: Data Mining
+
+Contact:
+
+TEL: +01-234-5678
+
+FAX: +02-345-6789
+
+List 1
+
++ Age: …
+
++ Sex: …
+
++ Research Interest: …
+
++ Contact: …
+
+List 2
+
++ TEL: …
+
++ FAX: …
+
+Fig. 1. Example Document and Its Repeated Tuples
+
+The model we propose in this study is somewhat similar; however, it uses a hier-
+archical Bayesian framework to not only model similarities of visual eﬀects, but
+also model
+
+– hierarchical structures by using dependency trees as constraints to prior
+
+probabilities, and,
+
+– simultaneously model local tag similarity and general visual eﬀect usage, by
+
+using the hierarchical Bayesian model.
+
+2 Related Work
+
+Research on extracting repeated patterns from Web documents has a long his-
+tory. The most popular approach is to make DOM trees and ﬁnd frequency
+patterns on them[1, 2]. The problem with this approach is that it does not work
+for repeated patterns indicated by non-DOM patterns including patterns with
+symbols as shown in Figure 2.
+
+Several studies have addressed the problem of extracting logical structures
+from general HTML pages without labeled training examples. One of these stud-
+ies used domain-speciﬁc knowledge to extract information used to organize log-
+ical structures [3]. However, the approach in these studies cannot be applied
+to domains without any knowledge. Another study employed algorithms to de-
+tect repeated patterns in a list of HTML tags and texts [4, 5] or more struc-
+tured forms [6–8] such as DOM trees. This approach might be useful for certain
+types of Web documents, particularly those with highly regular formats such
+as www.yahoo.com and www.amazon.com. However, there are also many cases
+in which HTML tag usage does not have signiﬁcant regularity, or the HTML
+tag patterns do not reﬂect semantic structures (whereas symbol patterns do.)
+Therefore, this type of algorithm may be inadequate for the task of heading ex-
+traction from arbitrary Web documents. Nguyen [9] proposed a method for web
+document analysis using supervised machine learning. However, our proposal is
+to use probabilistic modeling for Web documents to obtain their structures in
+an unsupervised manner.
+
+Some studies on extracting titles or headlines have been reported in [10,
+11]. Our task diﬀers from these, in that their methods focus only on titles
+
+574
+
+M. Yoshida et al.
+
+John Smith’s Page
+
+John Smith’s Page
+
+</h1>
+
+Age: 25
+
+Sex: Male
+
+HEAD
+
+Row 1
+
+Research Interest: Data Mining
+
+Age
+
+:
+
+25
+
+<br>
+
+Contact:
+
+TEL: +01-234-5678
+
+FAX: +02-345-6789
+
+HEAD
+
+CONT
+
+Row 2
+
+Sex
+
+:
+
+Male
+
+<br>
+
+HEAD
+
+CONT
+
+Row 3
+
+Fig. 2. Conversion from HTML Document to Dependency Structure. HEAD represents
+“heading” and CONT represents “contents”.
+
+(and headlines) and ignore the other parts of Web documents, while our al-
+gorithm handles all parts of the Web documents and provides a tree structure of
+the entire document; this algorithm enables the system to extract various types
+of heading other than titles and headlines, such as attributes. In particular, our
+approach has the advantage that it can handle symbols as well as HTML tags,
+making the system applicable to many private (less formal) Web documents.
+
+Cai et al. [12] proposed VIPS that can extract content structure without
+DOM trees. Their algorithm depends on several heuristic rules for visual repre-
+sentation of each block in Web documents. However, we propose unsupervised
+analysis based on a Bayesian probabilistic model for Web document structures.
+This has several advantages, including easy adaptation to some speciﬁc docu-
+ment layouts, easiness of tuning its parameters (because we only have to change
+hyperparameters), and ability of obtaining probabilities for words and symbols
+that may be used for other type of documents such as text ﬁles.
+
+Weninger et al.[13] compared several list extraction algorithm. One of the
+contributions of this study is that we propose a model for nested structures of
+lists, which has not been tried in most previous studies.
+
+3 Preliminaries
+
+3.1 Problem Setting and Terms Deﬁnition
+
+We model an HTML document as a list of rows. Each row ri is a list of blocks,
+i.e, ri =< bi1, ..., bi|ri| >. Here |ri| is the size of row ri, which is the number of
+blocks in the row. A block bj is a pair (wj , sj) of the representative word and
+symbol list s =< sj1 , ..., sj|sj | >.
+
+Because our experiments currently use Japanese documents, which do not
+contain word breaking symbols, it is not a trivial task to extract the representa-
+tive word for each document. In our current system, we extract the predeﬁned
+length of suﬃx from each block1 and call them representative words. We did
+
+1 Length changes according to character types such as “trigrams for alphabets and
+
+numbers”, “unigrams for Kanji characters”, etc.
+
+Unsupervised Analysis of Web Page Semantic Structures
+
+575
+
+Row 1
+
+Row 2
+
+Row 3
+
+Row 4
+
+Fig. 3. Prohibited Dependency Relations
+
+not use word breaker tools, partly because they are not for short strings such
+as those that frequently appear in Web documents, partly because we do not
+need human-comprehensive features (because our purpose is not information ex-
+traction but document structure recognition), and partly because simple suﬃx
+extraction rules contribute to stability of extraction results.
+
+We assume several hidden variables associated with the above observed vari-
+ables. First, each block bj is labeled with label lj, which can have one of two
+values {H, C}. Here, H means heading and C means contents. Headings are ti-
+tles of subdocuments, and we assume that the heading is presented in the ﬁrst
+few blocks of the subdocument, followed by other blocks that we call content
+blocks. (See Figure 2.) Blocks labeled with H are called heading blocks, and
+blocks labeled with C are called content blocks. Heading rows are the rows that
+contain one or more heading blocks, while content rows are the rows that con-
+tain no heading blocks. In addition a hidden variable pk is associated with each
+symbol sk. It indicates whether the symbol is a linefeed-related one, used in the
+Gibbs sampling step described later.
+
+Next, we assume the dependency structures in documents. Here a dependency
+relation between two rows means that one row is modiﬁed by another. In Figure
+2, the row “Age: 25” (depending row) depends on the row “John Smith” (de-
+pended row). We assume that a pair of hidden variables (depi, boundi) for the
+i-th row. (We also write dep(ri) = j if depi = j.) Here, depi is the row id that the
+i-th row depends on. Note that the structure is augmented with an additional
+variable boundi, which denotes the position of the boundary between heading
+blocks and content blocks in the i-th row. If boundi = 0, it means that there is
+no heading block in the row (and depi = −1 in this case), and if boundi = |ri|,
+it means that there is no content block in the line. The sisters of row ri de-
+note the list of all the rows ri1, ri2, ... depending on the same row as ri (i.e.,
+dep(ri1) = dep(ri2) = ... = dep(i)).
+
+Dependency Structures. Our deﬁnition of dependency structures in this study
+is slightly diﬀerent from that used in natural language processing communities.
+One main diﬀerence is that it allows isolated rows that do not depend on any
+other rows. We consider that isolated rows link to a special row called the null
+row, indicated by the id number −1. We consider that two dependency structures
+are diﬀerent if at least one row has diﬀerent links. Note that we prohibit crossings
+in the dependency structures, and their probability is set to 0 (See Figure 3).
+
+576
+
+M. Yoshida et al.
+
+[1] R_nolink -> CL (1.0)
+[2] [2.1] R_haslink -> HL CL (p4) | [2.2] HL (p5)
+[3] [3.1] HL -> H HL (p6) | [3.2] H (p7)
+[4] [4.1] CL -> C CL (0.5) | [4.2] C (0.5)
+[5] H -> word1 | word2 | ...
+[6] C -> word1 | word2 | ...
+
+Fig. 4. PCFG Rules
+
+Dependency structures with no crossing links are called possible dependency
+structures.
+
+4 Probability Model and Estimation
+
+We deﬁne the probability of generating the whole document as P (d, T ) =
+Pprior(T ) · Pblock(d|T ), where T is the assignment of (dep, bound) for all rows
+in document d.
+
+Our idea is to divide the process of generating blocks into vertical and horizon-
+tal generation processes. The former generates rows under the constraints of row
+dependency structures. Currently, the probability of row dependency structures
+is deﬁned as uniform distribution among all possible dependency structures. Af-
+ter each row is generated, all blocks in the row are generated horizontally with
+probabilities induced by CFG rules. Dividing the generation process in this way
+reduces the size of the search space. One of the merits of using CFG for prior
+probability calculation is that it can naturally model the ratio of headings and
+contents in each row, regardless of how many blocks are in the line. For example,
+if we directly model the probability of the value of boundi, diﬀerent lengths of
+rows require diﬀerent models, which makes the model complicated. Instead, in
+our model, the ratio can be modeled by generation probabilities of a few of rules.
+Figure 4 shows our PCFG rules used in our model. H means headings and C
+means contents. HL and CL mean heading list and contents list, which generates
+a list of heading blocks and content blocks, respectively. R means rows, which
+consist of one heading list, optionally followed by a content list. Here R_nolink
+is a nonterminal that indicates content (isolated) rows, and R_haslink is a non-
+terminal for heading rows. Note that this model prohibits headings from starting
+in the middle of each row.
+
+Then, probabilities are calculated on the basis of the resulting CFG tree struc-
+
+tures, using the PCFG rules shown in Figure 4.
+
+Probability for Heading Rows. A heading row needs a probability of p4 or p5
+before generating its heading and content lists. However, content rows do not
+need such probability (because they generate content lists with a probability of
+1 by rule [1].)
+
+Unsupervised Analysis of Web Page Semantic Structures
+
+577
+
+Probability by Heading Blocks. As rule [3] shows, for each heading row, the
+last heading block needs a probability of p7, and other heading blocks need a
+probability of p6, to be generated. We deﬁne heading probability of the row as
+Ph(r) = p6nh(r)−1 · p7, where nh(r) is the number of heading blocks in row r.
+
+Probability by Content Blocks. From rule [4], it is easily shown that each content
+block needs a probability of 0.5 to be generated. We deﬁne content probability of
+the row as Pc = 0.5nc, where nc is the number of content blocks in the document.
+
+4.1 Block Probability
+The remaining part of the probability is the probability for blocks Pblock(D|T ).
+First, note that each block is labeled H or C, according to the CFG tree in the
+horizontal generation. Each word in the block is generated from a distribution
+selected according to this label. We assign one of the labels {B, N, E, L} to
+each symbol in the document using the following rules. Intuitively, B denotes
+boundary between heading and contents, N denotes non-boundary, E denotes
+end of subdocuments, and L denotes line symbols that are used in most of the
+linefeeds, which are not likely to have any semantic meaning, such as heading-
+associated tags such as <h1>.
+
+– If the separator sik is in the last block of row ri, and the value of pik is 1,
+
+– If the separator sik is in the last block of row ri, the value of pik is 0, and
+
+then it is labeled L.
+boundi (cid:2)= ik, then it is labeled E.
+
+– Otherwise, if boundi = ik, separators in block bik are labeled B.
+– Otherwise, separators are labeled N .
+Based on these labels, Pblock(d|T ) is deﬁned as a multinomial distribution of
+the bag of words: Pblock(d, T ) = P (wH ) · P (wC ) · P (sB) · P (sN ) · P (sE) · P (sL)
+where wH is a list of words labeled H, wC is a list of words labeled C, sB is
+a list of symbols labeled B, sN is a list of symbols labeled N , sL is a list of
+symbols labeled E, sL is a list of symbols labeled L, in document d.
+
+Our word/symbol generation model is a hierarchical Bayesian model. We as-
+
+sume the following generative process for words assigned nonterminal H.
+1. Each word w in a document labeled H (i.e, w ∈ wH ) is drawn from the
+
+distribution Hd: w ∼ Hd.
+
+3. The base distribution Hbase is drawn from the Dirichlet distribution with
+
+2. Hd, the heading distribution for document d, is drawn from the Dirichlet
+distribution with base distribution Hbase and concentration parameter αH :
+Hd ∼ Dir(αH Hbase).
+measure B: Hbase ∼ Dir(B).
+Words labeled C, and separators labeled N , E, or L are distributed in the
+same manner. Base distributions and concentration parameters for them are
+denoted by Cbase, Nbase, Ebase, and Lbase, and αC , αN , αE, αL, respectively.
+
+578
+
+M. Yoshida et al.
+
+Sampling from B is slightly diﬀerent, because distributions are generated not
+for each document, but for each sister. Here sisters are a group of rows that
+depends on the same row.
+1. Each separator s in the class labeled B (i.e., s ∈ sB) is drawn from Bi:
+
+s ∼ Bi.
+
+2. Bi, the bound distribution for sisters class i, is drawn from the Dirichlet
+distribution with base distribution Bbase and concentration parameter αB:
+Bi ∼ Dir(αBBbase).
+measure BB: Bbase ∼ Dir(BB).
+
+3. The base distribution Bbase is drawn from the Dirichlet distribution with
+
+Parallel subdocuments tend to have similar layouts, and such similarity typ-
+ically appears in the boundary between headings and contents. We intend to
+model similar layouts by modeling boundary separators in the same list as that
+drawn from the same distribution.
+
+We collapse the distribution for each document drawn from base distributions.
+For example, assume that w1, w2, ..., andwn−1 have been drawn from Hd. Then,
+distribution for wn is obtained by integrating out the multinomial distribution
+Hd, which results in the following equation.
+
+P (w) =
+
+nw
+
+αH + n.
+
++
+
+α
+
+αH + n.
+
+Hbase(w)
+
+(1)
+
+where nw is the number of times w occurs, and n. is the number of all word
+occurrences, in the list w1, ..., wn−1. This equation can be obtained using the
+one for Pitman-Yor process [14] by assigning the discount parameter to be zero.
+By using this backoﬀ-smoothing style equation, we can model the locality of the
+usage of words/separators by the ﬁrst term, which corresponds to the number
+of occurrences of w in the same context, and global usage by the second term.
+
+4.2 Sampling of Dependency Relations
+
+Gibbs sampling is executed by looking at each row ri and sampling the pair
+(depi, boundi) for the row according to the probability P ((depi, boundi)|d−i).
+Here d−i means the document without current row ri. We calculate the relative
+probability of the document for all possible values for (depi, boundi) by taking
+all possible values for (depi, boundi), calculating the probability P (d, T ) for each
+dependency value, and normalizing them by the sum of all calculated values.
+
+4.3 Sampling of Base Distributions
+
+Another important part of our Gibbs sampling is sampling distributions given
+the document structures, which model the general tendency of usage of words
+and symbols. We use the fast sampling scheme described in [14] which omit
+time-consuming “bookkeeping” operations for sampling base distributions. First,
+the parameter m, which indicates “how many times each word w was drawn
+
+Unsupervised Analysis of Web Page Semantic Structures
+
+579
+
+γ(αβw)
+
+γ(αβw+nw )
+
+−w, β) =
+
+from the second term of the equation 1, is drawn from the following distribu-
+tion. p(mw = m|z, m
+s(nw, m)(αβw)m where s(n, m) are
+unsigned Stirling numbers of the ﬁrst kind. (Note that the factor k in Teh’s
+representation corresponds to word w in our representation.) After drawing
+m, the base parameter β is drawn from the following Dirichlet distribution:
+(β1, ..., βK) ∼ Dir(m1 + α(cid:3)γ1, ..., mK + α(cid:3)γK) where α and γ are the strength
+parameter and the base distribution for the distribution for drawing H, respec-
+tively.
+
+The following base distributions are sampled by using this scheme: Hbase is
+sampled from wH , Cbase is sampled from wC , Nbase is sampled from sN , Bbase
+is sampled from sN , and Lbase is sampled from sL.
+
+5
+
+Implementation Issues
+
+5.1 Sentence Row Finder
+
+In HTML layout structure detection, sentence blocks are critical performance
+bottlenecks. For example, it is relatively easy to detect the suﬃxes of the rows
+that indicate sentences. However, it is diﬃcult to decide whether the row starts
+with headings, especially when the sentences are decorated with HTML tags or
+symbols. (e.g., “Hobby: I like to hear music!”)
+
+Our idea is to use preﬁxes to decide whether the row contains headings. We
+assume that rows starting with sentences contain no headers, and the algorithm
+ﬁnds sentences by using the ratio of obvious sentences in all rows, starting with
+the preﬁx. The obvious sentences are detected by using simple heuristics that “if
+symbols in the row are only commas and periods, then the row surely consists of
+only sentences.” Currently, if the ratio exceeds the threshold value 0.3, the row
+is determined as a sentence. Note that the sentence row ﬁnder is also applied to
+the baseline algorithm described later.
+
+5.2 Hyperparameter Settings
+
+We assume a Dirichlet prior for each rule of probability where Dirichlet hyper-
+parameters are set α1 = α2 = 5.0 for rules [2.1] and [2.2], and (α1, α2) =
+(10.0, 90.0) for rules [3.1] and [3.2] heuristically. The latter parameters sug-
+gest that our observation that the length of heading lists is not so large, giving
+high-probability values to short heading lists. This sampling of parameters helps
+to stabilize sampled dependency relations.
+
+5.3 Parallelization
+
+Parallelization of the above Gibbs sampling is straightforward because each sam-
+pling of tuples (dep, rel, bound) only uses the state of other tuples in the same
+document, along with the base distributions such as Hbase and Bbase, which are
+not changed in tuple sampling. The task of sampling tuples is therefore divided
+
+580
+
+M. Yoshida et al.
+
+into several groups as each group consists of one or more whole documents, and
+the sampling of tuples for each group is executed in parallel. (Sampling base
+distributions is not easily parallelized.)
+
+5.4 Dependency Structure Estimation
+
+Gibbs sampling can be used as a scheme for sampling the latent variables; how-
+ever, it is not obvious how to extract highly probable states using this sampling
+scheme. Plausible base distributions can be obtained by taking several samples
+and averaging them. However, dependency structures are so complicated that it
+is almost impossible to see the same sample of structure two times or more. We
+thus use the following heuristic steps to obtain highly probable structures.
+
+– Run the Gibbs sampling for some burn-in period.
+– Take several samples for base distributions, and average them as an estima-
+tion for the base distribution and PCFG rule probabilities (these parameters
+are ﬁxed thereafter.)
+
+– Initialize the latent categorical variables.
+– Run the Gibbs sampling again, but only for categorical variables for some
+burn-in period and calculate the marginal likelihood of the selected struc-
+tures in each time.
+
+– Take the structures with the maximum marginal likelihood so far.
+– Greedy ﬁnalization: for each line, ﬁx the state to the one with the highest
+probability. This step is executed over all rows sequentially, and repeated
+several times.
+
+6 Experiments
+
+Our corpus consists of 1,012 personal web pages found in the Japanese web
+site @nifty. We randomly selected 50 Web documents from them. We excluded
+10 documents that contain <table> tags because table structures need special
+treatment for proper analysis and including them into the corpus harms the
+reliability of the evaluation. We extracted all repeated subdocuments in the
+remaining 40 documents manually. Among them, 14 documents contained no
+repeated subdocuments. For each algorithm, we extracted each set of sisters
+from dependency structures and regarded them as resulting sets of lists. We
+used purity, inverse purity, and their f-measure for evaluation, which is a popular
+measure for clustering evaluation.
+
+6.1 Evaluation Measure
+
+To evaluate the quality of extracted lists, we use purity and inverse purity
+measures[15], which are popular for cluster evaluation. We regard each extracted
+list as a cluster of subdocuments and represent it with the pair (i, j), where
+i is the start position and the j is the end position of the subdocuments.
+
+Unsupervised Analysis of Web Page Semantic Structures
+
+581
+
+The end position is set just before the start position of the next subdocument
+in the list.2 Subdocument extraction is evaluated by comparing this cluster to
+manually constructed subdocument clusters.
+
+Assume that Ci is a cluster in the algorithm results, and Li is a cluster in the
+|Ci|
+N maxj P recision(Ci, Lj)
+i |Ci|. Inverse purity is deﬁned
+
+manual annotation. Purity is computed by P =
+(cid:2)
+where P recision(Ci, Lj) =
+asIP =
+
+|Li|
+N maxj P recision(Li, Cj) where N =
+
+|Ci∩Lj|
+
+|Ci|
+
+(cid:2)
+
+i |Li|.
+
+and N =
+
+(cid:2)
+
+i
+
+(cid:2)
+i
+
+Quality of the output lists is evaluated by the F-measure, which is the har-
+
+monic mean of purity and inverse purity: F =
+
+1
+
+1/P +1/IP .
+
+We did not used B-cubed evaluation measures[16] because B-cubed is an
+element-wise deﬁnition, which calculates correctness of all rows in the corpus, in-
+dicating that we would have to consider rows that have no headings, for which no
+clusters are generated. B-cubed measures are developed as a metric that works
+for soft-clustering, whereas our task can be regarded as hard clustering, in which
+P-IP measures work well.
+
+We used micro-averaged and macro-averaged f-measures for cluster evaluation.
+Macro-averaged f-measure compute f-value for each document that has any re-
+peated patterns (i.e., 26 documents in the test set) and average all the f-values.
+However, micro-averaged f-measures regard all 40 documents in the test set as
+one document, and calculate P, IP, and F on this one large document. Thus, we
+can evaluate how each method does not extract unnecessary lists from documents
+with no repeated lists by using a micro-averaged f-measure.
+
+6.2 Baseline
+
+We use the baseline algorithm that uses some heuristic rules to extract sub-
+documents. We test several conﬁgurations (e.g., what header tags are used for
+extraction, whether rows with |r| = 1 are extracted as headings, etc.) and select
+the one that performed the best on the test set. This baseline algorithm selects
+heading rows among all rows (except the ones discarded by the sentence row
+ﬁnder) using following heuristic rules.
+
+First, it uses “header tag heuristics”. For example, if the row is in an <h2>
+tag, we assume that the row is a heading that modiﬁes the following blocks until
+the next <h2> or larger headers (<h1> in this case) appear. Header tags <h1>,
+<h2>, <h3>, and <h4> are used in this heuristics.3
+Second, it uses the block number heuristics which showed good performance
+in our preliminary experiments. Assume that |r| is the number of blocks in the
+row |r|. If |r| ≥ 2, the algorithms regard r as heading row (we assume that this
+row is bracketed by <h8>, which is smaller than all other h tags.) If |r| = 1 and r
+is not a sentence row, we assume r is bracketed by <h7>, which indicates that it
+will be the heading of the next rows (if the next row has more than one blocks.)
+
+2 It is set to the end position of the document for the last subdocument in the list.
+3 We also used <h7> and <h8> generated by the block number heuristics described
+
+below.
+
+582
+
+M. Yoshida et al.
+
+Table 1. Averaged F-measure (%) for Each Method
+
+Method w/o no-repeat (26 docs.) w/ no-repeat (40 docs.)
+micro-averaged
+Proposed
+Baseline
+macro-averaged
+Proposed
+Baseline
+
+47.68
+42.42
+
+—
+—
+
+50.23
+46.93
+
+49.63
+42.05
+
+Note that this simple heuristics can extract many sub-documents in Figure 2
+
+including “Age:25” and “TEL:+01-234-5678”.
+
+6.3 Results
+
+We run our Gibbs sampling with 1000 initial iterations and 500 ﬁnal iterations.
+Values of parameters (αB, αE, αL, αN ) were set to (10, 100, 100, 1000) heuristi-
+cally. We use the uniform distribution for each base distribution. Results were
+obtained by running Gibbs sampling 5 times and averaging all the averaged
+f-measure values.
+
+Table 1 shows the results. Our algorithm outperformed the baseline algo-
+rithm by about 3.3 – 7.6 points. The performance gain of our algorithm in
+micro-averaged f-measure increased from 3.3 to 5.3 by using 14 “no-repeat” doc-
+uments. This result suggests that our method works well in detecting “no-repeat”
+documents to avoid incorrect repeated lists.
+
+Performance gain was mainly obtained by detection of heading blocks that
+could not be found by the baseline algorithm and detection of content blocks that
+could not be found by sentence row ﬁnder heuristics. However, the performance
+of our algorithm for documents with heading blocks that were easily detected by
+the baseline algorithm tended to be lower. We need an algorithm that takes the
+strength of both our method and the baseline method for better performance.
+
+7 Conclusion
+
+In this study, we proposed a probabilistic model for document structures for
+HTML documents that uses Bayesian hierarchical modeling. Our model can si-
+multaneously manage both local coherence and global tendencies of layout usage,
+thanks to hierarchical modeling and cache eﬀects obtained by integrating out of
+distributions. Experimental results showed that document structures obtained
+by our model were better than those obtained by the heuristic baseline method.
+For future study, we are keen to improve the performance of our method by, for
+example, using larger data sets to obtain more reliable knowledge about layout
+usage, or using more sophisticated methods to obtain maximum-likelihood states
+for our model.
+
+Unsupervised Analysis of Web Page Semantic Structures
+
+583
+
+References
+
+1. Miao, G., Tatemura, J., Hsiung, W.P., Sawires, A., Moser, L.E.: Extracting data
+records from the web using tag path clustering. In: Proceedings of WWW 2009,
+pp. 981–990 (2009)
+
+2. Liu, B., Grossman, R.L., Zhai, Y.: Mining data records in web pages. In: Proceed-
+
+ings of KDD 2003, pp. 601–606 (2003)
+
+3. Chung, C.Y., Gertz, M., Sundaresan, N.: Reverse engineering for web data: From
+
+visual to semantic structures. In: ICDE (2002)
+
+4. Yang, Y., Zhang, H.: HTML page analysis based on visual cues. In: Proceedings
+of the Sixth International Conference on Document Analysis and Recognition,
+ICDAR 2001 (2001)
+
+5. Nanno, T., Saito, S., Okumura, M.: Structuring web pages based on repetition of
+elements. In: Proceedings of the Second International Workshop on Web Document
+Analysis, WDA 2003 (2003)
+
+6. Mukherjee, S., Yang, G., Tan, W., Ramakrishnan, I.: Automatic discovery of se-
+mantic structures in HTML documents. In: Proceedings of the Seventh Interna-
+tional Conference on Document Analysis and Recognition, ICDAR 2003 (2003)
+
+7. Crescenzi, V., Mecca, G., Merialdo, P.: ROADRUNNER: Towards automatic data
+extraction from large web sites. In: Proceedings of the 27th International Confer-
+ence on Very Large Data Bases (VLDB 2001), pp. 109–118 (2001)
+
+8. Chang, C.H., Lui, S.C.: IEPAD: Information extraction based on pattern discovery.
+In: Proceedings of the 10th International WWW Conference (WWW 2001), pp.
+681–688 (2001)
+
+9. Nguyen, C.K., Likforman-Sulem, L., Moissinac, J.C., Faure, C., Lardon, J.: Web
+document analysis based on visual segmentation and page rendering. In: Proceed-
+ings of International Workshop on Document Analysis Systems (DAS 2012), pp.
+354–358. IEEE Computer Society (2012)
+
+10. Hu, Y., Xin, G., Song, R., Hu, G., Shi, S., Cao, Y., Li, H.: Title extraction from
+bodies of HTML documents and its application to web page retrieval. In: Proceed-
+ings of the 28th Annual International ACM SIGIR Conference (SIGIR 2005), pp.
+250–257 (2005)
+
+11. Tatsumi, Y., Asahi, T.: Analyzing web page headings considering various presen-
+tation. In: Proceedings of the 14th International Conference on World Wide Web
+Special Interest Tracks and Posters, pp. 956–957 (2005)
+
+12. Cai, D., Yu, S., Wen, J.R., Ma, W.Y.: Extracting content structure for web pages
+based on visual representation. In: Zhou, X., Zhang, Y., Orlowska, M.E. (eds.)
+APWeb 2003. LNCS, vol. 2642, pp. 406–417. Springer, Heidelberg (2003)
+
+13. Weninger, T., Fumarola, F., Barber, R., Han, J., Malerba, D.: Unexpected results
+in automatic list extraction on the web. ACM SIGKDD Explorations Newslet-
+ter 12(2), 26–30 (2010)
+
+14. Teh, Y.W., Jordan, M.I., Beal, M.J., Blei, D.M.: Hierarchical dirichlet processes.
+
+Journal of the American Statistical Association 101(476), 1566–1581 (2006)
+
+15. Artiles, J., Gonzalo, J., Sekine, S.: The semeval-2007 weps evaluation: Establishing
+a benchmark for the web people search task. In: Proceedings of the Workshop on
+Semantic Evaluation (SemEval 2007) at ACL 2007, pp. 64–69 (2007)
+
+16. Artiles, J., Gonzalo, J., Sekine, S.: Weps 2 evaluation campaign: overview of the
+web people search clustering task. In: Proceedinsg of the 2nd Web People Search
+Evaluation Workshop (WePS 2009), 18th WWW Conference (2009)
+
+

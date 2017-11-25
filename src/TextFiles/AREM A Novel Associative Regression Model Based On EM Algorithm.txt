@@ -1,0 +1,1120 @@
+AREM: A Novel Associative Regression
+
+Model Based on EM Algorithm
+
+Zhonghua Jiang and George Karypis
+
+Department of Computer Science & Engineering,
+
+Digital Technology Center, University of Minnesota,
+
+Minneapolis, MN, 55455, U.S.A.
+{zjiang,karypis}@cs.umn.edu
+
+Abstract. In recent years, there have been increasing eﬀorts in applying
+association rule mining to build Associative Classiﬁcation (AC) models.
+However, the similar area that applies association rule mining to build
+Associative Regression (AR) models has not been well explored. In this
+work, we ﬁll this gap by presenting a novel regression model based on
+association rules called AREM. AREM starts with ﬁnding a set of re-
+gression rules by applying the instance based pruning strategy, in which
+the best rules for each instance are discovered and combined. Then a
+probabilistic model is trained by applying the EM algorithm, in which
+the right hand side of the rules and their importance weights are up-
+dated. The extensive experimental evaluation shows that our model can
+perform better than both the previously proposed AR model and some
+of the state of the art regression models, including Boosted Regression
+Trees, SVR, CART and Cubist, with the Mean Squared Error (MSE)
+being used as the performance metric.
+
+Keywords: association rule, regression rule, associative regression, prob-
+abilistic model, EM algorithm, instance based pruning.
+
+1
+
+Introduction
+
+In recent years, there have been increasing eﬀorts in applying association rule
+mining to build classiﬁcation models [1] [2] [3] [4] [5], which have resulted in
+the area of Associative Classiﬁcation (AC) modeling. Several studies [1] [2] [3]
+have provided empirical evidence that AC classiﬁers can outperform tree-based
+[6] and rule-induction based models [7] [8]. The good performance of the AC
+models can be attributed to the fact that by using a bottom-up approach to
+rule discovery (either via frequent itemset mining or instance-based rule mining)
+they can discover better rules than the traditional heuristic-driven top-down
+approaches.
+
+Regression is a data mining task that is applicable to a wide-range of ap-
+plication domains. However, despite the success of association rule mining for
+classiﬁcation, it has not been extensively applied to develop models for regres-
+sion. We are only aware of the Regression Based on Association (RBA) method
+
+J. Pei et al. (Eds.): PAKDD 2013, Part I, LNAI 7818, pp. 459–470, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+460
+
+Z. Jiang and G. Karypis
+
+developed by Ozgur et al. [9] that uses association rule mining to derive a set
+of regression rules. Since regression models need to predict a continuous value,
+whereas the classiﬁcation models need to predict a categorical value, the methods
+developed for AC modeling are in general not applicable for solving regression
+problems.
+
+Motivated by the success of AC modeling, we study the problem of applying
+the association rule mining to build an Associative Regression (AR) model. We
+believe this is an important problem for the following two reasons: First, an
+AR model is built upon a set of regression rules, which in many cases, can be
+easily interpreted by domain experts and thus provide valuable insights. Second,
+the good performance of the well studied AC classiﬁers leads us to believe that
+the AR model may potentially perform better than the tree-based [10] [11] and
+rule-induction based [12] regression models.
+
+We present an associative regression model utilizing expectation maximiza-
+tion [13], called AREM. An AR model consists of three major components: (i)
+the method used to identify the sets of itemsets that form the left hand sides
+of the rules, (ii) the method used to estimate the right hand sides of the rules,
+and (iii) the method used to compute a prediction. Drawing upon approaches
+used for developing AC models, AREM uses an instance-based approach to se-
+lect a subset of frequent itemsets that are used to form the left hand side of
+the rules. However, unlike existing AC and AR models, it develops and utilizes
+a probabilistic model coupled with an EM-based optimization approach to de-
+termine the right hand side of the rules and also assign a weight to each rule
+that is used during prediction. The advantage of this probabilistic model is that
+it allows AREM to capture the interactions of the various rules and to learn
+the parameters that lead to more accurate predictions. Our experimental evalu-
+ation shows that AREM outperforms several state of the art regression models
+including RBA [9], Boosted Regression Trees [10], SVR [14], CART [11] and
+Cubist [12] on many data sets, with the Mean Square Error (MSE) being used
+as the performance metric.
+
+The remainder of this paper is organized as follows. Section 2 introduces some
+notations and deﬁnitions. Section 3 presents the related work in this area. AREM
+is formally presented in Section 4. In Section 5, we explain the experimental
+design and results for model evaluation. And ﬁnally Section 6 concludes.
+
+2 Notations and Deﬁnitions
+
+The methods developed in this work apply to datasets whose instances are de-
+scribed by a set of features that are present. Such datasets occur naturally in
+market basket transactions (features represent the set of products purchased) or
+bag-of-word modeling of documents (features correspond to the set of words in
+the document). We will refer to these features as items. Note that other types of
+datasets can be converted to the above format via discretization techniques [15].
+Let the data set D = {(τi, yi)|i = 1, 2, ..., N} be a set of N instances. The
+instance (with index) i is a tuple (τi, yi), where τi is a set of items (or, an
+
+AREM: A Novel Associative Regression Model
+
+461
+
+itemset), and yi is the real-valued target variable. Given an itemset x, and an
+instance (τi, yi), we say, x is contained in (τi, yi), or, (τi, yi) contains x, if x ⊆ τi.
+The support of itemset x, is deﬁned as the number of instances in D that contain
+x. The itemset x is frequent if its support is not less than s0, where s0 is the
+user speciﬁed parameter. For itemset x, we deﬁne its mean (μx) and standard
+deviation (σx) as computed from the set of target variables from instances in D
+that contain x.
+A regression rule is of the form rx : x → αx. The rule’s left hand side (LHS) x
+is an itemset.The rule’s right hand side (RHS) αx is the target value predicted
+by this rule. Each rule is also associated with a positive value wx which is used
+as the weight when combining multiple rules together for making predictions.
+The rule rx is frequent if its itemset x is frequent.
+
+3 Related Work
+
+To our best knowledge, the RBA [9] model is the only previous work on associa-
+tive regression. It starts with mining the set of frequent itemsets which form the
+set of rules’ LHS. For each frequent itemset x, RBA computes the rule’s RHS as
+the mean of x. It also computes the standard deviation σx of x. These rules are
+then ranked by variance (i.e., σ2
+x) from small to large. The database sequential
+coverage is applied to prune rules which are ranked low. For making predictions,
+three weighting schemes for wx are developed: (1) equal, where rules are equally
+weighted, (2) supp, where the rule rx is weighted by the support of x, and (3)
+inv-var, where the rule’s weight is inverse proportional to the variance σ2
+x.
+
+Associative Classiﬁcation (AC) [16] is an area that applies similar techniques,
+but the focus is on the Classiﬁcation task. Among the many methods developed
+for AC modeling [1] [2] [3] [5], Harmony [4] is the model that employs a similar
+rule pruning strategy to AREM: it mines the highest conﬁdence rules for each
+instance and combines them to the ﬁnal rule set.
+
+AR and AC models are descriptive in that they can be easily interpreted by
+end users. Tree based and rule induction based models are another two groups of
+descriptive models. The classiﬁcation and regression tree (CART) [11] partitions
+the input space into smaller, rectangular regions, and assigns the average of the
+target variables as the predicted value to each region. Cubist [12] is a rule based
+algorithm and ﬁts a linear regression model to each of the regions. Boosting [10] is
+a technique to build ensemble models by training each new model to emphasize
+the training instances that previous models misclassiﬁed. Boosted regression
+trees have shown to be arguably the best algorithms for web-ranking [17].
+
+4 The AREM Model
+
+The AREM model training consists of two major components. First, it discovers
+a set of frequent regression rules rx : x → μx, where μx is the mean value of x in
+D. We denote this set of rules by R. Second, for each rx ∈ R, AREM updates
+its RHS to a new value αx by learning a probabilistic model. The EM algorithm
+
+462
+
+Z. Jiang and G. Karypis
+
+is applied for model learning where αx is learned together with the rule’s weight
+wx.
+For the rule discovery component (i.e., the ﬁrst component above), AREM
+follows a two-step approach to ﬁnd the rule set R. First, it uses the FP Growth
+algorithm [18] to ﬁnd all frequent itemsets x in D. For each frequent itemset x,
+AREM generates the rule rx : x → μx, where μx is the mean value of x in D.
+Let F be this set of frequent rules. Second, for each training instance i, let Fi
+be the set of rules rx from F such that x ⊆ τi. AREM selects K rules from Fi
+to form the set Ri. Finally, R is the union of these rules Ri over all training
+instances i in D. Since R will in general contain fewer rules than F , this step
+applies instance based approach to prune the initial set of frequent rules.
+Using the set of updated rules R with the associated weights, AREM predicts
+the target variable of a test itemset τ as follows. First, it identiﬁes the set of rules
+Rτ = {rx1, . . . , rxm} ⊆ R whose LHS are subsets of τ (i.e., (xi → αxi) ∈ Rτ if
+xi ⊆ τ ), then it eliminates from Rτ all but the k rules that have the highest wxi
+values among them. This set of rules, denoted by Rk
+τ , is then used to predict the
+target variable using the formula
+
+(cid:2)
+
+ˆy =
+
+rxi
+(cid:2)
+
+∈Rk
+
+τ
+
+wxi αxi
+
+∈Rk
+
+τ
+
+wxi
+
+rxi
+
+,
+
+(1)
+
+which is nothing more than the average of the RHS of the k rules weighted by
+their corresponding wxi values. In the case when the test itemset τ is not covered
+by rules in R, i.e., |Rτ| = 0, we simply predict ˆy as the global mean of target
+variables in database D.
+
+AREM model requires the speciﬁcation of four parameters: (i) the minimum
+support s0, (ii) the number of rules K that are selected for each training instance,
+(iii) the number of EM steps M for rule parameter learning, and (iv) the number
+of rules k from R that are used for predicting the target variable. Even though
+the optimal values of these parameters need to be determined using a cross-
+validation framework, our experience has been that the performance of AREM
+remains consistently good for a wide range of these values.
+In the rest of this section we describe the probabilistic model that we devel-
+oped for estimating from D the αx and wx parameters of the rules in R and the
+method used to select for each training instance i the K rules from Fi.
+
+4.1 The Probabilistic Model
+Let X be the set of itemsets of rules in R (i.e., X = {x|rx ∈ R}). Consider
+an arbitrary training instance (τ, y). The goal of the probabilistic model is to
+specify the probability of target variable y given τ , i.e., P [y|τ ]. We want to relate
+this quantity to the set of itemsets in X . To this end, we treat itemset x as a
+random variable that takes values in X and write P [y|τ ] as
+P [y|τ, x]P [x|τ ],
+
+P [y, x|τ ] =
+
+P [y|τ ] =
+
+(cid:3)
+
+(cid:3)
+
+x
+
+x
+
+AREM: A Novel Associative Regression Model
+
+463
+
+P [y|x] = N (y|αx, β2
+x).
+
+where P [y|τ, x] is the probability of generating the target variable y given τ and
+x, which is generated from τ with probability P [x|τ ]. Our goal then becomes to
+specify P [y|τ, x] and P [x|τ ] and relate them to αx and wx.
+In order to specify P [y|τ, x], we ﬁrst assume the conditional independence
+P [y|τ, x] = P [y|x]. That is, we assume that once the itemset x is known, the
+probability of y is not dependent on τ , which simpliﬁes our model so that the
+dependency of τ is fully captured in P [x|τ ]. Given that, we then model P [y|x] as
+a Normal distribution whose mean is the RHS of the rule x → αx and standard
+deviation βx. That is,
+
+(2)
+Next, we specify P [x|τ ] by considering how AREM makes predictions. In order
+to simplify this discussion we ignore the fact that AREM picks the top k rules
+(i.e., it uses the set of rules in Rk
+τ ) and assume that it predicts the target value
+by using all the rules in Rτ . Speciﬁcally, Equation 1 now becomes
+
+(cid:2)
+
+ˆy =
+
+rxi
+(cid:2)
+
+∈Rτ
+
+wxiαxi
+
+∈Rτ
+
+wxi
+
+rxi
+
+=
+
+(cid:3)
+
+x
+
+αx
+
+(cid:2)
+
+Ix⊆τ wx
+x(cid:2)⊆τ wx(cid:2)
+
+,
+
+(3)
+
+where Ix⊆τ is the indicator function which takes value 1 (0) when x ⊆ τ is true
+(false).
+
+From the probabilistic modeling point of view, we predict the target variable
+
+as the expected value of y given τ , that is,
+
+ˆy = E[y|τ ] =
+
+(cid:3)
+
+x
+
+E[y|τ, x]P [x|τ ].
+
+(4)
+
+From Equation 2, we get E[y|τ, x] = αx. To specify P [x|τ ], we compare Equation
+3 with 4, and get
+
+P [x|τ ] =
+
+(cid:2)
+
+Ix⊆τ wx
+x(cid:2)⊆τ wx(cid:2)
+
+.
+
+(5)
+To summarize, we have reached a two step model P [y, x|τ ] = P [y|x]P [x|τ ]. In the
+ﬁrst step, a regression rule’s LHS x ∈ X is generated based on τ with probability
+P [x|τ ] given by Equation 5. In the second step, the target variable y is generated
+by x with probability P [y|x] given by Equation 2.
+
+4.2 EM Algorithm: Learning αx, βx and wx
+Denote by θ = {αx, βx, wx|x ∈ X} the complete set of model parameters. The
+maximum likelihood estimation of θ given the training data set is to maximize
+
+L(θ) =
+
+(cid:3)
+
+i
+
+log (P [yi|τi, θ]) =
+
+(cid:3)
+
+(cid:3)
+
+log (
+
+i
+
+xi
+
+P [yi, xi|τi, θ]),
+
+(6)
+
+where we have introduced xi to denote the itemset generated by our probabilistic
+model for instance i. The diﬃculty of this optimization problem comes from the
+summation inside the logarithmic function. This is due to the existence of the
+
+464
+
+Z. Jiang and G. Karypis
+
+hidden variables xi, which are not directly observable from the training data set.
+EM algorithm is the standard approach to solve this problem.
+
+EM algorithm is an iterative optimization technique. In the following, we add
+a subscript t to all model parameters to denote the parameters used by EM
+algorithm at iteration t. For each iteration t, EM algorithm ﬁnds the updated
+set of parameters θt+1 given the current parameter estimations θt. This is ac-
+complished by maximizing the function
+
+Q(θt+1, θt) =
+
+(cid:3)
+
+(cid:3)
+
+i
+
+xi
+
+P [xi|τi, yi, θt] log(P [yi, xi|τi, θt+1]).
+
+(7)
+
+This optimization problem is much easier than the original one for Equation 6,
+due to the fact that the logarithmic function is now inside the summation. The
+EM algorithm at iteration t is splitted into an E-step which computes πi,xi,t =
+P [xi|τi, yi, θt] and an M-step which optimizes Q(θt+1, θt) given πi,xi,t. After
+each iteration, the log-likelihood function L is guaranteed to be increased, that
+is, L(θt+1) ≥ L(θt).
+At iteration t = 0, we initialize the weight wx,0 to one and αx,0, βx,0 to the
+mean and standard deviation of x in D. For the E-step, we ﬁrst apply Bayes’
+Theorem so that
+πi,xi,t = P [xi|τi, yi, θt] =
+
+∝ P [yi|τi, xi, θt]P [xi|τi, θt].
+
+P [yi|τi, xi, θt]P [xi|τi, θt]
+
+P [yi|τi, θt]
+
+According to Equations 5 and 2, we have
+
+P [yi|τi, xi, θt]P [xi|τi, θt] ∝ N (yi|αxi,t, β2
+
+xi,t)wxi,tIxi⊆τi.
+
+Combining these two Equations, we get
+
+πi,xi,t =
+
+N (yi|αxi,t, β2
+(cid:2)
+x(cid:2)⊆τi
+
+N (yi|αx(cid:2),t, β2
+
+xi,t)wxi,tIxi⊆τi
+x(cid:2),t)wx(cid:2),t
+
+.
+
+(8)
+
+For the M-step, we split P [yi, xi|τi, θt+1] as P [yi|xi, θt+1]P [xi|τi, θt+1], so that
+Q = Q1 + Q2, where Q1 contains only αx,t+1, βx,t+1 and Q2 contains only
+wx,t+1.
+
+Next, we optimize Q1 which is given by
+
+Q1 =
+
+(cid:3)
+
+(cid:3)
+
+xi⊆τi
+
+i
+
+πi,xi,t log(P [yi|xi, θt+1]).
+
+By changing the order of summation, we can write Q1 =
+πi,x,t log(P [yi|x, θt+1]).
+
+Qx =
+
+(cid:3)
+
+i:x⊆τi
+
+(cid:2)
+
+x Qx, where
+
+One can see that diﬀerent itemsets are decoupled from each other, so we only
+need to solve Qx for ∀x ∈ X . Observe that Qx is nothing but the weighted version
+
+AREM: A Novel Associative Regression Model
+
+465
+
+of the log-likelihood function of model P [y|x, θt+1] = N (y|αx,t+1, β2
+the weights are given by πi,x,t for instance i. The solution is straightforward:
+
+x,t+1), where
+
+αx,t+1 =
+
+(cid:2)
+
+i:x⊆τi
+(cid:2)
+i:x⊆τi
+
+πi,x,tyi
+πi,x,t
+
+,
+
+and,
+
+(cid:2)
+
+β2
+x,t+1 =
+
+i:x⊆τi
+
+(cid:2)
+
+πi,x,t(yi − αx,t+1)2
+i:x⊆τi
+
+πi,x,t
+
+(9)
+
+(10)
+
+.
+
+In Equations 9 and 10, the parameters αx and βx are the weighted mean and
+standard deviation where the weight of instance i at iteration t is given by πi,x,t.
+This weighting mechanism can help to remove the outlier instance whose πi,x,t
+is small.
+
+Now, we optimize Q2 which is given by
+
+Q2 =
+
+(cid:3)
+
+(cid:3)
+
+xi⊆τi
+
+i
+
+πi,xi,t log(P [xi|τi, θt+1]).
+
+By plugging Equation 5 into Q2, and taking the derivative, we get
+
+∂Q2
+∂wx,t+1
+
+=
+
+(cid:3)
+
+i:x⊆τi
+
+(
+
+πi,x,t
+wx,t+1
+
+−
+
+1(cid:2)
+x(cid:2)⊆τi
+
+wx(cid:2),t+1
+
+).
+
+One can see that diﬀerent weights wx,t+1 are coupled in the above equation. So
+the exact analytical solution becomes impossible. To ensure the simplicity and
+computational eﬃciency of our approach, we make an approximation here by
+replacing t + 1 by t in the second term of RHS. Then by setting the derivative
+to zero, we get
+
+(cid:2)
+
+wx,t+1
+wx,t
+
+(cid:2)
+
+=
+
+i:x⊆τi
+(cid:2)
+
+πi,x,t
+wx,t
+x(cid:2)⊆τi
+
+i:x⊆τi
+
+wx(cid:2),t
+
+.
+
+(11)
+
+From Equations 9, 10 and 11, we see that πi,x plays the key role of relating
+parameters αx and βx to weights wx, so that they can interact with each other
+and be optimized consistently.
+
+Finally, we note that AREM introduces a parameter M which controls the
+number of EM-steps. After the EM algorithm is completed, the rule’s RHS and
+weight are ﬁnalized to be αx,M and wx,M .
+
+4.3 Instance Based Rule Mining
+
+The instance based rule mining is applied in the rule discovery component of
+AREM discussed at the beginning of Section 4, which selects K rules from Fi
+to form Ri for each training instance i. For this, AREM ﬁrst ranks rules in Fi
+by some “quality” metric, and then select the top K rules. The “quality” metric
+captures the quality of a rule from an instance’s perspective. From our proba-
+bilistic model, P [x|τi, yi] is the natural choice for the “quality” metric: a rule is
+
+466
+
+Z. Jiang and G. Karypis
+
+Table 1. Data Set Summary
+
+Yelp
+
+Data Set
+
+BestBuy CitySearch
+dep wf dep
+# of instances 10k 10k 10k
+# of items
+density (%)
+# of trialsb
+a
+
+wf dep wf
+10k 10k 10k
+1347 1010 1530 1080 2273 1662
+1.29 1.52 1.36
+1.95 1.35 1.94
+20
+20
+
+20
+
+20
+
+20
+
+20
+
+a
+
+Airline Socmob Pollen Spacega
+
+10k
+676
+1.63
+20
+
+1156
+44
+
+3848
+17
+11.36 23.53
+50
+
+200
+
+3107
+24
+25.00
+60
+
+The “density” captures how sparse the data set is. It is the percentage of
+non-zero entries if the data is converted into the matrix format.
+
+b
+
+Number of trials the data set is randomized and then splitted into 80%
+training set, 10% validation set and 10% testing set.
+
+better if it has a higher probability of being generated by the instance. We use
+
+the initialized rule parameters wx,0, αx,0 and βx,0 for computing P [x|τi, yi]. From
+P [x|τi, yi] ∝ P [x, yi|τi] ∝ N (yi|αx,0, β2
+x,0)wx,0, We have that for the ranking’s
+purpose P [x|τi, yi] is equivalent to N (yi|αx,0, β2
+x,0), where wx,0 = 1 is dropped.
+Thus, AREM uses N (yi|αx,0, β2
+
+x,0) for rule ranking for each instance.
+
+4.4 Comparing AREM with RBA
+
+We summarize the main diﬀerences between AREM and RBA as follows. First,
+in determining a small set of itemsets to form the ﬁnal rules’ LHS, AREM applies
+an instance based approach, while RBA applies the database sequential coverage
+technique. Second, in determining the ﬁnal rules’ RHS, AREM learns them in
+the EM framework, while RBA simply uses the mean of the rules’ itemsets. It
+turns out that, in AREM, the rule’s RHS is the weighted mean, which is likely
+to be a better estimation than the unweighted mean used by RBA. Third, in
+determining the rule weights used for predictions, AREM learns them together
+with rules’ RHS, while RBA pre-speciﬁes methods for computing them. These
+pre-speciﬁed methods may be reasonable but they are not optimized. Finally, in
+determining top k rules used for making predictions, AREM selects rules with
+the highest weights, while RBA selects rules with the smallest variance. Our
+choice is consistent with our probabilistic model in that rules with higher chance
+of being generated (see Equation 5) are more important and should be selected.
+
+5 Experimental Study
+
+5.1 Data Sets
+
+We evaluate the performance of AREM on 10 data sets summarized in Table
+1. The ﬁrst six data sets are randomly sampled from user reviews downloaded
+from three websites: “BestBuy” [19], “CitySearch” [20], and “Yelp” [21]. Each
+instance corresponds to the review of a product where the target variable to
+predict is the user’s rating which ranges from one to ﬁve. The review text is
+parsed and a set of features, or items, is extracted. We constructed two types
+of features: “dep” and “wf”. For “dep”, the Stanford dependencies [22] between
+
+AREM: A Novel Associative Regression Model
+
+467
+
+words in each sentence are extracted. Each dependency is a triplet containing
+the name of the relation, the governor and the dependent. For “wf”, words in
+the review text are extracted. We remove the infrequent items whose relative
+supports (that is, the support divided by |D|) are less than 0.5%. The “Airline”
+data set is downloaded from DataExpo09 competition [23]. The last three data
+sets are downloaded from CMU StatLib [24].
+
+5.2 Models
+
+For model comparison’s purpose, we focus on descriptive models and select sev-
+eral state of the art tree-based and rule-based regression models. The support
+vector regression (SVR) [14] is an exception. It is included because it is one of
+the best known and standard models for regression.
+SVR We use “libsvm” [25] for SVR, and use only the linear kernel. Model
+parameters tuned are: C and , where  is the size of -insensitive tube, and C
+controls the model complexity.
+CARTk This group of models contain the Classiﬁcation And Regression Tree
+(CART) [11] and the Boosted Regression Tree [10] where CART of ﬁxed size
+is acting as the weak learners. So, CARTk stands for CART being boosted k
+times [26]. We tuned three parameters for CARTk: depth, leaf and lrate, where
+depth is the maximum depth of the tree, leaf is the minimum number of leaf
+samples of the tree, and lrate is the learning rate of the gradient boosting method.
+CUBISTk Cubist [12] is a rule based algorithm which has the option of build-
+ing committee models. The number of members in the committee is captured
+in k. We tuned two binary parameters for CUBISTk: UB (unbiased), and CP
+(composite). Parameter UB instructs CUBIST to make each rule approximately
+unbiased. Parameter CP instructs CUBIST to construct the composite model.
+RBAk We implemented the RBA model following [9]. Here k is the number of
+top ranked rules used for prediction. We tuned two parameters for RBAk: s0 and
+weight, where s0 is the minimum support threshold, and weight is the weighting
+scheme used for prediction, which can take three values supp, inv-var and equal.
+AREMk Here, k is the number of top ranked rules used for prediction. We
+tuned three parameters for AREMk: s0, K and M , where s0 is the minimum sup-
+port threshold, K is the number of high quality rules for each training instance
+during pruning, and M is the number of EM steps during model training.
+
+The parameter k in the above models (except SVR) can be uniformly inter-
+preted as the number of rules used for making predictions. For our experimental
+study, we choose k to be 1, 5, 10, 15 and 20 for all four models. The rationale of
+choosing these values comes from the following: if k is too large, these models’
+strength of being interpretable essentially disappears; on the other hand, if k is
+too small, the performance may not be satisfactory. We choose the maximum k
+value to be 20 as a compromise from these two extreme case considerations.
+
+5.3 Evaluation
+
+We used the Mean Squared Error (MSE) between the actual and predicted
+target variable’s values as the performance metric. For each (model, data) pair,
+
+468
+
+Z. Jiang and G. Karypis
+
+Table 2. Model Comparison: Average MSE
+
+dep
+
+wf
+
+Airline Socmob Pollen Spacega
+
+0.535 0.469
+0.440 0.487
+0.349 0.481
+0.349 0.482
+0.349 0.483
+0.341 0.483
+0.363 0.501
+0.367 0.500
+0.370 0.499
+0.369 0.499
+0.369 0.499
+0.533 0.507
+0.562 0.496
+0.594 0.497
+0.603 0.497
+0.603 0.497
+0.421 0.581
+0.307 0.499
+0.299 0.483
+0.299 0.481
+0.300 0.481
+
+0.480
+0.488
+0.480
+0.481
+0.482
+0.484
+0.490
+0.494
+0.492
+0.493
+0.493
+0.530
+0.496
+0.496
+0.497
+0.497
+0.628
+0.529
+0.507
+0.490
+0.483
+
+model\data
+SVR
+CART1
+CART5
+CART10
+CART15
+CART20
+CUBIST1
+CUBIST5
+CUBIST10
+CUBIST15
+CUBIST20
+RBA1
+RBA5
+RBA10
+RBA15
+RBA20
+AREM1
+AREM5
+AREM10
+AREM15
+AREM20
+
+BestBuy
+dep
+
+wf
+
+CitySearch
+wf
+
+dep
+
+Yelp
+
+0.945 0.810 0.961 0.814 0.935 0.770 0.643
+1.014 0.875 1.131 0.974 1.118 0.924 0.649
+0.937 0.815 0.997 0.847 0.994 0.804 0.640
+0.921 0.799 0.962 0.827 0.962 0.782 0.642
+0.913 0.790 0.956 0.809 0.946 0.765 0.640
+0.909 0.787 0.949 0.814 0.939 0.755 0.640
+0.658
+1.043 0.880 1.210 0.990 1.130 0.959
+0.663
+1.070 0.937 1.213 0.966 1.129 0.949
+1.074 0.943 1.216 0.973 1.138 0.946
+0.664
+0.664
+1.080 0.947 1.218 0.976 1.138 0.944
+0.664
+1.081 0.951 1.221 0.985 1.137 0.944
+0.730
+1.111 1.004 1.200 1.141 1.156 1.023
+0.682
+0.969 0.898 1.044 0.928 1.026 0.930
+0.685
+0.964 0.878 1.041 0.894 1.019 0.915
+0.962 0.872 1.040 0.893 1.015 0.904
+0.685
+0.685
+0.964 0.872 1.038 0.890 1.013 0.903
+0.754
+1.248 1.235 1.354 1.248 1.311 1.241
+0.875 0.763 0.908 0.844 0.953 0.799
+0.670
+0.862 0.751 0.896 0.784 0.920 0.753 0.657
+0.864 0.753 0.894 0.773 0.921 0.748 0.652
+0.865 0.758 0.899 0.770 0.926 0.749 0.646
+
+we ﬁrst identiﬁed a set of parameter conﬁgurations that was likely to achieve
+the best performance. The model was then trained on the training set and MSE
+was calculated on the validation set for each of the parameter conﬁgurations.
+Then we selected the parameter conﬁguration that gives the best MSE on the
+validation set, and computed the corresponding MSE on the testing set. This
+process is repeated for the number of trials shown in Table 1. Finally, we reported
+the average MSE on all testing trials.
+
+For a given data set, in order to compare model m1 to model m2, we take into
+account the distribution of the MSE values computed on multiple testing trials
+for each model. Let μ1, σ1, n1 (μ2, σ2, n2) be the mean, standard deviation and
+the number of observations of the set of MSE values for model m1 (m2), respec-
+tively. We introduce μm1−m2 = μ2 − μ1 and σm1−m2 =
+/n2. The
+quantity μm1−m2/σm1−m2 is used in statistical testing [27] for the comparison
+of two population means. Under the null hypothesis that two population means
+are the same, μm1−m2 /σm1−m2 can be assumed to have the Normal distribution
+N (0, 1). So the more deviated from zero this quantity is, the more likely that
+two models are performing diﬀerently.
+
+/n1 + σ2
+2
+
+σ2
+1
+
+(cid:4)
+
+5.4 Experimental Results
+
+The average MSE for the discussed set of models on the various data sets are
+shown in the Table 2, where the best results have been highlighted. Table 3
+shows the quantity μm1−m2 /σm1−m2 for comparing AREMk to the rest of the
+models. Note that CART1 is the standard CART model, in contrast to CARTk
+which stands for the boosted regression tree. For easy comparison, we derive the
+win-tie-loss from Table 3 and present them in Table 4.
+
+AREM: A Novel Associative Regression Model
+
+469
+
+Table 3. Compare AREMk To Other Models: μm1−m2 /σm1−m2
+
+Model\Data
+CARTk
+SVR
+RBAk
+CART1
+CUBISTk
+
+dep
+
+dep
+
+Yelp
+
+BestBuy CitySearch
+dep wf
+wf
+wf
+2.86 2.71 4.26 2.65 1.73 0.56
+4.65 4.16 4.97 2.95 1.26 1.80
+4.98 8.15 10.18 8.11 8.64 12.17
+7.89 8.36 16.78 11.48 16.50 13.84
+8.04 7.50 20.25 11.49 16.43 13.76
+
+Airline Socmob Pollen Spacega
+
+-0.61
+-0.35
+3.15
+0.23
+1.03
+
+2.29
+
+0.09
+10.51 -2.14
+2.74
+1.15
+3.15
+
+9.68
+6.77
+3.49
+
+-0.12
+-0.11
+0.52
+0.23
+0.31
+
+Table 4. Compare AREMk To Other Models: win-tie-loss
+comparing criteriaa\model CARTk SVRk RBAk CART1 CUBISTk
+|μm1−m2| ≥ σm1−m2
+|μm1−m2| ≥ 2σm1−m2
+|μm1−m2| ≥ 3σm1−m2
+a It is a tie if |μm1−m2| < nσm1−m2 . Otherwise, it is a win
+or loss depending on the sign of μm1−m2 .
+
+7-2-1 9-1-0
+5-4-1 9-1-0
+4-6-0 8-2-0
+
+9-1-0
+8-2-0
+8-2-0
+
+8-2-0
+7-3-0
+7-3-0
+
+6-4-0
+5-5-0
+1-9-0
+
+Tables 3 and 4 show that AREM is performing better than all competing
+methods on most of the data sets. For almost all cases, AREM is either better
+or at least as good as the competing method (with the only exception on “Pollen”
+when compared to SVR). It is also interesting to observe that AREM performs
+almost uniformly well on the review data sets, but not as uniform on the rest of
+the data sets. Given that the review data sets have much larger number of items
+(see Table 1), we think this is an indication that AREM is more suitable for high-
+dimensional and sparse data sets. Finally, from Table 2, we can see how diﬀerent
+k values aﬀect the AREM’s performance. When k = 1, the performance is not
+satisfactory. This is not surprising because our probabilistic model is optimized
+for large number of rules. However, as k becomes suﬃciently large (15 or 20),
+the performance improves considerably and remains quite stable.
+
+6 Conclusions
+
+We have proposed a novel regression model based on association rules called
+AREM. AREM applies the instance based rule mining approach to discover
+a set of high quality rules. Then the rules’ RHS and importance weights are
+learned consistently within the EM framework. Experiments based on 10 in
+house and public datasets show our model can perform better than RBA [9],
+Boosted Regression Trees [10], SVR [14], CART [11] and Cubist [12].
+
+Acknowledgment. This work was supported in part by NSF (IOS-0820730,
+IIS-0905220, OCI-1048018, CNS-1162405, and IIS-1247632) and the Digital Tech-
+nology Center at the University of Minnesota. Access to research and computing
+facilities was provided by the Digital Technology Center and the Minnesota Su-
+percomputing Institute.
+
+470
+
+Z. Jiang and G. Karypis
+
+References
+
+1. Li, W., Han, J., Pei, J.: Cmar: Accurate and eﬃcient classiﬁcation based on multiple
+
+class-association rules. In: ICDM, pp. 369–376 (2001)
+
+2. Yin, X., Han, J.: Cpar: Classiﬁcation based on predictive association rules. In:
+
+SDM (2003)
+
+3. Thabtah, F.A., Cowling, P., Peng, Y.: MMAC: A New Multi-class, Multi-label
+Associative Classiﬁcation Approach. In: Proceedings of the 4th IEEE International
+Conference on Data Mining, ICDM 2004, pp. 217–224 (2004)
+
+4. Wang, J., Karypis, G.: Harmony: Eﬃciently mining the best rules for classiﬁcation.
+
+In: Proc. of SDM, pp. 205–216 (2005)
+
+5. Cheng, H., Yan, X., Han, J., Yu, P.S.: Direct discriminative pattern mining for
+
+eﬀective classiﬁcation. In: ICDE, pp. 169–178 (2008)
+
+6. Quinlan, J.R.: C4.5: Programs for Machine Learning. Morgan Kaufmann (1993)
+7. Quinlan, J.R., Cameron-Jones, R.M.: Foil: A midterm report. In: Brazdil, P.B.
+
+(ed.) ECML 1993. LNCS, vol. 667, pp. 3–20. Springer, Heidelberg (1993)
+
+8. Cohen, W.W.: Fast eﬀective rule induction. In: ICML, pp. 115–123 (1995)
+9. Ozgur, A., Tan, P.N., Kumar, V.: Rba: An integrated framework for regression
+
+based on association rules. In: SDM (2004)
+
+10. Friedman, J.H.: Greedy function approximation: A gradient boosting machine.
+
+Annals of Statistics 29, 1189–1232 (2000)
+
+11. Breiman, L., Friedman, J.H., Olshen, R.A., Stone, C.J.: Classiﬁcation and Regres-
+
+sion Trees. Wadsworth (1984)
+
+12. Quinlan, J.R.: Cubist, http://www.rulequest.com
+13. Dempster, A.P., Laird, N.M., Rubin, D.B.: Maximum likelihood from incomplete
+data via the em algorithm. Journal of the Royal Statistical Society, Series B 39(1),
+1–38 (1977)
+
+14. Smola, A.J., Sch¨olkopf, B.: A tutorial on support vector regression. Technical re-
+
+port, Statistics and Computing (2003)
+
+15. Kotsiantis, S., Kanellopoulos, D.: Discretization techniques: A recent survey (2006)
+16. Thabtah, F.A.: A review of associative classiﬁcation mining. Knowledge Eng. Re-
+
+view 22(1), 37–65 (2007)
+
+17. Chapelle, O., Chang, Y.: Yahoo! learning to rank challenge overview. Journal of
+
+Machine Learning Research - Proceedings Track 14, 1–24 (2011)
+
+18. Han, J., Pei, J., Yin, Y.: Mining frequent patterns without candidate generation.
+
+In: SIGMOD Conference, pp. 1–12 (2000)
+
+19. BestBuy, http://www.bestbuy.com
+20. CitySearch, http://www.citysearch.com
+21. Yelp, http://www.yelp.com
+22. Marneﬀe de, M.C., Manning, C.D.: The stanford typed dependencies represen-
+tation. In: Coling 2008: Proceedings of the Workshop on Cross-Framework and
+Cross-Domain Parser Evaluation, CrossParser 2008, pp. 1–8 (2008)
+
+23. Airline, http://stat-computing.org/dataexpo/2009
+24. StatLib, http://lib.stat.cmu.edu/datasets
+25. Chang, C.C., Lin, C.J.: LIBSVM: A library for support vector machines. ACM
+
+Transactions on Intelligent Systems and Technology 2, 27:1–27:27 (2011)
+
+26. Pedregosa, F., Varoquaux, G., Gramfort, A., et al.: Scikit-learn: Machine Learning
+
+in Python. Journal of Machine Learning Research 12, 2825–2830 (2011)
+
+27. NIST-handbook: Two-sample t-test for equal means,
+
+http://www.itl.nist.gov/div898/handbook/eda/section3/eda353.htm
+
+

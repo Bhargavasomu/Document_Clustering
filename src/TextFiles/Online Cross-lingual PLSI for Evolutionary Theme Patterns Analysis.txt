@@ -1,0 +1,1362 @@
+Online Cross-Lingual PLSI for Evolutionary
+
+Theme Patterns Analysis
+
+Xin Xin, Kun Zhuang, Ying Fang, and Heyan Huang
+
+School of Computer Science and Technology,
+Beijing Institute of Technology, Beijing, China
+{xxin,kzhuang,yfang,hhy63}@bit.edu.cn
+
+Abstract. In this paper, we focus on the problem of evolutionary theme
+patterns (ETP) analysis in cross-lingual scenarios. Previously, cross-
+lingual topic models in batch mode have been explored. By directly ap-
+plying such techniques in ETP analysis, however, two limitations would
+arise. (1) It is time-consuming to re-train all the latent themes for each
+time interval in the time sequence. (2) The latent themes between two
+adjacent time intervals might lose continuity. This motivates us to utilize
+online algorithms to solve these limitations. The research of online topic
+models is not novel, but previous work cannot be directly employed,
+because they mainly target at monolingual texts. Consequently, we pro-
+pose an online cross-lingual topic model. By experimental veriﬁcation in
+a real world dataset, we demonstrate that our algorithm performs well
+in the ETP analysis task. It can eﬃciently reduce the updating time
+complexity; and it is eﬀective in solving the continuity limitation.
+
+Keywords: Temporal Text Mining, Evolutionary Topic Patterns,
+Incremental/Online PLSI, Cross-lingual PLSI.
+
+1
+
+Introduction
+
+Tracking the temporal evolutionary theme patterns (ETP) of documents is an
+important research issue nowadays. The original documents on the Web, such
+as news articles, research papers, etc., are generated in an unstructured stream,
+which would bring information overload problem to users. With the help of
+ETP analysis, it is more user-friendly to automatically group the documents in
+a temporal hierarchical structure. Figure 1(left) shows the ETP analysis result
+from the news articles (from NetEase, VOC, etc.) of the event Euro 2012. Before
+game starts, themes are mainly about the basic information of diﬀerent teams,
+such as the stars, the strategies, etc.; after the game starts, the themes are
+evolved to the performances and reviews; before the ﬁnal, the themes of the two
+participants in the ﬁnal, Spain and Italy, merge into one theme, whose content
+includes the predictions from the fans, the comparison analysis, etc.; ﬁnally
+after the ﬁnal, the theme is involved into the celebrations, the dominations, the
+reviews, and etc. We can see from this example that such a temporal hierarchical
+structure is very informative in tracking the development of an event. In addition,
+
+J. Pei et al. (Eds.): PAKDD 2013, Part I, LNAI 7818, pp. 74–85, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+Online Cross-Lingual PLSI for Evolutionary Theme Patterns Analysis
+
+75
+
+June 1
+
+June 20
+
+July 2
+The Time Line
+
+July 10
+
+T1
+
+T3
+T2
+The Time Line
+
+T4
+
+T1: Theme1
+
+T2: Theme1
+
+T3: Theme1
+
+T4: Theme1
+
+Celebrations
+
+Spain Stars
+
+Spain Games
+
+Italy Stars
+
+Italy Games
+
+T1: Theme2
+
+T2: Theme2
+
+T3: Theme2
+
+Dominations
+
+T2: Theme3
+
+Final
+
+Time Window for T3
+
+Reviews
+
+Time Window for T4
+
+Fig. 1. An example of ETP analysis
+
+it would be very helpful for information retrieval tasks from the semantic level.
+As a result, the ETP analysis has attracted more and more attention in both
+academia and industry [10–12].
+
+In this paper, we focus on the issue of ETP analysis in the cross-lingual
+scenarios, which is diﬀerent from previous ETP analysis [12] in monolingual
+texts. In this case, a topic is presented by documents of multiple languages
+rather than a monolingual one. Cross-lingual data would make the information
+more complete and the ETP analysis more accurate. For example, in Euro 2012
+news, the discussion attitudes between a participant (e.g., Spain), and a third
+party member (e.g., China) might be quite diﬀerent. The former would have
+bias to Spain; but the latter might be more neutral. Both of them should be
+considered in the ETP analysis.
+
+Cross-lingual latent theme modeling is the key technique in cross-lingual ETP
+analysis. Competitive approaches include the cross-lingual probabilistic latent
+semantic indexing (PLSI) [15] model and the cross-lingual latent Dirichlet al-
+location (LDA) [9] model. The limitation of these competitive methods is that
+both of them are in batch mode. This would make the ETP analysis face the
+following two limitations.
+
+Time-consuming Limitation. In the process of ETP analysis, the themes of
+documents in a new time interval should be integrated into the previous themes.
+In the batch mode, all the latent themes should be re-trained among the new
+documents and the old documents. In practice, the re-train process needs the
+enumeration of all the words in all the documents. Since the initial points are
+randomly chosen, it would also take many iterations of the enumeration before
+the model converges. Therefore, it is time-consuming to re-train the whole model
+for each time interval in the ETP analysis.
+
+Continuity Limitation. If the re-train process is conducted for each time inter-
+val, the latent themes between adjacent time intervals might lose the continuity.
+The “continuity” has two meanings. 1) It is diﬃcult to match the latent theme
+ids between the current time interval and the previous time interval. Because
+such ids are randomly assigned in the initial step of the algorithm. Thus the
+evolution process of themes might be not clear. 2) The latent themes between
+
+76
+
+X. Xin et al.
+
+adjacent time intervals might have diﬀerent category angles and might not match
+each other. For example, in Fig. 1 (left), the latent themes are divided by teams.
+However, the latent themes could also be divided by the activities from fans, the
+activities from the match, etc. In fact, these themes do exist in the data. But it
+is not proper to have one category in one time interval, and have another in the
+next. An ideal ETP tracking should keep the continuity in all the time intervals.
+These two limitations motivate us to investigate online algorithms for ETP
+analysis. Intuitively, when new documents arrive, the online algorithms only
+make local update to the model instead of global one, thus the time complexity
+would be much less than re-training the whole model. In addition, while the
+online algorithm retains the main body of the previous model, the continuity
+would be kept. Thus both the above limitations could be solved.
+
+Online algorithms for topic models are not novel research tasks either. Both
+online PLSI [4] and online LDA [6] have been explored. But these models are
+mainly for monolingual scenarios. Thus they cannot be directly employed. There-
+fore, in this paper, we combine the ideas of previous work and propose an online
+cross-lingual topic model for cross-lingual ETP analysis. Comparing between
+the PLSI model and the LDA model, the LDA model utilizes the regularization
+technique to smooth the data ﬁtting, which indeed performs well in previous
+tasks, but it also increases the training cost and the model complexity. As a
+preliminary study, in this paper, we ﬁrst choose to combine the cross-lingual
+PLSI [15] and the online PLSI [4] for simplicity. We leave the combination of the
+cross-lingual LDA[9] and the online LDA [6] as our future work.
+
+The main contributions of this paper lie in that we combine the ideas of pre-
+vious cross-lingual PLSI and online PLSI together and propose an online cross-
+lingual topic model. In addition we utilize it in ETP analysis and demonstrate
+its eﬃciency for reducing the time complexity and its eﬀectiveness for keeping
+the continuity property.
+
+In the following of this paper, to make it consistent with previous work and
+easy for comparisons, many previous deﬁnitions and variables in [4, 12, 15] are
+retained if being not necessarily changed, and our contribution is to combine
+these ideas in the cross-lingual ETP analysis task.
+
+2 Problem Deﬁnition
+
+2.1 Preliminary Deﬁnitions
+
+Deﬁnition 1 (Cross-lingual Corpus). Following [15], the cross-lingual cor-
+
+pus is a dataset with multiple languages. We utilize C = {C1, C2, ..., Cs} to de-
+note the set of data collections with s languages. Each Ci denotes the data collec-
+tion of a single language, whose vocabulary is denoted by Wi = {wi
+}.
+Ni is the total word number in the ith language. Each data collection Ci contains
+}. Each document is presented by a bag
+a set of documents, Ci = {di
+2, ..., di
+of words, and a function c(wi
+j) is utilized to denote the occurrence count of
+word wi
+
+k in document di
+j.
+
+1, wi
+
+2, ...wi
+Ni
+
+1, di
+k, di
+
+Mi
+
+Online Cross-Lingual PLSI for Evolutionary Theme Patterns Analysis
+
+77
+
+(cid:2)
+
+...
+
+(cid:2)
+
+(cid:2)
+
+W2
+
+Ws. For each θ, we have
+
+Deﬁnition 2 (Cross-lingual Theme). Following [15], a cross-lingual theme
+θ is presented as a multinomial distribution of words, denoted by p(w|θ), w ∈
+w∈W i p(w|θ) = 1. Under this
+W1
+deﬁnition, a cross-lingual theme would gather the words of all the languages with
+related semantic meanings together. This is a super set of monolingual theme.
+A monolingual theme could be extracted from the cross-lingual theme by normal-
+ization as pi(wi|θ) =
+
+(cid:3)s
+
+i=1
+
+(cid:3)
+
+(cid:2)
+
+p(wi|θ)
+w∈Wi
+
+p(w|θ) .
+
+Deﬁnition 3 (Time Interval and Time Window). As shown in Fig. 1
+(right), the time line is divided into discrete time intervals. Each time inter-
+val is a ﬁxed number of days, e.g., a week of seven days. For each time interval,
+the themes are automatically learned from the documents in both the current in-
+terval and the recent intervals to retain the overlap between new documents and
+old documents [12]. By doing this, the evolution analysis would be more smooth
+and robust. Thus a time window is deﬁned for each time interval. It contains the
+current interval and a ﬁxed number l − 1 of the recent intervals. The themes in
+a time interval is learned from the documents in its corresponding time window.
+Take l = 3 as an example, in Fig. 1 (right), the themes in interval T3 is trained
+from the documents in the time window of T1,T2 and T3; and the themes in T4
+is trained from the documents in a time window of T2,T3 and T4.
+
+Deﬁnition 4 (Cross-lingual Evolutionary Transition). Following [12], we
+utilize θTi to denote a theme with a time stamp in the cross-lingual data. Suppose
+b , if the similarity between them is larger than a
+a theme θ
+threshold, it is deﬁned that there is a cross-lingual evolutionary transition from
+Ti−1
+θ
+a
+
+and a theme θTi
+
+Ti−1
+a
+
+to θTi
+b .
+
+Deﬁnition 5 (Cross-lingual Theme Evolutionary Graph). Following [12],
+the cross-lingual theme evolutionary graph G = (N, E) is deﬁned as a weighted
+graph as shown in Fig. 1 (right). In the graph, each node v ∈ N denotes a
+theme with a time stamp; and each edge e ∈ E denotes whether the two nodes in
+adjacent time intervals have an evolutionary transition. The weight of an edge
+(denoted by the thickness of the edge), stands for the similarity value between the
+current theme and the evolved theme. The larger the similarity is, the thicker the
+edge would be.
+
+2.2 The Task of Cross-Lingual ETP Analysis
+
+Following the idea in [12], we deﬁne the task of cross-lingual ETP analysis as
+to draw a cross-lingual theme evolutionary graph from the unstructured data
+stream. The result of ETP analysis would give a clear temporal hierarchical
+overview of the themes and their evolutions for diﬀerent events, which would
+serve for both users and other intelligent services.
+
+78
+
+X. Xin et al.
+
+Fig. 2. Illustration for online cross-lingual PLSI
+
+3 General Framework
+
+The general framework for cross-lingual ETP analysis is a two-step process.
+The ﬁrst step is to extract the themes in each time interval from their time
+windows; and the second step is to construct the evolutionary transitions among
+the themes in adjacent time intervals.
+
+The second step is more intuitive by calculating the KL-divergence D(θ2||θ1)
+
+between two themes [12]. In the cross-lingual case, it is deﬁned as
+
+D(θ2||θ1) =
+
+(cid:4)
+
+wi∈W1
+
+(cid:3)
+
+W2
+
+(cid:3)
+
+...
+
+(cid:3)
+
+Ws
+
+p(wi|θ2) log
+
+p(wi|θ2)
+p(wi|θ1)
+
+.
+
+(1)
+
+The main diﬀerence compared with [12] is that the cross-lingual theme contains
+words from diﬀerent languages.
+
+The ﬁrst step is the key point that would be discussed in this paper. A naive way
+is to re-train all the documents in the time window in a batch mode. For example,
+the cross-lingual PLSI [15] model could be directly utilized here for theme extrac-
+tion. However, as discussed in previous sections, it is time-consuming to re-train all
+the latent themes for each time interval; and the latent themes between two adja-
+cent time intervals might lose continuity. Therefore, in this paper, we combine the
+idea in [15] and [4] to propose an online cross-lingual PLSI model for cross-lingual
+ETP analysis, which would be illustrated in detail in the following section.
+
+4 Online Cross-Lingual PLSI
+
+4.1 Cross-Lingual PLSI in Batch Mode
+The cross-lingual PLSI [15] model is described by two kinds of parameters, p(θ|d)
+and p(w|θ). θ denotes the theme; d denotes the document; and w denotes the
+word.
+The learning process of p(θ|d) and p(w|θ) is to optimize the linear combination
+of 1) the log-likelihood of the data and 2) the constraint function of cross-lingual
+connection, denoted as
+
+Online Cross-Lingual PLSI for Evolutionary Theme Patterns Analysis
+
+79
+
+F = (1 − λ)L(C) + λR(C),
+
+where
+
+s(cid:4)
+
+(cid:4)
+
+(cid:4)
+
+k(cid:4)
+
+L(C) =
+
+i=1
+
+R(C) = − 1
+2
+
+w
+
+d∈Ci
+(cid:4)
+
+k(cid:4)
+
+<wu,wv>∈E
+
+j=1
+
+(
+
+c(w, d)log
+
+p(θj|d)p(w|θj ),
+− p(wv|θj)
+
+)2.
+
+Deg(wv)
+
+j=1
+
+p(wu|θj)
+Deg(wu)
+
+(2)
+
+(3)
+
+(4)
+
+L(C) is the log-likelihood of the data in multiple languages. In constructing the
+constraint function R(C), a multi-partite undirected graph G =< W, E > is
+built from each bilingual dictionaries as shown in Fig. 2 (left). Each node in W
+denotes a word. If two words from diﬀerent languages, e.g., wu and wv, could
+interpret each other, there would be an edge between them. Dev(wu) denotes
+the degree of the word wu. From the deﬁnition, by optimizing the function R(C),
+words from multiple languages that have similar meanings, would have similar
+probabilities within a theme.
+
+The optimization is based on the EM algorithm as follows.
+
+1. E-Step
+
+2. M-Step
+
+P (θ|w, d) =
+
+(cid:3)
+
+P (w|θ)P (θ|d)
+θ(cid:3) P (w|θ(cid:4))P (θ(cid:4)|d)
+
+P (w|θ) =
+
+(cid:3)s
+
+(cid:3)
+
+(cid:3)s
+i=1
+(cid:3)
+
+d∈Ci c(w, d)P (θ|w, d)
+
+w(cid:3)∈d c(w(cid:4), d)P (θ|w(cid:4), d)
+
+(cid:3)
+
+i=1
+
+p(θ|d) =
+
+d∈Ci
+w∈d c(w, d)P (θ|w, d)
+
+(cid:3)
+
+(cid:3)
+
+w∈d c(w, d)
+
+(5)
+
+(6)
+
+(7)
+
+p(t+1)(wu|θj) = (1 − α)p(t)(wu|θj) + α
+
+(cid:4)
+
+1
+
+<wu,wv>∈E
+
+Deg(wv)
+
+p(t)(wv|θj) (8)
+
+4.2 Proposed Cross-Lingual PLSI in Online Mode
+
+Following the idea in [4], the process of the online cross-lingual PLSI is shown in
+Fig. 2 (right), including 1) discarding old documents and old terms; 2) folding in
+new documents and new terms and 3) updating the PLSI parameters. Compared
+with the online monolingual PLSI in [4], in this paper, step 2 and 3 are extended
+in order to ﬁt the cross-lingual data. Therefore, in this section, we would focus
+these two steps. The ﬁrst step could be referred in [4].
+
+80
+
+X. Xin et al.
+
+1. Fold in new documents and terms. The target of folding in new documents
+and terms is to estimate P (θ|dnew) and P (θ|wnew). The diﬀerence of our
+work from previous work [4] is that the process should be extended for
+incorporating the cross-lingual word relations. Because words in diﬀerent
+languages that have similar meanings should have more probability to be as-
+signed to the same theme. In the batch learning mode, this problem has been
+solved by a global update in Eq. 8; in the online learning mode, this would
+be solved by a local update. Consequently, we add an local update step as
+an extension of previous updating process. The whole process is conducted
+as follows by EM algorithms. By ﬁxing the parameter of P (w|θ), P (θ|dnew)
+could be estimated by iteration calculation of
+
+P (θ|w, dnew) =
+
+(cid:3)
+
+P (w|θ)P (θ|dnew)
+θ(cid:3)∈Θ P (w|θ(cid:4))P (θ(cid:4)|dnew)
+
+, .
+
+(9)
+
+.
+
+(10)
+
+(cid:3)
+
+w∈dnew c(w, dnew)P (θ|w, dnew)
+
+P (θ|dnew) =
+
+w∈dnew c(w, dnew)P (θ(cid:4)|w, dnew)
+After P (θ|dnew) is estimated, P (dnew|θ) could be estimated by
+
+θ∈Θ
+
+(cid:3)
+
+(cid:3)
+
+P (dnew|θ) =
+
+(cid:3)
+(cid:3)
+
+w∈dnew c(w, dnew)P (θ|w, dnew)
+w∈d c(w, d)P (θ|w, d)
+d∈Dnew
+
+(cid:3)
+
+,
+
+(11)
+
+where Dnew is all the documents in the new time window, including doc-
+uments in the remaining intervals and the new interval. By ﬁxing the pa-
+rameter of P (dnew|θ), P (θ|wnew) could be estimated by iteration calculation
+of
+
+P (θ|wnew,dnew ) =
+
+(cid:3)
+
+P (θ|wnew) =
+
+(cid:3)
+
+P (dnew|θ)P (θ|wnew)
+θ(cid:3)∈Θ P (dnew|θ(cid:4))P (θ(cid:4)|wnew)
+d∈Dnew c(wnew, d)P (θ|wnew, d)
+
+(cid:3)
+
+d(cid:3)∈Dnew c(wnew, d(cid:4))
+
+,
+
+(12)
+
+.
+
+(13)
+
+(cid:4)
+
+(θ|wnew) = (1 − α)P (θ|wnew) + α
+
+P
+
+(cid:4)
+
+1
+
+<wnew,wv >∈E
+
+Deg(wnew)
+
+P (θ|wv).(14)
+
+In the last equation, the cross-lingual smoothing is incorporated following
+the idea of [15]. Consequently, the similar words in diﬀerent languages would
+have similar latent theme distributions.
+2. Update the PLSI parameters. In the folding in process, p(wold|θ) has not been
+changed and p(wnew|θ) has not been incorporated. Thus a normalization is
+utilized following [4] as
+P (w|θ) =
+
+d∈Dnew c(w, d)P (θ|w, d)
+
+(15)
+
+(cid:3)
+
+(cid:3)
+
+(cid:3)
+
+w(cid:3)∈d(cid:3) c(w(cid:4), d(cid:4))P (θ|w(cid:4), d(cid:4))
+
+.
+
+d(cid:3)∈Dnew
+
+Online Cross-Lingual PLSI for Evolutionary Theme Patterns Analysis
+
+81
+
+If calculation complexity is limited in a small range, the updating has been
+ﬁnished. But if more calculation is allowed, Eq. 5, Eq. 6, Eq. 7 and Eq. 8
+could be executed iteratively to optimize the parameters further.
+
+5 Experiments
+
+The experiments are targeted at justifying the following issues for the proposed
+online cross-lingual PLSI model.
+
+1. What is its overall performance in the ETP analysis?
+2. Whether it is eﬃcient in reducing the time complexity?
+3. Whether it is eﬀective in solving the continuity limitation?
+
+To issue 1, we show an intuitive example of the ETP analysis result; and we also
+compare it with a version of monolingual topic model by translating multiple
+languages into a single language, in order to show the advantages of cross-lingual.
+To issue 2, we compare the speed of convergence of the proposed model with the
+original cross-lingual model in batch mode. To issue 3, we give both qualitative
+and quantitative justiﬁcation compared with the original cross-lingual model in
+batch mode.
+
+5.1 Dataset
+
+Our dataset is a set of news articles, which is collected between June 1st 2012 to
+June 23th 2012. The articles are either in English or in Chinese. Totally, 269,144
+Chinese articles and 64,897 English articles are collected. A pre-processing is
+conducted before the experiments, including splitting words, removing the stop
+words and stemming. We choose mandarintools1 to build the bilingual word
+graph as shown in Fig. 2 (left).
+
+The dataset is divided into three time intervals evenly, denoted as T1, T2 and
+T3. The time window length is l = 2. Thus the time window for T2 include T1
+and T2; and the time window for T3 is T2 and T3. When documents of T3 arrive,
+the topic model should discard the old words and documents in T1 and fold in
+the new words and documents in T3. In the proposed online PLSI, this process
+is natural. In the original PLSI in batch mode, the model should be re-trained
+using the documents in T2 and T3.
+
+5.2 Overall Performance
+
+To evaluate the overall performance, we utilize the proposed model to extract
+the themes in T2 and T3. Then the cross-lingual evolutionary transitions are
+generated by calculating the KL-divergence using Eq. 1. A cross-lingual theme
+evolutionary graph is drawn like Fig. 1 (right). Due to the space limitation, we
+do not demonstrate the whole graph, but we show part of it instead for analysis.
+
+1
+
+mandarintools.com
+
+82
+
+X. Xin et al.
+
+Table 1. Overall performance example
+
+Theme extraction in T2
+
+Theme extraction in T3
+by PLSI in batch mode
+
+Theme extraction in T3
+by the proposed model
+
+Theme 2.1
+England
+
+(cid:0)(cid:0)(cid:0)(Cahill)
+
+Terry
+France
+
+(Paul)
+
+(cid:0)(cid:0)(opening)
+
+(cid:0)(cid:0)
+
+(warm-up match)
+
+Hodgson
+
+Curtis
+
+(cid:0)(cid:0)(jersey)
+(cid:3)(cid:0)(Sweden)
+
+Theme 2.2
+
+Theme 3.1’
+
+Theme 3.2’
+
+Theme 3.1
+
+Theme 3.2
+
+Italy
+Spain
+
+(cid:2)(cid:2)(cid:0)(Croatia)
+(cid:2)(cid:0)(cid:2)(goals scored)
+
+(cid:0)Ǳ(fan)
+Cassano
+
+	(cid:0)(cid:2)(Pirlo)
+(cid:0)(cid:0)(cid:0)(Torres)
+
+player
+
+(cid:0)(cid:2)(train)
+(predict)
+
+  (police)
+(cid:4)(cid:3)(hotel)
+
+worker
+
+sex
+
+(cid:0)(topic)
+(cid:0)(China)
+
+(cid:2)(cid:0)(cid:3)
+
+(racial discrimination)
+
+country
+watch
+
+(cid:0)(cid:2)(cid:2)(Ukraine)
+
+coach
+
+(cid:0)(cid:2)(cid:2)(Ukraine)
+(cid:0)(cid:0)(cid:0)(Cahill)
+(cid:4)(Germany)
+
+Spain
+
+(cid:2)(cid:0)(cid:3)(Italian)
+(cid:2)(cid:0)(cid:2)(England)
+
+(cid:0)(cid:0)(contest)
+(cid:0)(cid:2)(advance)
+
+knock
+
+England
+(cid:0)Ǳ(fan)
+
+(cid:0)(cid:2)(cid:2)(Ukraine)
+
+hotel
+Spain
+
+(cid:5)(cid:4)(cid:4)(Gerrard)
+
+Italy
+
+Ireland
+
+(cid:2)(cid:2)(cid:0)(Croatia)
+(cid:2)(cid:3)(cid:3)(Balotelli)
+
+(cid:3)(tacit)
+barbecue
+
+(cid:3)(cid:2)(Rooney)
+
+(cid:0)(gambling)
+
+sex
+
+(cid:5)(cid:2)(end line)
+
+(cid:2)(cid:3)(score)
+(cid:0)(cid:0)(jersey)
+
+team
+
+(cid:0)(cid:4)(cid:4)(Cassano)
+
+(cid:0)(cid:2)(advance)
+
+ﬁnal
+
+d
+o
+o
+h
+
+i
+l
+
+e
+k
+
+i
+l
+
+−
+g
+o
+L
+ 
+"
+n
+o
+i
+t
+c
+e
+
+l
+l
+
+o
+c
+−
+s
+s
+o
+r
+c
+"
+
+−5.3x 106
+−5.4
+−5.5
+−5.6
+−5.7
+−5.8
+−5.9
+−6
+−6.1
+−6.2
+−6.3
+0
+
+ 
+
+1
+
+ 
+
+PLSI Mono−Lingual
+PLSI Cross−Lingual
+9
+
+7
+
+6
+
+8
+
+4
+5
+Iteration
+
+2
+
+3
+
+d
+o
+o
+h
+
+i
+l
+
+e
+k
+
+i
+l
+
+−
+g
+o
+L
+ 
+"
+n
+o
+i
+t
+c
+e
+
+l
+l
+
+o
+c
+−
+s
+s
+o
+r
+c
+"
+
+−5.7x 106
+
+−5.8
+
+−5.9
+
+−6
+
+−6.1
+
+−6.2
+
+−6.3
+0
+
+ 
+
+1
+
+2
+
+3
+
+ 
+
+PLSI Mono−Lingual
+PLSI Cross−Lingual
+9
+
+7
+
+6
+
+8
+
+4
+5
+Iteration
+
+(a) α = 0.2
+
+(b) α = 0.8
+
+Fig. 3. Comparison with monolingual topic model
+
+We choose the event of Euro 2012 as an example. Table. 1 shows the ETP
+analysis result. Column 1 shows the theme extraction result for T2; Column
+2 shows the theme extraction result for T3 from cross-lingual PLSI in batch
+mode, which would be utilized to show the improvement of continuity later; and
+Column 3 shows the theme extraction result for T3 from the proposed model.
+T heme 3.1 is evolved from theme 2.1; and theme 3.2 is evolved from theme 2.2.
+It can be observed that in theme 2.1, stories are related to the England
+team, such as the stars, the opponent team, etc. The stories are about warm-up
+matches, openings, etc. After being evolved to theme 3.1, stories are also related
+to England team. But as time goes by, the content of the stories has been changed
+to whether the England team can advance, the behavior of its star Rooney, etc.
+T heme 2.2 and theme 3.2 have similar theme evolution, but they are related to
+the Italy team. We can also see that the English media is more open in sensitive
+topics such as “sex” than the Chinese media, which shows the complementarity
+of information among the cross-lingual data. This example demonstrates that
+proposed model is eﬀective in cross-lingual ETP tasks.
+
+To show the advantage of cross-lingual topic model, we compare it with the
+monolingual PLSI by translating the Chinese documents into English documents.
+The experimental setup for translation can be referred to [15]. For evaluation,
+
+d
+o
+o
+h
+
+i
+l
+
+e
+k
+
+i
+l
+
+−
+g
+o
+L
+
+Online Cross-Lingual PLSI for Evolutionary Theme Patterns Analysis
+
+83
+
+x 107
+
+ 
+
+−2.48
+−2.52
+−2.56
+−2.6
+−2.64
+−2.68
+−2.72
+−2.76
+−2.8
+0
+
+ 
+
+1
+
+2
+
+3
+
+4
+5
+Iteration
+
+6
+
+PLSI−Batch
+PLSI−Online
+9
+
+7
+
+8
+
+l
+
+y
+t
+i
+x
+e
+p
+r
+e
+P
+
+7500
+7000
+6500
+6000
+5500
+5000
+4500
+4000
+3500
+3000
+2500
+0
+
+ 
+
+ 
+
+PLSI−Batch
+PLSI−Online
+
+1
+
+2
+
+3
+
+4
+5
+Iteration
+
+6
+
+7
+
+8
+
+9
+
+(a) log-likelihood
+
+(b) perplexity
+
+Fig. 4. Comparison with cross-lingual PLSI in batch mode (1)
+
+#Theme
+
+PLSI-Batch
+Convergence 
+
+time (ms)
+
+8
+
+16
+
+24
+
+190300
+
+504269
+
+796977
+
+PLSI-Online
+Convergence 
+
+time (ms)
+42375 
+(22.2%)
+91857
+(18.2%)
+145785 
+(18.3%)
+
+ 
+
+PLSI−Batch
+PLSI−Online
+
+1.3
+
+1.2
+
+1.1
+
+1
+
+0.9
+
+0.8
+
+0.7
+
+0.6
+
+0.5
+
+e
+c
+n
+e
+g
+r
+e
+v
+d
+−
+L
+K
+
+i
+
+ 
+
+0.4
+2000 2500 3000 3500 4000 4500 5000 5500 6000 6500
+
+Stream
+
+(a) execution time
+
+(b) continuity
+
+Fig. 5. Comparison with cross-lingual PLSI in batch mode (2)
+
+we utilize the “cross-collection” log-likelihood deﬁned in [15]. Fig. 3 shows the
+experimental result for diﬀerent parameters. α is the parameter used in Eq. 8
+and Eq. 14. It could be observed that the cross-lingual topic model constantly
+outperform the monolingual topic model in each iteration. This is because the
+cross-lingual topic model could well smooth the connection between diﬀerent
+languages. The result is consistent with the result in [15].
+
+5.3 Justiﬁcation for Reducing the Time Complexity
+
+In order to justify the performance of reducing the time complexity, we compare
+our proposed model with the original cross-lingual PLSI [15] in batch mode. Fol-
+lowing the evaluation metrics in [1, 4], we utilize the log-likelihood and perplexity
+to evaluate the performance of the model in each iteration. For perplexity, the
+smaller the value, the better the performance. The deﬁnition of the metrics could
+be found in [1, 4]. For the proposed online model, the parameters are updated
+from the parameters of the previous model; for the original model in batch mode,
+the parameters are randomly allocated at ﬁrst and are re-trained thoroughly.
+
+Fig. 4 and Fig. 5(a) shows the experimental results. It could be observed that
+the proposed online model converges much faster than the model in batch mode,
+
+84
+
+X. Xin et al.
+
+in both log-likelihood and perplexity metrics. From Fig. 5(a), the convergence
+time of the proposed model is around 20% of the original model’s, which is
+consistent with the result in [4] (15% to 20% of the batch mode in monolingual
+case). This demonstrates that the proposed model is eﬃcient for reducing the
+time complexity in folding in the new documents and words.
+
+5.4 Justiﬁcation for Solving the Continuity Limitation
+
+In qualitative analysis, we show an example of the ETP analysis from the original
+PLSI [15] in batch mode in Table. 1. We can see the diﬀerence between this model
+and our proposed model. The themes in T2 are divided by diﬀerent teams. One
+for England and one for Italy. After the evolution in T3, the themes extracted
+by our proposed model are also divided by diﬀerent teams. However, the themes
+extracted by the original PLSI in batch mode are divided by other dimensions.
+theme 3.1
+is about the activities of
+the game. This example demonstrates directly that the proposed model performs
+better in keeping the continuity.
+
+is about the activities of fans; and theme 3.2
+
+(cid:4)
+
+(cid:4)
+
+In quantitative analysis, following the idea in [4], we utilize the average KL
+divergence rate of the two closest latent variables in two adjacent time windows
+to quantify the continuity performance. The detailed deﬁnition of this metric
+could be found in [4]. Fig. 5(b) shows the performance of our proposed model
+and the original model in batch mode. It could be observed that the performance
+of the proposed model outperforms the original model constantly. The average
+distance of our proposed model is 56% of the original model’s.
+
+From above justiﬁcations, it can be concluded that the proposed model is
+
+eﬀective in solving the continuity limitation.
+
+6 Related Work
+
+The primary work related to ETP analysis in history is the topic detection and
+tracking (TDT) task [14]. The main diﬀerence of the TDT tasks from the ETP
+analysis is that TDT is in the document level, while ETP is in the word level.
+Recent work of ETP analysis include [5, 8, 10–12]. The main diﬀerence from our
+work is that our model can model cross-lingual themes. Topic model is the key
+technique in this paper. Two representatives of topic model include PLSI [7] and
+LDA [2]. Many variances of topic models are presented over these years, including
+the online learning [1, 4, 6, 8]; the cross-lingual modeling [3, 9, 13, 15], and etc.
+
+7 Conclusion and Future Work
+
+In this paper, we propose an online cross-lingual PLSI model and utilize this
+model in the ETP analysis tasks. Experimental veriﬁcation from a real world
+dataset demonstrates that the proposed model performs well. It is eﬃcient to
+reduce the training time in folding in new documents; and the proposed model is
+eﬀective in keeping the continuity property of themes in diﬀerent time intervals.
+
+Online Cross-Lingual PLSI for Evolutionary Theme Patterns Analysis
+
+85
+
+In the future, we will try to combine previous online LDA and cross-lingual
+LDA model in ETP analysis. We believe through the regularization techniques
+in LDA, the performance would obtain another improvement.
+
+Acknowledgments. The work described in this paper was fully supported
+by the National Basic Research Program of China (973 Program, Grant No.
+2013CB329605). The authors also would like to thank the reviewers for their
+helpful comments.
+
+References
+
+1. AlSumait, L., Barbar´a, D., Domeniconi, C.: On-line lda: adaptive topic models for
+mining text streams with applications to topic detection and tracking. In: Proceed-
+ings of ICDM 2008, pp. 3–12. IEEE (2008)
+
+2. Blei, D.M., Ng, A.Y., Jordan, M.I.: Latent dirichlet allocation. Journal of machine
+
+Learning research 3, 993–1022 (2003)
+
+3. Boyd-Graber, J., Blei, D.M.: Multilingual topic models for unaligned text. In:
+
+Proceedings of UAI 2009, pp. 75–82. AUAI Press (2009)
+
+4. Chou, T.C., Chen, M.C.: Using incremental plsi for threshold-resilient online event
+analysis. IEEE Transactions on Knowledge and Data Engineering 20(3), 289–299
+(2008)
+
+5. He, Q., Chen, B., Pei, J., Qiu, B., Mitra, P., Giles, L.: Detecting topic evolution
+in scientiﬁc literature: how can citations help? In: Proceeding of CIKM 2009, pp.
+957–966. ACM (2009)
+
+6. Hoﬀman, M.D., Blei, D.M., Bach, F.: Online learning for latent dirichlet allocation.
+
+In: Proceedings of NIPS 2010, vol. 23, pp. 856–864 (2010)
+
+7. Hofmann, T.: Probabilistic latent semantic indexing. In: Proceedings of SIGIR
+
+1999, pp. 50–57. ACM (1999)
+
+8. Iwata, T., Yamada, T., Sakurai, Y., Ueda, N.: Online multiscale dynamic topic
+
+models. In: Proceedings of KDD 2010, pp. 663–672. ACM (2010)
+
+9. Jagarlamudi, J., Daum´e III, H.: Extracting multilingual topics from unaligned
+comparable corpora. In: Gurrin, C., He, Y., Kazai, G., Kruschwitz, U., Little, S.,
+Roelleke, T., R¨uger, S., van Rijsbergen, K. (eds.) ECIR 2010. LNCS, vol. 5993, pp.
+444–456. Springer, Heidelberg (2010)
+
+10. Kleinberg, J.: Bursty and hierarchical structure in streams. In: Proceedings of the
+
+KDD 2003, vol. 7, pp. 373–397 (2003)
+
+11. Lin, C.X., Mei, Q., Han, J., Jiang, Y., Danilevsky, M.: The joint inference of topic
+diﬀusion and evolution in social communities. In: Proceedings of ICDM 2011, pp.
+378–387. IEEE (2011)
+
+12. Mei, Q., Zhai, C.X.: Discovering evolutionary theme patterns from text: an explo-
+ration of temporal text mining. In: Proceedings of the KDD 2005, pp. 198–207.
+ACM (2005)
+
+13. Ni, X., Sun, J.T., Hu, J., Chen, Z.: Cross lingual text classiﬁcation by mining
+multilingual topics from wikipedia. In: Proceedings of WSDM 2011, pp. 375–384.
+ACM (2011)
+
+14. Wang, C., Zhang, M., Ma, S., Ru, L.: Automatic online news issue construction in
+
+web environment. In: Proceedings of WWW 2008, pp. 457–466. ACM (2008)
+
+15. Zhang, D., Mei, Q., Zhai, C.X.: Cross-lingual latent topic extraction. In: Proceed-
+ings of ACL 2010. Association for Computational Linguistics, pp. 1128–1137 (2010)
+
+

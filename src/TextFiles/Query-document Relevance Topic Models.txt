@@ -1,0 +1,961 @@
+Query-Document Relevance Topic Models
+
+Meng-Sung Wu1, Chia-Ping Chen2, and Hsin-Min Wang3
+
+1 ITRI, Hsinchu, Taiwan
+
+2 National Sun Yat-Sen University, Kaohsiung, Taiwan
+
+3 Institute of Information Science, Academia Sinica, Taipei, Taiwan
+
+wums@itri.org.tw, cpchen@mail.cse.nsysu.edu.tw, whm@iis.sinica.edu.tw
+
+Abstract. In this paper, we aim to deal with the deﬁciency of cur-
+rent information retrieval models by integrating the concept of relevance
+into the generation model from diﬀerent topical aspects of the query.
+We study a series of relevance-dependent topic models. These models
+are adapted from the latent Dirichlet allocation model. They are dis-
+tinguished by how the notation of query-document relevance, which is
+critical in information retrieval, is introduced in the modeling frame-
+work. Approximate yet eﬃcient parameter estimation methods based on
+the Gibbs sampling technique are employed for parameter estimation.
+The results of experiments evaluated on the Text REtrieval Conference
+Corpus in terms of the mean average precision (mAP) demonstrate the
+superiority of the proposed models.
+
+Keywords: latent Dirichlet allocation, query-document
+topic model, information retrieval.
+
+relevance,
+
+1 Introduction
+
+Language model, which captures the statistical regularities of language gener-
+ation, (LM) has been successfully applied in information retrieval (IR) [13,22].
+However, the LM-based IR approaches often suﬀer from the problem of the word
+usage variety. Using topic models to address the above issue has been an area of
+interesting and exciting research. Topic model refers to the language model that is
+commonly used for extracting and analyzing the semantic information in a collec-
+tion of documents. Probabilistic latent semantic analysis (PLSA) [7] and latent
+Dirichlet allocation (LDA) [2] are two well-known topic models for documents.
+In PLSA, a document model is a mixture of multinomials, where each mixture
+component corresponds to a topic. The parameters in the mixture of multino-
+mials, e.g., weights and multinomial parameters, can be easily estimated via the
+maximum likelihood principle. In LDA, weights and multinomial parameters are
+treated as random variables with the (conjugate) Dirichlet prior distributions. The
+maximum a posterior estimates for these variables are used for document models.
+Topic model and its variants have been applied to applications such as language
+modeling and language model adaptation [4,6,20], information retrieval [16,18,19],
+tag-based music retrieval [9,17], and social network analysis [10].
+
+J. Pei et al. (Eds.): PAKDD 2013, Part II, LNAI 7819, pp. 209–220, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+210
+
+M.-S. Wu, C.-P. Chen, and H.-M. Wang
+
+For IR applications, the state-of-the-art topic models can be somewhat de-
+ﬁcient. The main issue here is that they often fail to exploit the valuable in-
+formation conveyed in the queries while focusing only on document contents.
+Chemudugunta et al. [3] propose a probabilistic topic model which assumes
+that words are generated either from a speciﬁc aspect distribution or a back-
+ground distribution. Wei and Croft [19] linearly combine the LDA model with
+document-speciﬁc word distributions to capture both general as well as speciﬁc
+information in documents. Another interesting topic modeling approach gives
+users the ability to provide feedback on the latent topic level and reformulate
+the original query [1,14]. In addition, Tao et al. [15] construct a method to ex-
+pand every document with its neighborhood information. As described in [12],
+query association is one of the most important forms of document context, which
+could improve the eﬀectiveness of IR systems. In this paper, we aim to deal with
+this deﬁciency by integrating the concept of relevance into the generation model
+from diﬀerent topical aspects of the query rather than expanding a query from
+an initially retrieved set of documents [24]. That is, we design IR systems with
+emphasis on the degree of matchedness between the user’s information needs
+and the relevant documents.
+
+In this paper, we propose a novel technique called relevance-dependent topic
+model (RDTM). The main contribution of this work is modeling the generation
+of a document and its relevant past queries with topics for information retrieval.
+Relevant past queries are incorporated to obtain a more accurate model for the
+information need. The model assumes that relevant information about the query
+may aﬀect the mixture of the topics in the documents and the topic of each term
+in a document may be sampled from either using the normal document speciﬁc
+mixture weights in LDA or using query speciﬁc mixture weights. The parame-
+ter estimation of the proposed RDTM is implemented by the Gibbs sampling
+method [5].
+
+The remainder of this paper is organized as follows. The background of this
+research work is surveyed in Section 2, with emphasis on the review of stochastic
+methods for information retrieval. Proposed relevance-dependent topic models
+and the corresponding learning and inference algorithms based on Gibbs sam-
+pling are introduced and explained in details in Section 3. The experimental
+results are presented and discussed in Section 4. Lastly, summarization and the
+concluding remarks are given in Section 5.
+
+2 Review and Related Works
+
+2.1 LDA-Based Document Model
+In a topic model, the probability of a word in a document depends on the
+topic of the document. Without loss of generality, a word is denoted by w ∈
+{1, 2, . . . , V }, where V is the number of distinct words/terms in a vocabulary.
+A document, represented by d = w1, . . . , wnd, is a sequence of words. A col-
+lection of documents is denoted by D = {d1, . . . , dD}. The number of topics is
+assumed to be K, so a topic is denoted by z ∈ {1, . . . , K}. A latent topic model
+
+Query-Document Relevance Topic Models
+
+211
+
+is a topic model but the topics are not observed. Mathematically, a latent topic
+model is equivalent to a convex combination of a set of topic models. In this
+paper, the relevance-based topic model is an extension of the latent Dirichlet
+allocation. Thus, we brieﬂy review LDA as follows.
+
+Latent Dirichlet Allocation. In LDA [2], the weights and multinomial pa-
+rameters are random variables Φ and Θ(d) with conjugate Dirichlet priors. LDA
+can be represented by a graphical model (GM) as shown in Fig. 1 (a). The
+generation of D encoded in this graph is as follows.
+– Start
+– Sample from a Dirichlet prior with parameter β for the multinomial φz over
+– For each document d ∈ {1, . . . , D} 1
+
+the words for each topic z;
+• Sample from a Dirichlet prior with parameter α for the multinomial θ(d)
+over the topics;
+• For n = 1 . . . nd
+∗ Sample from θ(d) for the topic zn;
+∗ Sample from φzn for the word wn;
+
+– End
+For D (cid:2) {w1, . . . , wν} = w, the joint probability is
+
+P (w, z, θ, φ|α, β)
+(cid:3)
+= P (φ|β)
+
+D(cid:2)
+
+P (θ(d)|α)
+
+nd(cid:2)
+
+(cid:4)
+P (wn|zn, φ)P (zn|θ(d))
+
+(1)
+
+d=1
+
+n=1
+
+Marginalizing over θ, φ, and z, we have
+
+ˆ ˆ
+
+P (w|α, β) =
+
+P (φ|β)
+
+D(cid:2)
+
+(cid:3)
+
+P (θ(d)|α) · nd(cid:2)
+
+(cid:5)
+
+(cid:4)
+P (wn|zn, φ)P (zn|θ(d))
+
+dθdφ.
+
+(2)
+Note that the posterior distribution for Θ(d) varies from document to document.
+
+d=1
+
+n=1
+
+zn
+
+Parameter Estimation of LDA via Gibbs Sampling. In LDA, the prior
+distributions P (θ(d)|α) and P (φ|β) of the latent variables Θ(d) and Φ are diﬀerent
+from the posterior distributions P (θ(d)|α,D) and P (φ|β,D). Using the maximum
+a posterior (MAP) estimates ˆθ(d)(α,D) and ˆφ(β,D) of the posterior distributions
+of Θ(d) and Φ, the model for the nth word w in a given document d can be
+approximated by a multinomial mixture model as follows
+
+ˆP (wn|ˆθ(d), ˆφ) =
+
+P (wn|zn, ˆφ)P (zn|ˆθ(d)).
+
+(3)
+
+(cid:5)
+
+1 Note that d is document index and d is document representation.
+
+zn
+
+M.-S. Wu, C.-P. Chen, and H.-M. Wang
+
+212
+That is, ˆθ(d)(α,D) is the multinomial parameter for topics and ˆφ(β,D) is the
+multinomial parameter for words.
+Recall that D is represented by w = {w1, . . . , wν}. In principle, given samples
+of z drawn from P (z|w), we can estimate ˆθ(w) and ˆφ(w) simply by their rel-
+ative frequencies. The key inferential problem is how to compute the posterior
+distribution P (z|w), which is directly proportional to the joint distribution
+
+P (z|w) = P (z, w)
+P (w)
+
+(cid:6)
+
+= P (z, w)
+z P (z, w)
+
+(4)
+
+In practice, however, it is obvious that the denominator in (4) is an enormous
+discrete distribution with K ν parameters, and sampling directly from P (z|w)
+is not feasible [5]. Alternative methods have been used to estimate the param-
+eters of topic models [2,5,11]. Therefore, we use the stochastic methods for the
+estimation problem.
+In the Gibbs sampling method, zn is sequentially sampled using the so-called
+full-conditional distribution P (zn|z−n, w), where z−n denotes z excluding zn.
+According to the graphical model depicted in Fig. 1 (a), we have
+
+P (z−n, w−n)P (wn|z−n, w−n)
+
+P (zn = k|z−n, w)
+= P (z, w)
+P (z−n, w)
+= P (z−n, w−n)P (zn = k, wn|z−n, w−n)
+∝ P (wn, zn = k|z−n, w−n)
+= P (wn|zn = k, z−n, w−n)P (zn = k|z−n, w−n)
+≈ ˆφ(k,wn)
+−n
+−n + β(wn)
+n(k,wn)
+n(k,·)−n + V β(wn)
+
+−n + α(k)
+n(dn,k)
+n(dn,·)−n + Kα(k)
+
+ˆθ(dn,k)
+−n
+
+=
+
+,
+
+(5)
+
+−n
+
+is the number of instances of wn in w assigned to the topic k
+over wn = 1, . . . , N;
+is the number of words in dn (the document that term n belongs to)
+is the sum of
+
+where n(k,wn)
+excluding the current instance; n(k,·)−n is the sum of n(k,wn)
+n(dn,k)
+−n
+assigned to topic k excluding the current instance; and n(dn,·)−n
+n(dn,k)
+−n
+Prior parameters α’s and β’s are used to balance the prior knowledge and the
+observation of data. Once a set of samples is available, the estimates ˆθ and ˆφ are
+simply given by
+
+over k = 1, . . . , K.
+
+−n
+
+ˆφ(k,w) = n(k,w) + β(w)
+n(k,·) + V β(w)
+
+,
+
+ˆθ(d,k) = n(d,k) + α(k)
+n(d,·) + Kα(k)
+
+.
+
+(6)
+
+The symbols in (6) have the same meaning as in (5) except that the current
+instance is not excluded.
+
+Query-Document Relevance Topic Models
+
+213
+
+α
+
+θ
+
+z
+
+w
+
+dN
+
+D
+
+β
+
+ϕ
+
+T
+
+β2
+
+β1
+
+Ω
+
+ψ
+
+β
+
+ϕ
+
+T
+
+α
+
+θ
+
+z
+
+w
+
+δ
+
+σ
+
+y
+
+dN
+
+D
+
+αq
+
+θq
+
+α
+
+γ
+
+θ
+
+z
+
+w
+
+π
+
+x
+
+dN μ+
+
+d
+
+~
+D
+
+β
+
+ϕ
+
+T
+
+A) LDA
+
+b) SWB
+
+c) RDTM
+
+Fig. 1. Graphical models studied in this paper: (a) latent Dirichlet allocation (LDA);
+(b) special words with background (SWB); (c) Relevance-dependent topic model
+(RDTM)
+
+2.2 Topic Model with Background Distribution
+Topic models are unsupervised probabilistic models for the document collection
+and are generally used for extracting coarse-grained semantic information from
+the collection [2,7]. It assumes that words of a document are drawn from a set of
+topic distributions. Chemudugunta et al. [3] proposed SWB (special words with
+background) models for diﬀerent aspects of a document. In SWB, special words
+are incorporated into a generative model. Each document is represented as a
+combination of three kinds of multinomial word distributions. Fig. 1 (b) shows
+the graphical model of SWB. A hidden switch variable y is used to control
+the generation of a word. y = 0 means that the word is sampled from a mixture
+distribution θz over general topics z, y = 1 means that the word is drawn from the
+document-speciﬁc multinomial distribution ψ with symmetric Dirichlet prioris
+parametrized by β1, and y = 2 means that the word is a background word
+and sampled from the corpus-level multinomial distribution Ω with symmetric
+Dirichlet prioris parametrized by β2.
+
+The conditional probability of a word w given a document d can be written as:
+
+(cid:5)
+
+P (w|d) = P (y = 0|d)
+
+P (w|z, φ)P (z|θ(d))
+
+z
+
++ P (y = 1|d)P (cid:3)(w|d, ψ)
++ P (y = 2|d)P (cid:3)(cid:3)(w|Ω).
+
+(7)
+
+The model has been applied in information retrieval, and it has been showed
+that the model can match documents both at a general level and at a speciﬁc
+word level.
+
+3 Relevance-Dependent Topic Model
+
+3.1 LDA with Model Expansion
+In the RDTM, we introduce a word-level switch variable xn for a topic zn in the
+graphical model of LDA. For each word position, the topic z is sampled from
+
+214
+
+M.-S. Wu, C.-P. Chen, and H.-M. Wang
+
+q
+
+the distribution over topics associated with a latent variable x. It is used to
+determine whether to generate the word from a document speciﬁc distribution
+or a query speciﬁc distribution. If the word w is seen in the past relevant queries,
+then x = 1, and the word is sampled from the general topic z speciﬁc to the
+query θ(d)
+. Otherwise, then x = 0, and the word is sampled from the general
+topic z speciﬁc to the document θ(d). In RDTM, observed variables include not
+only the words in a document but also the words in the set of queries that are
+relevant to the document.
+
+The generation of ˜D = ˜w is stated as follows.
+– Start
+– Sample from a Dirichlet prior with parameter β for the multinomial φz for
+
+each topic z;
+
+– Sample from a Beta prior with parameter γ for the Bernoulli π;
+– For each document d ∈ {1, . . . , D}
+
+over the topics;
+
+• Sample from a Dirichlet prior with parameter α for the multinomial θ(d)
+• Sample from a Dirichlet prior with parameter αq for the multinomial
+• For each word position n = 1, . . . , nd, nd + 1, . . . , nd + μd
+
+over the topics;
+
+θ(d)
+q
+∗ sample from π for xn;
+∗ if xn = 1, sample from θ(d)
+q
+from θ(d) for the topic zn;
+
+• Sample from φzn for the word wn;
+
+for the topic zn; else (xn = 0), sample
+
+– End
+Fig. 1 (c) depicts the graphical model expansion. Again, for each ˜d ∈ ˜D, the
+observed variables consist of d and q(d). Given hyperparameters α, αq, β, and
+γ, the joint distribution of all observed and hidden variables can be factorized
+as follows
+P (˜d, z, x, θ, θq, φ, π|α, αq, β, γ) = P (π|γ)P (φ|β)
+× D(cid:2)
+
+P ( ˜wn|zn, φ)P (zn|xn, θ(d), θ(d)
+
+(cid:4)
+q )P (xn|π)
+
+P (θ(d)|α)P (θ(d)
+
+nd+μd(cid:2)
+
+|αq)
+
+(8)
+
+.
+
+(cid:3)
+
+q
+
+d=1
+
+n=1
+
+Recall that in Section 2.1, the generation model for the word w in a given
+document d is approximated by
+
+ˆP (w|ˆθ(d), ˆφ) =
+
+K(cid:5)
+
+z=1
+
+P (w|z, ˆφ)P (z|ˆθ(d)),
+
+(9)
+
+where ˆθ and ˆφ are estimated by the Gibbs samples drawn from the posterior
+distribution of the hidden variables P (z|w). With RDTM, it is still infeasible
+to compute P (z, x| ˜w) directly, so we use the Gibbs sampling technique again to
+
+215
+sample z and x from the full conditional P (zn, xn| ˜w, z−n, x−n) sequentially. zn
+can be sampled from the following probabilities
+
+Query-Document Relevance Topic Models
+
+P (zn = k|z−n, x, ˜w)
+∝ P (zn = k, xn|z−n, x−n, ˜w)
+∝ P (zn = k|xn, θ(d), θ(d)
+∝
+
+(cid:7)
+
+, xn = 0,
+, xn = 1,
+
+˜φ(k, ˜wn)
+−n
+˜φ(k, ˜wn)
+−n
+
+˜θ(dn,k)
+−n
+˜θ( ˜dn,k)
+q,−n
+
+q )P ( ˜wn|zn = k)
+
+k = 1, . . . , K.
+
+(10)
+
+(11)
+
+(12)
+
+From a Gibbs sample, the approximation of ˜θ, ˜θq and ˜φ can be obtained as follows
+˜φ(k, ˜w) = n(k, ˜w) + β(w)
+n(k,·) + V β(w)
+
+˜θ(d,k) = n(d,k) + α(k)
+n(d,·) + Kα(k)
+
+= n( ˜d,k) + α(k)
+n( ˜d,·) + Kα(k)
+
+˜θ( ˜d,k)
+
+,
+
+,
+
+.
+
+q
+
+q
+
+q
+
+xn can be sampled from the odds
+P (xn = 0|z, x−n, ˜w)
+P (xn = 1|z, x−n, ˜w)
+= P (xn = 0, zn|z−n, x−n, ˜w)
+P (xn = 1, zn|z−n, x−n, ˜w)
+= P (xn = 0|z−n, x−n, ˜w)P (zn|xn = 0, z−n, x−n, ˜w)
+P (xn = 1|z−n, x−n, ˜w)P (zn|xn = 1, z−n, x−n, ˜w)
+˜π0 · ˜θ(dn,zn)
+−n
+˜π1 · ˜θ( ˜dn,zn)
+q,−n
+and ˜π1 = n( ˜d)
+n(D)
+
+where ˜π0 = n(d)
+n(D)
+
+=
+
+.
+
+,
+
+−n+γ
+−n +2γ
+
+−n+γ
+−n +2γ
+
+3.2 RDTM for Information Retrieval
+When the corpus-level topic models are directly applied to the ad-hoc retrieval
+tasks, the average precision is often very low [18], due to the fact that the corpus-
+level topic distribution is too coarse [3,19]. Signiﬁcant improvements can be
+achieved through a linear combination with the document model [3,18,19]. In
+the language-model approaches for information retrieval, the query likelihoods
+given the document models, PLM(q|Md) are used to rank the documents. By
+the bag-of-words assumption, the query likelihood can be expressed by [13]
+
+PLM(q|Md) =
+
+P (w|Md).
+
+(13)
+where Md is the language model estimated based on document d. The proba-
+bility P (w|Md) is deﬁned as follows [23],
+
+w∈q
+
+(cid:2)
+
+P (w|Md) = nd
+nd + σ
+
+PML(w|d) + (1 − nd
+nd + σ
+
+)PML(w|D)
+
+,
+
+(14)
+
+M.-S. Wu, C.-P. Chen, and H.-M. Wang
+
+216
+with PML(w|D) (resp. PML(w|d)) being the maximum likelihood estimate of a
+query term w generated in the entire collection D (resp. d). nd is the length of
+document d. Note that (14) is a Bayesian learning of the word probability with
+a Dirichlet prior σ [23]. In this paper, σ is set to 1, 000 since it achieves the best
+results in [19].
+
+Compared to the standard query likelihood document model, RDTM oﬀers a
+new and interesting framework to model documents. Motivated by the signiﬁcant
+improvements obtained by Wei and Croft [19], we formulate our model as the
+linear combination of the original query likelihood document model and RDTM
+(15)
+The RDTM model facilitates a new representation for a document based on
+topics. Given the posterior estimators (11), the query likelihood PRDTM(q|Md)
+can be calculated as follows:
+PRDTM(q|Md) =
+
+P (q|Md) = λ ˜PLM(q|Md) + (1 − λ)PRDTM(q|Md),
+
+0 ≤ λ ≤ 1,
+
+(cid:2)
+
+PRDTM(w|Md)
+(cid:8)
+
+K(cid:5)
+
+P (w|z, ˆφ)
+
+w∈q
+
+z=1
+
+w∈q
+(cid:2)
+
+=
+
+P (x = 1|˜π)P (z|ˆθ(q)) + P (x = 0|˜π)P (z|ˆθ(d))
+
+(cid:9)
+
+.
+
+(16)
+
+4 Experiments
+
+In this section we empirically evaluate RDTM in ad hoc information retrieval
+and compare it with other state-of-the-art models.
+
+4.1 Data and Setting
+We perform experiments on two TREC testing collections: namely the Associ-
+ated Press Newswire (AP) 1988-90 on disk 1-3 with topics 51-150 as test queries,
+and the Wall Street Journal (WSJ) with topics 151-200 as test queries. Queries
+are taken from the “title” ﬁeld of TREC topics only (i.e., short queries). The
+remaining TREC topics are used as the historical queries together with their
+corresponding relevant documents to learn the document models in the training
+phase. In other words, topics 151-300 are used as the historical queries for the
+AP task, while topics 51-150 and 201-300 are used as the historical queries for
+the WSJ task. The preprocessing steps include stemming and stop word removal.
+Several parameters need to be determined in the experiments. We use sym-
+metric Dirichlet prior with α = αq = 50/K, β = β1 = 0.01, β2 = 0.0001, δ = 0.3
+and γ = 0.5, which are common settings in the literature. The number of topics
+K are set to 200. The interpolation parameter λ is selected by cross validation,
+and it is ﬁnally set to 0.7.
+
+The retrieval performance is evaluated in terms of the mean average precision
+(mAP) and 11-point recall/precision. To evaluate the signiﬁcance of performance
+diﬀerence between two methods, we employ the Wilcoxon test [8] for the out-
+comes. All the statistically signiﬁcant performance improvements with a 95%
+conﬁdence according to the Wilcoxon test are marked by stars in the results.
+
+Query-Document Relevance Topic Models
+
+217
+
+Table 1. The results for the query likelihood (QL) model, the LDA-based docu-
+ment model (LBDM), the special words with the background (SWB) model, and the
+relevance-dependent topic models (RDTM0 and RDTM) evaluated on the WSJ data
+set. The evaluation measure is the average precision.
+
+LBDM SWB RDTM0 RDTM
+
+recall QL
+0.00 0.7359 0.7501 0.7431 0.7579
+0.10 0.5774 0.6016 0.6072 0.6032 *
+0.20 0.4766 0.5068 0.5176 0.5500* ** 0.5576* **
+0.30 0.4272 0.4570 0.4745 0.4950* ** 0.4919* **
+0.40 0.3779 0.3843 0.4095 0.4260* ** 0.4288* **
+0.50 0.3265 0.3429 0.3639 0.3771* ** 0.3732* **
+0.60 0.2457 0.2742 0.2892 0.3016* ** 0.2919* **
+0.70 0.2046 0.2209 0.2321 0.2270*
+0.80 0.1702 0.1754 0.1706 0.1703
+0.90 0.1064 0.1071 0.0993 0.0911
+1.00 0.0551 0.0401 0.0375 0.0400 ** 0.0391
+
+0.7813* **
+0.6044
+
+0.2228*
+0.1673
+0.1070**
+
+4.2 Results
+
+We compare the eﬀectiveness of our relevance-dependent topic model (RDTM)
+with the query likelihood (QL) model [23], LDA-based document model (LBDM)
+[19] and special words with the background (SWB) model [3]. In addintion, we
+also adds the query terms into the relevant documents when training the LDA-
+based model. That is, we expand each document in the training set with the
+queries known to be relevant, and then learn the document language model based
+on the augmented text data. This method is referred to as RDTM0. For the query
+likelihood model, we use the Dirichlet model described in (14). Retrieval results
+on the WSJ collection are presented in Table 1. We can see that both RDTM0
+and RDTM achieves better results than QL, LBDM and SWB. This shows that
+incorporating query-document relevance into the document model by using the
+relevant past queries is helpful to IR. From Table 1, it is obvious that both
+RDTM0 and RDTM signiﬁcantly outperform QL. To evaluate the signiﬁcance
+of improvements over LBDM and SWB, we employ the Wilcoxon test [8] with
+a 95% conﬁdence. Statistically signiﬁcant improvements of RDTM0 and RDTM
+over both LBDM (marked by *) and SWB (marked by **) are observed at many
+recall levels.
+
+Table 2 compares the results of QL, LBDM, and RDTM0 on two data sets.
+We can see that both LDA-based models (LBDM and RDTM0) improve over
+the query likelihood (QL) model. The mAP of RDTM0 is 0.2305, which is better
+than those obtained by LBDM (0.2162) and QL (0.1939) on the AP collection.
+The relative improvement in mAP of RDTM0 over LBDM is 6.61%. In the same
+measure, the mAP of RDTM0 is 0.3489, which is better than those obtained
+by LBDM (0.3347) and QL (0.3162) on the WSJ collection. In the table, “*”
+and “**” mean that a signiﬁcant improvement is achieved over QL and LBDM,
+respectively.
+
+218
+
+M.-S. Wu, C.-P. Chen, and H.-M. Wang
+
+Table 2. The results of QL, LBDM, and RDTM0 in mean average precision. % diﬀ
+indicates the relative improvement of RDTM0 over LBDM.
+
+QL LBDM RDTM0 % diﬀ
+AP 0.1939 0.2162 0.2305 6.61* **
+WSJ 0.3162 0.3347 0.3489 4.24* **
+
+Table 3. The results of LBDM, SWB, and RDTM in mean average precision. % diﬀ
+indicates the relative improvement of RDTM over LBDM and SWB.
+
+LBDM SWB RDTM LBDM
+7.12*
+5.65*
+
+AP 0.2162 0.2274 0.2316
+WSJ 0.3347 0.342 0.3536
+
+% diﬀ over % diﬀ over
+
+SWB
+1.85**
+3.39**
+
+In Table 3, we compare the retrieval results of RDTM with the LBDM and
+SWB on two data sets. Obviously, RDTM achieves improvements over both
+LBDM and SWB, and the improvements are signiﬁcant. Considering that SWB
+has already obtained signiﬁcant improvements over LBDM, the signiﬁcant per-
+formance improvements of RDTM over SWB are in fact very encouraging. The
+mAP of RDTM is 0.3536, which is better than those obtained by SWB (0.342)
+and LBDM (0.3347), with a 3.39% and 5.65% improvement in mean average
+precision, respectively, on the WSJ collection. In the same measure, the rela-
+tive improvements of mAP of RDTM over SWB and LBDM are 1.85%, and
+7.12%, respectively, on the AP collection. In the table, “*” and “**” mean that
+a signiﬁcant improvement is achieved over LBDM and SWB, respectively.
+
+Several comments can be made based on the results. First, IR performance
+can be improved by using topic models for document smoothing, as it is ob-
+served that RDTM, SWB, and LBDM achieve higher mAP than QL. Second,
+the document representation with known relevant queries works well, as both
+data expansion and model expansion lead to improvements over the baseline
+methods. This new representation could be applied to other retrieval, classiﬁca-
+tion, and summarization tasks.
+
+5 Conclusion
+
+In this paper, we investigate the relevance dependent generative model for text.
+The new methods for ad hoc information retrieval simultaneously model docu-
+ment contents and query information into the topic model based on latent Dirich-
+let allocation. One implementation is a data expansion approach that directly
+adds query terms into the related documents for the training of the LDA-based
+model (RDTM0), and the other is a model expansion approach that assumes
+relevant information about the query may aﬀect the mixture of the topics in
+the documents (RDTM). Model expansion leads to a larger graph for which the
+
+Query-Document Relevance Topic Models
+
+219
+
+parameter estimation is realized by the method of Gibbs sampling. Experimen-
+tal results on the TREC collection show that our proposed approach achieves
+signiﬁcant improvements over the baseline methods using the query-likelihood
+(QL) model and the general LDA-based document model (LBDM and SWB).
+
+In the future, it would be interesting to explore other ways of incorporating
+relevance into the topic-model framework for text. As in [21], we will try to
+explore the utility of diﬀerent types of topic models for IR. In addition, we
+can test our approach on large corpora (such as the World Wide Web) or train
+our model in a semi-supervised manner. Alternatively, we can try to add more
+information to extend the existing model.
+
+Acknowledgments. This work was supported by Ministry of Economic Aﬀairs,
+Taiwan, R.O.C. project under No. B3522P1200.
+
+References
+
+1. Andrzejewski, D., Buttler, D.: Latent Topic Feedback for Information Retrieval. In:
+Proceedings of ACM KDD Conference on Knowledge Discovery and Data Mining,
+pp. 600–608 (2011)
+
+2. Blei, D.M., Ng, A.Y., Jordan, M.I.: Latent Dirichlet Allocation. Journal of Machine
+
+Learning Research 3(4-5), 993–1022 (2003)
+
+3. Chemudugunta, C., Smyth, P., Steyvers, M.: Modeling general and speciﬁc aspects
+of documents with a probabilistic topic model. Advances in Neural Information
+Processing Systems, 241–248 (2007)
+
+4. Chien, J.T., Wu, M.S.: Adaptive Bayesian latent semantic analysis. IEEE Trans-
+
+actions on Audio, Speech, and Language Processing 16(1), 198–207 (2008)
+
+5. Griﬃths, T.L., Steyvers, M.: Finding scientiﬁc topics. Proceedings of the National
+
+Academy of Sciences, 5228–5235 (2004)
+
+6. Heidel, A., Chang, H.A., Lee, L.S.: Language Model Adaptation Using Latent
+Dirichlet Allocation and an Eﬃcient Topic Inference Algorithm. In: Proceedings of
+INTERSPEECH, pp. 2361–2364 (2007)
+
+7. Hofmann, T.: Probabilistic latent semantic indexing. In: Proceedings of ACM SI-
+GIR International Conference on Research and Development in Information Re-
+trieval, pp. 50–57 (1999)
+
+8. Hull, D.: Using statistical testing in the evaluation of retrieval experiments. In: Pro-
+ceedings of ACM SIGIR International Conference on Research and Development
+in Information Retrieval, pp. 329–338 (1993)
+
+9. Levy, M., Sandler, M.: Learning latent semantic models for music from social tags.
+
+Journal of New Music Research 2(37), 137–150 (2008)
+
+10. Mei, Q., Cai, D., Zhang, D., Zhai, C.: Topic Modeling with Network Regulariza-
+tion. In: Proceeding of the 17th International Conference on World Wide Web,
+pp. 101–110 (2008)
+
+11. Minka, T., Laﬀerty, J.D.: Expectation-propagation for the generative aspect model.
+In: Proceedings of the 18th Conference on Uncertainty in Artiﬁcial Intelligence,
+pp. 352–359 (2002)
+
+12. Scholer, F., Williams, H.E.: Query association for eﬀective retrieval. In: Proceed-
+ings of the ACM CIKM International Conference on Information and Knowledge
+Management, pp. 324–331 (2002)
+
+220
+
+M.-S. Wu, C.-P. Chen, and H.-M. Wang
+
+13. Song, F., Croft, W.B.: A general language model for information retrieval. In: Pro-
+ceedings of ACM SIGIR International Conference on Research and Development
+in Information Retrieval, pp. 279–280 (1999)
+
+14. Song, W., Yu, Z., Liu, T., Li, S.: Bridging topic modeling and personalized search.
+
+In: Proceedings of COLING, pp. 1167–1175 (2010)
+
+15. Tao, T., Wang, X., Mei, Q., Zhai, C.: Language Model Information Retrieval with
+
+Document Expansion. In: Proceedings of HLT/NAACL, pp. 407–414 (2006)
+
+16. Wallach, H.: Topic Modeling: Beyond Bag-of-Words. In: Proceedings of the 23rd
+
+International Conference on Machine Learning, pp. 977–984 (2006)
+
+17. Wang, J.C., Wu, M.S., Wang, H.M., Jeng, S.K.: Query by Multi-tags with Multi-
+level Preferences for Content-based Music Retrieval. In: IEEE International Con-
+ference on Multimedia and Expo (ICME) (2011)
+
+18. Wang, X., McCallum, A., Wei, X.: Topical N-Grams: phrase and topic discovery,
+with an application to information retrieval. In: Seventh IEEE International Con-
+ference on Data Mining (ICDM), pp. 697–702 (2007)
+
+19. Wei, X., Croft, W.B.: LDA-based document models for ad-hoc retrieval. In: Pro-
+ceedings of ACM SIGIR International Conference on Research and Development
+in Information Retrieval, pp. 178–185 (2006)
+
+20. Wu, M.S., Lee, H.S., Wang, H.M.: Exploiting semantic associative information
+in topic modeling. In: Proceedings of the IEEE Workshop on Spoken Language
+Technology, pp. 384–388 (2010)
+
+21. Yi, X., Allan, J.: A Comparative Study of Utilizing Topic Models for Information
+Retrieval. In: Boughanem, M., Berrut, C., Mothe, J., Soule-Dupuy, C. (eds.) ECIR
+2009. LNCS, vol. 5478, pp. 29–41. Springer, Heidelberg (2009)
+
+22. Zhai, C.: Statistical Language Models for Information Retrieval: A Critical Review.
+
+Foundations and Trends in Information Retrieval 3(2), 137–213 (2008)
+
+23. Zhai, C., Laﬀerty, J.D.: A study of smoothing methods for language models applied
+to Ad Hoc information retrieval. In: Proceedings of ACM SIGIR International
+Conference on Research and Development in Information Retrieval, pp. 334–342
+(2001)
+
+24. Zhai, C., Laﬀerty, J.D.: Model-based feedback in the language modeling approach
+to information retrieval. In: Proceedings of the CIKM International Conference on
+Information and Knowledge Management, pp. 403–410 (2001)
+
+

@@ -1,0 +1,1330 @@
+Forward Classiﬁcation on Data Streams
+
+Peng Wang1,2,3, Peng Zhang3, Yanan Cao3, Li Guo3, and Bingxing Fang4
+
+1 Institute of Computing Technology, Chinese Academy of Science, China
+
+2 University of Chinese Academy of Science, China
+
+3 Institute of Information Engineering, Chinese Academy of Science, China
+
+peng860215@gmail.com, {zhangpeng,caoyanan,guoli}@iie.ac.cn, fangbx@cae.cn
+
+4 Chinese Academy of Engineering, China
+
+Abstract. In this paper, we explore a new research problem of predict-
+ing an incoming classiﬁer on dynamic data streams, named as forward
+classiﬁcation. The state-of-the-art classiﬁcation models on data streams,
+such as the incremental and ensemble models, fall into the retrospective
+classiﬁcation category where models used for classiﬁcation are built from
+past observed stream data and constantly lag behind the incoming un-
+observed test data. As a result, the classiﬁcation model and test data
+are temporally inconsistent, leading to severe performance deterioration
+when the concept (joint probability distribution) evolves rapidly. To this
+end, we propose a new forward classiﬁcation method which aims to build
+the classiﬁcation model which ﬁts the current data. Speciﬁcally, forward
+classiﬁcation ﬁrst predicts the incoming classiﬁer based on a line of re-
+cent classiﬁers, and then uses the predicted classiﬁer to classify current
+data chunk. A learning framework which can adaptively switch between
+forward classiﬁcation and retrospective classiﬁcation is also proposed.
+Empirical studies on both synthetic and real-world data streams demon-
+strate the utility of the proposed method.
+
+Keywords: Data stream classiﬁcation, linear dynamic system, concept
+drifting.
+
+1
+
+Introduction
+
+Data stream classiﬁcation is an important tool for real-time applications. For
+example, data stream classiﬁcation is popularly used in real-time intrusion de-
+tection, spam ﬁltering, and malicious website monitoring. Compared to data
+mining models, data stream classiﬁcation models face extra challenges from the
+unbounded stream data and the continuously evolving concept (joint probability
+distribution)[21,18] underneath stream data.
+
+In data stream scenarios, the classiﬁcation ability of a stream classiﬁcation
+model generally decreases with time because of the concept evolving reality[1].
+For example, in data streams, a classiﬁcation model cN built at time stamp N
+may classify its synchronous data chunk DN accurately, but its accuracy on in-
+coming data chunk DN +1 may deteriorate signiﬁcantly. This is because that data
+distributions in DN +1 may be signiﬁcantly diﬀerent from the training samples
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part I, LNAI 8443, pp. 261–272, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+262
+
+P. Wang et al.
+
+collected at time stamp N (in this paper, samples, records, and instances are
+interchangeable terms). As a result, in data stream classiﬁcation, it is important
+to build the classiﬁer which ﬁts the concept of current data.
+
+Unfortunately, existing data stream classiﬁcation models, including the incre-
+mental models[5,8] and ensemble models[12], are based on the assumption that
+same data is ﬁrst used for training then for testing. However, in real-world ap-
+plications, we have to classify the incoming data ﬁrst and the labeled samples
+of the incoming data for training tend to lag behind (for example, for fraud be-
+havior classiﬁcation in bank, typically it will take days or weeks to ﬁnd whether
+the user was actually a fraud or not.). As a result, the classiﬁer does not tempo-
+rally consistent with test data, as illustrated in Fig.1. This type of approaches
+regard concepts of data stream as sequence of recurring events, so they can
+only model the recurring probability of old concepts/classiﬁers, but cannot fore-
+cast a new classiﬁer not showing up before. In this paper, we refer to this type
+of classiﬁcation models as retrospective prediction, i.e., uses models directly
+trained from past stream data to classify incoming data. To synchronize the
+
+1c
+
+2c
+
+nc
+
+1c
+
+(cid:40)(cid:81)(cid:86)(cid:72)(cid:80)(cid:69)(cid:79)(cid:72)
+
+(cid:3)(cid:54)(cid:83)(cid:68)(cid:70)(cid:72)
+
+nc
+
+1nc (cid:14)
+
+1D
+1t
+
+2D
+2t
+
+nD
+nt
+
+1nD (cid:14)
+1nt (cid:14)
+
+(cid:54)(cid:87)(cid:85)(cid:72)(cid:68)(cid:80)(cid:3)(cid:54)
+
+Fig. 1. The ensemble (retrospective) model can describe all the past concepts. However,
+it fails to describe the incoming concept(classiﬁer) cN+1 that never appeared before.
+
+classiﬁcation model and test data on data streams, we present a novel forward
+classiﬁcation method. Forward classiﬁcation uses past classiﬁers to predict an
+incoming classiﬁer, which is further used to classify incoming test data. Com-
+pared to the retrospective classiﬁcation, the classiﬁer used to classify incoming
+test data is not directly trained from historical stream records.
+
+The main challenge of forward classiﬁcation is to accurately predict the incom-
+ing classiﬁer based on the past classiﬁers, which demands to model the evolution
+trend underneath the classiﬁers built from historical stream data. In this paper,
+we assume that concept evolution is a Markov process, i.e., the current con-
+cept of data stream is probabilistically determined by its previous state. This
+assumption is commonly used in data stream research [17]. Then, based on the
+observation that the classiﬁcation boundaries of all the past classiﬁers can be
+represented as continuous vectors, we propose to use Linear Dynamic System
+(LDS)[3,11] as the solution. In this way, tracking the evolving concept is tan-
+tamount to learning the LDS model based on all the past observed classiﬁers
+(continuous vectors), and predicting the incoming classiﬁer is equivalent to in-
+ferring the next state of the system.
+
+Forward Classiﬁcation on Data Streams
+
+263
+
+Forward classiﬁcation does not always outperform retrospective classiﬁcation.
+As a model’s performance is closely related to its version space [6,15], we design
+a ﬂexible learning framework, which can adaptively switch between the forward
+classiﬁcation and the retrospective classiﬁcation, which is based on ensemble
+learning. In doing so, our learning framework is robust under diﬀerent concept
+drifting patterns. We also demonstrate the eﬀectiveness of the proposed method
+by experiments on both synthetic and real-world data streams.
+
+The remainder of the paper is structured as follows: Section 2 introduces
+the modeling of the forward classiﬁcation using Linear Dynamic System (LDS).
+Section 3 conducts the experiments. Section 4 surveys related work. We conclude
+the paper in Section 5.
+
+2 Model for Forward Classiﬁcation
+
+In this section, we ﬁrst describe concept evolution with a graphical model. Then,
+we discuss how to use Linear Dynamic System (LDS) as the solution. Finally, a
+forward classiﬁcation framework is proposed. Consider a data stream S consist-
+ing of inﬁnite number of records (x, y), where x ∈ Rd is the feature vector and y
+is the class label. Assume the records arrive chunk-by-chunk. The records arrive
+at time stamp n are denoted as data chunk Dn. The classiﬁer built on Dn is
+denoted as cn. The concept at time stamp n is the joint probability distribution
+p(x, y|n).
+
+p x y
+( ,
+
+|1)
+
+p x y
+( ,
+
+|2)
+
+p x y n(cid:16)
+( ,
+| 1)
+
+p x y n
+| )
+( ,
+
+p x y n(cid:14)
+( ,
+1)
+
+|
+
+(cid:17)(cid:17)(cid:17)
+
+(cid:38)(cid:79)(cid:68)(cid:86)(cid:86)(cid:76)(cid:73)(cid:76)(cid:72)(cid:85)
+
+(cid:38)(cid:82)(cid:81)(cid:70)(cid:72)(cid:83)(cid:87)
+
+1c
+
+2c
+
+1nc (cid:16)
+
+nc
+
+1nc (cid:14)
+
+Fig. 2. Graphical model for concept description
+
+Fig. 2 is the graphical model describing the concept evolution under the
+Markov assumption. The solid gray circles stand for the classiﬁers. The hol-
+low circles represent the hidden concepts. The graph can be decomposed into
+two processes: a evolution process p(x, y|n − 1) −→ p(x, y|n) that describes the
+concept evolution between two neighboring concepts, and a modeling process
+p(x, y|n) −→ cn that describes the classiﬁer training from the labeled training
+data. Noise is also involved in modeling process because the training set usually
+is a small biased data set sampled from the hidden concept. Based on graph
+model forward classiﬁcation is formally deﬁned as:
+
+Forward classiﬁcation: Given W historical classiﬁers C = {cN−W +1,··· , cN}
+
+which are built consecutively from data stream S, the forward classiﬁcation aims
+to predict the incoming classiﬁer cN +1:
+
+f : ({cN−W +1,··· , cN}) −→ (cid:2)cN +1
+
+(1)
+
+264
+
+P. Wang et al.
+
+Here, cN +1 is the correct incoming classiﬁer but cannot be known before
+hand while (cid:2)cN +1 is our prediction. To solve the prediction problem, we use
+Linear Dynamic System(LDS) as the solution. In a deterministic LDS, a set of
+linear equations, governs the system evolution. Generally, the evolution of hidden
+concept is a stochastic process instead of a deterministic one. Thus, we add a
+random variable (denoted as w) to model the randomness as shown in Eq. (2).
+
+zn+1 = A · zn + wn+1.
+
+(2)
+
+To model the concept drifting in data stream with LDS, we assume the classi-
+ﬁer model cn can be converted to a vector of ﬁxed length, such as linear classiﬁer
+model y = ωx + b can be represented by the vector [ω, b]. And we assume the
+concept p(x, y) can be represented by a vector z. So the concept drifting process
+equates to the evolving of z. Moreover, to model the probabilistic dependence of
+
+p(zn|zn−1) and p(cn|zn), we assume that probabilities p(zn|zn−1) and p(cn|zn)
+
+follow Gaussian distributions:
+
+p(zn|zn−1) = N (zn|A · zn−1, Γ )
+
+p(cn|zn) = N (cn|B · zn, Σ)
+
+(3)
+
+(4)
+
+where A represents the transform matrix that governs how the concept evolves,
+
+A · zn−1 is the mean value of zn, Γ is the covariance of the Gaussian noise
+
+incurred by the irregular concept evolution. B represents the transform matrix
+that governs how the latent concept maps to the classiﬁer, Σ is the Gaussian
+noise incurred by the biased sampled training data. Eqs. (3) and (4) can be
+described as noisy linear equations:
+
+(5)
+
+zn = A · zn−1 + wn
+cn = B · zn + vn
+z1 = μ0 + u
+
+(6)
+(7)
+where Eq. (7) describe the initial state in LDS, wn ∼ N (wn|0, Γ ), vn ∼ N (vn|0, Σ)
+and u ∼ N (u|0, V0) are the Gaussian noises.
+
+We have described classiﬁer prediction problem with LDS, then we will show
+
+how to learn the model and the resulting forward classiﬁcation framework.
+
+2.1 Model Learning
+
+The learning problem [10,13] is to ﬁnd the optimal parameter θ that maximizes
+
+the likelihood function of the observations C = {cN−W +1,··· , cN} , as in Eq. (8),
+
+(8)
+where p(C|θ) is a marginal distribution of the joint distribution p(C, Z|θ) w.r.t.
+Z, as in Eqs. (9) and (10).
+
+(cid:2)θ = arg max log p(C|θ).
+
+p(C|θ) =
+
+(cid:3)
+
+p(C, Z|θ)dZ
+
+Z
+
+(9)
+
+Forward Classiﬁcation on Data Streams
+
+265
+
+p(C, Z|θ) = p(z1|μ0)
+
+(cid:4)
+
+N
+
+(cid:5)
+
+i=2
+
+p(zi|zi−1, A)
+
+(cid:6)
+
+p(cj|zj, B)
+
+N
+
+(cid:5)
+
+j=1
+
+(10)
+
+(cid:7)
+
+Because p(C|θ) =
+
+Eq. (10) is comprised of three parts. The ﬁrst part is the probability of the initial
+state, the second part is probability of the concept evolution, and the last part is
+the probability of mapping the latent variables to classiﬁers. All the three parts
+are under the Gaussian distribution assumption.
+
+Z p(C, Z|θ)dZ is very diﬃcult to calculate, ﬁnding op-
+timal solution is hardly achievable. Therefore, we use the Expectation Max-
+imization (EM) algorithm to maximize log p(C|θ). The EM algorithm starts
+with well-selected initial values for the parameters θold. Then, in the E-step, we
+use θold to ﬁnd the posterior distribution of the latent variables p(Z|C, θold).
+We then take the expectation of the log likelihood w.r.t the posterior dis-
+tribution p(Z|C, θold). In the M -step, we aim to ﬁnd θnew that maximizes
+Q(θ, θold) = EZ|θold [ln p(C, Z|θ)]. The E-step and M -step are recursively exe-
+cuted until Q(θ, θold) converges. The details for the E-step and M-step of EM
+algorithm for learning LDS can be found in [3]. The basic process is summa-
+rized in Algorithm 1. The future classiﬁer (cid:2)cN +1 can be predicted based on the
+parameters θ and estimated current hidden state (cid:8)zN learned above:
+
+(cid:2)cN +1 = B · A · (cid:8)zN
+
+(11)
+
+Algorithm 1. Learning LDS
+Require: A set of classiﬁcation model in time sequential C = {cN−W +1,··· , cN};
+
+Initial value θold;
+The up bound of iterations M ;
+The convergence threshold .
+
+, V new
+
+0
+
+0
+
+, Anew, Γ new, Bnew, Σnew};
+
+The expected latent state (cid:2)ZN for N time block.
+
+Ensure: θnew = {μnew
+1: Complete-data likelihood Q; Qpre ←− +∞,Qnew ←− 0;
+2: i ←− 0;
+3: while |Qpre − Qnew| >  AND i < M do
+4:
+5:
+6:
+7:
+8:
+9: end while
+10: return θnew, (cid:2)zN = E[zN ]
+
+i ←− i + 1
+Qpre ←− Qnew
+{E[zn], E[znzT
+θnew ←− M-step([E[zn], E[znzT
+n ]], C, θold)
+Evaluate Qnew ←− Q(θnew, θold) based on θnew, C
+
+n ]} ←− E-step(θold, C)
+
+n−1], E[znzT
+
+n−1], E[znzT
+
+2.2 Method Comparison and Selection
+
+In this part, we try to answer the following questions: does the forward classi-
+ﬁcation always outperform retrospective classiﬁcation (e.g., ensemble method)?
+
+266
+
+P. Wang et al.
+
+If the answer is NO, then how to select proper methods for real-world data
+streams? Here we denote the predicted classiﬁer in forward classiﬁcation as cf ,
+and we use ensemble method as a typical example of retrospective method. As
+a classiﬁer can be mapped to a point in hyperspace, the ensemble classiﬁer ce
+will lie at the center of the most recently W classiﬁers, i.e. ce = (1/W )
+i=1 ci.
+Intuitively, if a data stream evolves continuously with stable patterns, i.e., the
+transform matrix A is time-invariant, the classiﬁer is predictable; otherwise, the
+predicted classiﬁer will overﬁt to the fake pattern. Except the irregular evolving
+pattern, the random noise will also make it diﬃcult to learn the correct evolving
+pattern. So forward classiﬁcation will not dominate retrospective method on all
+data streams. What’s worse, there is no analytic solution for LDS, so cf cannot
+be directly compared to ce. It raise the problem how to adaptively select between
+these methods in real-world data stream?
+
+(cid:9)W
+
+We solve the problem from the view of version space. Version space, in concept
+learning or induction, refers to a subset of all hypotheses that are consistent with
+the observed training examples. For data stream, all possible classiﬁers form the
+version space. As concept drifts continuously, for an incoming data chunk at
+time N + 1, the classiﬁer cN +1 may have many possibilities, namely the version
+space of cN +1 can be large. According to Tong’s theory in [16], the larger version
+space is, the less accurate the classiﬁer tends to be. We illustrate diﬀerent version
+space on diﬀerent concept evolving scenarios in Fig. 3. We can notice that, for
+data stream with clear evolving patterns, the version space of cf is smaller than
+ce; while for data stream without clear evolving pattern, the version space of
+cf is bigger than ce.
+Based on the Gaussian noise assumption, cf obeys Gaussian distribution, i.e.
+cf ∼ N (BA (cid:8)zN , Ψf ). We take the volume within standard deviation from BA (cid:8)zN
+as the version space, which is determined by Ψf . According the analysis in [3],
+we have cf = (cid:2)cN +1 = N (BAzN , BPN BT + Σ), where PN = AVN AT + Γ . So
+Ψf = BPN BT + Σ. On the other hand, the covariance of ce, denoted as Ψe, is
+i=1(ci− ce)(ci − ce)T . The volume of version space of the classiﬁer
+Ψe = (1/W )
+λi, where λi is the eigenvector of Ψ . By comparing
+can be calculated by ζ =
+the version space of cf and ce, we can adaptively decide which method to adopt
+for the data stream on hand.
+
+(cid:9)W
+
+(cid:10)
+
+2.3 The Learning Framework
+
+In this part, we introduce the classiﬁcation framework which combines retro-
+spective and forward classiﬁcation. In data streams, it is often very hard to im-
+mediately obtain labeled records for model updating. In contrast, the proposed
+framework can avoid such a shortcoming, by tracing the trend of concept drift-
+ing and forecasting the model that reﬂects the current concept, then select the
+proper classiﬁer based on criteria of version space. Learning from data streams
+contains both training and testing processes. Our framework mainly focuses on
+the training process. The framework is summarized in Algorithm 2.
+
+Forward Classiﬁcation on Data Streams
+
+267
+
+11.5
+
+11
+
+10.5
+
+10
+
+9.5
+
+9
+
+8.5
+
+8
+
+7.5
+
+7
+−5
+
+14
+
+13
+
+12
+
+11
+
+10
+
+9
+
+8
+
+7
+
+5
+
+Concept
+Historical Classifiers
+Classifiers Smoothed by LDS
+Predicted Classifier
+Version Space
+
+0
+
+5
+
+10
+
+15
+
+20
+
+25
+
+30
+
+35
+
+40
+
+(a)
+
+Concept
+Historical Classifiers
+Classifiers Smoothed by LDS
+Predicted Classifier
+Version Space
+
+6
+
+7
+
+8
+
+9
+
+10
+
+11
+
+12
+
+13
+
+14
+
+15
+
+11.5
+
+11
+
+10.5
+
+10
+
+9.5
+
+9
+
+8.5
+
+8
+
+7.5
+
+7
+−5
+
+14
+
+13
+
+12
+
+11
+
+10
+
+9
+
+8
+
+7
+
+5
+
+Concept
+Historical Classifiers
+Ensemble Classifier
+Version Space
+
+0
+
+5
+
+10
+
+15
+
+20
+
+25
+
+30
+
+35
+
+40
+
+(b)
+
+Concept
+Historical Classifiers
+Ensemble Classifier
+Version Space
+
+6
+
+7
+
+8
+
+9
+
+10
+
+11
+
+12
+
+13
+
+14
+
+15
+
+(c)
+
+(d)
+
+Fig. 3. Comparisons w.r.t. version space on diﬀerent concept evolving scenarios. (a)
+cf on stream with clear concept evolving pattern; (b) ce on stream with clear concept
+evolving pattern; (c) cf on stream without clear pattern; (d) ce on stream without
+clear pattern
+
+Algorithm 2. Learning Framework
+Require: Data stream D;
+Time window size β;
+maximum size of classiﬁer set W .
+
+1: Build initial classiﬁcation model sets C = {c1};
+2: N ←− 1;
+3: Calculate proper initial value θinit.
+4: while true do
+5:
+6:
+7:
+8:
+
+[θnew, E[zN ]] ←− learnLDS(C, θinit);
+Predict Model (cid:2)cN+1 ←− BnewAnew
+Calculate cf and ce and their corresponding version space ζf and ζe.
+Compared version space and send proper classiﬁer to test process for
+classifying N + 1 data chunk.
+Sleep during N + 1 time window as labeled records cannot be get
+immediately.
+Build cN+1 based on the labeled records in N + 1 time window;
+C ←− C ∪ cN+1;
+if |C| > W then
+
+E[zN ];
+
+C ←− C − {cN−W };
+
+end if
+θinit ←− θnew, N ←− N + 1;
+
+9:
+
+10:
+11:
+12:
+13:
+14:
+15:
+16: end while
+
+268
+
+P. Wang et al.
+
+0.4
+
+0.35
+
+0.3
+
+e
+t
+a
+R
+
+ 
+r
+o
+r
+r
+
+E
+
+0.25
+
+0.2
+
+0.15
+
+0.1
+
+0.05
+
+0
+
+0.4
+
+0.35
+
+0.3
+
+0.25
+
+0.2
+
+0.15
+
+0.1
+
+e
+
+t
+
+a
+R
+
+ 
+r
+o
+r
+r
+
+E
+
+LDS
+Ave.En
+Wght.En
+HT
+DDM
+RWM
+
+0.4
+
+0.35
+
+0.3
+
+0.25
+
+0.2
+
+0.15
+
+0.1
+
+e
+t
+a
+R
+
+ 
+r
+o
+r
+r
+
+E
+
+LDS
+Ave.En
+Wght.En
+HT
+DDM
+RWM
+
+5
+
+10
+
+15
+Time
+
+(a)
+
+20
+
+25
+
+30
+
+0.05
+
+0
+
+5
+
+10
+
+20
+
+25
+
+30
+
+15
+Time
+
+(b)
+
+LDS
+Ave.En
+Wght.En
+HT
+DDM
+RWM
+
+0.4
+
+0.35
+
+0.3
+
+0.25
+
+0.2
+
+0.15
+
+0.1
+
+e
+
+t
+
+a
+R
+
+ 
+r
+o
+r
+r
+
+E
+
+LDS
+Ave.En
+Wght.En
+HT
+DDM
+RWM
+
+LDS
+Ave.En
+Wght.En
+HT
+DDM
+RWM
+
+20
+
+25
+
+30
+
+5
+
+10
+
+15
+Time
+
+(c)
+
+LDS
+Ave.En
+Wght.En
+HT
+DDM
+RWM
+
+0.4
+
+0.35
+
+0.3
+
+e
+t
+a
+R
+
+ 
+r
+o
+r
+r
+
+E
+
+0.25
+
+0.2
+
+0.15
+
+0.1
+
+0.05
+
+0
+
+0.4
+
+0.35
+
+0.3
+
+0.25
+
+0.2
+
+0.15
+
+0.1
+
+e
+
+t
+
+a
+R
+
+ 
+r
+o
+r
+r
+
+E
+
+0.05
+
+0
+
+5
+
+10
+
+15
+Time
+
+(d)
+
+20
+
+25
+
+30
+
+0.05
+
+0
+
+5
+
+10
+
+15
+Time
+
+(e)
+
+20
+
+25
+
+30
+
+0.05
+
+0
+
+5
+
+10
+
+20
+
+25
+
+30
+
+15
+Time
+
+(f)
+
+Fig. 4. Comparisons w.r.t. diﬀerent concept evolving scenarios. (a) No concept drift;
+(b) Shift in one direction with speed 0.25/t; (c) Hybrid drifting; (d) Spin with an
+angular speed π
+3.6
+
+/t; (e) Random walk; (f) Period drift with a sin function.
+
+Eﬃciency Analysis. The time cost of the proposed framework comes from two
+parts: training base classiﬁers, and predicting a future classiﬁer. For simplicity,
+we take the cost of the ﬁrst part as a constant value O(1). The second part
+contains two sub-parts: an EM learning process and a prediction process. The E-
+step, which using the forward and backward recursions, has O(W dz dc) time cost,
+where W is the size of the historical classiﬁer set, and dz is the dimension of latent
+concept while dc the classiﬁer. The M-step directly updates the parameters, with
+time complexity of O(W ). Since we set the max number of iterations for EM as
+I, the time complexity of EM learning process is O(W Idz dc). In addition, from
+Eq.(11), the time complexity of predicting a future classiﬁer is O(1). To sum up,
+the total time complexity for a loop in the learning framework is O(W Idz dc).
+
+3 Experimental Study
+
+In this section, we ﬁrst introduce the benchmark methods, followed by the test-
+bed. The test results on both synthetic and real-world data sets and the analysis
+will be given in the end.
+
+We compare our method with four state-of-the-art classiﬁcation method on
+data stream: ensemble learning[2,19], incremental learning[14], drift detection
+method(DDM)[7] and random walk model[9]. All of them fall into the category
+of retrospective learning.
+
+3.1 Data Stream Test-Bed
+
+In our experiment, we adopt both synthetic data stream generator and real world
+data streams as our test-bed.
+
+Forward Classiﬁcation on Data Streams
+
+269
+
+Evolving Gaussian Generator. As we have described in the previous sections,
+the concept of data stream is a joint distribution p(x, y). So we can generate a
+evolving data stream by generating records according to certain distribution and
+changes the distribution as time passes. For simplicity, we assume a binary clas-
+siﬁcation problem, where the positive and negtive records are generated accord-
+ing to the Gaussian distribution. To simulate the concept evolving, we gradually
+change mean of the distribution as time passes. Particularly, we generate data
+stream with 6 types of concept drifting: stay still, shift, hybrid, spin, random
+walk and periodic variation.
+
+Rotating Hyperplane is used as a test bed for CVFDT[8] models. A hyper-
+plane in a d-dimensional space is a set of points x that satisﬁes
+i=1 wixi = w0,
+i=1 wixi ≥ w0
+where xi is the ith dimension of the vector x. Records satisfying
+are labeled as positive. Otherwise, negative. To simulate concept evolution, we
+let each weight attribute wi = wi + dσ change with time, where σ denotes the
+probability that the direction of change is reversed and d denotes that the change
+degree.
+
+(cid:9)d
+
+(cid:9)d
+
+Sensor Stream. Sensor stream[20] contains information (temperature, humid-
+ity, light, and sensor voltage) collected from 54 sensors deployed in Intel Berkeley
+Research Lab. The learning task is to correctly identify the sensor ID based on
+the sensor data. This dataset can be downloaded from website1.
+
+Power Supply. Power Supply stream [20] contains hourly power supply of an
+Italian electricity company. The learning task is to classify the time the current
+power supply belongs to. This dataset can be downloaded from website2.
+
+3.2 Results
+
+In Fig.4 we report the algorithm performance w.r.t. diﬀerent types of concept
+drifting scenarios. From Fig.4(a), we can observe that our model is as good as
+the classic methods if there is no concept drifting in the stream data. Fig.4(b)
+indicates that for concept shifting data stream, our method outperforms oth-
+ers. This is because when concept drifting follows stable pattern, our method
+can track the pattern of the changes and more accurately predict future classi-
+ﬁers. In Fig.4(c), the drifting pattern is unstable. For example, before t = 10,
+
+the concept stays still, classiﬁers {c1,··· , c10} are determined by the parameter
+θstill while {c10,··· , cN} are determined by θdrif t. When θstill −→ θdrif t, the
+
+error rate of LDS arises, as the classiﬁer predicted with θstill for the future con-
+cept. As the drifting records increase, the LDS model can gradually tracking the
+concept evolution. So the error rate gradually decreases. In Fig.4(d), the con-
+cept’s evolving rate is fast. We can observe that LDS signiﬁcantly outperforms
+other methods for the fast evolving data stream. In Fig.4(e), the concept of data
+stream evolves in a random walk manner. We can see that LDS can handle the
+noise factor well for it can switch to retrospective method when the evolving
+
+1
+
+2
+
+http://www.cse.fau.edu/~xqzhu/Stream/sensor.arff
+http://www.cse.fau.edu/~xqzhu/Stream/powersupply.arff
+
+270
+
+P. Wang et al.
+
+Table 1. Error rate comparisons among diﬀerent methods
+
+DataSet
+
+Average EN Weighted EN
+
+H.T.
+
+DDM
+
+RWM
+
+Gaussian Static 0.077±0.001 0.079±0.001 0.087±0.004 0.079±0.001 0.0841±0.001 0.079±0.002
+0.138±0.017 0.109±0.004 0.103±0.004 0.102±0.003 0.082±0.004
+0.351±0.003
+Gaussian Shift
+0.221±0.046 0.087±0.005 0.085±0.002 0.094±0.003
+Gaussian Hybrid 0.085±0.002
+0.111±0.010
+0.343±0.001
+0.230±0.012 0.143±0.005 0.121±0.006 0.267±0.001 0.086±0.007
+Gaussian Spin
+0.091±0.002 0.105±0.008 0.095±0.018 0.087±0.001 0.090±0.005
+Gaussian Random 0.093±0.003
+0.113±0.014 0.117±0.004 0.094±0.003 0.096±0.003 0.089±0.003
+Gaussian Period 0.218±0.031
+0.110±0.027 0.176±0.031 0.107±0.021 0.103±0.024 0.100±0.023
+0.173±0.043
+0.070±0.028 0.077±0.035 0.055±0.019 0.073±0.033 0.052±0.026
+0.064±0.027
+0.042±0.006
+0.039±0.004 0.037±0.009 0.034±0.003 0.079±0.022 0.032±0.020
+
+Power Supply
+
+Hyperplane
+
+Sensor
+
+LDS
+
+pattern is blurred. Random walk model also perform well and it can ﬁlter out
+the random noise of {c1,··· , cN}, and track the proper concept, as in this model,
+A ≡ I so it will not learn false drifting patterns. In Fig.4(f), the evolving pat-
+tern of the data stream is changing periodically. the LDS model is robust to this
+kind of concept drifting. In summary, our learning framework outperforms other
+benchmark methods for data streams with regular evolving patterns.
+
+In Table 1, we summarize and compare the performance of diﬀerent methods
+on all data streams. Overall, for data streams having regular evolving patterns,
+the performance of the proposed LDS model outperforms other benchmark meth-
+ods. For data streams whose evolving is not a stable Markov process, learning
+methods such as drift detection and random walk perform better.
+
+Eﬃciency. From our experiments, we observe that the EM algorithm converges
+within 100 iterations, so M is manually set to 100. In most cases, when W > 50,
+the predicted classiﬁer is stable, so W is manually set to 50. With these settings,
+on our PC with 2.8G Hz CPU, the time cost for predicting the classiﬁer is less
+than 1 minute. In real-world applications, it usually takes hours for the concept
+having detectable change, so the framework is eﬃcient.
+
+4 Related Work
+
+Existing data stream classiﬁcation models can be categorized into three groups:
+online / incremental models[8,14], ensemble learning[12,18,19] and drift detec-
+tion methods [7]. We brieﬂy describe them based on the development trace. In
+the simplest situation, where the concept of data stream remains stable, for
+each time window, the classiﬁer has prediction variance due to limited training
+samples. We can use majority voting method to ensemble these classiﬁers, be-
+cause random variance tends to compensate each other. This is the fundamental
+framework for retrospective classiﬁcation. For data stream with concept drifting,
+the majority voting for ensemble is inappropriate. An alternative solution is to
+use weighted ensemble, where each classiﬁer is weighted according to their con-
+sistence with the most recent observed training data. For incremental or DDM
+method, they keep updating the classiﬁer using newly arriving records, enabling
+the learning model to adapt to new concepts. For retrospective learning models
+[17,4], they regard concepts of data stream as a sequence of recurring events
+
+Forward Classiﬁcation on Data Streams
+
+271
+
+and use the most probable concept in the future to classify incoming stream
+data. Unfortunately, existing weighing and updating approaches, including the
+proactive learning framework, cannot forecast a completely new classiﬁer. Thus,
+they cannot synchronize the classiﬁer to the evolving stream data.
+
+Forward classiﬁer prediction method, on the other hand, uses probabilistic
+model to deﬁne time evolution of the concept. By using the probabilistic model,
+we can approximate the distribution that maximizes the posterior probability of
+the model [3]. Moreover, we can predict the optimal incoming classiﬁer by adopt-
+ing the inference method. That is to say, forward classiﬁer prediction method is
+able to derive better classiﬁcation results.
+5 Conclusions
+
+In this paper, we present a novel forward classiﬁcation method for classifying
+evolving stream data. Due to the temporal evolving of data streams, simply
+learning classiﬁcation models from historical data, as existing retrospective clas-
+siﬁcation methods do, is inadequate and inaccurate. So a proper classiﬁcation
+design is to capture the evolution trend underneath stream data and use it to
+predict a future classiﬁer for classiﬁcation. With this vision and the assumption
+that the concept evolving can be characterized by Markov process, we propose to
+model the trend of classiﬁers using the Linear Dynamic System, through which
+we can model the concept drifting and predict incoming classiﬁer. We also notice
+that forward classiﬁcation is not overwhelmingly better than retrospective clas-
+siﬁcation. Then we design the learning framework, which adaptively switches
+between the forward classiﬁcation based on LDS and basic ensemble learning
+method, so it is robust to diﬀerent types of data streams. Experiments on syn-
+thetic and real-world streams demonstrate that our framework outperforms other
+methods in diﬀerent types of concept drifting scenarios.
+
+Acknowledgments. This work was supported by the NSFC (No. 61003167), IIE
+Chinese Academy of Sciences (No. Y3Z0062101), 863 projects (No. 2011AA010703
+and 2012AA012502), 973 project (No. 2013CB329606), and the Strategic Leading
+Science and Technology Projects of Chinese Academy of Sciences (No.
+XDA06030200).
+
+References
+
+1. Aggarwal, C.C., Han, J., Wang, J., Yu, P.S.: On demand classiﬁcation of data
+
+streams. In: Proc. of 10th ACM SIGKDD, New York, USA, pp. 503–508 (2004)
+
+2. Bifet, A., Holmes, G., Pfahringer, B., Kirkby, R., Gavald`a, R.: New ensemble meth-
+ods for evolving data streams. In: Proc. of the 15th ACM SIGKDD, New York,
+USA, pp. 139–148 (2009)
+
+3. Bishop, C.M.: Pattern Recognition and Machine Learning. Springer Sci-
+
+ence+Business Media (2006)
+
+4. Chen, S., Wang, H., Zhou, S., Yu, P.S.: Stop chasing trends: discovering high order
+models in evolving data. In: Proc. of the 24th IEEE International Conference on
+Data Engineering, ICDE 2008, pp. 923–932. IEEE (2008)
+
+272
+
+P. Wang et al.
+
+5. Domingos, P., Hulten, G.: Mining high-speed data streams. In: Proc. of the Sixth
+
+ACM SIGKDD, KDD 2000, pp. 71–80. ACM, New York (2000)
+
+6. Dubois, V., Quafafou, M.: Concept learning with approximation: Rough version
+spaces. In: Alpigini, J.J., Peters, J.F., Skowron, A., Zhong, N. (eds.) RSCTC 2002.
+LNCS (LNAI), vol. 2475, pp. 239–246. Springer, Heidelberg (2002)
+
+7. Gama, J., Medas, P., Castillo, G., Rodrigues, P.: Learning with drift detection.
+In: Bazzan, A.L.C., Labidi, S. (eds.) SBIA 2004. LNCS (LNAI), vol. 3171, pp.
+286–295. Springer, Heidelberg (2004)
+
+8. Hulten, G., Spencer, L., Domingos, P.: Mining time-changing data streams. In:
+Proc. of the Seventh ACM SIGKDD, KDD 2001, pp. 97–106. ACM, New York
+(2001)
+
+9. Jaakkola, M.S.T., Szummer, M.: Partially labeled classiﬁcation with markov ran-
+dom walks. In: Advances in Neural Information Processing Systems (NIPS), vol. 14,
+pp. 945–952 (2002)
+
+10. Kalman, R.E.: A new approach to linear ﬁltering and prediction problems. Journal
+
+of Basic Engineering 82(5311910), 35–45 (1960)
+
+11. Katok, A., Hasselblatt, B.: Introduction to the modern theory of dynamical sys-
+
+tems, Cambridge (1996)
+
+12. Opitz, D., Maclin, R.: Popular ensemble methods: An empirical study. Journal of
+
+Artiﬁcial Intelligence Research 11, 169–198 (1999)
+
+13. Zarchan, P., Musoﬀ, H.: Fundamentals of Kalman ﬁltering: a practical approach.
+
+American Institute of Aeronautics Astronautics (2005)
+
+14. Pfahringer, B., Holmes, G., Kirkby, R.: New options for hoeﬀding trees. In: Orgun,
+M., Thornton, J. (eds.) AI 2007. LNCS (LNAI), vol. 4830, pp. 90–99. Springer,
+Heidelberg (2007)
+
+15. Sverdlik, W., Reynolds, R.: Dynamic version spaces in machine learning. In: Pro-
+ceedings of the Fourth International Conference on Tools with Artiﬁcial Intelli-
+gence, TAI 1992, pp. 308–315 (November 1992)
+
+16. Tong, S., Koller, D.: Support vector machine active learning with applications to
+
+text classiﬁcation. The Journal of Machine Learning Research 2, 45–66 (2002)
+
+17. Yang, Y., Wu, X., Zhu, X.: Combining proactive and reactive predictions for data
+streams. In: Proc. of the Eleventh ACM SIGKDD, KDD 2005, pp. 710–715. ACM
+(2005)
+
+18. Zhang, P., Zhu, X., Shi, Y.: Categorizing and mining concept drifting data streams.
+In: Proceedings of the 14th ACM SIGKDD, KDD 2008, pp. 812–820. ACM, New
+York (2008)
+
+19. Zhang, P., Zhu, X., Shi, Y., Guo, L., Wu, X.: Robust ensemble learning for mining
+
+noisy data streams. Decision Support Systems 50(2), 469–479 (2011)
+
+20. Zhu, X.: Stream data mining repository (2010),
+http://www.cse.fau.edu/~xqzhu/stream.html
+
+21. Zliobaite, I.: Learning under concept drift: an overview. Technical Report (2009)
+
+

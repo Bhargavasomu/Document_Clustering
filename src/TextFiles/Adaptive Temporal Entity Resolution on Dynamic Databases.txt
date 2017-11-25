@@ -1,0 +1,1033 @@
+Adaptive Temporal Entity Resolution
+
+on Dynamic Databases(cid:2)
+
+Peter Christen1 and Ross W. Gayler2
+
+1 Research School of Computer Science, The Australian National University,
+
+Canberra ACT 0200, Australia
+peter.christen@anu.edu.au
+
+2 Veda, Melbourne VIC 3000, Australia
+
+ross.gayler@veda.com.au
+
+Abstract. Entity resolution is the process of matching records that refer
+to the same entities from one or several databases in situations where the
+records to be matched do not include unique entity identiﬁers. Match-
+ing therefore has to rely upon partially identifying information, such as
+names and addresses. Traditionally, entity resolution has been applied in
+batch-mode and on static databases. However, increasingly organisations
+are challenged by the task of having a stream of query records that need
+to be matched to a database of known entities. As these query records
+are matched, they are inserted into the database as either representing
+a new entity, or as the latest embodiment of an existing entity. We in-
+vestigate how temporal and dynamic aspects, such as time diﬀerences
+between query and database records and changes in database content,
+aﬀect matching quality. We propose an approach that adaptively adjusts
+similarities between records depending upon the values of the records’
+attributes and the time diﬀerences between records. We evaluate our ap-
+proach on synthetic data and a large real US voter database, with results
+showing that our approach can outperform static matching approaches.
+
+Keywords: Data matching, record linkage, dynamic data, real-time
+matching.
+
+1
+
+Introduction
+
+Entity resolution is the process of identifying, matching, and merging records
+that correspond to the same entities from several databases [1]. The entities
+under consideration commonly refer to people, such as patients or customers.
+The databases to be matched often do not include unique entity identiﬁers.
+Therefore, the matching has to be based on the available attributes, such as
+names, addresses, and dates of birth. Entity resolution is employed in many
+domains, the most prominent being health, census statistics, national security,
+digital libraries, and deduplication of mailing lists [2–4].
+
+(cid:2) This research was funded by the Australian Research Council (ARC), Veda Advan-
+
+tage, and Funnelback Pty. Ltd., under Linkage Project LP100200079.
+
+J. Pei et al. (Eds.): PAKDD 2013, Part II, LNAI 7819, pp. 558–569, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+Adaptive Temporal Entity Resolution on Dynamic Databases
+
+559
+
+RecID EntID Given name Surname
+
+Street address
+13 Main Road
+
+City
+
+r1
+r2
+r3
+r4
+r5
+r6
+r7
+r8
+
+e1
+e2
+e1
+e1
+e2
+e1
+e2
+e1
+
+Gale
+Peter
+Gail
+Gail
+Pete
+
+Abigail
+Peter
+Gayle
+
+Miller
+
+Sydney
+O’Brian 43/1 Miller Street Sydney
+
+11 Town Place Melbourne
+Miller
+Smith
+42 Ocean Drive
+O’Brien 43 Miller Street
+Smith
+42 Ocean Drive
+12 Nice Terrace Brisbane
+OBrian
+Smith
+11a Town Place
+Sydney
+
+Perth
+Sydney
+Perth
+
+Postcode Time-stamp
+2006-01-21
+2006-02-21
+2007-01-28
+2007-07-12
+2008-01-11
+2008-06-30
+2009-01-01
+2009-04-29
+
+2000
+2010
+3003
+6010
+2610
+6010
+7011
+2022
+
+Fig. 1. Example data set of eight records representing two entities
+
+While entity resolution has traditionally been applied in batch mode and on
+static databases, an increasingly common scenario in many application domains
+is the model of data streams [5], where query records (potentially from several
+sources) need to be matched with (and potentially inserted into) a database that
+contains records of known entities.
+
+An example application of entity resolution in such a dynamic environment
+is the veriﬁcation of identifying information provided by customers at the time
+of a credit card or loan application. In many countries, the ﬁnancial institutions
+where customers apply will send the customers’ identifying information to a
+central credit bureau. The responsibility of this bureau is to match the query to a
+pre-existing credit ﬁle to retrieve that customer’s credit history, and to determine
+that the customer is the person they claim to be [6]. The credit bureau receives a
+stream of query records that contain identifying information about people, and
+the bureau’s task is to match these records (in real-time) to a large database of
+known validated entities. In this application, accurate entity resolution is crucial
+to avoid inappropriate lending and prevent credit application fraud [6].
+
+Temporal and dynamic aspects in the context of entity resolution have only
+been investigated in the past three years [7–11]. Most similar to our work is
+the technique proposed by Li et al. [8, 9] on linking temporal records. Their
+approach assumes that all records in a database have a time-stamp attached,
+as illustrated in Fig. 1. These time-stamps are used to calculate decay proba-
+bilities for combinations of individual attributes and time diﬀerences. Based on
+these probabilities the similarities between records (calculated using approxi-
+mate string comparison functions on individual attributes [2]) are adjusted. The
+agreement decay was deﬁned by Li et al. [8] as the probability that two diﬀerent
+entities, represented by two records with a time diﬀerence of Δt, have the same
+value in an attribute. The disagreement decay was deﬁned as the probability
+that the value in an attribute for a given entity changes over time Δt. Such a
+change occurs if, for example, a person moves to a new address.
+In Fig. 1, for the ‘City’ attribute and Δt ∈ [0, 1) year, there are three pairs of
+records by the same entity where the attribute value has changed: (r3,r4) and
+(r6,r8) for e1, and (r5,r7) for e2, and one pair where the value did not change:
+(r4,r6). The disagreement probability for this attribute and Δt ∈ [0, 1) year is
+therefore 75%. As both entities live in ‘Sydney’ in 2006, we can calculate an
+agreement probability for this value. However, due to the sparseness of this data
+set, we cannot calculate agreement probabilities for other ‘City’ values.
+
+560
+
+P. Christen and R.W. Gayler
+
+Li et al. [8] calculated both agreement and disagreement probabilities such
+that they increase monotonically as Δt gets larger. However, as Fig. 2 shows, this
+is not necessarily the case. Their approach also assumes that the databases from
+which records are matched are static; that the decay probabilities are learned
+once in an oﬀ-line process using a supervised learning technique (learning dis-
+agreement probabilities is of linear complexity in the number of entities, while
+learning agreement probabilities is of quadratic complexity); and that these de-
+cay probabilities are independent of the frequencies of individual attribute values.
+The experiments conducted on a bibliographic data set showed that taking such
+temporal information into account can improve matching quality [8].
+
+In contrast, our approach is aimed at facilitating an eﬃcient adaptive calcu-
+lation of weights that are used to adjust similarities between records. While our
+approach to calculate disagreement probabilities is similar to Li et al. [8], we
+calculate agreement probabilities that incorporate the frequency distributions of
+the attribute values. This is similar to frequency-based weight adjustments as ap-
+plied in traditional probabilistic record linkage [4]. As an example, if two records
+have an agreeing surname value ‘Smith’, which is common in many English
+speaking countries, then it is more likely that they correspond to two diﬀerent
+entities compared to two records that have the uncommon surname value ‘Di-
+jkstra’. As our experimental study on a large real-world database shows, taking
+these frequencies into account can lead to improved matching accuracy.
+
+Our contributions are (1) an adaptive matching approach for dynamic data-
+bases that contain temporal information; (2) an eﬃcient temporal adjustment
+method that takes the frequencies of attribute values into account; and (3) an
+evaluation of our approach on both synthetic data (with well controlled charac-
+teristics) and a large real voter database from North Carolina in the USA.
+
+2 Related Work
+
+Most research in entity resolution over the past decade has focused on improving
+quality and scalability when matching databases. Several recent surveys provide
+overviews of the research ﬁeld [2–4]. Besides the work by Li et al. [8, 9] on
+linking temporal records (described above), several other recent approaches have
+investigated temporal or dynamic aspects in entity resolution.
+
+Whang et al. [10] developed an approach to matching databases where match-
+ing rules can evolve over time, and where a complete re-run of an entity resolution
+process is not required when new data become available. The assumption is that
+a user provides an initial set of matching rules and over time reﬁnes these rules.
+While the rules in this approach are evolving, no temporal information in the
+records that are matched is taken into account in the matching process.
+
+Ioannou et al. [7] proposed an entity query system based on probabilistic en-
+tity databases, where records and their attributes are assigned probabilities of
+uncertainty that are incorporated into the matching process. These probabilities
+correspond to the conﬁdence one has that an attribute value has been recorded
+correctly for an entity. During the matching process a dynamic index data struc-
+ture is maintained which contains sub-sets of entities that are connected through
+
+Adaptive Temporal Entity Resolution on Dynamic Databases
+
+561
+
+common attribute values. Related to this work, Christen et al. [12, 13] investi-
+gated techniques to facilitate the real-time matching of query records to a large
+static database by incorporating the similarities calculated between attribute
+values into a novel index data structure. Both of these approaches however do
+not consider temporal aspects of the databases that are matched.
+
+Yakout et al. [11] developed a matching approach for transactional records
+that correspond to the behaviour of entities (such as shopping baskets of indi-
+viduals) over time, rather than the actual entity records. Their approach converts
+the transactions of an entity into a behaviour matrix. Entities are then matched
+by calculating similarities between condensed representations of their behaviour
+matrices. While temporal information is used to generate sequences of transac-
+tions for an entity, this information is not used in the matching process.
+
+Pal et al. [14] recently presented an approach to integrate Web data from
+diﬀerent sources where temporal information is unreliable and unpredictable
+(such as updates of changes are missing or incomplete). The temporal aspects of
+updates of entities are modelled with a hidden semi-Markov process. Results on
+a diverse set of data, from Twitter to climate data, showed encouraging results.
+The focus of this work is however to compute the correct value of an entity’s
+attributes, not to identify and match records that refer to the same entity.
+
+A large body of work has been conducted in the areas of stream data min-
+ing [5], where temporal decays are commonly used to give higher weights to
+more recent data, and temporal data mining [15], where the aim is to discover
+patterns over time in temporal data. To summarise, while either temporal in-
+formation or dynamic data have been considered in recent approaches to entity
+resolution, our approach is a ﬁrst to consider both, with the aim to achieve an
+entity resolution approach that adapts itself to changing data characteristics.
+
+3 Modelling Temporal Changes of Entities
+
+We assume a stream of query records q, which are to be matched (as detailed in
+Sect. 4) to a database R that contains records about known entities. We denote
+records in R with ri, 1 ≤ i ≤ N , with N being the number of records in R.
+At any point in time N is ﬁxed, but over time new records (such as matched
+query records) are added to R while the existing records are left unchanged.
+The records in R consist of attributes, ri.aj, 1 ≤ j ≤ M , with M the number of
+
+attributes. Examples of such attributes include name and address details, phone
+numbers, or dates of birth. The records also contain a time-stamp ri.t, and an
+entity identiﬁer, ri.e. All records that correspond to the same entity are assumed
+to have the same unique value in ri.e. In a supervised setting, the ri.e are the
+true known entity identiﬁers, while in an unsupervised setting the values of ri.e
+are based on the match classiﬁcation, as will be described further in Sect. 4.
+
+Assume we want to calculate the similarity between query record q and record
+ri in R. These two records have a diﬀerence in their time-stamps of Δt = |q.t −
+ri.t|. For a single attribute aj, we classify the attribute to be agreeing if both
+records have the same attribute value (q.aj = ri.aj), or if the two attribute
+
+562
+
+P. Christen and R.W. Gayler
+
+Fig. 2. The probabilities of an entity not changing its attribute values over time (i.e.
+the attribute values are agreeing), P (Aj, Δt|S), as calculated from over 2.4 million
+entities in a North Carolina (NC) voter database. The x-axes show the time-diﬀerences
+Δt between two records that refer to the same entity for up-to 20 years, with the right-
+hand side plot zooming into the time diﬀerences up-to three years. As can be seen,
+address values are more likely to change over time than name values.
+
+values are highly similar, i.e. simj(q.aj, ri.aj) ≥ ssame, with simj(·,·) being
+the similarity function used to compare values for attribute aj, and ssame a
+minimum similarity threshold. If, on the other hand, simj(q.aj, ri.aj) < ssame,
+then we classify the attribute to be disagreeing. Similarity values are assumed to
+be normalised, with simj(·,·) = 0 for two attribute values that are completely
+diﬀerent, and simj(·,·) = 1 for two values that are the same. Similarity functions
+
+vary by attribute and may be domain speciﬁc. For string attributes, such as
+names, approximate string similarity functions are commonly used [2].
+
+To take temporal aspects into account, we need to consider the following
+events. We denote the event that q and ri actually refer to the same entity
+with S, and the event that they actually refer to two diﬀerent entities with
+¬S. Furthermore, we denote the event that q and ri have an agreeing value
+in attribute aj with Aj , and the event that they have a disagreeing value in
+attribute aj with ¬Aj .
+below, they are used to adjust the similarities simj(·,·) according to the time
+diﬀerence Δt between records q and ri.
+P (Aj, Δt|S) = P (simj(q.aj, ri.aj) ≥ ssame ∧ |q.t − ri.t| = Δt | q.e = ri.e) (1)
+
+We now consider the following two probabilities. As discussed in Sect. 3.1
+
+is the probability that a query and a database record that actually refer to the
+same entity have an agreeing value in attribute aj over Δt (i.e. the value does
+not change). It holds that P (Aj , Δt|S) = 1 − P (¬Aj , Δt|S).
+P (¬Aj , Δt|¬S) = P (simj(q.aj, ri.aj) < ssame∧|q.t−ri.t| = Δt | q.e (cid:6)= ri.e) (2)
+
+is the probability that a query and a database record that actually refer to two
+diﬀerent entities have disagreeing (i.e. diﬀerent) values in attribute aj over Δt.
+Clearly, P (¬Aj, Δt|¬S) = 1 − P (Aj , Δt|¬S).
+
+Adaptive Temporal Entity Resolution on Dynamic Databases
+
+563
+
+The probability P (Aj , Δt|S) can be learned for individual attributes and dif-
+ferent Δt by counting the number of agreeing and disagreeing attribute values
+for pairs of records of the same entity that have a time diﬀerence of Δt.
+Calculating the probability P (¬Aj , Δt|¬S) is more diﬃcult because it requires
+
+the comparison of attribute values across records that have a time diﬀerence of
+Δt and where the records refer to diﬀerent entities. Such an approach, which
+is of quadratic complexity in the number of entities, was employed by Li et
+at. [8, 9]. Our approach, described in Sect. 3.2, is aimed at eﬃciently calculating
+the two probabilities (1) and (2) in an adaptive fashion. First we present how
+these probabilities are used to adjust the similarities between records.
+
+3.1 Adjusting Similarities between Records
+Assume the attributes of a query record q and a database record ri have been
+compared using a set of similarity functions sj = simj(q.aj , ri.aj), 1 ≤ j ≤ M ,
+such as approximate string comparison functions [2], with sj the similarity value
+calculated for attribute aj, and M the number of compared attributes.
+Without taking temporal eﬀects into account, we use sj as an estimate of the
+probability that two attribute values are the same, and (1−sj) as the probability
+they are diﬀerent [8] (remember we assume 0 ≤ sj ≤ 1). In a temporal setting,
+
+we aim to assign weights to individual attributes that indicate their importance
+according to the likelihood of a change of value in this attribute, as discussed
+above. Following Li et al. [8], we use (3) to adjust and normalise similarities.
+
+sim(q, ri) =
+
+,
+
+(3)
+
+(cid:2)
+
+M
+j
+(cid:2)
+
+wj (sj, Δt) · sj
+wj (sj, Δt)
+
+M
+j
+
+where sj = simj(q.aj , ri.aj) and Δt = |q.t − ri.t|. This equation is a heuristic
+
+that attempts to adjust the similarity in a qualitatively reasonable manner. We
+calculate the weights wj (sj, Δt) using the minimum similarity threshold ssame:
+– If sj ≥ ssame we set wj(sj, Δt) = sj·(1−P (Aj, Δt|¬S)) = sj·P (¬Aj , Δt|¬S).
+
+This means that the more likely it is that two entities have the same value
+in attribute aj over time diﬀerence Δt, the less weight should be given to
+the similarity value sj of this agreement.
+– If sj < ssame we set wj (sj, Δt) = sj · (1 − P (¬Aj , Δt|S)) = sj · P (Aj , Δt|S).
+This means that the more likely it is that a value in attribute aj changes
+over time diﬀerence Δt, the less weight should be given to this disagreement.
+
+For example, as can be seen from Fig. 2, almost nobody in the NC voter database
+has changed their given name even over long periods of time, compared to
+changes in address attributes (such as street, suburb and postcode). There-
+fore, agreeing given name values are a strong indicator in this database that
+two records refer to the same entity. On the other hand, a low similarity in an
+address attribute is a weak indicator that two records refer to diﬀerent entities.
+During the matching process a query record is compared with one or more
+database records, and the resulting adjusted similarities sim(q, ri) as calculated
+with (3) are ranked. Details of this matching process are presented in Sect. 4.
+
+564
+
+P. Christen and R.W. Gayler
+
+3.2 Learning Agreement and Disagreement Probabilities
+
+In a dynamic setting, the aim is to eﬃciently learn the probabilities given in (1)
+
+and (2) in an adaptive way. The agreement probability P (Aj , Δt|S) can be
+
+learned from data if it is known which records correspond to the same entity.
+To facilitate an eﬃcient calculation of this probability, we discretise the time
+diﬀerences Δt into equal sized intervals Δtk, of durations such as weeks, months,
+or years (depending on the overall expected time span in an application). We
+keep two arrays for each attribute aj, Aj[Δtk] and Dj[Δtk]. The ﬁrst array,
+Aj[Δtk], keeps track of the number of times a value in attribute aj is agreeing
+for two records of the same entity that have a discretised time diﬀerence of Δtk,
+while Dj[Δtk] keeps track of the number of times the values in aj are disagreeing
+for two records of the same entity. Using these two counters, we calculate:
+
+P (Aj , Δtk|S) =
+
+Aj[Δtk]
+
+(Aj [Δtk] + Dj[Δtk])
+
+(4)
+
+for Δt1, . . . , Δtmax, with Δtmax the maximum discretised time diﬀerence en-
+countered between two records of the same entity in R. The update of the
+counters Aj[Δtk] and Dj [Δtk], and calculating (4) for a certain discretised Δtk,
+requires a single increase of a counter and one division for each query record
+that is matched to a database record, making this a very eﬃcient approach.
+
+It is possible that no pair of records of the same entity with a certain discre-
+tised time diﬀerence of Δtk does occur in a data set, and therefore (4) cannot be
+calculated for this Δtk. To overcome this data sparseness issue, we also calculate
+the average value for P (Aj, Δt|S) over all Δtk for each attribute aj, and use this
+average value in case P (Aj, Δtk|S) is not available for a certain Δtk.
+To calculate P (¬Aj , Δt|¬S), we use the probability that two records that
+refer to two diﬀerent entities have the same value v in attribute aj, which equals
+to P (Aj , Δt|¬S) = 1 − P (¬Aj , Δt|¬S). This probability depends upon how
+frequently a certain value v occurs in an attribute. The probability Pj(v) that
+an entity has the value v in attribute aj can be estimated from the count of how
+many records in R have this value: Pj(v) =
+. For example, only a
+few records in R might have the rare surname ‘Dijkstra’, and so the probability
+that two records from diﬀerent entities both have this value is very low.
+
+|ri∈R,ri.aj =v|
+
+|R|
+
+We keep an array Vj for each attribute aj with a counter for each distinct
+value v of how many records in R have this value in aj. We then calculate
+P (¬Aj , Δt|¬S) = 1 − Pj(v) for all attributes values v. If a value in a query
+record q in attribute q.aj has not previously occurred in R (and thus Pj (q.aj) =
+0), we set P (¬Aj , Δt|¬S) = 1.0 for this value. Updating the counters Vj and
+probabilities Pj(v) requires one integer increment and one division per attribute.
+For a single query record, the calculations of both agreement and disagreement
+probabilities are thus of complexity O(1), making this approach very eﬃcient.
+The database record to which a query record is matched determines the calcu-
+lation of P (Aj, Δtk|S). In a supervised setting, the true match status of (a subset
+
+of) record pairs is known, allowing the calculation of this probability based on
+these training pairs. For a query record q, if there is a previous record ri of the
+
+Adaptive Temporal Entity Resolution on Dynamic Databases
+
+565
+
+Algorithm 1. Adaptive Temporal Matching Process
+Input:
+- Initial database with known entity records: R = Rinit
+- Arrays with counters for agreements, disagreements, and values: Aj , Dj , and Vj
+- Attribute similarity functions: simj (·, ·); and thresholds: ssame and smatch
+- Stream of query records: q
+Output:
+- Identiﬁers of matched entities: q.e
+
+Get candidate records C from R: C = get cand records(q, R)
+for c ∈ C do:
+
+Δt = |q.t − c.t|; sj = simj (q.aj , c.aj), 1 ≤ j ≤ M
+Calculate sim(q, c) using Equation (3)
+
+1: Set countent to number of entities in R
+2: while q do:
+3:
+4:
+5:
+6:
+7:
+8:
+9:
+10:
+11:
+12:
+
+cbest = max(ci : sim(q, ci) > sim(q, ck), ci ∈ C, ck ∈ C, ci (cid:5)= ck)
+if sim(q, cbest) ≥ smatch then q.e = cbest.e
+else q.e = countent; countent = countent + 1
+Insert q into R: insert(q, R)
+Update Aj , Dj , and Vj , and P (Aj , Δtk|S) and Pj (v), 1 ≤ j ≤ M.
+Pass q.e to application
+
+same entity in R, we calculate Δt = |q.t − ri.t| and which attributes agree or
+disagree for these two records using simj(q.aj , ri.aj) and ssame, and we update
+the appropriate counters in Aj and Dj and the corresponding probabilities.
+
+If no training data are available, then for a query record the best matching
+database record, i.e. the record with the highest adjusted similarity according
+to (3), is assumed to be the true match. We can then calculate the time diﬀer-
+ences and update the relevant counters and probabilities in the same way as in
+a supervised setting. Due to limited space, we only consider the supervised case.
+
+4 Adaptive Temporal Matching
+
+Algorithm 1 provides an overview of the main steps of our matching process.
+The required input is a database Rinit of known entities. In a supervised setting,
+where (some of) the true entities are known, the entity identiﬁers ri.e in Rinit
+allow us to generate for an entity a chain of records sorted according to the time-
+stamps ri.t. Using these entity chains, the counters Aj and Dj are populated,
+and the initial values for the P (Aj , Δtk|S), 1 ≤ j ≤ M are calculated. In an
+unsupervised setting, no such initial database is available, and thus R = ∅.
+The other input parameters required are a set of similarity functions simj(·,·),
+one per attribute aj used, and the two thresholds ssame and smatch. The former
+is used to decide if two attribute values are agreeing or not (as described in
+Sect. 3), while the latter is use to decide if a query record is classiﬁed as a match
+with a database record or not (lines 8 and 9 in Algo. 1).
+
+The algorithm loops as long as query records q are to be matched. We as-
+sume the case where query records are inserted into the database once they are
+matched (line 10). Removing this line will mean that R and the counters in Aj,
+Dj and Vj are not updated, and therefore our approach becomes non-adaptive
+(while still taking temporal aspects into account).
+
+In line 3, a set of candidate records C is retrieved from R using an index tech-
+nique for entity resolution. For example, C might be all records from R that have
+
+566
+
+P. Christen and R.W. Gayler
+
+the same postcode value as q. In our implementation, we employ a similarity-
+aware index technique that has shown to be eﬃcient for real-time matching [13].
+For each candidate record c ∈ C, its time diﬀerence and similarities with q are
+calculated in line 5 and adjusted in line 6, as described in Sect. 3.1.
+
+The candidate record with the highest adjusted similarity, cbest, is identiﬁed in
+line 7 by ﬁnding the candidate record that has the maximum similarity with the
+query record q. If this similarity is above the minimum match similarity smatch,
+then q is assigned the entity identiﬁer of this best match (line 8). Otherwise q
+is classiﬁed as a new entity and given a new unique entity identiﬁer number in
+line 9. In line 10, the query record q is inserted into the database R, and in line 11
+the counters in Aj[Δt], Dj[Δt], and Vj, as well as the relevant probabilities, are
+updated for all attributes aj. Finally, the entity identiﬁer of q is passed on to the
+application that requires this information, allowing the application to extract all
+records from R that refer to this entity.
+
+5 Experiments and Discussion
+
+We evaluate our adaptive temporal entity resolution approach on both synthetic
+and real data. Synthetic data allows us to control the characteristics of the
+data, such as the number of records per entity, and the number of modiﬁcations
+introduced [16]. We generated six data sets, each containing 100,000 records, with
+an average of 4, 8, or 16 records per entity, and either having a single modiﬁcation
+per record (named ‘Clean’ data) or eight modiﬁcations per record (named ‘Dirty’
+data). Modiﬁcations introduced were both completely changed attribute values,
+as well as single character edits (like inserts, deletes and substitutions).
+
+As real data we used the North Carolina (NC) voter registration database [17],
+which we downloaded every two months since October 2011 to build a compound
+temporal data set. This data set contains the names, addresses, and ages of
+more than 2.4 million voters, as well as their unique voter registration numbers.
+Each record has a time-stamp attached which corresponds to the date a voter
+originally registered, or when any of their details were changed. This data set
+therefore contains realistic temporal information about a large number of people.
+There are 111,354 individuals with two records, 2408 with three, and 39 with four
+records in this data set. An exploration of this data set has shown that many of
+the changes in the given name attribute are corrections of nicknames and small
+typographical mistakes, while changes in surnames and address attributes are
+mostly genuine changes that occur when people get married or move address.
+
+We sorted all data sets according to their time-stamps, and split each into a
+training and test set such that around 90% of the second and following records of
+an entity (of those that had more than one record) were included in the training
+set. We compare our proposed adaptive temporal matching technique with a
+static matching approach that does not take temporal information into account,
+and with a simple temporal matching approach where an additional temporal
+|q.t−ri.t|
+similarity value is calculated for a record pair as simt(q.t, ri.t) =
+ΔTmax , with
+ΔTmax being the diﬀerence between the time stamps of the earliest and latest
+
+Adaptive Temporal Entity Resolution on Dynamic Databases
+
+567
+
+Table 1. Matching results for synthetic data sets shown as percentage of true matches
+correctly identiﬁed. The parameter pair given refers to ssame / smatch.
+
+Parameters
+Avrg rec per ent
+
+None
+
+4
+
+8
+
+16
+
+Temp Attr
+
+4
+
+8
+
+16
+
+Adapt
+
+4
+
+8
+
+16
+
+Non Adapt
+
+4
+
+8
+
+16
+
+Clean, 0.8 / 0.7
+Clean, 0.9 / 0.8
+Dirty, 0.8 / 0.7
+Dirty, 0.9 / 0.8
+
+92.3
+63.8
+47.1
+16.7
+
+90.5
+57.9
+35.1
+10.3
+
+87.2
+50.7
+25.5
+5.9
+
+91.9
+63.2
+46.5
+14.7
+
+90.6
+57.9
+38.6
+10.5
+
+87.4
+50.7
+29.9
+6.6
+
+92.3
+64.2
+53.5
+21.9
+
+90.8
+59.1
+40.5
+13.5
+
+87.3
+50.9
+29.2
+7.4
+
+92.3
+63.9
+53.6
+21.9
+
+91.1
+59.6
+40.5
+13.5
+
+87.3
+50.9
+29.2
+7.4
+
+record in R. Note that we cannot compare our approach to the temporal linkage
+method proposed by Li et al. [8, 9], because their method is only applicable on
+static databases, as was described in Sect. 1. We label the non-temporal matching
+approach with ‘None’; the above described temporal attribute approach with
+‘Temp Attr’; our proposed adaptive approach described in Sect. 4 as ‘Adapt’;
+and with ‘Non Adapt’ a variation of this adaptive approach that calculates the
+
+probabilities P (Aj , Δtk|S) and Pj(v) only once at the end of the training phase,
+
+but that does not adjust these probabilities for each of the following query records
+(i.e. line 11 in Algo. 1 is not executed for query records in the test set).
+
+In Table 1 and Fig. 3 we report matching accuracy as the percentage of true
+matches correctly identiﬁed, i.e. if a candidate record cbest in line 7 in Algo. 1
+was a record of the same entity as the entity of query record q, cbest.e = q.e.
+For the NC voter data set we additionally report the percentage of true matches
+that occurred in the ten top-ranked candidate records. In a real-time query
+environment, returning the ten top-ranked results is a realistic assumption.
+
+We implemented our approach using Python 2.7.3, and ran experiments on a
+server with 128 GBytes of memory and two 6-core CPUs running at 2.4 GHz.
+
+We used the Jaro-Winkler string comparison function [2] as simj(·,·) to com-
+parameter settings: ssame = {0.8, 0.9} and smatch = {0.7, 0.8}. To facilitate re-
+
+pare name and address attribute values. We ran four sets of experiments with
+
+peatability, the programs and synthetic data sets are available from the authors.
+The results shown in Table 1 for the synthetic data sets indicate that all four
+matching approaches are sensitive to the choice of parameter settings, and if the
+data are clean or dirty. With data that contain a larger number of variations,
+identifying true matches becomes much more diﬃcult, as would be expected.
+Matching also becomes harder with more records per entity, because more at-
+tributes will have their values changed over time. The proposed approach to
+adjust the similarities between records is able to improve matching quality most
+when data are dirty. Such data are likely to occur in dynamic entity resolution
+applications, where it is not feasible to apply expensive data cleaning operations
+on query records prior to matching them to a database of entity records.
+
+The experiments conducted on the NC voter database show quite diﬀerent
+results (Fig. 3), with the proposed similarity adjustment approach outperforming
+the two baseline approaches. Taking top ten matches into account, our approach,
+which adjusts the similarities between records, is able to identify nearly twice
+as many true matches compared to the two baseline approaches. However, the
+
+568
+
+P. Christen and R.W. Gayler
+
+d
+e
+i
+f
+i
+t
+n
+e
+d
+
+i
+
+y
+l
+t
+c
+e
+r
+r
+o
+c
+
+s
+e
+h
+c
+t
+a
+m
+e
+u
+r
+t
+
+f
+o
+
+e
+g
+a
+t
+n
+e
+c
+r
+e
+P
+
+N
+
+oter matching uality ith
+
+T
+
+T top
+
+T
+
+T top
+
+None
+
+Temp Attr
+
+Adapt
+
+Non Adapt
+
+d
+e
+i
+f
+i
+t
+n
+e
+d
+
+i
+
+y
+l
+t
+c
+e
+r
+r
+o
+c
+
+s
+e
+h
+c
+t
+a
+m
+e
+u
+r
+t
+
+f
+o
+
+e
+g
+a
+t
+n
+e
+c
+r
+e
+P
+
+N
+
+oter matching uality ith
+
+T
+
+T top
+
+T
+
+T top
+
+None
+
+Temp Attr
+
+Adapt
+
+Non Adapt
+
+Fig. 3. Matching results for the NC voter database shown as percentage of true matches
+(TM) correctly identiﬁed. Diﬀerent from the results in Table 1, these results are robust
+with regard to parameter settings, and they are also signiﬁcantly better for the proposed
+adaptive approach compared to the baseline approaches ‘None’ and ‘Temp Attr’.
+
+Timing results for NC Voter data set
+
+Match time
+
+Adjust time
+
+Update time
+
+s
+d
+n
+o
+c
+e
+s
+-
+i
+l
+l
+i
+
+m
+n
+
+i
+
+e
+m
+T
+
+i
+
+None
+
+Temp Attr
+
+Adapt
+
+Non Adapt
+
+Fig. 4. Average time for matching a single query record to the North Carolina voter
+database. The adjustment of similarities using (3) adds only around 10% extra time.
+
+adaptive approach does not perform as well as the non-adaptive approach. This
+is likely because the number of true matches compared to all query records is
+very small, which distorts the calculation of the probabilities in (4).
+
+As Fig. 4 illustrates, our approach is very eﬃcient, even on the large real
+database with over 2.4 million records. The time needed to adjust the similarity
+values between records, as done in (3), only adds around 10% to the total time
+required to match a query record, while the time needed to update the coun-
+
+ters Aj, Dj , and Vj, and P (Aj, Δtk|S), is negligible. This makes our approach
+
+applicable to adaptive entity resolution on dynamic databases.
+
+6 Conclusions and Future Work
+
+We have presented an approach to facilitate eﬃcient adaptive entity resolu-
+tion on dynamic databases by adaptively calculating temporal agreement and
+
+Adaptive Temporal Entity Resolution on Dynamic Databases
+
+569
+
+disagreement probabilities that are used to adjust the similarities between records.
+As shown through experiments on both synthetic and real data, our temporal
+matching approach can lead to signiﬁcantly improved matching quality.
+
+Our plans for future work include to conduct experiments for unsupervised
+settings as discussed in Sect. 3.2 and run experiments on other data sets, to
+conduct an in-depth analysis of our proposed algorithm, and to extend our ap-
+proach to account for attribute and value dependencies. For example, when a
+person moves, most of their address related attribute values change, and the
+probability that a person moves also depends upon their age (young people are
+known to change their address more often than older people). We also plan to
+integrate our approach with traditional probabilistic record linkage [4], and we
+will investigate how to incorporate constraints, such as only a few people can
+live at a certain address at any one time.
+
+References
+
+1. Winkler, W.E.: Methods for evaluating and creating data quality. Elsevier Infor-
+
+mation Systems 29(7), 531–550 (2004)
+
+2. Christen, P.: Data Matching. In: Data-Centric Systems and Appl., Springer (2012)
+3. Elmagarmid, A., Ipeirotis, P., Verykios, V.: Duplicate record detection: A survey.
+
+IEEE Transactions on Knowledge and Data Engineering 19(1), 1–16 (2007)
+
+4. Herzog, T., Scheuren, F., Winkler, W.: Data quality and record linkage techniques.
+
+Springer (2007)
+
+5. Aggarwal, C.: Data Streams: Models and Algorithms. Database Management and
+
+Information Retrieval, vol. 31. Springer (2007)
+
+6. Anderson, K., Durbin, E., Salinger, M.: Identity theft. Journal of Economic Per-
+
+spectives 22(2), 171–192 (2008)
+
+7. Ioannou, E., Nejdl, W., Nieder´ee, C., Velegrakis, Y.: On-the-ﬂy entity-aware query
+
+processing in the presence of linkage. VLDB Endowment 3(1) (2010)
+
+8. Li, P., Dong, X., Maurino, A., Srivastava, D.: Linking temporal records. Proceed-
+
+ings of the VLDB Endowment 4(11) (2011)
+
+9. Li, P., Tziviskou, C., Wang, H., Dong, X., Liu, X., Maurino, A., Srivastava, D.:
+Chronos: Facilitating history discovery by linking temporal records. VLDB Endow-
+ment 5(12) (2012)
+
+10. Whang, S., Garcia-Molina, H.: Entity resolution with evolving rules. VLDB En-
+
+dowment 3(1-2), 1326–1337 (2010)
+
+11. Yakout, M., Elmagarmid, A., Elmeleegy, H., Ouzzani, M., Qi, A.: Behavior based
+
+record linkage. VLDB Endowment 3(1-2), 439–448 (2010)
+
+12. Christen, P., Gayler, R.: Towards scalable real-time entity resolution using a
+similarity-aware inverted index approach. In: AusDM 2008, Glenelg, Australia (2008)
+13. Christen, P., Gayler, R., Hawking, D.: Similarity-aware indexing for real-time entity
+
+resolution. In: ACM CIKM 2009, Hong Kong, pp. 1565–1568 (2009)
+
+14. Pal, A., Rastogi, V., Machanavajjhala, A., Bohannon, P.: Information integration
+
+over time in unreliable and uncertain environments. In: WWW, Lyon (2012)
+
+15. Laxman, S., Sastry, P.: A survey of temporal data mining. Sadhana 31(2) (2006)
+16. Christen, P., Pudjijono, A.: Accurate synthetic generation of realistic personal
+information. In: Theeramunkong, T., Kijsirikul, B., Cercone, N., Ho, T.-B. (eds.)
+PAKDD 2009. LNCS (LNAI), vol. 5476, pp. 507–514. Springer, Heidelberg (2009)
+17. North Carolina State Board of Elections: NC voter registration database,
+
+ftp://www.app.sboe.state.nc.us/ (last accessed September 11, 2012)
+
+

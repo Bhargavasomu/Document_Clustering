@@ -1,0 +1,954 @@
+A Relevance Weighted Ensemble Model
+
+for Anomaly Detection in Switching Data Streams
+
+Mahsa Salehi1, Christopher A. Leckie1,
+
+Masud Moshtaghi2, and Tharshan Vaithianathan3
+
+1 National ICT Australia, Department of Computing and Information Systems,
+
+The University of Melbourne, Victoria 3010, Australia
+
+msalehi@student.unimelb.edu.au, caleckie@unimelb.edu.au
+
+2 Faculty of Information Technology,
+
+Monash University, Victoria 3145, Australia
+
+3 National ICT Australia, Department of Electrical and Electronic Engineering,
+
+masud.moshtaghi@monash.edu
+
+The University of Melbourne, Victoria 3010, Australia
+
+tharshan@nicta.com.au
+
+Abstract. Anomaly detection in data streams plays a vital role in on-
+line data mining applications. A major challenge for anomaly detection is
+the dynamically changing nature of many monitoring environments. This
+causes a problem for traditional anomaly detection techniques in data
+streams, which assume a relatively static monitoring environment. In an
+environment that is intermittently changing (known as switching data
+streams), static approaches can yield a high error rate in terms of false
+positives. To cope with dynamic environments, we require an approach
+that can learn from the history of normal behaviour in data streams,
+while accounting for the fact that not all time periods in the past are
+equally relevant. Consequently, we have proposed a relevance-weighted
+ensemble model for learning normal behaviour, which forms the basis of
+our anomaly detection scheme. The advantage of this approach is that
+it can improve the accuracy of detection by using relevant history, while
+remaining computationally eﬃcient. Our solution provides a novel contri-
+bution through the use of ensemble techniques for anomaly detection in
+switching data streams. Our empirical results on real and synthetic data
+streams show that we can achieve substantial improvements compared
+to a recent anomaly detection algorithm for data streams.
+
+Keywords: Anomaly detection, Ensemble models, Data streams.
+
+1
+
+Introduction
+
+Anomaly detection (also known as novelty or outlier detection) is an important
+component of many data stream mining applications. For example, in network
+intrusion detection, anomaly detection is used to detect suspicious behaviour
+that deviates from normal network usage. Similarly, in environmental monitor-
+ing, anomaly detection is used to detect interesting events in the monitored
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part II, LNAI 8444, pp. 461–473, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+462
+
+M. Salehi et al.
+
+environment, as well as to detect faulty sensors that can cause contamination of
+the collected data. A major challenge for anomaly detection in applications such
+as these is the presence of nonstationary behaviour in the underlying distribution
+of normal observations. In addition, the high rate of incoming data in such ap-
+plications adds another challenge to anomaly detection, as the anomalous data
+points should be detected in a computationally eﬃcient way with high accuracy.
+Many anomaly detection techniques are based on an assumption of stationar-
+ity. However, such an assumption can result in low detection accuracy when
+the underlying data stream exhibits nonstationarity. In this paper, we present a
+novel method for robust anomaly detection for a special class of nonstationarity,
+known as switching data streams.
+
+Many environments are intermittently changing, and thus exhibit piecewise
+stationarity. For example, sensors in an oﬃce environment may collect observa-
+tions with diﬀerent underlying statistical distributions between day-time and
+night-time. We refer to the data from such environments as switching data
+streams. In addition to large-scale switching behaviour, there can also be ﬁner-
+scale variation in the distribution of observations, e.g., variation during day-
+time observations. To address these challenges, we propose a novel approach to
+anomaly detection that can selectively learn from previous time periods in order
+to construct a model of normal behaviour that is relevant to the current time
+window. This is achieved by maintaining a cluster model of normal behaviour in
+each previous time period, and then constructing an ensemble model of normal
+behaviour for the current period, based on the relevance of the cluster models
+from previous time periods to the current time period. This relevance-weighted
+ensemble model of normal behaviour can then provide a more robust model of
+normality in switching data streams.
+
+While ensemble methods have been widely used in supervised learning [1,2],
+their use for unsupervised anomaly detection in data streams is still an open
+research challenge. A key advantage of our approach is that it can improve the
+accuracy of anomaly detection in switching data streams. We have evaluated the
+eﬀectiveness of our approach on large-scale synthetic and real sensor network
+data sets, and demonstrated its ability to adapt to the intermittent changes in
+switching data streams. We show that our approach achieves greater accuracy
+compared to a state-of-the-art anomaly detection approach for data streams.
+
+2 Related Work
+
+A number of surveys [3,4] have categorized various techniques for anomaly de-
+tection. Most focus only on static environments and do not consider dynamic
+behaviour. In dynamic environments an unknown volume of data (data streams)
+are produced. Hence the major challenge is how to detect anomalies in such en-
+vironments in the presence of dynamics in the distribution of the data stream.
+Based on existing surveys of anomaly detection in data streams [5,6], we cate-
+gorize these methods into Model based and Distance based approaches.
+
+A Relevance Weighted Ensemble Model for Anomaly Detection
+
+463
+
+Model based approaches build a model over the data set and update it as
+data evolves with each incoming data point. In this category, some authors learn
+a probabilistic model. This requires a priori knowledge about the underlying
+distribution of data, which is not appropriate if the distribution is not known
+[7,8]. Other approaches use clustering algorithms to build a model for normal
+behaviour in data streams. However, they are not really designed for anomaly
+detection [9,10]. An exception is [11], in which a segment based approach is pro-
+posed. It uses k-means as a base model and provides guidelines regarding how
+to use the proposed approach for anomaly detection. As a result, it assumes the
+number of clusters is known, which may not be the case in changing environ-
+ments (since the number of clusters may change over time). In addition, while
+these clustering techniques work for gradually evolving data streams, they are
+not applicable in switching environments, which is our focus in this paper.
+
+Distance based approaches are the second category of anomaly detection tech-
+niques in data streams. We have two types of distance-based outliers: ‘global’
+and ‘local’. Distance-based ‘global’ outliers are ﬁrst introduced by [12], where a
+data point x is a distance-based outlier if less than k data points are within a
+distance R from it. In [13] and [14], a sliding window is used to detect such global
+outliers. Since parameter R is ﬁxed for all portions of the data, these approaches
+fail to detect anomalies in non-homogenous densities. In contrast, distance-based
+‘local’ outliers are data points that are outliers with respect to their k nearest
+neighbours without considering any distance R. Local outliers are ﬁrst intro-
+duced in [15] and a measure of being an outlier - the Local Outlier Factor(LOF)
+- is assigned to each data point in a static environment. Later, in [16] and [6] two
+similar approaches are proposed to ﬁnd local outliers in data streams. While the
+former made an assumption about the underlying distribution of data, the latter
+(Incremental LOF) extended [15], and could detect outliers in data streams by
+assigning the LOF to incoming data points and updating the k nearest neighbors.
+However, there are still some limitations with this approach in the presence of
+switching data streams: 1) It has problems with detecting dense drift regions in
+data streams, which results in false negatives. 2) In switching data streams, the
+distribution of normal data can change suddenly. Since incremental LOF keeps
+all of the history of the data points, it could not diﬀerentiate between diﬀerent
+states, which again results in false negatives (e.g., a data point is an anomaly
+in one state while it is not an anomaly in another). 3) It is hard to choose the
+parameter value k in the presence of changing distribution environments. We
+propose to address these open problems for anomaly detection in switching data
+streams by using an ensemble approach.
+
+Ensemble approaches have been shown to have beneﬁts over using a single
+classiﬁer, particularly in dynamic environments. So far, several ensemble learn-
+ing methods have been proposed for data stream classiﬁcation [1,2]. In contrast,
+there is little work done on anomaly detection using ensemble techniques [17]. In
+a recent comprehensive survey paper [18], a categorization of outlier detection en-
+semble techniques is based on the constituent components (data/model) in these
+
+464
+
+M. Salehi et al.
+
+techniques. Nevertheless, none of these approaches are aimed at handling switch-
+ing data streams or even streaming data.
+
+Since incremental LOF (iLOF) is the only anomaly detection technique in
+streaming data which handles diﬀerent densities and is reported to detect changes
+in data distributions, we use it as a baseline to evaluate our proposed approach.
+
+3 Our Methodology
+
+In this section, we formally deﬁne our problem and proposed algorithm.
+
+3.1 Problem Deﬁnition
+
+We begin by describing our notation for switching data streams. We consider the
+problem of anomaly detection in a switching data stream, where the underlying
+distribution of observations is only piecewise stationary. That is, the monitored
+environment switches between a number of “normal” states, such as day vs night
+in an episodic manner. Let the state of the system be a random variable over
+
+the domain of possible states S = {s1, ..., sD}, where the system has D normal
+states. The distribution of an observation X in state sd is drawn from a mixture
+of Kd components. For example, each component of the mixture distribution of
+state sd could be a multivariate Gaussian distribution with diﬀerent means and
+covariance. Let Θ = {θd,i, i = 1, .., Kd} denote the parameters corresponding
+to the Kd components of state sd, e.g., θd,1 = {μd,1, Σd,1} for a multivariate
+Gaussian distribution. Further, let Φ = {φd,i, i = 1, .., Kd} denote the mixture
+weights of the Kd components of state sd, i.e., the prior probability that a ran-
+dom observation in state sd comes from component i is φd,i.
+
+We observe a stream of observations, where X(1 : T ) denotes the sequence
+of observation vectors collected over the time period [t1, ..., tT ]. At time t, we
+receive a vector of observations X(t) = [x1(t), .., xP (t)]T corresponding to P
+diﬀerent types of observation variables, e.g., temperature, pressure, humidity,
+etc, where X(t) ∈ (cid:3)P . If the environment is in state sd at time t, then X(t) is
+sampled from one of the Kd component distributions in Θd of state sd.
+The monitored environment is initially in some random state s(1) ∈ S at time
+t1, and remains in that state until a later time tc1 when it switches to a diﬀerent
+state s(2) ∈ S\s(1). It then remains in state s(2) until a later time tc2 when it
+switches again to s(3) ∈ S\s(2), and so on. Our aim is to detect anomalies in this
+data stream X. In order to detect anomalies, we require a model of “normal”
+behaviour for the environment, given that the number of possible states, the
+number and mixture of components in each state, and the parameters of each
+component in each state are unknown a priori.
+
+In order to learn our model of normal behaviour, we could estimate all of
+the diﬀerent component parameters for all states by keeping all data X(1 : t).
+However, this is impractical due to the memory requirements and it would mix
+all the states together when building the normal model. Alternatively we can
+learn only from the window of the w most recent observations X(t − w + 1 : t).
+
+A Relevance Weighted Ensemble Model for Anomaly Detection
+
+465
+
+While this is more computationally eﬃcient, it only provides a limited sample
+of measurements from the current state. If the window size w is small, then this
+might yield a noisy estimate of the component distribution parameters.
+
+The problem we address is how to ﬁnd a balance between these two extremes,
+by maintaining multiple models of normal behaviour based on previous data
+windows. Our expectation is that this will provide us with a balance between
+minimising the memory requirements for our anomaly detection scheme while
+maximising accuracy. However, the key challenge in achieving this balance is
+that not all previous windows will be relevant to the current window of observa-
+tions, due to the switching nature of the data stream. Consequently, we require a
+method to take into consideration the relevance of previous windows, so that we
+can construct a model of normal behaviour based on the current and previous
+windows. In particular, we need a way to weight the inﬂuence of previous win-
+dows on data in the current window, based on the degree of relevance of those
+previous windows. We consider diﬀerent kinds of anomalies in the system: either
+localized in time, i.e., a burst of noise or a drift in the data stream, or uniformly
+distributed over the data stream.
+
+3.2 Our Ensemble-Based Algorithm
+
+We now describe the main steps of our algorithm for ensemble anomaly detection
+in switching data streams. Algorithm 1 shows the pseudo code of the ensemble
+algorithm, comprising three main steps: Windowing, Weighting and Ensemble
+formation. We assume the previous data streams have already been clustered
+based on windows of w observations and the problem is how to detect anomalies
+in the most recent (current) window of w observations.
+
+1. Windowing Step: In general, in applications that generate data steams, the ob-
+servations arrives sequentially. We consider a data stream that switches between
+diﬀerent states, where each state comprises diﬀerent component distributions.
+By breaking the whole data stream of observations into windows of size w, we
+can extract the diﬀerent underlying distributions of the data streams.
+
+In this step, we cluster the current w observations by using an appropri-
+ate clustering algorithm, in order to ﬁnd out the current underlying component
+distributions. We chose the HyCARCE clustering algorithm [19], which is a com-
+putationally eﬃcient density-based hyperellipsoidal clustering algorithm that au-
+tomatically detects the number of clusters, and only requires an initial setting for
+one input parameter, i.e., the grid-cell size. In addition, it has a lower computa-
+tional complexity in comparison to existing methods. Hence, it is an appropriate
+clustering algorithm for our data stream analysis problem in which time is a
+vital issue and the number of clusters is unknown. Interested readers can ﬁnd
+a detailed description and pseudo code for the HyCARCE algorithm in [19]. At
+the end of this step a clustering model is built that comprises a set of cluster
+
+boundaries, Cκ = {cκ,1, ..., cκ,|Cκ|}. In this paper we use the boundaries of the
+
+ellipsoidal clusters as our decision boundaries.
+
+466
+
+M. Salehi et al.
+
+Input : Wκ = {X(t − w + 1), ..., X(t)}: most recent window of w observations
+
+from the data stream
+E = {C1, C2, ..., Cκ−1}: set of clusterings corresponding to previous
+windows {W1, ..., Wk−1}, where a clustering Cj = {cj,1, ..., cj,|Cj|}
+Output: Aκ = {a1, ..., aw}: set of anomaly scores in most recent window Wκ
+1 Cκ ←− Cluster(Wκ); // cluster Wκ using the HyCARCE clustering [19]
+2 R ←− {}; // compute relevance of previous clustering to current one
+3 foreach clustering Cj ∈ E do
+
+R ←− R ∪ {Relevance(Cκ, Cj)}; // Algorithm 2
+
+4
+5 end
+6 R ←− R ∪ {max(R)}; // R = {r1, ..., rκ}
+7 E ←− E ∪ {Cκ};
+8 foreach Xn ∈ Wκ do
+
+// test each observation in Wκ to check if it is an anomaly
+
+// test if X belongs to any cluster in each clustering Cj
+// belongs is defined in Definition 1 using Equation 1 and 2
+foreach Cj ∈ E do
+
+if ∃cj,i ∈ Cj — belongs (X, cj,i) then
+
+bj = 0; // X is normal in clustering Cj
+
+else
+
+bj = 1; // X is anomalous in clustering Cj
+
+end
+
+end
+(cid:2)κ
+(cid:2)κ
+
+j=1 bj rj
+an =
+j=1 rj
+A ←− A ∪ {an};
+
+; [1]
+
+9
+
+10
+
+11
+
+12
+
+13
+
+14
+
+15
+
+16
+
+17
+
+18 end
+19 return A;
+
+Algorithm 1. Ensemble Anomaly Detection
+
+2. Weighting Step: According to our windowing step, all of the previous w sized
+observation windows have already been clustered. The history is used to better
+estimate the underlying distribution of the current window. However, not all of
+the previous clusterings have the same level of importance, and some of them
+might be more relevant to the current window, as the data stream switches be-
+tween diﬀerent states. Our solution, which is called the Weighting step, is to
+assign weights to previous clustering models based on the similarity between the
+current and previous clustering models.
+
+In this step, the distance between each previous clustering model (Cj ) and the
+current clustering model (Cκ) is computed. As time complexity is a major issue
+for anomaly detection on data streams, a greedy approach is proposed to com-
+pute this distance. In this approach, the distance between each pair of cluster
+boundaries in Cκ and Cj is computed based on their focal distance [20]. Focal
+distance is a measure of the distance between two hyperellipsoids considering
+their shapes, orientations and locations. According to a recent work [20], this
+measure works well for computing the similarity between hyperellipsoids.
+
+A Relevance Weighted Ensemble Model for Anomaly Detection
+
+467
+
+Input : Cj = {cj,1, ..., cj,|Cj|}: previous clustering
+Cκ = {cκ,1, ..., cκ,|Cκ|}: current clustering
+
+Output: rj: the similarity between Cj and Cκ
+// λ and γ are smallest/equal and largest clustering respectively
+
+1 if |Cj| ≤ |Cκ| then
+λ ←− j; γ ←− κ;
+λ ←− κ; γ ←− j;
+
+2
+3 else
+4
+5 end
+6 D ←− {}; // compute distance between every pair of hyperellipsoids
+7 foreach cλ,r ∈ Cλ do
+
+foreach cγ,c ∈ Cγ do
+
+dr,c ←− F ocalDistance(cλ,r, cγ,c); // Focal Distance[20]
+// D = {D1, ..., D|Cλ|} and Di = {di,1, ..., di,|Cγ|}
+
+10
+
+end
+
+11 end
+12 dist = 0; // compute minimum distance based on a Greedy approach
+13 while D (cid:7)= ∅ do
+
+8
+
+9
+
+14
+
+15
+
+16
+
+17
+
+18
+
+19
+
+r,c ←− ﬁnd minimum element in D;
+dmin
+dist ←− dist + dmin
+foreach Di ∈ D do
+
+r,c
+
+Di ←− Di − {di,c}; // removing relevant assigned clusters
+
+end
+D ←− D − {Dr};
+
+20 end
+21 rj =
+
+1
+dist ; return rj ;
+
+Algorithm 2. Relevance Function
+
+After determining the focal distance, the algorithm ﬁnds the minimum dis-
+tance among all computed distances, and assigns the relevant cluster boundaries
+as a matching pair. It continues this process, until all of the clusters in at least
+one of the two clustering models are each matched to a corresponding cluster in
+the other model. The sum of the found minimum distances is used as the dis-
+tance between two clustering models. Obviously, if the models are less distant,
+they would be more similar. Therefore, the distances are reversed at the end of
+the algorithm to show the similarity. The relevant pseudo code is described in
+Algorithm 2. Finally, in order to use the current clustering model in the ensemble
+step, the maximum assigned similarity among all previous clusterings is assigned
+to the current clustering. In this way, we can ﬁnd a balance between the current
+window and previous windows for anomaly detection.
+3. Ensemble Step: In this step, anomaly detection is performed based on the
+current and previous clusterings. As discussed in the previous subsection, not
+all historical models are useful, due to the changing environment. Hence, for
+each current observation, we check if it belongs to a hyperellipsoid in each of the
+clustering models according to the following deﬁnition:
+
+468
+
+M. Salehi et al.
+
+Deﬁnition 1. The observation X belongs to hyperellipsoid cj,i, if the Maha-
+lanobis distance between them is less than a threshold t2, where the Mahalanobis
+distance is:
+
+M(X, cj,i) = (X − ˆμj,i)T ˆΣ−1
+
+j,i (X − ˆμj,i)
+
+(1)
+
+(2)
+
+where ˆμj,i and ˆΣj,i are the mean and covariance of hyperellipsoid cj,i respectively,
+and the threshold is:
+
+t2 = (χ2
+
+−1
+P )
+ρ
+
+where t2 is the inverse of chi-square statistic, ρ is the percentage of data covered
+by the ellipsoid, and P is the dimensionality of the observations.
+
+Thereafter, the probability of being outlier is computed for the current obser-
+vation according to the formula in Algorithm 1 (line 16). The formula is based on
+a relevance voting. The algorithm computes this probability for all data points
+X in the current window.
+
+3.3 Time Complexity
+
+N
+w
+
+The total number of observations (data points) N is divided into κ windows
+of size w. Let l be the average of number of ellipsoids in each Cj. Therefore l
+is a function of Kd, d = {1, .., D} and Kd (cid:4) N . The time complexity for the
+Windowing Step is O(N ) as the complexity of HyCARCE is near linear with
+respect to the number of data points. The Weighting Step can be computed in
+l3), considering the ‘Relevance’ can be computed in O(l3) in the worst case.
+O(
+In the last step of the algorithm, ‘belongs’ can be computed in O(l) so the time
+complexity of the Ensemble Step is O(wκl). As a result, the time complexity of
+l3
+w + l)), which is near linear with respect to the number
+Algorithm 1 is O(N (
+of data points. Hence, our ensemble approach is computationally eﬃcient. Time
+complexity of iLOF is also near to linear depending on the parameter k.
+
+4 Evaluation
+
+In this section we aim to compare the accuracy, sensitivity and speciﬁcity of our
+ensemble model with the iLOF algorithm on several dynamic environments.
+
+4.1 Data Sets
+
+We use three diﬀerent data sets to evaluate our approach.
+
+Synthetic Data Set: In order to generate synthetic data sets, we consider a
+state machine that can simulate a switching data stream from a changing envi-
+ronment. We assume there are only two diﬀerent states (S1, S2) and changing
+from one state to the other occurs periodically. The ﬁrst state (s1) has three un-
+derlying component distributions θ1,1, θ1,2 and θ1,3 with corresponding mixture
+
+A Relevance Weighted Ensemble Model for Anomaly Detection
+
+469
+
+weights φ1,1, φ1,2 and φ1,3. The second state (s2) has two underlying component
+distributions θ2,1 and θ2,2 with mixture weights φ2,1 and φ2,2. Altogether the
+environment consists of ﬁve component distributions. The states are changing
+periodically based on a constant rate (every m = 100 samples). In addition, the
+distributions are hyperellipsoids and the initial mean and covariance is chosen
+randomly. As discussed earlier, from one instance of a state to the other, for
+the same state, we have some perturbations in the mean and covariance of the
+underlying distribution, i.e.,the parameters of θd,i can be slightly perturbed be-
+tween diﬀerent occurrences of state sd. By using this state machine, we have
+generated 50,000 2-dimensional records. We generated 10 diﬀerent data sets and
+averaged the ﬁnal results. The inserted noise was 2%.
+
+Real Data Sets: In order to evaluate our algorithm over a real data set, we used
+two public available data sets. These data sets contain periodic measurements
+over day (state s1) and night (state s1). The ﬁrst is the IBRL (Intel Berkeley
+Research Lab) data set1. A group of 54 sensors were deployed to monitor an of-
+ﬁce environment, from Feb. 28th until Apr. 5th, 2004. Moreover, by visualising
+the data collected by all the sensors, we observed that sensor number 45 stopped
+working in the last two days causing a drift which is labeled as anomalies (4%).
+The sensors were collecting weather information. We chose two features, humid-
+ity and temperature. The measurements were taken every 31 seconds and there
+are about 50,000 records.
+
+The second real data set is from the TAO (Tropical Atmosphere Ocean)
+project2, by the Paciﬁc Marine Environmental Lab of the U.S. National Oceanic
+and Atmospheric Administration. This monitors the atmosphere in the tropical
+Paciﬁc ocean. We have used the period of time from Jan. 1st until Sep. 1st,
+2006 which is used in [13]. We chose three features, precipitation, relative hu-
+midity and sea surface temperature. Among the diﬀerent monitoring sites, we
+E), since this site has all three features available for the
+chose site:(2
+mentioned period of time. The measurements were taken every 10 minutes and
+there are about 37,000 records. This data set has some labels on the quality of
+measurements and we have used them for our evaluation. After visualization of
+the low quality data points (2%) and good quality ones, we ﬁnd that in this data
+set the noise is a dense separate region from the normal observations.
+
+N,165
+
+◦
+
+◦
+
+4.2 Performance Measures
+
+In order to evaluate our algorithm in comparison to iLOF, we have used three
+performance measures: (1) Area under the ROC curve (AUC). (2) The accu-
+T P + T N
+P + N ) of the ROC curve’s optimal point, where P is the number of
+racy (
+positives (anomalies) in the data set, N is the number of negatives (normal obser-
+vations), T P is the number of true positives (correctly reported anomalies) and
+T N is the number of true negatives (correctly reported normal observations).
+
+1
+
+2
+
+http://db.lcs.mit.edu/labdata/labdata.html
+www.pmel.noaa.gov/tao
+
+470
+
+M. Salehi et al.
+
+SEi + SPi − 1
+
+The optimal point on a ROC curve is the point with the maximum distance
+), where SEi
+from diagonal line using the Youden Index (maxi
+is the sensitivity for the ith threshold and SPi is the speciﬁcity for the ith
+T P
+P ) and
+T N
+N ) for the ROC curve’s
+
+threshold. (3) The ratio of correctively detected anomalies sensitivity (
+
+correctly detected normal observations speciﬁcity (
+optimal points.
+
+√
+2
+
+4.3 Results and Discussion
+
+We have compared our ensemble approach with iLOF on the three test data sets.
+For iLOF we have used the implementation provided in ELKI[21]. All measure-
+ments were normalized based on min-max normalization and we set ρ = 0.99 in
+Equation 2 [19]. Moreover, we have studied how the performance of our approach
+varies over diﬀerent window sizes. The window size w is initially set to 100 ob-
+servations, and then it is increased by increments of 500 observations until w is
+1
+3 of the whole data set length (because we need at least two window sizes for
+voting). We also studied the eﬀect of changing the number of nearest neighbours
+k in the iLOF algorithm, where k ∈ {3, 5, 10, .., 200}. Since the computational
+time of the iLOF algorithm increases with k, we set the upper bound to 200 to
+obtain a reasonable runtime.
+
+We have computed the ROC curves for diﬀerent window sizes w and number
+of neighbours k. Figure 1 depicts only the best ROC curves (thicker graph)
+and worst ones (thinner graphs) for simplicity for both approaches over three
+diﬀerent data sets. The results show that in the two real data sets with dense
+outliers, our approach is better than iLOF by a large margin for both the best
+and worst curves (Figure 1a and 1b). In addition in Figure 1b our worst curve is
+even better than iLOF’s best curve. However, in the synthetic data set in which
+the outliers are uniformly distributed over the data stream, both approaches
+have approximately the same best curves, and our approach has better AUC
+in comparison to iLOF in the worst case (Figure 1c). In order to make a more
+detailed comparison, we computed the optimal points of diﬀerent ROC curves
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+y
+t
+i
+v
+i
+t
+i
+s
+n
+e
+S
+
+ 
+0
+0
+
+0.2
+
+0.4
+
+0.6
+
+1−Specificity
+(a)IBRL
+
+ 
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+y
+t
+i
+v
+i
+t
+i
+s
+n
+e
+S
+
+Max Ens
+Min Ens
+Max iLOF
+Min iLOF
+
+0.8
+
+1
+
+ 
+0
+0
+
+0.2
+
+ 
+
+Max Ens
+Min Ens
+Max iLOF
+Min iLOF
+
+0.8
+
+1
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+y
+t
+i
+v
+i
+t
+i
+s
+n
+e
+S
+
+ 
+0
+0
+
+0.2
+
+ 
+
+Max Ens
+Min Ens
+Max iLOF
+Min iLOF
+
+0.8
+
+1
+
+0.4
+
+0.6
+
+1−Specificity
+
+(c)Synthetic
+
+0.4
+
+0.6
+
+1−Specificity
+(b)TAO
+
+Fig. 1. ROC curves for three data sets: Ensemble (Ens) in red, iLOF in blue
+
+A Relevance Weighted Ensemble Model for Anomaly Detection
+
+471
+
+Table 1. Optimal Point Comparison: Our Ensemble Method vs iLOF
+
+Data Set Algorithm
+
+Accuracy
+
+Speciﬁcity
+
+Sensitivity
+
+Max Avg Min Max Avg Min Max Avg Min
+Ensemble 98.23 90.62 74.90 98.18 90.22 73.60 100 98.39 55.45
+93.68 76.46 07.73 98.06 78.36 03.30 95.81 39.74 03.28
+
+iLOF
+
+IBRL
+
+TAO
+
+iLOF
+
+Ensemble 90.81 86.57 74.62 90.73 86.45 74.40 100
+
+100
+88.42 84.98 53.38 88.92 76.09 53.37 54.72 39.89 26.06
+
+100
+
+Synthetic
+
+Ensemble 98.17 97.80 94.42 98.87 98.27 94.56 87.06 72.61 48.66
+94.49 90.82 84.74 94.64 91.04 85.51 88.98 79.09 21.82
+
+iLOF
+
+as we described in Section 4.2. The results of the optimal point’s accuracy,
+sensitivity and speciﬁcity are shown in Table 1.
+
+The accuracy and speciﬁcity of the optimal points in our approach are higher
+than iLOF in all data sets. This means that iLOF produces more false negatives.
+In the IBRL and TAO data sets which are the real data sets, we have dense out-
+liers (either drift or a separate distribution) which yields the false negatives. As
+can be seen the minimum speciﬁcity of iLOF in both real data sets is extremely
+low. Moreover, since in all three data sets we have switching states our ensemble
+algorithm can perform better in terms of speciﬁcity, whereas iLOF keeps all the
+history of the data points, and it could not diﬀerentiate between diﬀerent states,
+which again results in false negatives. The last three columns of the table show
+the optimal point’s sensitivity. The results show that we have much higher sensi-
+tivity in comparison to iLOF in the IBRL and TAO data sets and iLOF fails to
+detect anomalies with a considerably lower rate. However, in the synthetic data set
+with uniformly distributed anomalies, iLOF performs better in terms of ﬁnding
+anomalies in the average and maximum cases. However, the diﬀerence is small,
+and our ensemble method performs better in terms of overall accuracy. Finally,
+considering the max, average and min in all measures in Table 1, our method per-
+forms more consistently, which shows the results are less dependent on choosing
+the window size w. Also, for iLOF the range between the max and min cases is
+larger, indicating that it is sensitive to the choice of the parameter k.
+
+In summary, our approach outperforms iLOF on the two real data sets with
+dense anomalies. Moreover, it is better than iLOF in accuracy and speciﬁcity on
+the synthetic data set, while iLOF only performs better in terms of sensitivity
+in the synthetic data set with uniformly distributed anomalies.
+
+5 Conclusion
+
+In this paper we proposed a novel approach to the problem of anomaly detection
+in data streams where the environment changes intermittently. We introduce an
+ensemble based approach to construct a robust model of normal behaviour in
+switching data streams. Although there have been many supervised techniques
+based on ensemble models for outlier detection in data streams, to the best of our
+knowledge there is no similar work that tackles the problem of using ensemble
+
+472
+
+M. Salehi et al.
+
+techniques for anomaly detection in data streams. The empirical results show the
+strength of our approach in terms of accuracy. This highlights several interesting
+directions for future research. First, we can explore alternatives to our greedy
+approach for comparing clusterings. Second, we will investigate approaches to
+minimize memory consumption. Third, we will investigate diﬀerent methods for
+selecting appropriate window boundaries.
+
+Acknowledgments. The authors would like to thank National ICT Australia
+(NICTA) for providing funds and support.
+
+References
+
+1. Wang, H., Fan, W., Yu, P.S., Han, J.: Mining concept-drifting data streams using
+
+ensemble classiﬁers. In: SIGKDD, pp. 226–235. ACM (2003)
+
+2. Bifet, A., Holmes, G., Pfahringer, B., Kirkby, R., Gavald`a, R.: New ensemble meth-
+
+ods for evolving data streams. In: SIGKDD, pp. 139–148. ACM (2009)
+
+3. Rajasegarar, S., Leckie, C., Palaniswami, M.: Anomaly detection in wireless sensor
+
+networks. IEEE Wireless Communications 15(4), 34–40 (2008)
+
+4. Chandola, V., Banerjee, A., Kumar, V.: Anomaly detection: A survey. ACM Com-
+
+puting Surveys 41(3), 1–58 (2009)
+
+5. Gupta, M., Gao, J., Aggarwal, C.C., Han, J.: Outlier detection for temporal data:
+
+A survey. Knowledge and Data Eng. 25(1), 1–20 (2013)
+
+6. Pokrajac, D., Lazarevic, A., Latecki, L.J.: Incremental local outlier detection for
+
+data streams. In: CIDM, pp. 504–515. IEEE (2007)
+
+7. Yamanishi, K., Takeuchi, J.I., Williams, G., Milne, P.: On-line unsupervised outlier
+detection using ﬁnite mixtures with discounting learning algorithms. In: SIGKDD,
+pp. 320–324. ACM (2000)
+
+8. Yamanishi, K., Takeuchi, J.I.: A unifying framework for detecting outliers and
+change points from non-stationary time series data. In: SIGKDD, pp. 676–681.
+ACM (2002)
+
+9. Aggarwal, C.C., Han, J., Wang, J., Yu, P.S.: A framework for clustering evolving
+
+data streams. In: VLDB, pp. 81–92. VLDB Endowment (2003)
+
+10. Cao, F., Ester, M., Qian, W., Zhou, A.: Density-based clustering over an evolving
+
+data stream with noise. In: SIAM Conf. on Data Mining, pp. 328–339 (2006)
+
+11. Aggarwal, C.C.: A segment-based framework for modeling and mining data
+
+streams. Knowledge and Inf. Sys. 30(1), 1–29 (2012)
+
+12. Knox, E.M., Ng, R.T.: Algorithms for mining distance-based outliers in large
+
+datasets. In: VLDB, pp. 392–403. Citeseer (1998)
+
+13. Angiulli, F., Fassetti, F.: Detecting distance-based outliers in streams of data. In:
+
+CIKM, pp. 811–820. ACM (2007)
+
+14. Yang, D., Rundensteiner, E.A., Ward, M.O.: Neighbor-based pattern detection for
+windows over streaming data. In: Advances in DB Tech., pp. 529–540. ACM (2009)
+15. Breunig, M.M., Kriegel, H.P., Ng, R.T., Sander, J.: LOF: identifying density-based
+
+local outliers. In: ACM SIGMOD, vol. 29, pp. 93–104. ACM (2000)
+
+16. Vu, N.H., Gopalkrishnan, V., Namburi, P.: Online outlier detection based on
+relative neighbourhood dissimilarity. In: Bailey, J., Maier, D., Schewe, K.-D.,
+Thalheim, B., Wang, X.S. (eds.) WISE 2008. LNCS, vol. 5175, pp. 50–61. Springer,
+Heidelberg (2008)
+
+A Relevance Weighted Ensemble Model for Anomaly Detection
+
+473
+
+17. Lazarevic, A., Kumar, V.: Feature bagging for outlier detection. In: SIGKDD,
+
+pp. 157–166. ACM (2005)
+
+18. Aggarwal, C.C.: Outlier ensembles: Position paper. SIGKDD Explorations
+
+Newsletter 14(2), 49–58 (2013)
+
+19. Moshtaghi, M., Rajasegarar, S., Leckie, C., Karunasekera, S.: An eﬃcient hy-
+perellipsoidal clustering algorithm for resource-constrained environments. Pattern
+Recognition 44(9), 2197–2209 (2011)
+
+20. Moshtaghi, M., Havens, T.C., Bezdek, J.C., Park, L., Leckie, C., Rajasegarar, S.,
+Keller, J.M., Palaniswami, M.: Clustering ellipses for anomaly detection. Pattern
+Recognition 44(1), 55–69 (2011)
+
+21. Achtert, E., Goldhofer, S., Kriegel, H.P., Schubert, E., Zimek, A.: Evaluation of
+
+clusterings–metrics and visual support. In: ICDE, pp. 1285–1288. IEEE (2012)
+
+

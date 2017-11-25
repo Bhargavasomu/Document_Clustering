@@ -1,0 +1,1481 @@
+Mining Representative Movement Patterns
+
+through Compression
+
+Phan Nhat Hai1, Dino Ienco1, Pascal Poncelet2, and Maguelonne Teisseire1
+
+{nhat-hai.phan,dino.ienco,maguelonne.teisseire}@teledetection.fr
+
+1 IRSTEA Montpellier, UMR TETIS - 34093 Montpellier, France
+
+2 LIRMM CNRS Montpellier - 34090 Montpellier, France
+
+pascal.poncelet@lirmm.fr
+
+Abstract. Mining trajectories (or moving object patterns) from spatio-temporal
+data is an active research ﬁeld. Most of the researches are devoted to extract
+trajectories that differ in their structure and characteristic in order to capture dif-
+ferent object behaviors. The ﬁrst issue is constituted from the fact that all these
+methods extract thousand of patterns resulting in a huge amount of redundant
+knowledge that poses limit in their usefulness. The second issue is supplied from
+the nature of spatio-temporal database from which different types of patterns
+could be extracted. This means that using only a single type of patterns is not
+sufﬁcient to supply an insightful picture of the whole database.
+
+Motivating by these issues, we develop a Minimum Description Length
+(MDL)-based approach that is able to compress spatio-temporal data combin-
+ing different kinds of moving object patterns. The proposed method results in
+a rank of the patterns involved in the summarization of the dataset. In order to
+validate the quality of our approach, we conduct an empirical study on real data
+to compare the proposed algorithms in terms of effectiveness, running time and
+compressibility.
+
+Keywords: MDL, moving objects, spatio-temporal data, top-k, compressibility.
+
+1 Introduction
+
+Nowadays, the use of many electronic devices in real world applications has led to an
+increasingly large amount of data containing moving object information. One of the
+objectives of spatio-temporal data mining [5] [10] [6] is to analyze such datasets for
+interesting moving object clusters. A moving object cluster can be deﬁned as a group
+of moving objects that are physically closed to each other for at least some number of
+timestamps. In this context, many recent studies have been deﬁned such as ﬂocks [5],
+convoy queries [7], closed swarms [10], group patterns [15], gradual trajectory patterns
+[6], traveling companions [13], gathering patterns [16], etc...
+
+Nevertheless, after the extraction, the end user can be overwhelmed by a huge num-
+ber of movement patterns although only a few of them are useful. However, relatively
+few researchers have addressed the problem of reducing movement pattern redundancy.
+In another context, i.e. frequent itemsets, the Krimp algorithm [14], using the minimum
+description length (MDL) principle [4], proposes to reduce the amount of itemsets by
+
+J. Pei et al. (Eds.): PAKDD 2013, Part I, LNAI 7818, pp. 314–326, 2013.
+© Springer-Verlag Berlin Heidelberg 2013
+
+Mining Representative Movement Patterns through Compression
+
+315
+
+Fig. 1. An example of moving object
+database. Shapes are movement patterns,
+oi, ci respectively are objects and clusters.
+
+Fig. 2. An example of pattern overlapping,
+between closed swarm (dashed line rectan-
+gle) and rGpattern≥
+(step shape), over-
+lapping clusters are c5, c6 and c7
+
+using an efﬁcient encoding and then provide the end-user only with a set of informative
+patterns.
+
+In this paper, we adapt the MDL principle for mining representative movement pat-
+terns. However, one of the key challenges in designing an MDL-based algorithm for
+moving object data is that the encoding scheme needs to deal with different pattern struc-
+tures which can cover different parts of the data. If we only consider different kinds of
+patterns individually then it is difﬁcult to obtain an optimal set of compression patterns.
+For instance, see Figure 1, we can notice that there are three different patterns, with
+different structures, that cover different parts of the moving object data. If we only keep
+patterns having a rectangular shape then we lose the other two patterns and viceversa.
+Furthermore, although patterns express different kinds of knowledge, they can over-
+lap each other as well. Thus, enforcing non-overlapping patterns may result in los-
+ing interesting patterns. For instance, see Figure 2, there are two overlapping patterns.
+Krimp algorithm does not allow overlapping patterns then it has to select one and ob-
+viously loses the other one. However, they express very different knowledge and thus,
+by removing some of them, we cannot fully understand the object movement behavior.
+Therefore, the proposed encoding scheme must to appropriately deal with the pattern
+overlapping issue.
+
+Motivated by these challenges, we propose an overlapping allowed multi-pattern
+structure encoding scheme which is able to compress the data with different kinds of
+patterns. Additionally, the encoding scheme also allows overlapping between different
+kinds of patterns. To extract compression patterns, a naive greedy approach, named
+NAIVECOMPO, is proposed. To speed up the process, we also propose the SMART-
+COMPO algorithm which takes into account several useful properties to avoid useless
+computation. Experimental results on real-life datasets demonstrate the effectiveness
+and efﬁciency of the proposed approaches by comparing different sets of patterns.
+
+2 Preliminaries and Problem Statement
+
+2.1 Object Movement Patterns
+
+Object movement patterns are designed to group similar trajectories or objects which
+tend to move together during a time interval. In the following, we brieﬂy present the
+deﬁnitions of different kinds of movement patterns.
+
+316
+
+P.N. Hai et al.
+
+Fig. 3. An example of closed swarm
+
+Fig. 4. An example of rGpattern
+
+Database of clusters. Let us consider a set objects occurring at different times-
+tamps. A database of clusters, CDB = {Ct1, Ct2 , . . . , Ctm}, is a collection of snap-
+shots of the moving object clusters at timestamps {t1, t2, . . . , tm}. Given a cluster
+c ∈ Ct(cid:2) (∈ CDB), t(c) and o(c) are respectively used to denote the timestamp that c
+is involved in and the set of objects included in c. For brevity sake, we take clustering
+as a preprocessing step.
+After generating CDB, the moving object database (ODB, TDB) is deﬁned such as
+each object o ∈ ODB contains a list of clusters (i.e. o = c1c2 . . . cm) and TDB stands
+for the associated timestamp. For instance, Figure 1 presents the database ODB and
+object o1 can be represented as o1 = c1c4c6c7c8.
+
+From this set different patterns can be extracted. In an informal way, a closed swarm
+is a list of clusters cs = c1 . . . cn such that they share at least ε common objects, cs
+contains at least mint clusters and cs cannot be enlarged in terms of objects and clus-
+ters. Note that there are no pairs of clusters which are in the same timestamps involved
+in cs. Then a closed swarm can be formally deﬁned as follows:
+
+Deﬁnition 1. ClosedSwarm[10]. A list of clusters cs = c1 . . . cn is a closed swarm if:
+
+⎧
+⎪⎪⎨
+
+⎪⎪⎩
+
+i=1 ci| ≥ ε.
+
+(1) : |O(cs)| = | (cid:6)n
+(2) : |cs| ≥ mint.
+(3) : (cid:2)i, j ∈ {1, . . . , n}, i (cid:4)= j, t(ci) = t(cj).
+: cs ⊂ cs
+(4) : (cid:2)cs
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+, cs
+
+satisﬁes the conditions (1), (2) and (3).
+
+(1)
+
+For instance, see Figure 3, cs = c1c3c4 is a closed swarm with mint = 2, ε = 2.
+Similarly, in Figure 1, we also have cs = c2c5c7c9 is a closed swarm. A convoy is
+a group of objects such that these objects are closed each other during at least mint
+consecutive time points. Another pattern is group pattern which essentially is a set of
+disjointed convoys which are generated by the same group of objects in different time
+intervals. In this paper, we only consider closed swarm instead of convoy and group
+pattern since closed swarm is more general [10].
+
+A gradual trajectory pattern [6], denoted rGpattern, is designed to capture the grad-
+ual object moving trend. More precisely, a rGpattern is a maximal list of moving object
+clusters which satisfy the graduality constraint and integrity condition during at least
+mint timestamps. The graduality constraint can be the increase or decrease of the num-
+ber of objects and the integrity condition can be that all the objects should remain in the
+next cluster. A rGpattern can be deﬁned as follows:
+
+Mining Representative Movement Patterns through Compression
+
+317
+
+⎧
+
+Deﬁnition 2. rGpattern [6]. Given a list of clusters C
+trajectory pattern if:
+(1) : |C
+∗| ≥ mint.
+∀i ∈ {1, . . . , n − 1},
+(2) : o(ci) ⊆ o(ci+1).
+(3) : |cn| > |c1|.
+(4) : (cid:2)cm : C
+
+∗ ∪ cm is a C
+
+⎪⎪⎪⎪⎨
+⎪⎪⎪⎪⎩
+
+= C
+
+= C
+
+≥
+
+≥
+
+≤
+
+∗
+
+C
+
+∗
+
+C
+
+.
+
+∗
+
+⎧
+
+⎪⎪⎪⎪⎨
+⎪⎪⎪⎪⎩
+
+= c1 . . . cn. C
+(1) : |C
+∗| ≥ mint.
+∀i ∈ {1, . . . , n − 1},
+(2) : o(ci) ⊇ o(ci+1).
+(3) : |cn| < |c1|.
+(4) : (cid:2)cm : C
+
+∗ ∪ cm is a C
+
+≥
+
+.
+
+∗
+
+is a gradual
+
+Essentially, we have two kinds of rGpatterns, rGpattern
+stance, see Figure 1, rGpattern
+
+= c1c4c6 and rGpattern
+
+≥
+
+≥
+
+and rGpattern
+≤
+
+= c7c8.
+
+≤
+
+. For in-
+
+2.2 Problem Statement
+
+Eliminating the number of uninteresting patterns is an emerging task in many real world
+cases. One of the proposed solutions is the MDL principle [4]. Let us start explaining
+this principle in the following deﬁnition:
+Deﬁnition 3. (Hypothesis). A hypothesis P is a set of patterns P = {p1, p2, . . . , ph}.
+let LS(P ) be the description length of hypothesis P and
+Given a scheme S,
+LS(ODB|P ) be the description length of data ODB when encoded with the help of
+the hypothesis and an encoding scheme S. Informally, the MDL principle proposes
+that the best hypothesis always compresses the data most. Therefore, the principle
+suggests that we should look for hypothesis P and the encoding scheme S such that
+LS(ODB) = LS(P) + LS(ODB|P) is minimized. For clarity sake, we will omit S
+when the encoding scheme is clear from the context. Additionally, the description length
+of ODB given P is denoted as LP(ODB) = L(P) + L(ODB|P).
+In this paper, the hypothesis is considered as a dictionary of movement patterns P.
+Furthermore, as in [9], we assume that any number or character in data has a ﬁxed length
+bit representation which requires a unit memory cell. In our context, the description
+length of a dictionary P can be calculated as the total lengths of the patterns and the
+p∈P |p| + |P|). Furthermore, the length of the data
+number of patterns (i.e. L(P) =
+ODB when encoded with the help of dictionary P can be calculated as L(ODB|P) =
+
+(cid:7)
+
+o∈ODB
+The problem of ﬁnding compressing patterns can be formulated as follows:
+
+(cid:7)
+
+|o|.
+
+Deﬁnition 4. (Compressing Pattern Problem). Given a moving object database ODB,
+a set of pattern candidates F = {p1, p2, . . . , pm}. Discover an optimal dictionary P∗
+which contains at most K movement patterns so that:
+
+P∗
+
+= arg minP
+
+(cid:8)
+L
+
+(cid:9)
+∗
+P (ODB)
+
+= arg minP
+
+(cid:8)
+
+∗
+
+(P) + L
+
+∗
+
+L
+
+(ODB|P)
+
+(cid:9)
+
+,P∗ ⊆ F
+
+(2)
+
+A key issue in designing an MDL-based algorithm is: how can we encode data given a
+dictionary? The fact is that if we consider closed swarms individually, Krimp algorithm
+can be easily adapted to extract compression patterns. However, the issue here is that
+we have different patterns (i.e. closed swarms and rGpatterns) and Krimp algorithm has
+
+318
+
+P.N. Hai et al.
+
+not been designed to deal with rGpatterns. It does not supply multi-pattern types in the
+dictionary that may lead to losing interesting ones. Furthermore, as mentioned before,
+we also have to address the pattern overlapping issue. In this work, we propose a novel
+overlapping allowed multi-pattern structures encoding scheme for moving object data.
+
+3 Encoding Scheme
+
+3.1 Movement Pattern Dictionary-Based Encoding
+
+Before discussing our encoding for moving object data, we revisit the encoding scheme
+used in the Krimp algorithm [14]. An itemset I is encoded with the help of itemset
+patterns by replacing every non-overlapping instance of a pattern occurring in I with
+a pointer to the pattern in a code table (dictionary). In this way, an itemset can be
+encoded to a more compact representation and decoded back to the original itemset.
+
+.
+
+ODB
+
+o3 = c6
+
+o3 = [p1, 2]
+
+Encoded ODB
+
+o1 = [p1, 0][p3, 1]
+
+Dictionary P
+
+Table 1. An illustrative example of database and dictionary in
+Figure 1. ¯0, ¯1 and ¯2 respectively are pattern types: closed swarm,
+rGpattern≥
+
+and rGpattern≤
+
+o1 = c1c4c6c7c8
+o2 = c3c4c6c7c10 o2 = c3[p1, 1][p3, 0]c10 p1 = c1c4c6, ¯1
+p2 = c2c5c7c9, ¯0
+
+In this paper we use
+similar dictionary-
+a
+based encoding scheme
+object
+for moving
+a
+database. Given
+dictionary
+consisting
+of movement patterns
+P = {p1, . . . , pm},
+an object o ∈ ODB
+containing a
+list of
+clusters is encoded by
+replacing instances of any pattern pi in o with pointers to the dictionary. An important
+difference between itemset data and moving object data is that there are different kinds
+of movement patterns which have their own characteristic. The fact is that if a closed
+swarm cs occurs in an object o then all the clusters in cs are involved in o. While an
+object can involve in only a part of a rGpattern and viceversa.
+
+o4 = c2c5c7c9
+o5 = c2c5c7c9
+
+o4 = p2
+o5 = p2
+
+p3 = c7c8, ¯2
+
+≥
+
+For instance, see Figure 1, we can consider that o2 joins the rGpattern
+
+= c1c4c6
+
+at c4c6. While, the closed swarm cs = c2c5c7c9 occurs in o4 and o5 entirely.
+
+Property 1. (Encoding Properties). Given an object o which contains a list of clusters
+and a pattern p = c1 . . . cn. p occurs in o or o contributes to p if:
+
+⎧
+⎨
+
+⎩
+
+(1) : p is a rGpattern
+(2) : p is a rGpattern
+(3) : p is a closed swarm,∀j ∈ [1, n], cj ∈ o.
+
+,∃i ∈ [1, n]
+,∃i ∈ [1, n]
+
+(cid:10)
+(cid:10)
+
+(cid:10)∀j ≥ i, cj ∈ o.
+(cid:10)∀j ≤ i, cj ∈ o.
+
+≥
+≤
+
+(3)
+
+Proof. Case (1): after construction we have o(ci) ⊆ o(ci+1) ⊆ . . . ⊆ o(cn). Addition-
+ally, o ∈ o(ci). Consequently, o ∈ o(ci+1), . . . , o(cn) and therefore ∀j ≥ i, cj ∈ o.
+Furthermore, in Case (2): we have o(c1) ⊇ o(c2) ⊇ . . . ⊇ o(ci−1). Additionally,
+o ∈ o(ci−1). Consequently, o ∈ o(c1), . . . , o(ci−1) and therefore ∀j ≤ i, cj ∈ o. In
+Case (3), we have o ∈ O(cs) =
+
+i=1 ci and therefore ∀j ∈ [1, n], cj ∈ o.
+(cid:6)n
+
+Mining Representative Movement Patterns through Compression
+
+319
+
+≤
+
+≥
+
+, rGpattern
+
+For instance, see Table 1, we can see that for each pattern, we need to store an extra bit
+to indicate the pattern type. Regarding to closed swarm, by applying Property 1, in the
+object o we only need to replace all the clusters, which are included in closed swarm,
+by a pointer to the closed swarm in the dictionary. However, in gradual trajectories (i.e.
+), we need to store with the pointer an additional index to
+rGpattern
+indicate the cluster ci. Essentially, ci plays the role of a starting involving point (resp.
+ending involving point) of the object o in a rGpattern
+As an example, consider dictionary P in Table 1. Using P, o1 can be encoded as
+o1 = [p1, 0][p3, 1] where 0 (in [p1, 0]) indicates the cluster at index 0 in p1, (i.e. c1) and
+1 (in [p3, 1]) indicates the cluster at index 1 in p3, i.e. c8. While, o4 can be encoded as
+o4 = p2, i.e. p2 is a closed swarm.
+
+(resp. rGpattern
+
+≥
+
+≤
+
+).
+
+3.2 Overlapping Movement Pattern Encoding
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+Until now, we have already presented the encoding function for different patterns when
+encoding an object o given a pattern p. In this section, the encoding scheme will be
+completed by addressing the pattern overlapping problem so that overlapped patterns
+can exist in the dictionary P.
+See Figure 5, a selected pattern p ∈ P
+(cid:2) ∈ F overlap each other
+and a candidate p
+at c1c2c3 on object o. Assume that o is
+encoded given p then o = pc4c5. As in
+is still remained as ori-
+Krimp algorithm, p
+gin and then p
+cannot be used to encode
+(cid:2)
+occurs in o. This is because
+o despite of p
+they are mismatched (i.e. o = pc4c5, p
+=
+c1c2c3c4). To solve the problem, we pro-
+(cid:2)
+given p so that o and p
+pose to encode p
+will contain the same pointer to p (i.e. p
+=
+pc4). Now, the regular encoding scheme can
+(i.e. o =
+be applied to encode o given p
+(cid:2)
+are
+p
+overlapping but both of them can be included in the dictionary P. Note: in our con-
+text, overlapped clusters are counted only once.
+Main idea. Given a dictionary P and a chosen pattern p (i.e. will be added into P),
+a set of pattern candidates F . The main idea is that we ﬁrst encode the database ODB
+(cid:2) ∈ F given p in
+given pattern p. Secondarily, we propose to encode all candidates p
+order to indicate the overlapping clusters between p and p
+. After that, there are two
+kinds of pattern candidates which are encoded candidates and non-encoded candidates.
+Next, the best candidate in F will be put into P and used to encode ODB and F . The
+process will be repeat until obtaining top-K patterns in the dictionary P.
+(cid:2) ∈ F
+to identify whenever encoding p
+given p is needed. The correlation between p and
+(cid:2)
+is illustrated in Table 2. First of all, we do not allow overlap between two patterns
+p
+of the same kind since they represent the same knowledge that may lead to extracting
+redundant information.
+
+Let us consider the correlations between a pattern p ∈ P and a candidate p
+
+c5). We can consider that p and p
+
+Fig. 5. An example of the approach
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+320
+
+P.N. Hai et al.
+
+(cid:2)
+
+≤
+
+≥
+
+(cid:2)
+
+cs
+
+(cid:2)
+
+.
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+p
+
+≥
+≤
+
+O
+O
+X
+
+O
+X
+O
+
+rGpattern
+
+rGpattern
+rGpattern
+
+p
+≥
+cs rGpattern
+X
+Δ
+Δ
+
+Table 2. Correlations between pattern p and pattern
+p(cid:4)
+in F . O, Δ and X respectively mean ”overlapping
+allowed, regular encoding”, ”overlapping allowed,
+no encoding” and ”overlapping not allowed”.
+
+Next, if p is a closed swarm then
+do not need to be encoded given
+p
+p. This is because there are objects
+which contribute to gradual trajecto-
+but not closed swarm. These
+ries p
+objects cannot be encoded using p
+and therefore p
+needs to be re-
+mained the same and the regular en-
+coding scheme can be applied. Oth-
+will never be chosen later
+erwise, p
+since there are no objects in ODB
+. For instance, see Figure 2, the objects o1 and o4 do not contribute
+which match p
+to the closed swarm p. Thus, if the gradual trajectory p
+is encoded given p to indi-
+cate the overlapping clusters c5c6c7 then that leads to a mismatched statement between
+o1, o4 and the gradual trajectory p
+(cid:2) ∈ F (i.e. non-encoded and
+encoded candidates). Next, some candidates will be used to encode the database ODB.
+To encode an object o ∈ ODB given a non-encoded candidate p
+, the regular encoding
+scheme mentioned in Section 3.1 can be applied. However, given an encoded candidate
+(cid:2)
+, we need to perform an additional step before so that the encoding scheme can be
+p
+applied regularly. This is because the two pointers referring to the same pattern p ∈ P
+(e.g. [p, l]) can be different (i.e. k (cid:4)= l) despite the fact
+from o (e.g. [p, k]) and from p
+is essentially included in o. That leads to a mismatched statement between o and
+that p
+(cid:2)
+p
+
+Until now, we already have two kinds of candidates p
+
+and thus o cannot be encoded given p
+For instance, see Figure 2, given a gradual trajectory pattern rGpattern
+
+c3c4c5c6c7, a closed swarm p
+We ﬁrst encodes o3 given p such that o3 = c1c2[p, 1]c9c10. Then, p
+p, i.e. p
+o (i.e. [p, 1]) and from p
+Therefore, o cannot be encoded given p
+
+p =
+= c1c2c5c6c7c9c10, the object o3 = c1c2c4c5c6c7c9c10.
+is encoded given
+= c1c2[p, 2]c9c10. We can consider that the two pointers referring to p from
+are mismatched.
+essentially occurs in o.
+To deal with this issue, we simply recover uncommon clusters between the two point-
+, we ﬁrst recover uncommon cluster such that
+= c1c2[p, 2]c9c10, o3 is
+
+ers. For instance, to encode o3 by using p
+o3 = c1c2c4[p, 2]c9c10. Note that [p, 1] = c4[p, 2]. Since p
+encoded given p
+
+despite the fact that p
+(cid:2)
+
+(i.e. [p, 2]) are different and thus o3 and p
+
+such that o3 = p
+
+c4.
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+.
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+≥
+
+≥
+
+Deﬁnition 5. (Uncommon Clusters for rGpattern
+, p =
+c1 . . . cn and two pointers refer to p, [p, k] and [p, l] with k ≤ l. uncom(p, k, l) =
+ckck+1 . . . cl−1 is called an uncommon list of clusters between [p, k] and [p, l]. Note
+that [p, k] = ckck+1 . . . cl−1[p, l].
+
+). Given a rGpattern
+
+. Until now, we
+Similarly, we also have uncom(p, k, l) in the case p is a rGpattern
+are able to recover uncommon clusters between two pointers which refer to a pattern.
+(cid:2) ∈ F , if p
+Now, we start proving that given an object o ∈ ODB and a candidate p
+(cid:2)
+occurs in o then o can be encoded using p
+even though they contain many pointers to
+other patterns. First, let us consider if p is a rGpattern
+
+is a closed swarm.
+
+and p
+
+≥
+
+(cid:2)
+
+(cid:2)
+
+≤
+
+≥
+
+, p = c1 . . . cn, an object o and a closed swarm p
+
+321
+(cid:2) ∈
+= xp(cid:2) [p, l]yp(cid:2). Note that
+
+Mining Representative Movement Patterns through Compression
+
+Lemma 1. Given a rGpattern
+F . In general, if o and p
+xo, yo, xp(cid:2) and yp(cid:2) are lists of clusters. If o contributes to p
+
+refer to p then o = xo[p, k]yo and p
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+then:
+
+k ≤ l ∧ o = xo uncom(p, k, l)[p, l] yo
+
+(4)
+Proof. After construction if k > l then ∃ci ∈ {cl, . . . , ck}(⊆ p) s.t. ci ∈ p
+(cid:2) ∧ ci (cid:4)∈ o.
+Therefore, o does not contribute to p
+(Property 1). That suffers the assumption and thus
+we have k ≤ l. Deal to the Deﬁnition 5, [p, k] = uncom(p, k, l)[p, l]. Consequently, we
+have o = xo uncom(p, k, l)[p, l] yo.
+
+(cid:2)
+
+(cid:11)(cid:8)
+
+= xp(cid:2) [p, l]yp(cid:2).
+By applying Lemma 1, we have o = xo uncom(p, k, l)[p, l] yo and p
+Then we can apply the regular encoding scheme to encode o given p
+. let us as-
+sume that each object o ∈ Op(cid:2) has a common list of pointers to other patterns as
+−−−→
+where ∀i ∈ [1, n], [pi, li] is the
+(cid:2)
+(p
+pointer from p
+to pi and [pi, ki] is the pointer from o to pi. If we respectively apply
+Lemma 1 on each pointer in
+. Similarly, we also
+have the other lemmas for other pattern types.
+
+, o) then o can be encoded given p
+
+(cid:9)
+, . . . ,
+−−−→
+(p
+
+(cid:8)
+[pn, ln], [pn, kn]
+
+[p1, l1], [p1, k1]
+
+, o) =
+
+(cid:9)(cid:12)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+Data description length computation. Until now, we have deﬁned an encoding
+scheme for movement patterns. The description length of the dictionary in Table 1 is
+calculated as L(P) = |p1|+1+|p2|+1+|p3|+1+|P| = 3+1+4+1+2+1+2 = 14.
+Similarly, description length of o2 is L(o2|P) = 1 + |[p1, 1]| + |[p3, 0]| + 1 = 6.
+Note: for each pattern, we need to consider an extra memory cell of pattern type.
+Additionally, for any given dictionary P and the data ODB, the cost of storing the
+timestamp for each cluster is always constant regardless the size of the dictionary.
+
+4 Mining Compression Object Movement Patterns
+
+In this section we will present the two greedy algorithms which have been designed to
+extract a set of top-K movement patterns that compress the data best.
+
+4.1 Naive Greedy Approach
+
+(cid:2)
+
+(cid:2)
+
+The greedy approach takes as input a database ODB, a candidate set F and a parameter
+K. The result is the optimal dictionary which encodes ODB best. Now, at each iteration
+(cid:2)
+of NaiveCompo, we select candidate p
+which compresses the database best. Next, p
+will be added into the dictionary P and then the database ODB and F will be encoded
+given p
+
+. The process is repeated until we obtain K patterns in the dictionary.
+
+To select the best candidate, we generate a duplication of the database Od
+
+DB and
+which returns the
+for each candidate p
+smallest data description length will be considered as the best candidate. Note that
+(cid:8)
+(cid:9)
+(cid:2)
+Lp∗ (ODB)
+. The NAIVECOMPO is presented in Algorithm 1.
+p
+
+(cid:2) ∈ F , we compress Od
+
+DB. The candidate p
+
+= argminp∗∈F
+
+(cid:2)
+
+322
+
+P.N. Hai et al.
+
+4.2 Smart Greedy Approach
+
+Algorithm 1. NaiveCompo
+
+: Database ODB , set of patterns F , int K
+
+Input
+Output: Compressing patterns P
+Input
+Output: Compressing patterns P
+
+: Database ODB , set of patterns F , int K
+
+1 begin
+2
+3
+4
+
+P ←− ∅;
+while |P| < K do
+
+foreach p ∈ F do
+
+DB ←− ODB ;
+Od
+DB|p) ←−
+L∗
+(Od
+CompressionSize(Od
+p∗ ←− arg minp L∗
+DB|p);
+(Od
+; F ←− F \ {p∗};
+P ←− p∗
+Replace all instances of p∗
+in ODB by its pointers;
+Replace all instances of p∗
+in F by its pointers;
+
+DB , p);
+
+The disadvantage of naive greedy
+algorithm is that we need to
+compress the duplicated database
+Od
+DB for each pattern candidate at
+each iteration. However, we can
+avoid this computation by consid-
+ering some useful properties as
+follows.
+
+(cid:2)
+
+Given a pattern p
+
+, Op(cid:2) and
+Op(cid:2)
+respectively are the set of
+objects that do not contribute to
+(cid:2)
+and the set of objects involv-
+p
+ing in p
+. The compression gain
+which is the number of mem-
+ory cells we earned when adding
+(cid:2)
+into dictionary can be deﬁned
+p
+,P) = LP (ODB) −
+as gain(p
+LP∪p(cid:2)(ODB).
+
+(cid:2)
+
+(cid:2)
+
+5
+
+6
+
+7
+8
+9
+10
+
+18
+19
+20
+21
+
+output P;
+
+DB , p)
+
+11
+12 CompressionSize(Od
+13 begin
+14
+15
+16
+17
+
+size ←− 0;
+foreach o ∈ ODB do
+
+foreach o ∈ ODB do
+size ←− size + |o|;
+size ←− size + |p| + 1;
+output size;
+
+if p.involved(o) = true then
+
+Replace instance of p in o by its pointers;
+
+The fact is that we can compute
+the compression gain by scanning
+objects o ∈ Op(cid:2) with p
+. Each pat-
+tern type has its own compression gain computation function. Let us start presenting
+the process by proposing the property for a closed swarm p
+Property 2. Given a dictionary P, a closed swarm p
+−−−→
+(cid:2)
+(p
+, o)(cid:13)
+
+,P) is computed as:
+
+(cid:2) ∈ F . gain(p
+
+Op(cid:2)(cid:13)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+.
+
+gain(p
+
+(cid:2)
+
+,P) = |Op(cid:2)| × |p
+
+(cid:2)| − (cid:8)
+
+|li − ki| + |p
+
+(cid:2)| + |Op(cid:2)| + 2
+
+(cid:9)
+
+(5)
+
+o
+
+i
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:7)
+
+(cid:2)| + 2) + L(Op(cid:2)|P) + L(Op(cid:2)|P ∪ p
+
+) + L(ODB|P ∪ p
+Proof. After construction we have LP∪p(cid:2)(ODB) = L(P ∪ p
+(cid:2)
+) =
+(L(P) +|p
+). Note that L(Op(cid:2)|P) = L(Op(cid:2)|P ∪ p
+(cid:2)
+−−−→
+).
+Furthermore, ∀o ∈ Op(cid:2) : L(o|P ∪ p
+|li − ki|. Thus,
+(cid:2)
+, o)
+(p
+i
+L(Op(cid:2)|P∪p
+(cid:2)|+
+|li−
+o∈Op(cid:2) L(o|P ∪p
+ki|+|Op(cid:2)|. Therefore, we have LP∪p(cid:2)(ODB) = L(P)+L(Op(cid:2)|P)+L(Op(cid:2)|P)−|Op(cid:2)|×
+. Note that L(ODB|P) = L(Op(cid:2)|P)+
+(cid:2)|+
+|p
+L(Op(cid:2)|P). Consequently, we have gain(p
+|li −
+ki| + |p
+
+) = L(o|P) − |p
+(cid:2)| + 1 +
+) = L(Op(cid:2)|P)−|Op(cid:2)|×|p
+
+,P) = |Op(cid:2)| × |p
+
+−−−→
+(cid:7)
+, o)
+(p
+i
+
+−−−→
+(cid:7)
+, o)
+(p
+i
+
+(cid:2)| + |Op(cid:2)| + 2
+
+(cid:2)|+|Op(cid:2)|+ 2
+
+|li− ki|+|p
+
+−−−→
+, o)
+(p
+i
+
+(cid:2)| − (cid:8) (cid:7)Op(cid:2)
+
+(cid:8) (cid:7)Op(cid:2)
+
+(cid:7)Op(cid:2)
+
+) =
+
+(cid:7)
+
+(cid:7)
+
+(cid:9)
+.
+
+(cid:9)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+(cid:2)
+
+o
+
+o
+
+o
+
+By applying Property 2, we can compute the compression gain when adding a new
+,P)
+closed swarm p
+
+into the dictionary P. In the Equation 5, the compression gain(p
+
+(cid:2)
+
+(cid:2)
+
+Mining Representative Movement Patterns through Compression
+
+323
+
+(cid:2)
+
+(cid:2)
+
+, O(p
+
+(cid:2)
+with objects o ∈ O(p
+
+) and the number of uncommon clusters that can be com-
+depends on the size of p
+puted by scanning p
+) without encoding ODB. Due to the space
+limitation, we will not describe properties and proofs for the other pattern types (i.e.
+) but they can be easily derived in a same way as Property 2.
+rGpattern
+To select the best candidate at each iteration, we need to chose the candidate which
+
+, rGpattern
+
+≥
+
+≤
+
+(cid:2)
+
+returns the best compression gain. SMARTCOMPO is presented in the Algorithm 2.
+
+5 Experimental Results
+
+L∗
+
+(ODB|p);
+
+; F ←− F \ {p∗};
+
+in ODB by its pointers;
+in F by its pointers;
+
+P ←− ∅;
+while |P| < K do
+
+Algorithm 2. SmartCompo
+
+: Database ODB , set of patterns F , int K
+
+Input
+Output: Compressing patterns P
+
+(ODB|p) ←− Benef it(ODB , p);
+
+1 begin
+2
+3
+4
+5
+6
+7
+8
+9
+
+foreach p ∈ F do
+p∗ ←− arg minp L∗
+P ←− p∗
+Replace all instances of p∗
+Replace all instances of p∗
+
+A comprehensive performance
+study has been conducted on real-
+life datasets. All the algorithms
+are implemented in C++, and all
+the experiments are carried out on
+a 2.8GHz Intel Core i7 system
+with 4GB Memory. The system
+runs Ubuntu 11.10 and g++ 4.6.1.
+As in [10] [6], the two fol-
+lowing datasets1 have been used
+during experiments: Swainsoni
+dataset includes 43 objects evolv-
+ing over 764 different timestamps.
+The dataset was generated from
+July 1995 to June 1998. Buf-
+falo dataset concerns 165 buf-
+faloes and the tracking time from
+year 2000 to year 2006. The original data has 26610 reported locations and 3001 times-
+tamps. Similarly to [7] [10], we ﬁrst use linear interpolation to ﬁll in the missing data.
+Furthermore, DBScan [2] (M inP ts = 2; Eps = 0.001) is applied to generate clus-
+ters at each timestamp. In the comparison, we compare the set of patterns produced by
+SmartCompo with the set of closed swarms extracted by ObjectGrowth [10] and the set
+of gradual trajectories extracted by ClusterGrowth [6].
+
+10
+11 Beneﬁt(Od
+12 begin
+13
+14
+15
+16
+
+if p.involved(o) = true then
+b ←− b + benef it(o, p);
+
+b ←− 0;
+foreach o ∈ ODB do
+
+b ←− b + |p| + 1;
+output b;
+
+output P;
+DB , p)
+
+17
+18
+
+Effectiveness. We compare the top-5 highest support closed swarms, the top-5 high-
+est covered area gradual trajectory patterns and the top-5 compression patterns from
+Swainsoni dataset. Each color represents a Swainsoni trajectory involved in the pattern.
+Top-5 closed swarms are very redundant since they only express that Swainsonies
+move together from North America to Argentina. Similarly, top-5 rGpatterns are also
+redundant. They express the same knowledge that is ”from 1996-10-01 to 1996-10-25,
+the more time passes, the more objects are following the trajectory {Oregon(cid:14) N evada(cid:14)
+U tah(cid:14) Arizona(cid:14) M exico(cid:14) Colombia}”.
+
+≥
+
+Figure 6 illustrates 3 patterns among 5 extracted ones by using SmartCompo. The
+expresses the same knowledge with the mentioned rGpattern in the top
+rGpattern
+highest covered area. The closed swarm expresses new information that is ”after ar-
+riving South America, the Swainsonies tend to move together to Argentina even some
+
+1 http://www.movebank.org
+
+324
+
+P.N. Hai et al.
+
+(a) rGpattern ≥
+
+(b) Closed swarm
+
+(c) rGpattern≤
+
+Fig. 6. Top-3 typical compression patterns
+
+(a) Swainsoni dataset
+
+(b) Buffalo dataset
+
+Fig. 7. Compressibility (higher is better) of different algorithms
+
+of them can leave their group”. Next, the rGpattern
+shows that ”the Swainsonies
+return back together to North America from Argentina (i.e. 25 objects at Argentina)
+and they will step by step leave their group after arriving Guatemala (i.e. 20 objects at
+Guatemala) since they are only 2 objects at the last stop, i.e. Oregon State”.
+
+≤
+
+Compressibility. We measure the compressibility of the algorithms by using their
+top-K patterns as dictionaries for encoding the data. Since NaiveCompo and Smart-
+Compo provides the same results, we only show the compression gain of SmartCompo.
+Regarding to SmartCompo, the compression gain could be calculated as the sum
+of the compression gain returned after each greedy step with all kinds of patterns
+in F . For each individual pattern type, compression gain is calculated according to
+the greedy encoding scheme used for SmartCompo. They are respectively denoted as
+≥
+SmartCompo CS (i.e. for closed swarms), SmartCompo rGi (i.e. for rGpattern
+)
+and SmartCompo rGd (i.e. for rGpattern
+). Additionally, to illustrate the difference
+between MDL-based approaches and standard support-based approaches, we also em-
+ploy the set of top-K highest support closed swarms and top-K highest covered area
+gradual trajectories patterns.
+
+≤
+
+Figure 7 shows the compression gain of different algorithms. We can consider that
+top-K highest support or covered area patterns cannot provide good compression gain
+since they are very redundant. Furthermore, if we only consider one pattern type, we
+cannot compress the data best since the compression gains of SmartCompo CS, Smart-
+Compo rGi and SmartCompo rGd are always lower than SmartCompo. This is because
+
+Mining Representative Movement Patterns through Compression
+
+325
+
+the pattern distribution in the data is complex and different patterns can cover different
+parts of the data. Thus, considering one kind of patterns results in losing interesting pat-
+terns and not good compression gain. By proposing overlapping allowed multi-pattern
+structure encoding scheme, we are able to extract more informative patterns.
+
+≥
+
+(a) Swainsoni dataset
+
+One of the most interesting phenomena is that
+the Swainsonies and Buffaloes have quite differ-
+ent movement behavior. See Figure 7a, we can
+consider that rGpattern
+is the most represen-
+tative movement behavior of Swainsonies since
+they compress the data better than the two other
+ones. While closed swarm is not as representative
+as the other patterns. This is because it is very easy
+for Swainsonies which are birds to leave the group
+and congregate again at later timestamps. How-
+ever, this movement behavior is not really true for
+Buffaloes. See Figure 7b, it clear that the com-
+≥
+pression gains of closed swarms, rGpattern
+and rGpattern
+have changed. The three kinds
+of patterns have more similar compression gain
+than the ones in Swainsonies. It means that Buf-
+faloes are more closed to each other and they
+move in a dense group. Thus closed swarm is
+more representative compare to itself in Swain-
+soni dataset. Furthermore, the number of Buf-
+faloes is very difﬁcult to increase in a group and thus SmartCompo rGi is lower than
+the two other ones.
+
+≤
+
+(b) Buffalo dataset
+
+Fig. 8. Running time
+
+Running Time. In our best knowledge, there are no previous work which address
+mining compression movement pattern issue. Thus, we only compare the two proposed
+approaches in order to highlight the differences between them. Running time of each
+algorithm is measured by repeating the experiment in compression gain experiment.
+
+As expected, SmartCompo is much faster than NaiveCompo (i.e. Figure 8). By ex-
+ploiting the properties, we can directly select the best candidate at each iteration. Con-
+sequently, the process efﬁciency is speed up.
+
+6 Related Work
+
+Mining informative patterns can be classiﬁed into 3 main lines: MDL-based approaches,
+statistical approaches based on hypothesis tests and information theoretic approaches.
+The idea of using data compression for data mining was ﬁrst proposed by R. Cilibrasi
+et al. [1] for data clustering problem. This idea was also explored by Keogh et al. [8],
+who propose to use compressibility as a measure of distance between two sequences.
+In the second research line, the signiﬁcance of patterns is tested by using a standard
+statistical hypothesis assuming that the data follows the null hypothesis. If a pattern
+pass the test it is considered signiﬁcant and interesting. For instance, A. Gionis et al. [3]
+use swap randomization to generate random transactional data from the original data.
+
+326
+
+P.N. Hai et al.
+
+A similar method is proposed for graph data by R. Milo et al. [11]. Another research
+direction looks for interesting sets of patterns that compress the given data most (i.e.
+MDL principle). Examples of this direction include the Krimp algorithm [14] and Slim
+algorithm [12] for itemset data and the algorithms for sequence data [9].
+
+7 Conclusion
+
+We have explored an MDL-based strategy to compress moving object data in order to:
+1) select informative patterns, 2) combine different kinds of movement patterns with
+overlapping allowed. We supplied two algorithms NaiveCompo and SmartCompo. The
+latter one exploits smart properties to speed up the whole process obtaining the same
+results to the naive one. Evaluations on real-life datasets show that the proposed ap-
+proaches are able to compress data better than considering just one kind of patterns.
+
+References
+
+1. Cilibrasi, R., Vit´anyi, P.M.B.: Clustering by compression. IEEE Transactions on Information
+
+Theory 51(4), 1523–1545 (2005)
+
+2. Ester, M., Kriegel, H.P., Sander, J., Xu, X.: A density-based algorithm for discovering clus-
+
+ters in large spatial databases with noise. In: KDD, pp. 226–231 (1996)
+
+3. Gionis, A., Mannila, H., Mielik¨ainen, T., Tsaparas, P.: Assessing data mining results via swap
+
+randomization. TKDD 1(3) (2007)
+
+4. Grunwald, P.: The minimum description length principle. The MIT Press (2007)
+5. Gudmundsson, J., van Kreveld, M.: Computing longest duration ﬂocks in trajectory data. In:
+
+ACM GIS 2006 (2006)
+
+6. Hai, P.N., Ienco, D., Poncelet, P., Teisseire, M.: Ming time relaxed gradual moving object
+
+clusters. In: ACM SIGSPATIAL GIS (2012)
+
+7. Jeung, H., Yiu, M.L., Zhou, X., Jensen, C.S., Shen, H.T.: Discovery of convoys in trajectory
+
+databases. Proc. VLDB Endow. 1(1), 1068–1080 (2008)
+
+8. Keogh, E.J., Lonardi, S., Ratanamahatana, C.A., Wei, L., Lee, S.H., Handley, J.:
+
+Compression-based data mining of sequential data. DMKD 14(1), 99–129 (2007)
+
+9. Lam, H.T., Moerchen, F., Fradkin, D., Calders, T.: Mining compressing sequential patterns.
+
+In: SDM, pp. 319–330 (2012)
+
+10. Li, Z., Ding, B., Han, J., Kays, R.: Swarm: mining relaxed temporal moving object clusters.
+
+Proc. VLDB Endow. 3(1-2), 723–734 (2010)
+
+11. Milo, R., Shen-Orr, S., Itzkovits, S., Kashtan, N., Chklovskii, D., Alon, U.: Network motifs:
+
+Simple building blocks of complex networks. Science 298(5594) (2002)
+
+12. Smets, K., Vreeken, J.: Slim: Directly mining descriptive patterns. In: SDM (2012)
+13. Tang, L.A., Zheng, Y., Yuan, J., Han, J., Leung, A., Hung, C.-C., Peng, W.-C.: On discovery
+
+of traveling companions from streaming trajectories. In: ICDE, pp. 186–197 (2012)
+
+14. Vreeken, J., Leeuwen, M., Siebes, A.: Krimp: Mining itemsets that compress. Data Min.
+
+Knowl. Discov. 23(1), 169–214 (2011)
+
+15. Wang, Y., Lim, E.P., Hwang, S.Y.: Efﬁcient mining of group patterns from user movement
+
+data. Data Knowl. Eng. 57(3), 240–282 (2006)
+
+16. Zheng, K., Zheng, Y., Yuan, J., Shang, S.: On discovery of gathering patterns from trajecto-
+
+ries. In: ICDE (2013)
+
+

@@ -1,0 +1,1433 @@
+Learning Representative Nodes
+
+in Social Networks
+
+Ke Sun1, Donn Morrison2, Eric Bruno3, and St´ephane Marchand-Maillet1
+
+1 Viper Group, Computer Vision & Multimedia Laboratory, University of Geneva,
+
+2 Unit for Information Mining & Retrieval, Digital Enterprise Research Institute,
+
+Switzerland
+
+3 Knowledge Discovery & Data Mining, Firmenich S.A., Switzerland
+
+NUIG, Galway, Ireland
+
+Abstract. We study the problem of identifying representative users in
+social networks from an information spreading perspective. While tradi-
+tional network measures such as node degree and PageRank have been
+shown to work well for selecting seed users, the resulting nodes often have
+high neighbour overlap and thus are not optimal in terms of maximising
+spreading coverage. In this paper we extend a recently proposed statisti-
+cal learning approach called skeleton learning (SKE) to graph datasets.
+The idea is to associate each node with a random representative node
+through Bayesian inference. By doing so, a prior distribution deﬁned over
+the graph nodes emerges where representatives with high probabilities
+lie in key positions and are mutually exclusive, reducing neighbour over-
+lap. Evaluation with information diﬀusion experiments on real scientiﬁc
+collaboration networks shows that seeds selected using SKE are more ef-
+fective spreaders compared with those selected with traditional ranking
+algorithms and a state-of-the-art degree discount heuristic.
+
+1
+
+Introduction
+
+In a social network, a small subset of representative nodes can help establish a
+hierarchical messaging scheme: the correspondence with each individual node is
+through a nearby representative. Despite that the word “representative” can be
+interpreted in diﬀerent ways in social analysis, here, the purpose of such a hier-
+archy is to broadcast information eﬃciently with constrained resources. Locally,
+these representatives should lie in hub positions so as to minimize the rout-
+ing cost to their nearby nodes. Globally, there should be as few representatives
+governing diﬀerent regions so as to save resources.
+
+From a machine learning perspective, a closely related problem is spectral
+clustering [1–3], where the network is partitioned into a ﬁxed number of densely-
+connected sub-networks with sparser connections between them. This technique
+has been applied to social networks, e.g., for community detection [4, 5] and spam
+nodes identiﬁcation [6]. It is powerful in depicting complex clusters with simple
+implementations. It is computationally expensive for large datasets, especially
+when a proper number of clusters has to be searched over [4].
+
+J. Pei et al. (Eds.): PAKDD 2013, Part II, LNAI 7819, pp. 25–36, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+26
+
+K. Sun et al.
+
+In the data mining community, the graph-based ranking algorithms [7–9] have
+a profound impact on the present World Wide Web and citation analysis systems.
+They rank graph nodes based on the general idea that the value of one node is
+positively related to the value of its neighbours. These approaches are further
+investigated by machine learning researchers using spectral graph theory [10, 11]
+and random walks [12]. In our task of selecting representatives, the highly ranked
+nodes by these algorithms usually have high neighbour overlap because of the
+mutual reinforcement between connected high degree nodes.
+
+Motivated by seeking eﬀective marketing strategies, eﬀorts have been made
+to select a set of inﬂuential individuals [13–15] and to maximize their inﬂuence
+through information diﬀusion [16, 17]. Although the optimization problem is
+generally NP hard [13], reasonable assumptions lead to polynomial-time solv-
+able models [14] and eﬃcient implementations with approximation bounds [15].
+Targeting at similar objectives, methods from diﬀerent perspectives are devel-
+oped with improved speed and performance [18, 19].
+
+This work provides a novel approach to measure the representativeness of
+graph nodes based on skeleton learning (SKE) [20]. It assigns each node a prob-
+ability of being a representative and minimizes the communication cost from
+a random node to its corresponding representative. This method is diﬀerent
+from other approaches in two aspects. First, the learned distribution has low
+entropy with the representative nodes having large probability and the non-
+representative nodes having probability close to zero. Second, the representative
+nodes are mutually exclusive: if a node already has a nearby representative, it will
+penalize the representativeness of other nearby candidates. Such exclusiveness
+is not implemented as heuristics in a greedy manner [18], but ﬁts in a minimiz-
+ing message length framework and allows global coordination in arranging the
+representatives.
+
+The rest of this paper is outlined as follows. Section 2 introduces the skeleton
+learning. Section 3 presents the recent development of this approach on social
+network analysis. Section 4 and Section 5 show the experimental results on toy
+datasets and real social networks, respectively. Finally, Section 6 concludes.
+
+2 Skeleton Learning
+
+This section brieﬂy reviews the recently proposed skeleton learning [20]. Given a
+set of samples X = {xi}n
+⊂ (cid:3)D, this unsupervised method learns a probability
+αi for each xi (
+αi = 1), so that the probability mass highlights the samples
+on the “skeleton” of the structures and diminishes on outliers.
+
+(cid:2)n
+
+The input samples are ﬁrst encoded into a probability matrix Pn×n = (pi|j)
+
+i=1
+
+i=1
+
+as in Stochastic Neighbour Embedding [21], so that
+exp(−hj||xi − xj||2)
+i:i(cid:3)=j exp(−hj||xi − xj||2)
+
+pi|j =
+
+(cid:2)
+
+(1)
+
+denotes the probability of node i receiving a message originated from node j
+with respect to space adjacency. In Eq.(1), ||·|| is 2-norm, and hj > 0 is a kernel
+
+Representative Nodes in Social Networks
+
+27
+
+width parameter, which can be ﬁxed so that the entropy of p·|j equals to a pre-
+speciﬁed constant [21]. The latent distribution α = (α1, . . . , αn) corresponds to
+a discrete random variable, or the index j ∈ {1, 2, . . . , n} of a random skeleton
+point xj ∈ X . By assumption, this random point sends out a message with
+respect to Pn×n. Any xi ∈ X , upon receiving such a message, can infer the
+location of the skeleton point using Bayes’ rule as
+
+qj|i =
+
+(cid:2)
+
+.
+
+(2)
+
+αj · pi|j
+j:j(cid:3)=i αj · pi|j
+
+The objective is to optimally route from a random location in X to its skeleton
+point, which is implemented by minimizing
+
+E(α) = − n(cid:3)
+
+i=1
+
+(cid:3)
+
+j:j(cid:3)=i
+
+qj|i log pj|i
+
+(3)
+
+with respect to α. Through such minimization, a compact set of skeleton po-
+sitions with large αi can be learned. As compared to clustering methods, the
+skeleton model is a prior distribution deﬁned on the observations, and the eﬀec-
+tive number of skeleton points shrinks continuously during learning. Therefore
+no model selection is necessary to determine an appropriate number of clusters,
+and the learning process can be terminated at anytime to produce reasonable
+results. However, the eﬀect of the kernel width parameter hj must be carefully
+investigated depending on application. In image denoising [20], it shows better
+performance in preserving the manifold structure as compared to a state-of-the-
+art denoising approach [22]. The gradient-based algorithm has a complexity of
+O(n2) at each step, which limits its scalability.
+
+3 Skeleton Learning on Graphs
+
+The skeleton learning method introduced in Section 2 is performed on a set of
+coordinates for denoising and outlier detection. This section extends the idea
+to graph datasets and discusses related problems. Assume the input data is a
+graph G = (V,E), where V = {1, 2, . . . , n} is the set of vertices and E = {(i, j)}
+is the set of edges. Throughout this paper, an undirected graph is treated as its
+directed version by replacing each edge i ↔ j with two opposite arcs (i, j) and
+(j, i). We aim to discover a random representative characterized by a discrete
+distribution α = (α1, . . . , αn) deﬁned on V, so that any random node in V can
+
+communicate with it in the most eﬃcient and economical way.
+We ﬁrst construct a channel between two random nodes so that the communi-
+cation cost can be measured. The input graph G can be equivalently represented
+by its normalized adjacency matrix A = (aij ) with
+
+aij = δij/di,
+
+δij =
+
+(cid:4)
+
+1 if (i, j) ∈ E;
+0 otherwise,
+
+(4)
+
+28
+
+K. Sun et al.
+
+where di is the outdegree of the node i. If a node i has at least one outgoing
+link, the i’th row of A deﬁnes a discrete distribution representing how likely
+i inﬂuences the other nodes according to the graph structure. To deal with
+nodes with no outgoing links or incoming links, we allow each node i to teleport
+to another random node with a small probability ν. In social networks, such
+teleportation models i’s inﬂuence through external ways not restricted by the
+network [7, 23]. Consider i sending a message to one unique receiver other than
+i at time 0. The probability that node j receives this message in one time step
+can be deﬁned as pj|i = (1 − ν)aij + ν/(n − 1) (j (cid:6)= i). In matrix form it is
+equivalently
+
+ν
+n − 1
+
+(eeT − I),
+
+P = (1 − ν)A +
+
+(5)
+
+where e = (1, . . . , 1)T and I is the identity matrix. If we allow this message
+to pass around in G for τ times (τ = 1, 2, . . . ) after time 0, the probability for
+each node j holding the message is given by the i’th row of the matrix P τ . It
+represents i’s indirect inﬂuence over G through information spreading. In the
+extreme case when τ → ∞, all rows of P τ will tend to be the same, or the
+equilibrium distribution corresponding to the PageRank (PR) measure [7]. To
+distinguish the “outgoing ability” of diﬀerent nodes, τ should be a small value
+(e.g., 1 or 2) so that each node can only reach a local region around itself.
+Without loss of generality, we focus on the case τ = 1 unless otherwise speciﬁed.
+Assume a latent prior distribution α of each node being the information
+source. The sender i, upon any node j receiving a message, can be identiﬁed
+with Bayesian inference in Eq.(2) (with i and j interchanged). The total com-
+munication cost for every node j ∈ V to reply to its information source is given
+by Eq.(3). By minimizing such a cost, α can be learned so that this communi-
+cation loop is established in the optimal way.
+More intuitively, consider without loss of generality the graph G as a social
+network of n persons. A directed link (i, j) ∈ E means that i could easily in-
+ﬂuence j because of personal relationship, etc. One real-life example could be j
+“follows” i on some microblogging website. In this context, the meaning of being
+a representative can be understood from Eq.(3). To minimize E(α), on average
+− log pj|i should be small, which means the representative j can perceive news
+from its surrounding nodes easily. As another condition, q·|i should have low
+entropy, which means each person i selects the candidate which inﬂuences i the
+most, and deselects other nearby candidates being its representative.
+
+Implementation
+
+The skeleton learning is implemented by gradient descent to minimize E(α).
+The gradient of E(α) has the form [20]
+
+⎛
+
+⎞
+
+∂E
+∂αj
+
+= − 1
+αj
+
+(cid:3)
+
+i:i(cid:3)=j
+
+qj|i,α
+
+⎝log pj|i − (cid:3)
+l:l(cid:3)=i
+
+ql|i,α log pl|i
+
+⎠ .
+
+(6)
+
+Representative Nodes in Social Networks
+
+29
+
+Algorithm 1. Skeleton Learning on Graph Datasets
+Input: A graph G = (V,E ) with n nodes; a small teleport probability ν
+Output: A discrete distribution α = (α1, . . . , αn) to measure the
+
+representativity of each node
+
+1 begin
+2
+
+α ← (1/n, . . . , 1/n); γ ← γ0; p0 = ν/(n − 1)
+repeat
+
+(cid:3) = ((cid:3)1, . . . ,(cid:3)n) ← 0; (cid:3)c ← 0
+foreach node i in S (see comments in the end) do
+j:j→i αj /dj + ν(1 − αi)/(n − 1)
+
+(cid:2)
+
+// γ: learning rate
+
+3
+
+4
+
+5
+
+6
+
+7
+
+8
+
+9
+
+10
+
+11
+
+12
+
+13
+
+14
+
+15
+
+16
+
+17
+
+18
+
+19
+
+20
+
+21
+
+pi ← (1 − ν)
+Ei ← −(1 − ν)
+Ei ← Ei/pi
+foreach j in Pre(i) do
+
+(cid:2)
+
+j:j→i αj log pj|i/dj − ν
+
+// dj is the out-degree of node j
+
+(cid:2)
+
+j:j(cid:3)=i αj log pj|i/(n − 1)
+
+(cid:3)j ← (cid:3)j − (1 − ν)(log pj|i + Ei)/(dj pi)
+
+// Pre(i) is the set of predecessors
+
+end
+foreach j in Suc(i) do
+
+(cid:3)j ← (cid:3)j − ν(log pj|i − log p0)/ ((n − 1)pi)
+
+// Suc(i) is the set of successors
+
+end
+(cid:3)i ← (cid:3)i + ν(log p0 + Ei)/ ((n − 1)pi)
+(cid:3)c ← (cid:3)c − ν(log p0 + Ei)/ ((n − 1)pi)
+
+end
+(cid:3) ← (cid:3) + (cid:3)c
+α ← α ◦ exp(−γ (cid:3) ◦α)
+(cid:2)
+normalize α so that
+
+i αi = 1
+
+// "◦" is the element-wise product
+
+22 end
+
+until convergence or the number of iterations reaches a pre-speciﬁed value
+/* If S = V, α is updated on every full scan of the whole dataset;
+if S is a small random subset of V, α is updated with stochastic
+
+gradient descent (more efficient and scalable) */
+
+Along −∂E/∂αj, the candidate weight αj is adjusted at each step. Intuitively
+Eq.(6) says, for each node i within j’s reachable range, j serves as a potential
+information source of i (the value qj|i,α is signiﬁcant enough based on Eq.(2)),
+and such i provides feedback to αj based on how eﬃciently it can reach back to
+j. If the length − log pj|i is shorter than the average length − (cid:2)
+l:l(cid:3)=i ql|i,α log pl|i,
+then ∂E/∂αj < 0 and αj increases, which means that i “votes” for j to become
+its representative. On the other hand, if the route i → j is too costly, i casts a
+negative vote for j. This type of gradient was discussed in a statistical machine
+learning framework [24] and further explored here in a non-parametric setting.
+In general, each gradient descent step requires O(|V|2) computation [20] be-
+cause P is dense. However, the fact that most entries of the transition matrix P
+equal ν/(n − 1) can lead to more eﬃcient implementations. On graph datasets,
+the gradient in Eq.(6) is further written as
+
+30
+
+K. Sun et al.
+
+∂E
+∂αj
+
+= − 1 − ν
+
+dj
+(cid:9)
+
+(cid:3)
+
+i:j→i
+
+Δij − ν
+n − 1
+
+(cid:10)
+
+1
+pi
+
+Δij =
+pi = (1 − ν)
+Ei = − (cid:3)
+j:j(cid:3)=i
+
+log pj|i + Ei
+
+, Δi0 =
+
+(cid:3)
+
+αj
+dj
+
++ ν 1 − αi
+n − 1
+j:j→i
+qj|i log pj|i = − 1 − ν
+
+,
+
+pi
+
+(cid:3)
+
+i:i→j
+1
+pi
+
+(Δij − Δi0) − ν
+n − 1
+(cid:12)
+
+(cid:11)
+
+(cid:3)
+
+i:i(cid:3)=j
+
+Δi0,
+
+log
+
+ν
+n − 1
+
++ Ei
+
+,
+
+(cid:3)
+
+j:j→i
+
+αj
+dj
+
+log pj|i
+
+⎛
+
+−
+
+ν
+
+pi(n − 1)
+
+(cid:3)
+
+j:i→j
+
+αj log pj|i −
+
+ν
+
+pi(n − 1)
+
+log
+
+ν
+n − 1
+
+⎝1 − αi − (cid:3)
+j:i→j
+
+⎞
+
+⎠ .
+
+αj
+
+In Algorithm 1, the simple gradient descent has a computational complexity
+of O(|E|) in each iteration. The stochastic gradient descent (SGD) [25] version
+reduces this computation time to O(max(di) · |S|). Besides the learning rate,
+the algorithm has only one parameter ν. By default we set ν = 0.2 in the
+following experiments. On real large social networks, the node degrees follow an
+exponential distribution, which may lead to trivial solutions if ν is too large.
+For example, one node with signiﬁcant number of links could become the sole
+representative over the whole network and communicate with the unconnected
+nodes through teleport. In this case we have to lower the value of ν to penalize
+the teleport communication and to discover more representatives.
+
+4 Toy Problems
+
+Figure 1 presents several toy social networks. Table 1 shows the αi value and
+the PageRank value of each node. In Figure 1(a), only one person (node 1)
+is acquainted to all the others. SKE has successfully identiﬁed it as the sole
+representative. Figure 1(b) shows two groups of people, each with a central hub
+(node 1 and node 5), and a link from node 1 to node 5. The SKE values are
+very concentrated on these two centers, with node 5 having slightly larger weight
+due to the fact that no edge exists from node 5 to node 1. This type of penalty
+becomes clearer in the network shown in Figure 1(c). In this example, each node
+has exactly the same indegree. There is one node 3 which links to all the other
+nodes, while half of the linked nodes do not respond. Its αi is close to zero,
+meaning that it has been identiﬁed as a spam node. In general, the PageRank
+values are less concentrated and do not reveal such information.
+
+The proposed method is further tested on two “Primary School Cumulative
+Networks” [26] 1, where the nodes represent students or teachers and the edges
+represent their face-to-face interactions. We only consider strong interactions,
+which are deﬁned as all such edges (A, B) if A and B has interacted for at least
+
+1
+
+http://www.sociopatterns.org/datasets/primary-school-cumulative-networks
+
+Representative Nodes in Social Networks
+
+31
+
+Table 1. SKE and PageRank results on the toy networks in Figure 1
+
+Network 1
+
+Network 2
+
+Network 3
+
+Node
+PageRank
+SKE
+PageRank
+SKE
+PageRank
+SKE
+
+1
+0.46
+0.99
+0.17
+0.41
+0.17
+0.20
+
+2
+0.18
+0.00
+0.06
+0.01
+0.22
+0.30
+
+3
+0.18
+0.00
+0.06
+0.01
+0.22
+0.00
+
+4
+0.18
+0.00
+0.06
+0.01
+0.22
+0.30
+
+5
+
+6
+
+7
+
+8
+
+0.11
+0.04
+
+0.11
+0.04
+
+0.11
+0.04
+
+0.32
+0.44
+0.17
+0.20
+
+2
+
+1
+
+3
+
+2
+
+1
+
+7
+
+4
+
+5
+
+6
+
+8
+
+4
+
+3
+
+(a) Network 1
+
+(b) Network 2
+
+1
+
+2
+
+3
+
+4
+
+5
+
+(c) Network 3
+
+Fig. 1. Toy social networks
+
+2 minutes and on at least 2 occasions. As a result, there are 236 nodes and 1954
+edges in network 1, and there are 238 nodes and 2176 edges in network 2.
+
+Figure 2 shows the visualization of the network on day 1, where the SKE
+value αi is intuitively presented by the size of the corresponding circle and the
+node degree is presented by the color density. We see that the representatives
+(large circles) do not necessarily have high degrees (dense color), and vice versa.
+This is further conﬁrmed by looking at the accurate measurements given in
+Table 2. Among the top ranked nodes, some have small degrees, such as node
+“1843” in day 1, node “1521” and “1880” in day 2. We further look at the
+average degree of their neighbours (Dn). All these three nodes have a relative
+small value of Dn, which means some of their neighbours are poorly-connected.
+The connections with these non-so-popular nodes are highly valued in the SKE
+measurement. On the other hand, among the bottom ranked nodes, some have
+large degrees, such as node “1628” and node “1428” in day 1, node “1766” and
+“1778” in day 2. Generally they have a relative large Dn value. Although they
+are well-connected, their relationships are mostly established with popular nodes,
+and thus have little value. We also see that the SKE measure has a “sharper”
+distribution as compared to PageRank, where the tail nodes have very small
+values. The eﬀective number of skeleton points (given by exp{− (cid:2)
+i αi log αi},
+or the number of uniformly distributed points with the same entropy as α) is
+95.8 and 91.3 in network 1 and 2, respectively.
+
+5
+
+Information Diﬀusion on Collaboration Networks
+
+We test the proposed approach as a seeding method for information diﬀusion
+in social networks [15], so that a small subset of seeds (corresponding to the
+representatives as discussed above) could inﬂuence as many nodes as possible.
+
+32
+
+K. Sun et al.
+
+Fig. 2. SKE results on Primary School Cumulative Networks (day 1). The node size
+represents the SKE value. The node color represents its degree (the darker the higher).
+
+Table 2. Diﬀerent measures of nodes in the cumulative network dataset. For each day,
+the columns show (1) node ID (2) class ID if the node is a child, or “Teachers” (3)
+degree D (4) average degree Dn of its neighbours (5) PageRank (PR) in percentage
+(6) αi (SKE) in percentage. The nodes are ordered by αi.
+
+Cumulative Network Day 1
+
+Cumulative Network Day 2
+
+Class
+
+2B
+
+D Dn PR SKE Node
+Node
+1890
+35 19.3 0.80
+1650 Teachers 25 16.0 0.65
+1783
+19 18.6 0.46
+28 18.9 0.67
+1743
+1843
+15 16.1 0.41
+
+1745 Teachers 28 21.5 0.57
+1521 Teachers
+6.9 0.47
+1668 Teachers 21 19.2 0.47
+23 17.1 0.58
+1443
+1880
+8.3 0.43
+
+D Dn PR SKE
+4.4
+3.3
+3.0
+2.9
+2.7
+
+4.3
+3.4
+3.1
+3.0
+2.4
+
+1A
+2B
+3A
+
+Class
+
+5B
+4B
+
+8
+
+8
+
+...
+
+1628
+1649
+1483
+1858
+1511
+1428
+1803
+1710
+1854
+1898
+
+2A
+2A
+5A
+2B
+5A
+5B
+4B
+2B
+2B
+2B
+
+23 21.3 0.57
+7 16.3 0.26
+4 16.0 0.18
+7 21.0 0.23
+9 20.3 0.27
+12 21.1 0.33
+6 18.2 0.22
+5 24.0 0.19
+5 23.4 0.18
+5 23.8 0.19
+
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+
+...
+
+1A
+1A
+1A
+4A
+4B
+1A
+
+1766
+1799
+1772
+1519
+1819
+1778
+1753 Teachers
+1710
+1807
+1760
+
+2B
+4B
+1A
+
+11 18.7 0.31
+9 19.6 0.26
+8 15.9 0.26
+2 21.0 0.13
+5 12.6 0.27
+11 22.9 0.29
+3 23.0 0.14
+8 29.6 0.21
+2 11.5 0.16
+3 23.7 0.14
+
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+
+Representative Nodes in Social Networks
+
+33
+
+We use the collaboration networks in the Stanford Large Network Dataset
+Collection2 [27]. ca-GrQc is a co-authorship network of physics publications,
+compiled from the General Relativity section of Arxiv. It has 5,242 nodes
+representing authors and 14,496 edges representing co-authorships. Similarly,
+ca-HepTh, ca-HepPh and ca-AstroPh are collaboration networks of diﬀerent
+domains on Arxiv. Their sizes denoted by #nodes/#edges are 9,877/25,998,
+12,008/118,521, 18,772/198,110, respectively. All datasets are undirected and
+unweighted, which means the accurate number of times that two authors have
+collaborated is discarded. For each dataset, ﬁve diﬀerent seeding methods are
+applied, which select seeds based on descending degree, descending PageRank
+value, descending SKE value (αi) computed by simple gradient descent and
+stochastic gradient descent, and the degree discount heuristic [18], respectively.
+The damping factor in PageRank is set to be 0.85 by convention. The teleport
+probability ν in SKE is set to be 0.2.
+
+To evaluate the seeding quality, we apply two diﬀerent diﬀusion models,
+namely Independent Cascade Model (ICM) [17] and Linear Threshold Model
+(LTM) [16], once the selected seeds are marked as being activated. Both of these
+models expand the activated set of nodes in discrete steps with respect to the
+network structure. In ICM, an activated node v has a single chance to activate a
+neighbour w with the probability pv,w. By discarding the number of times that
+two authors have cooperated, diﬀusion with ICM becomes harder because v has
+one link instead of several parallel links connecting with j. In LTM, a node v will
+be activated once the proportion of activated neighbours reaches a node-speciﬁc
+threshold θv. At convergence, the size of the activated set quantiﬁes the inﬂuence
+of the initial seeds. To average the eﬀect of random factors, the experiment for
+each seeding set is repeated for 100 times.
+
+Figure 3(a-d) shows the size of the activated set varying with the number
+of seeds on ca-GrQc and ca-HepTh using ICM. Figure 3(g) condenses the re-
+sults on ca-AstroPh and ca-HepPh using 100 seeds with ICM. Generally SKE
+and DegreeDiscount outperform PageRank, which in turn outperforms Degree.
+Basically SKE tries to place the minimum number of seeds while guaranteeing
+the inﬂuence coverage over diﬀerent regions. The good performance of DegreeD-
+iscount is due to a similar mechanism to penalize clustered seeds [18]. While
+the two approaches are comparable on ca-GrQc, seeding with SKE is obviously
+better on ca-HepTh (ICM probability=0.2), ca-AstroPh and ca-HepPh (ICM
+probability=0.1). Moreover, SKE can adapt to network changes through online
+learning, which is not straightforward for DegreeDiscount. Note, the SGD ver-
+sion of SKE has comparable performance with the simple implementation and
+is about ten times faster. Figure 3(h) shows the results with diﬀerent values of ν
+in the range [0.01, 0.3]. We see that the inﬂuence coverage has a small variation
+and thus is not sensitive to this conﬁguration.
+
+As Figure 3(e-f) displays, the performance of SKE falls behind PageRank on
+the LTM experiments. Such results are expected. LTM, as well as the weighted
+independent cascade model [15], requires a certain proportion of v’s neighbours
+
+2
+
+http://snap.stanford.edu/data/index.html
+
+34
+
+K. Sun et al.
+
+700
+
+600
+
+500
+
+400
+
+300
+
+200
+
+100
+
+5
+
+DegreeDiscount
+
+Degree
+
+PageRank
+
+SKE (SGD)
+
+SKE
+
+DegreeDiscount
+
+Degree
+
+PageRank
+
+SKE (SGD)
+
+SKE
+
+1200
+
+1100
+
+1000
+
+900
+
+800
+
+700
+
+20
+
+40
+
+60
+
+80
+
+100
+
+600
+
+5
+
+20
+
+40
+
+60
+
+80
+
+100
+
+(a) ca-GrQc; ICM with probability 0.1
+
+(b) ca-HepTh; ICM with probability 0.1
+
+1450
+
+1400
+
+1350
+
+1300
+
+1250
+
+1200
+
+1150
+
+1100
+
+5
+
+DegreeDiscount
+
+Degree
+
+PageRank
+
+SKE (SGD)
+
+SKE
+
+DegreeDiscount
+
+Degree
+
+PageRank
+
+SKE (SGD)
+
+SKE
+
+3100
+
+3080
+
+3060
+
+3040
+
+3020
+
+3000
+
+2980
+
+2960
+
+20
+
+40
+
+60
+
+80
+
+100
+
+2940
+
+5
+
+20
+
+40
+
+60
+
+80
+
+100
+
+(c) ca-GrQc; ICM with probability 0.2
+
+(d) ca-HepTh; ICM with probability 0.2
+
+1400
+
+1200
+
+1000
+
+800
+
+600
+
+400
+
+200
+
+0
+
+5
+
+9640
+
+9630
+
+9620
+
+9610
+
+9600
+
+9590
+
+DegreeDiscount
+
+Degree
+
+PageRank
+
+SKE (SGD)
+
+SKE
+
+DegreeDiscount
+
+Degree
+
+PageRank
+
+SKE (SGD)
+
+SKE
+
+2500
+
+2000
+
+1500
+
+1000
+
+500
+
+20
+
+40
+
+60
+
+80
+
+100
+
+0
+
+5
+
+20
+
+40
+
+60
+
+80
+
+100
+
+(e) ca-GrQc; LTM
+
+(f) ca-HepTh; LTM
+
+ca-AstroPh
+
+ca-HepPh
+
+4050
+
+4000
+
+3950
+
+3900
+
+1200
+
+1100
+
+1000
+
+900
+
+800
+
+ca-GrQc
+ca-HepTh
+
+e
+
+e
+
+r
+
+g
+
+e
+
+D
+
+e
+
+g
+
+a
+
+P
+
+k
+
+n
+
+a
+
+R
+
+g
+
+e
+
+D
+
+e
+
+e
+
+r
+
+t
+
+n
+
+u
+
+o
+
+c
+
+D i s
+
+3850
+
+D )
+
+700
+
+E
+
+K
+
+S
+
+G
+
+S
+
+E   (
+
+K
+
+S
+
+600
+
+(g) ca-AstroPh & ca-HepPh; 100 seeds;
+ICM with probability 0.1
+
+0.05
+
+0.10
+
+0.15
+
+0.20
+
+0.25
+
+(h) Eﬀect of the parameter ν
+
+Fig. 3. The number of inﬂuenced nodes on collaboration networks
+
+Representative Nodes in Social Networks
+
+35
+
+to be activated in order for v to be activated. However, SKE places seeds so that
+they have less overlap and thus is not recommended in similar diﬀusion models,
+where more exposure to the spread increases the likelihood of activation.
+
+6 Conclusion
+
+We have extended a recently proposed skeleton learning approach [20] to social
+network analysis. From an information diﬀusion perspective, the method aims to
+identify representative individuals that have greater potential inﬂuence over the
+network. In a minimizing communication cost framework, the gradient-based op-
+timization naturally allows nodes to cast negative votes to each other in order to
+derive a set of mutually exclusive candidates. Consequently, the resulting repre-
+sentatives lie in diﬀerent regions which helps avoid overlap of neighbour sets. The
+computational complexity in each optimization step is improved from O(|V|2)
+to O(|E|) (V: node set; E: edge set) and is further boosted with stochastic gradi-
+ent descent. As presented in our experiments, this approach is able to discover
+important individuals who have fewer connections and are thus not considered
+by traditional methods such as PageRank. On real collaboration networks with
+the independent cascade model [17], the proposed method outperforms the tra-
+ditional ranking algorithms and the degree discount heuristic [18]. As for future
+work, we are interested in varying this technique for linear threshold model [16]
+and exploring other application scenarios such as community ﬁnding [5, 28].
+
+Acknowledgements. This work is supported by Swiss National Science Foun-
+dation (SNSF) via the NCCR (IM)2, the European COST Action on Multilingual
+and Multifaceted Interactive Information Access (MUMIA) via the Swiss State
+Secretariat for Education and Research (SER), and Irish CLIQUE Strategic Re-
+search Cluster (SFI grant no. 08/SRC/I1407).
+
+References
+
+1. Shi, J., Malik, J.: Normalized cuts and image segmentation. IEEE Trans. Pattern
+
+Anal. Mach. Intell. 22(8), 888–905 (2000)
+
+2. Ng, A.Y., Jordan, M.I., Weiss, Y.: On spectral clustering: Analysis and an algo-
+
+rithm. In: NIPS 14, pp. 849–856. MIT Press (2002)
+
+3. Luxburg, U.: A tutorial on spectral clustering. Stat. Comput. 17(4), 395–416 (2007)
+4. White, S., Smyth, P.: A spectral clustering approach to ﬁnding communities in
+
+graphs. In: Proc. SDM 2005, pp. 274–285 (2005)
+
+5. Newman, M.E.J.: Finding community structure in networks using the eigenvectors
+
+of matrices. Phys. Rev. E 74(3), 036104 (2006)
+
+6. Xu, K.S., Kliger, M., Chen, Y., Woolf, P.J., Hero III, A.O.: Revealing social net-
+works of spammers through spectral clustering. In: Proc. ICC 2009, pp. 735–740
+(2009)
+
+7. Brin, S., Page, L.: The anatomy of a large-scale hypertextual web search engine.
+
+Comput. Networks ISDN 30(1-7), 107–117 (1998)
+
+36
+
+K. Sun et al.
+
+8. Kleinberg, J.M.: Authoritative sources
+
+in a hyperlinked environment. J.
+
+ACM 46(5), 604–632 (1999)
+
+9. Lempel, R., Moran, S.: The stochastic approach for link-structure analysis
+
+(SALSA) and the TKC eﬀect. Comput. Netw. 33(1-6), 387–401 (2000)
+
+10. Chung, F.R.K.: Spectral Graph Theory. Amer. Math. Soc. (1997)
+11. Zhou, D., Huang, J., Sch¨olkopf, B.: Learning from labeled and unlabeled data on
+
+a directed graph. In: Proc. ICML 2005, pp. 1036–1043 (2005)
+
+12. Agarwal, A., Chakrabarti, S.: Learning random walks to rank nodes in graphs. In:
+
+Proc. ICML 2007, pp. 9–16 (2007)
+
+13. Domingos, P., Richardson, M.: Mining the network value of customers. In: Proc.
+
+SIGKDD 2001, pp. 57–66 (2001)
+
+14. Richardson, M., Domingos, P.: Mining knowledge-sharing sites for viral marketing.
+
+In: Proc. SIGKDD 2002, pp. 61–70 (2002)
+
+15. Kempe, D., Kleinberg, J., Tardos, E.: Maximizing the spread of inﬂuence through
+
+a social network. In: Proc. SIGKDD 2003, pp. 137–146 (2003)
+
+16. Granovetter, M.: Threshold models of collective behavior. Am. J. Sociol. 83(6),
+
+1420–1443 (1978)
+
+17. Goldenberg, J., Libai, B., Muller, E.: Talk of the network: A complex systems look
+at the underlying process of word-of-mouth. Market. Lett. 12(3), 211–223 (2001)
+18. Chen, W., Wang, Y., Yang, S.: Eﬃcient inﬂuence maximization in social networks.
+
+In: Proc. SIGKDD 2009, pp. 199–208 (2009)
+
+19. Kitsak, M., Gallos, L., Havlin, S., Liljeros, F., Muchnik, L., Stanley, H., Makse,
+H.: Identiﬁcation of inﬂuential spreaders in complex networks. Nature Phys. 6(11),
+889–893 (2010)
+
+20. Sun, K., Bruno, E., Marchand-Maillet, S.: Unsupervised skeleton learning for man-
+
+ifold denoising. In: Proc. ICPR 2012, pp. 2719–2722 (2012)
+
+21. Hinton, G.E., Roweis, S.T.: Stochastic Neighbor Embedding. In: NIPS 15, pp.
+
+833–840. MIT Press (2003)
+
+22. Hein, M., Maier, M.: Manifold denoising. In: NIPS 19, pp. 561–568. MIT Press
+
+(2007)
+
+23. Myers, S.A., Zhu, C., Leskovec, J.: Information diﬀusion and external inﬂuence in
+
+networks. In: Proc. SIGKDD 2012, pp. 33–41 (2012)
+
+24. Xu, L.: Learning algorithms for RBF functions and subspace based functions. In:
+Handbook of Research on Machine Learning Applications and Trends: Algorithms,
+Methods and Techniques, pp. 60–94. IGI Global (2009)
+
+25. Bottou, L.: Online algorithms and stochastic approximations. In: Online Learning
+
+and Neural Networks. Cambridge University Press (1998)
+
+26. Stehl´e, J., Voirin, N., Barrat, A., Cattuto, C., Isella, L., Pinton, J., Quaggiotto,
+M., Van den Broeck, W., R´egis, C., Lina, B., Vanhems, P.: High-resolution mea-
+surements of face-to-face contact patterns in a primary school. PLoS ONE 6(8),
+e23176 (2011)
+
+27. Backstrom, L., Leskovec, J.: Supervised random walks: predicting and recommend-
+
+ing links in social networks. In: Proc. WSDM 2011, pp. 635–644 (2011)
+
+28. Lancichinetti, A., Radicchi, F., Ramasco, J.J., Fortunato, S.: Finding statistically
+
+signiﬁcant communities in networks. PLoS ONE 6(4), e18961 (2011)
+
+

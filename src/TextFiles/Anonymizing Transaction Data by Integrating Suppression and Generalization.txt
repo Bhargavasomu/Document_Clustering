@@ -1,0 +1,603 @@
+Anonymizing Transaction Data by Integrating
+
+Suppression and Generalization
+
+Junqiang Liu1,2 and Ke Wang1
+
+1 Simon Fraser University, Burnaby, B.C. V5A 1S6, Canada
+2 Zhejiang Gongshang University, Hangzhou, 310018, China
+
+{jjliu,wangk}@cs.sfu.ca
+
+Abstract. Privacy protection in publishing transaction data is an im-
+portant problem. A key feature of transaction data is the extreme spar-
+sity, which renders any single technique ineﬀective in anonymizing such
+data. Among recent works, some incur high information loss, some result
+in data hard to interpret, and some suﬀer from performance drawbacks.
+This paper proposes to integrate generalization and suppression to re-
+duce information loss. However, the integration is non-trivial. We pro-
+pose novel techniques to address the eﬃciency and scalability challenges.
+Extensive experiments on real world databases show that this approach
+outperforms the state-of-the-art methods, including global generaliza-
+tion, local generalization, and total suppression. In addition, transaction
+data anonymized by this approach can be analyzed by standard data
+mining tools, a property that local generalization fails to provide.
+
+Keywords: Anonymity, privacy, information security, transaction data.
+
+1 Introduction
+
+Transaction data, such as shopping transactions [1], web query logs [11], and
+movie ratings [10], are important sources for knowledge discovery. People are
+increasingly releasing transaction data to the data mining research community
+for discovering knowledge that helps improve services. However, transaction data
+contains signiﬁcant amount of personal and sensitive information. The release of
+such data to the public or a third party could breach privacy, as highlighted by
+recent incidents [2][10]. Transaction data must be anonymized before release.
+
+Recently, several works started to address the transaction data anonymization
+problem [4][5][13][14]. However, these works suﬀer from a few limitations, namely,
+incurring high information loss, failing to enable standard data mining tools, and
+introducing invalid analysis results. Let us examine those prior works using the
+transaction data in Fig. 1 (a) and the taxonomy in Fig. 1 (b).
+
+Global generalization [13]. The km-anonymity in [13] requires that every sub-
+set of no more than m items is contained in at least k transactions. The global
+generalization technique (a.k.a. full subtree generalization [6]) is employed in [13],
+∞-
+which is vulnerable to excessive distortion in the presence of outliers. Let k
+anonymity denote km-anonymity with m being the longest transaction length.
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part I, LNAI 6118, pp. 171–180, 2010.
+c(cid:3) Springer-Verlag Berlin Heidelberg 2010
+
+172
+
+J. Liu and K. Wang
+
+Fig. 1. Transactional database D, anonymizations of D, and taxonomy tree HP
+
+For example, to achieve 2∞-anonymity, as in the 4th column in Fig. 1 (a), all
+items are generalized to the top level because of the outlier, {e, i}.
+
+Suppression [14]. The (h, k, p)-coherence in [14] demands that every subset of
+no more than p public items must be contained in at least k transactions and
+no more than h percent of these transactions contain a common private item.
+km-anonymity is its special case with h = 100% and p = m. [14] employs the
+total item suppression technique to enforce (h, k, p)-coherence, which incurs high
+information loss when the data is sparse. E.g., in the 5th column in Fig. 1 (a),
+all occurrences of b, c, i, x, y, and z, are removed as indicated by *.
+
+Local generalization [5]. The transactional k-anonymity in [5] requires that
+each transaction has at least k duplicates. Such a requirement is stronger than
+∞-anonymity and introduces much more distortion than necessary. The multi-
+k
+dimensional generalization technique [7] is employed in [5]. But, it destroys the
+domain exclusiveness property, e.g., the 3rd column in Fig. 1 (a) shows the data
+anonymized by [5] where items T, P, and K coexist in the anonymized data, but
+their domains are not exclusive of each other. The analysis result based on such
+data are hard to interpret, e.g., according to such data, whenever a transaction
+contains K, it also contains f. But it is not true with the original data, e.g., the
+ﬁrst transaction contains c and d (and hence K), but it does not contain f.
+
+Band matrix method [4]. A method for grouping transactions and permuting
+the private items in each group to enforce l-diversity [9] is presented in [4]. How-
+ever, invalid analysis results could be derived from the anonymized data. The
+example in [4] explained this: in the original data, all customers who bought
+
+Anonymizing Transaction Data
+
+173
+
+cream but not meat have also bought a pregnancy test; while in the data
+anonymized by [4], only a half of such customers have bought a pregnancy test.
+This paper, motivated by the limitations of the prior works, proposes to
+integrate the global generalization technique with the total item suppression
+technique for enforcing km-anonymity. Our observation is that suppression can
+remove outlier items that otherwise will cause substantially generalization of
+many other items, and generalization can slightly generalize items that other-
+wise must be suppressed. While a single technique could not perform well, the
+integration can greatly reduce the overall information loss. Our approach has
+two strong properties: the anonymized data can be analyzed by standard data
+mining tools, and results derived from it are true in the original data. This is
+because both techniques preserve the domain exclusiveness property. For exam-
+ple, the last column in Fig. 1 (a) shows the data anonymized by our approach
+which suppresses item i and generalizes some other items.
+
+Integrating generalization and suppression is non-trivial because the search
+space is much larger than only employing one of them. We propose a multi-round,
+top-down greedy search strategy to address the challenge. Extensive comparative
+experiments showed that our approach yields better data utility than the prior
+works and is eﬃcient and scalable in anonymizing real world databases.
+
+The rest of the paper is organized as follows. Section 2 describes the privacy
+requirement and the anonymization model, Section 3 presents the basic approach
+that integrates generalization with suppression, Section 4 proposes the key tech-
+niques that make our approach eﬃcient and scalable, Section 5 evaluates the
+applicability of our approach, and Section 6 concludes the paper.
+
+2 Privacy and Anonymization Model
+A publisher wants to release a transaction database D = {t1, t2, . . . , tn}, where
+each transaction ti corresponds to an individual and contains items from an
+item universe I = {i1, i2, . . . , iq}. An adversary tries to link a target individual
+to his/her transaction with a high probability. To do so, the adversary acquired
+knowledge from external sources. That is, the adversary knows that the transac-
+tion is in the released data and knows some items of the target individual. The
+publisher wants to prevent such a linking attack.
+
+Deﬁnition 1 (Privacy threats and km-anonymity): A subset of items is
+called an itemset. An itemset X with |X| ≤ m is called a privacy threat if the
+number of transactions in D that support X, denoted by sup(X), is less than a
+user speciﬁed anonymity threshold k, i.e., sup(X) < k. A transaction t supports
+X if X is a subset of t; D observes km-anonymity [13] if there is no privacy
+(cid:2)
+threat supported by D.
+Enforcing the privacy notion in Deﬁnition 1 assures that the adversary’s cer-
+
+tainty in making any linking attack is no more than 1/k.
+
+Anonymization solutions: To enforce the privacy notion, the full subtree
+generalization technique [6][13] and the total item suppression technique [14] are
+
+174
+
+J. Liu and K. Wang
+
+integrated to anonymize D. We assume that a taxonomy tree HP for generalizing
+items is available. With the full subtree generalization technique, a generalization
+solution is deﬁned by a cut on HP . A cut contains exactly one item on every
+root-to-leaf path on HP , and is denoted by the set of such items. E.g., {P, f, g,
+M, e, i} denotes the cut depicted by a dash line on HP in Fig. 1 (b). With the
+total item suppression technique, to eliminate privacy threats in the generalized
+data, some constituent items of Cut are totally removed from all transactions.
+The set of items to be removed is called a suppression scenario of Cut.
+
+In other words, an anonymization is deﬁned by Cut and SS, a generalization
+cut and the suppression scenario associated with the cut. The anonymized data
+(cid:4)(cid:4) is derived in two steps: ﬁrst the original items in D are generalized to their
+D
+(cid:4) = g(D, Cut), and then items in SS are
+taxonomic ancestors in Cut to get D
+suppressed from D
+
+(cid:4) to eliminate threats, which results in D
+
+(cid:4)(cid:4) = s(D
+
+, SS).
+
+(cid:4)
+
+(cid:4), we get the anonymized data D
+
+Running Example: Consider the transaction database D in the 2nd column
+in Fig. 1 (a) and the taxonomy HP in Fig. 1 (b). Suppose that we enforce 2∞-
+anonymity . By generalizing D to the cut {P, f, g, M, e, i}, only one privacy
+threat, {e, i}, exists in the generalized data D
+(cid:4) = g(D,{P, f, g, M, e, i}). If we
+,{i}) where no
+(cid:4)(cid:4) = s(D
+suppress item i from D
+(cid:2)
+privacy threat exists, as shown in the last column in Fig. 1 (a).
+Anonymization causes information loss. Given Cut and SS, a generalization cut
+and its associated suppression scenario, costG(Cut) denotes the information loss
+(cid:4) = g(D, Cut), and costS(SS) denotes that
+incurred by generalizing D to get D
+incurred by suppressing items in SS from D
+, SS). The total
+cost is cost(Cut, SS) = costG(Cut) + costS(SS).
+
+(cid:4) to get D
+
+(cid:4)(cid:4) = s(D
+
+(cid:4)
+
+(cid:4)
+
+(cid:2)
+
+Anonymization can be measured by a variety of metrics. As most cost met-
+∗), and
+x∗∈Cut O(x
+∗) is the total number of oc-
+∗) is the gen-
+∗) is an extra suppression cost
+
+rics are additive, we can write costG(Cut) =
+costS(SS) =
+∗
+currences in D of all leaf items that are descendants of x
+eralization cost per occurrence of x
+in addition to ILG(x
+
+(cid:2)
+∗), where O(x
+∗, and ILS(x
+
+∗) · ILG(x
+
+∗) · ILS(x
+
+x∗∈SS O(x
+
+∗) if x
+
+, ILG(x
+
+We use LM [6] in our discussion, and assume that D only contains leaf items
+∗) − 1)/(#leaves(HP ) − 1), where
+on HP . With LM, ILG(x
+∗) and #leaves(HP ) denotes the number of leaves in the subtree
+#leaves(x
+∗ is suppressed,
+∗ and that in the taxonomy HP respectively. If x
+rooted at x
+∗ are generalized to the top level of HP ,
+it is deemed that all descendants of x
+∗ is 1, so the extra suppression
+the overall information loss per occurrence of x
+(cid:4)(cid:4) in the last column in
+cost is ILS(x
+Fig. 1 (a), Cut = {P, f, g, M, e, i}, SS = {i}. With LM, costG(Cut) = 3.6, and
+costS(SS) = 2. The total cost is cost(Cut, SS) = 5.6.
+
+∗). For example, for D
+
+∗) = 1 − ILG(x
+
+∗ is suppressed.
+∗) = (#leaves(x
+
+3 Integrating Generalization and Suppression
+
+An anonymization is deﬁned by (Cut, SS ), a generalization cut with its associ-
+ated suppression scenario, and can be found by two nested loops.
+
+Anonymizing Transaction Data
+
+175
+
+As the number of cuts is exponential in the number of items and so is the
+number of suppression scenarios for a cut, a complete enumeration for either loop
+is intractable. Therefore, we present a basic approach, heuristic generalization
+with heuristic suppression, namely HgHs.
+
+3.1 Top-Down Greedy Search of the Lattice of Cuts
+
+The outer loop of HgHs enumerates generalizations (cuts) by a top-down greedy
+search of a lattice of all possible cuts [8], where a speciﬁc cut (child) is derived
+from a general cut (parent) by replacing one constituent item of the parent cut
+by its child items on the taxonomy tree.
+
+Starting from the top-most cut which consists of only the root (item) of the
+taxonomy tree, the outer loop continues with the most promising child cut of
+the current cut, which is achieved by evaluating the suppression scenario for
+each child of the current cut by running the inner loop (detailed in the next
+subsection), and computing the anonymization cost. The outer loop stops when
+no child cut reduces the anonymization cost.
+For example, Fig. 2 (a) describes the searching process. The outer loop starts
+from cut1={T} with cost(cut1, SS1) = 23 where the suppression scenario SS1 for
+cut1 = {}. The only child of cut1 is cut2 = {P, Q, e, i}. There is one privacy threat,
+{e, i}, in D
+(cid:4) = g(D, cut2). The suppression scenario SS2 for cut2 (computed by
+the inner loop described in the next subsection) is {i}. So cost(cut2, SS2) =
+costG(cut2) + costS(SS2) = 6.6 + 2 = 8.6. The search continues to evaluate
+the children of cut2. The best child is cut4 since cost(cut4, SS4) = 6.2 while
+cost(cut3, SS3) = 10.2. The search stopped at cut6 ={P, f, g, M, e, i} with SS6
+= {i} as no child of cut6 reduces the cost. So, (cut6, SS6) deﬁnes the anonymized
+data D
+
+(cid:4)(cid:4) as shown in the last column in Fig. 1 (a).
+
+3.2 Finding a Good Suppression Scenario for a Cut
+
+The inner loop of HgHs is responsible for ﬁnding an item suppression scenario SS
+(cid:4) = g(D, Cut) where Cut is the cut currently
+to eliminate privacy threats from D
+being enumerated by the outer loop. SS is a subset of Cut, all occurrences of
+items in SS will be suppressed from D
+
+(cid:4).
+
+(cid:2)
+
+To determine SS, the inner loop greedily searches the so called suppression
+scenario enumeration tree, which is built per cut. Each node on the suppression
+scenario enumeration tree is denoted by a headlist and a taillist. The items in
+headlist are to be kept, and the items not in headlist are to be suppressed. We
+also use the set notation to represent headlist and taillist. Thus, the suppression
+scenario represented by a node N is Cut - N.headlist. And its suppression cost
+∗). For the root node, headlist = {} and
+is
+taillist = Cut, i.e., all items are suppressed. The jth child node C of a parent
+node P is derived based on the jth item, ij, in P.taillist such that C.headlist =
+P.headlist ∪ {ij} and C.taillist = the suﬃx of P.taillist after ij.
+For example, Fig. 2 (b) is the suppression scenario enumeration for cut3 in
+Fig. 2 (a). N1 is the root with N1.headlist = {} and N1.taillist = cut3 where
+
+x∗∈Cut−N.headlist O(x
+
+∗) · ILS(x
+
+176
+
+J. Liu and K. Wang
+
+Fig. 2. Searching the cut lattice and ﬁnding the suppression scenario for each cut
+
+items are listed in the descending order of suppression costs. N2 is derived from
+N1, by moving the ﬁrst item Q from taillist to headlist, which means that all
+items except Q are suppressed.
+
+Clearly, a suppression scenario represented by a node N is valid if and only if
+(cid:4) is contained by N.headlist. Moreover, if a threat X is contained
+no threat in D
+by N.headlist, then X is also contained by the headlist of any descendant of N.
+Therefore, if N is invalid, all its descendants are invalid, we can stop searching
+the subtree rooted at N. If items in headlist and taillist are in the descending
+order of suppression costs, the ﬁrst valid child of any node is the most promising
+child of the node, as it is valid and reduces the suppression cost most.
+For example, Fig. 2 (b) shows how the suppression scenario SS3 for eliminating
+the threats, {H,K,Q} and {e,i}, from D
+(cid:4) = g(D, cut3) is found. The inner loop of
+HgHs starts with N1 which is valid. N2 is the ﬁrst child of its parent and is valid,
+and so is N3. And N4 is the ﬁrst child of N3 but it is invalid. The inner loop
+stoped at N5 with N5.headlist = {Q, K, e}. So, the ﬁnal suppression scenario
+SS3 = cut3 − N5.headlist = {H, i}.
+
+4 Addressing Eﬃciency and Scalability Issues
+
+Although our basic approach HgHs presented in Section 3 enumerates a limited
+number of anonymizations, the work for examining each enumerated anonymiza-
+tion is still non-trivial. In this section, we propose the key techniques to address
+the eﬃciency and scalability issues in this regard.
+
+Anonymizing Transaction Data
+
+177
+
+4.1 Minimal Privacy Threats
+
+(cid:4) =
+The outer loop of HgHs needs to know the set of privacy threats in D
+g(D, Cut) for the current Cut. If such a set is empty, all threats are already
+eliminated by generalizing D. If it is not, we have to suppress some generalized
+(cid:4). First, we claim that it suﬃces to
+items to eliminate all privacy threats from D
+generate the set of minimal privacy threats.
+
+Deﬁnition 2 (Minimal privacy threats): A privacy threat X is a minimal
+(cid:2)
+threat if there is no privacy threat that is a subset of X.
+Since every privacy threat contains some minimal privacy threat, if we eliminate
+all minimal privacy threats, we also eliminate all privacy threats. However, ﬁnd-
+ing the set of minimal privacy threats on-the-ﬂy is ineﬃcient, since every threat
+occurs in multiple versions of the generalized data derived by diﬀerent cuts and
+hence will be repeatedly generated while the number of cuts to be enumerated
+is still quite large.
+
+Our approach is to generate the set of the minimal privacy threats sup-
+ported by all cuts on the taxonomy HP in an initialization step. For Cut being
+enumerated by the outer loop, we can retrieve privacy threats relevant to Cut
+(cid:4) on-the-ﬂy.
+from that set instead of generating D
+Given a suppression scenario SS for Cut, to see if all threats are removed from
+(cid:4)(cid:4) = s(D
+D
+For the running example, there are 25 threats in the set of the minimal privacy
+threats, from which we can retrieve the threats, {H, K, Q} and {e, i}, relevant
+to cut3 in Fig. 2 (a), for searching suppression scenarios in Fig. 2 (b).
+
+, SS), we check if no relevant threat is contained in Cut - SS.
+
+(cid:4) = g(D, Cut) and mining D
+
+(cid:4)
+
+4.2 A Multi-round Approach
+
+The set of the minimal privacy threats supported by all cuts on the taxonomy
+HP could be huge when HP is of a large scale and the maximum size m of
+privacy threats is large, which makes HgHs not scalable. We propose a multi-
+round approach, mHgHs, to address the scalability issue.
+
+best, SS1
+
+To ﬁnd a solution, mHgHs runs HgHs in m rounds. The 1st round ﬁnds
+best) on the original taxonomy HP , which deﬁnes an anonymization
+(Cut1
+observing k1-anonymity. The i-th round ﬁnds (Cuti
+best), which deﬁnes an
+anonymization observing ki-anonymity, on the reduced taxonomy H i−1
+that is
+derived by removing nodes under Cuti−1
+best. In
+other words, mHgHs performs anonymization progressively. Each round works
+on a reduced taxonomy based on the precedent round, so the set of the minimal
+privacy threats supported by all cuts for each round is under control.
+best = {a, b, c, d, f, g, M, e, i}
+best. Then, mHgHs
+best = {P, f, g, M,
+
+P by removing nodes under Cut1
+P , and so on. After ﬁve rounds, mHgHs ﬁnds Cut5
+best = {i}, which conforms 25-anonymity.
+
+For the running example, mHgHs ﬁrst ﬁnds Cut1
+
+with SS1
+works on H 1
+e, i} with SS5
+
+best = {}, and gets H 1
+
+best. Clearly, Cuti
+
+best,SSi
+
+best is above Cuti−1
+
+P
+
+178
+
+J. Liu and K. Wang
+
+5 Experimental Evaluation
+
+Our major goal is to investigate if our approach preserves more data utility than
+others approaches, and if our algorithm is scalable and eﬃcient. We evaluate our
+algorithm mHgHs by comparing it with several state-of-the-art algorithms, the
+local generalization algorithm LG [5], the global generalization algorithm AA
+[13], and the suppression algorithm MM [14]. The executables of AA and MM
+were provided by the authors. We implemented LG as it is not available.
+
+The POS dataset [15] and the AOL web query log dataset [11] are used in the
+experiments. The taxonomy tree for the POS dataset was created by [13]. We
+preprocessed the AOL dataset using WordNet [3] in creating the taxonomy tree.
+The AOL dataset is divided into 10 subsets. We use the ﬁrst subset to evaluate
+the basic features of all algorithms, and use all subsets to evaluate scalabilities.
+We measure information loss by NCP, a variant of LM [6], as it was used by
+AA and LG. Experiments were performed on a PC with a 3.0 GHz CPU and
+3.2 GB RAM. In the experiments, the default setting is k = 5, m = 7.
+
+5.1 Information Loss Evaluation
+
+Fig. 3(a)-(b) show the information loss on the POS dataset. Fig. 3(c)-(d) show
+that on the AOL dataset. Among all the 4 algorithms, the information loss by
+MM is the highest for all cases with m ≥ 2, which is between 7.5% and 70% on
+POS and between 46% and 96% on AOL. This is consistent with the ﬁnding in
+[14] that MM is not good for sparse datasets as the POS dataset is quite sparse
+while the AOL dataset is even sparser.
+
+The information loss by AA is the second highest in general. In some cases on
+POS (with a small m and a large k), LG incurs a little bit more. The information
+loss by AA on AOL is strikingly high, all around 39% even for m=1. Because
+the AOL dataset is extremely sparse, a lot of very infrequent items spread over
+the taxonomy. They have to be generalized to high levels, which brings their
+siblings to the same ancestors by AA. This situation is similar to our motivation
+example where as items e and i are infrequent, their siblings, P and Q, although
+quite frequent, have to be generalized to the top level together with e and i by
+AA. In such cases, suppressing a few outlier items will reduce information loss.
+This motivates our approach.
+
+The information loss by LG is the third highest. As we pointed out in Section
+1, LG exerts excessive distortion as it enforces the transactional k-anonymity
+principle which is too strong to be necessary. LG does not make use of m. So,
+the curves of LG with a varying m are all horizontal lines.
+
+Our algorithm, mHgHs, incurs the least information loss which is the ad-
+vantage of integrating suppression and generalization. The data utility gain of
+mHgHs over LG is moderate on POS, but it is signiﬁcant on AOL. All the infor-
+mation loss with mHgHs is under 10% on AOL, while the worst case with LG is
+27%, e.g., that by mHgHs is around 7.9% with k = 5 and m ≥ 5 on AOL as in
+Fig. 3(d), while that with LG is 12%. The gap increases when enforcing a more
+restrictive privacy requirement, e.g., that by mHgHs with k = 50 and m ≥ 5 on
+
+Anonymizing Transaction Data
+
+179
+
+Fig. 3. Information loss of algorithms MM, AA, LG, and mHgHs on POS and AOL
+
+AOL is 9% as in Fig. 3(c), while that by LG is 17%. Notice that the information
+loss reported for mHgHs is also computed on the original taxonomy.
+
+5.2 Eﬃciency and Scalability Evaluation
+We evaluated the eﬃciencies of all the algorithms. LG is the most eﬃcient be-
+cause it employs a divide-and-conquer approach. But, it comes with an expense,
+i.e., the anonymized data does not observe the domain exclusiveness as dis-
+cussed in Section 1. Our algorithm, mHgHs, is the second most eﬃcient. Al-
+though mHgHs is less eﬃcient than LG, the signiﬁcant gain in data utility by
+mHgHs over LG is worth the longer runtime. AA and MM are less eﬃcient. This
+is because the breadth-ﬁrst search approaches they employ are not eﬃcient in
+dealing with privacy threats with a large size. One exception is that AA is as
+eﬃcient as LG on AOL because the search space is greatly pruned by AA, which
+unfortunately results in the second highest information loss on AOL.
+
+We also evaluated the scalabilities of algorithms on all the 10 subsets of the
+AOL query logs. The result showed that our algorithm mHgHs is quite scalable.
+
+6 Conclusion
+
+This paper proposed to integrate generalization and suppression to enhance data
+utility in anonymizing transaction data. We presented a multi-round, top-down
+greedy search algorithm to address the performance issues. Extensive experi-
+ments show that our approach outperforms the state-of-the-art approaches.
+
+180
+
+J. Liu and K. Wang
+
+Acknowledgements. The research is supported in part by the Natural Sci-
+ences and Engineering Research Council of Canada, in part by the Science and
+Technology Development Plan of Zhejiang Province, China (2006C21034), and in
+part by the Natural Science Foundation of Zhejiang Province, China (Y105700).
+
+We thank Harshwardhan Agarwal for his help in experimental evaluation.
+
+References
+
+1. Agrawal, R., Imielinski, T., Swami, A.: Mining Association Rules between Sets of
+
+Items in Large Databases. In: SIGMOD 1993 (1993)
+
+2. Barbaro, M., Zeller, T.: A Face Is Exposed for AOL Searcher No. 4417749. New
+
+York Times (August 9, 2006)
+
+3. Fellbaum, C.: WordNet, An Electronic Lexical Database. MIT Press, Cambridge
+
+(1998)
+
+4. Ghinita, G., Tao, Y., Kalnis, P.: On the Anonymization of Sparse High-Dimensional
+
+Data. In: ICDE 2008 (2008)
+
+5. He, Y., Naughton, J.: Anonymization of Set-valued Data via Top-down Local Gen-
+
+eralization. In: VLDB 2009 (2009)
+
+6. Iyengar, V.: Transforming Data to Satisfy Privacy Constraints. In: KDD 2002
+
+(2002)
+
+7. LeFevre, K., DeWitt, D., Ramakrishnan, R.: Mondrian Multidimensional k-
+
+Anonymity. In: ICDE 2006 (2006)
+
+8. Liu, J., Wang, K.: On Optimal Anonymization for l+-Diversity. In: ICDE 2010
+
+(2010)
+
+9. Machanavajjhala, A., Gehrke, J., Kifer, D., Venkitasubramaniam, M.: l-Diversity:
+
+Privacy beyond k-Anonymity. In: ICDE 2006 (2006)
+
+10. Narayanan, A., Shmatikov, V.: How to Break Anonymity of the Netﬂix Prize
+
+Dataset. ArXiv Computer Science e-prints (October 2006)
+
+11. Pass, G., Chowdhury, A., Torgeson, C.: A Picture of Search. In: The 1st Intl. Conf.
+
+on Scalable Information Systems, Hong Kong (June 2006)
+
+12. Samarati, P., Sweeney, L.: Generalizing Data to Provide Anonymity When Dis-
+
+closing Information. In: PODS 1998 (1998)
+
+13. Terrovitis, M., Mamoulis, N., Kalnis, P.: Privacy Preserving Anonymization of
+
+Set-valued Data. In: VLDB 2008 (2008)
+
+14. Xu, Y., Wang, K., Fu, A., Yu, P.S.: Anonymizing Transaction Databases for Pub-
+
+lication. In: KDD 2008 (2008)
+
+15. Zheng, Z., Kohavi, R., Mason, L.: Real World Performance of Association Rule
+
+Algorithms. In: KDD 2001 (2001)
+
+

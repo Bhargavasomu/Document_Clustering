@@ -1,0 +1,1291 @@
+Outlier Detection Based on Leave-One-Out
+
+Density Using Binary Decision Diagrams
+
+Takuro Kutsuna1,2 and Akihiro Yamamoto2
+
+1 Toyota Central R&D Labs. Inc., Nagakute, Aichi, 480-1192, Japan
+
+kutsuna@mosk.tytlabs.co.jp
+
+2 Kyoto University, Sakyo-ku, Kyoto, 606-8501, Japan
+
+Abstract. We propose a novel method for detecting outliers based on
+the leave-one-out density. The leave-one-out density of a datum is deﬁned
+as a ratio of the number of data inside a region to the volume of the region
+after the datum is removed from an original data set. We propose an
+eﬃcient algorithm that evaluates the leave-one-out density of each datum
+on a set of regions around the datum by using binary decision diagrams.
+The time complexity of the proposed method is near linear with respect
+to the size of a data set, while the outlier detection accuracy is still
+comparable to other methods. Experimental results show the usefulness
+of the proposed method.
+
+Keywords: Outlier detection, binary decision diagram.
+
+1
+
+Introduction
+
+In this paper, we propose a novel and eﬃcient method for outlier detection, which
+is an important task in data mining and has been applied to many problems such
+as fraud detection, intrusion detection, data cleaning and so on [7]. The goal of
+outlier detection is to ﬁnd an unusual datum (outlier) from a given data set.
+Although many kinds of notion have been proposed to deﬁne an outlier, we
+consider a datum as an outlier if the leave-one-out density is lower than a given
+threshold for a set of regions around the datum. The leave-one-out density is a
+ratio of the number of data inside a region to the volume of the region, in which
+the focused datum is removed from the original data set. Generally, a leave-
+one-out like method is time consuming because a learning procedure is repeated
+N -times, where N is the cardinality of a data set. However, the proposed method
+enables us to evaluate the leave-one-out density eﬃciently without repeating a
+learning procedure N -times.
+
+We employ the initial region method proposed in [10], in which a data set is
+encoded into a Boolean formula and represented as a binary decision diagram.
+Although a one-class classiﬁer is proposed based on the initial region method
+in [10], it is not applicable to outlier detection, because the classiﬁer is estimated
+as an over-approximation of the data set and never classify a datum in the data
+set as an outlier. We extend the work of [10] to outlier detection by introduc-
+ing the notion of leave-one-out density and developing an eﬃcient algorithm to
+evaluate it.
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part II, LNAI 8444, pp. 486–497, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+Outlier Detection Based on Leave-One-Out Density
+
+487
+
+The proposed method is compared to other well-known outlier detection meth-
+ods, the one-class support vector machine [13] and the local outlier factor [4],
+with both synthetic data sets and realistic data sets. The experimental results
+indicate that the computation time of the proposed method is shorter than those
+of the other methods, keeping the outlier detection accuracy comparable to the
+other methods.
+
+The outlier detection problem addressed in this paper is formally deﬁned in
+Sect. 2. We review the initial region method in Sect. 3. In Sect. 4, the outline of
+the proposed method is ﬁrst stated, and then, its eﬃcient implementation based
+on binary decision diagrams is proposed. Section 5 shows experimental results.
+In Sect. 6, we conclude this paper by discussing limitations and future work.
+
+1.1 Related Work
+
+Kutsuna [10] proposed a one-class classiﬁer that over-approximates a training
+data set. The approximation is done quite eﬃciently by manipulating a binary
+decision diagram that is obtained by encoding the training data set. The situ-
+ation considered in [10] is that both a training data set and a test data set are
+given: A classiﬁer is ﬁrst learned from the training dataset, then the test data
+set is classiﬁed by the classiﬁer. It may seem that we can detect outliers within a
+data set by using the data set as both the training data set and the test data set
+simultaneously. However, no datum is detected as an outlier in such a setting,
+because the classiﬁer is estimated as an over-approximation of the training data
+set. Therefore, the method in [10] cannot be applied to outlier detection directly.
+Sch¨olkopf et al. [13] extended the support vector machine (SVM) to outlier
+detection, which was originally invented for binary classiﬁcation. Their method
+estimates a hyperplane that separates the origin and a data set with maximum
+margin, in which the hyperplane can be nonlinear by introducing kernel func-
+tions. The data that are classiﬁed to the origin side are detected as outliers.
+The SVM has an advantage that various nonlinear hyperplanes are estimated
+by changing kernel parameters. Some heuristics are proposed to tune kernel pa-
+rameters, such as [6].
+
+Breunig et al. [4] proposed the local outlier factor (LOF) that is calculated
+based on the distance to the k-nearest neighbor of each datum and has an ad-
+vantage that it can detect local outliers, that is, data that are outlying relative
+to their local neighborhoods. The LOF has been shown to perform very well
+in realistic problems [12]. An eﬃcient calculation of the k-nearest neighbors is
+essential in the LOF. Some techniques are proposed to accelerate the k-nearest
+neighbors calculation, such as [2].
+
+2 Problem Setting
+
+Let D be a data set that includes N data. The i-th datum in D is denoted
+by x(i) ∈ R
+u (i = 1, . . . , N ). We assume that there is no missing value in D and
+all the data in D are unlabeled. In this paper, we regard a datum as an outlier
+
+488
+
+T. Kutsuna and A. Yamamoto
+
+if the leave-one-out density is lower than a threshold for a set of regions around
+the datum. The leave-one-out density ρLOO of the i-th datum is deﬁned as:
+
+ρLOO (i,D) =
+
+#
+
+(cid:2)(cid:3)
+
+x(j)
+
+(cid:4)
+(cid:4) x(j) ∈ D, j = 1, . . . , N, j (cid:3)= i
+
+(cid:5)(cid:6)
+
+vol (D)
+
+where D is a u-dimensional region such that x(i) ∈ D, #(·) is the cardinality of a
+set and vol (·) is the volume of the region. The outlier score S of the i-th datum
+is deﬁned as:
+
+ρLOO (i,D)
+where ˜D (i) is a set of regions around x(i) deﬁned as:
+u-dimensional region D (cid:4)
+
+S (i) = maxD∈ ˜D(i)
+
+˜D (i) =
+
+(cid:7)
+
+(cid:4) x(i) ∈ D(cid:8)
+
+.
+
+A datum is detected as an outlier if the outlier score of the datum is less than a
+given threshold. Note that ˜D (i) is not the set of all possible regions, but rather
+a ﬁxed family, which is deﬁned in Sect. 4.1. In the following sections, we propose
+an eﬃcient algorithm that enables us to evaluate the outlier score in near linear
+time with respect to N .
+
+3 Preliminaries
+
+In this section, we brieﬂy review the initial region method [10] and deﬁne nota-
+tions. Let H be a u-dimensional hypercube deﬁned as H = [0, 2m)u, where m is an
+arbitrary positive integer. And let σ be an example normalizer such that σ(x(i)) ∈
+H for every x(i) in D. An example of σ is given in [10] as a simple scaling function.
+The neighborhood function ν, which is deﬁned as ν(z) := [(cid:4)z1(cid:5),(cid:4)z1(cid:5) + 1) × . . . ×
+[(cid:4)zu(cid:5),(cid:4)zu(cid:5) + 1), returns a u-dimensional unit hypercube that subsumes z = σ(x),
+where (cid:4)·(cid:5) is the ﬂoor function. The initial region G is a u-dimensional region in-
+side H that subsumes all the projected data, which is deﬁned as:
+
+(cid:9)
+
+(cid:10)
+
+(cid:11)
+
+ν
+
+z(j)
+
+.
+
+G =
+
+j=1,...,N
+
+For example, we consider a data set in R2. We set m = 3, then the data set is
+projected into H = [0, 23)2 by σ. The projected data z are shown as x-marks
+and the initial region G is shown as the gray region in Fig. 1(a).
+
+The initial region G is expressed as a Boolean function by using the coding
+function CodeZ. CodeZ ﬁrst truncates each element of z to an integer, and then,
+code them into a logical formula in the manner of an unsigned-integer-type
+coding. The set of Boolean variables B := {bij |i = 1, . . . , u; j = 1, . . . , m} is
+used to code z, where bi1 and bim represent the most and the least signiﬁcant
+bit of the i-th element of z, respectively. The initial Boolean function F is given
+as a disjunction of logical formulas such as:
+
+F =
+
+CodeZ(z(i)).
+
+(cid:12)
+
+i=1,...,N
+
+b21
+
+b22
+
+b23
+
+z2
+
+Outlier Detection Based on Leave-One-Out Density
+
+489
+
+b11
+
+b21
+
+b12
+
+b22
+
+b13
+
+b23
+
+D
+
+H
+
+I
+
+O
+
+B
+
+E
+
+J
+
+1
+
+z1
+b13
+b12
+b11
+
+F
+
+A
+
+True edge
+False edge
+Complement edge
+
+C
+
+F
+
+K
+
+L
+
+G
+
+M
+
+N
+
+P
+
+Q
+
+R
+
+S
+
+(b)
+
+(a)
+
+Fig. 1. X-marks mean a normalized data set and the gray region is the initial re-
+gion G (left). A BDD that represents the initial Boolean function F (right).
+
+It is shown that the initial Boolean function F is informational equivalent of the
+initial region G [11]. Let R be a function that decodes a Boolean function deﬁned
+on B into the corresponding u-dimensional region. In particular, R(1) = H and
+R(F ) = G. Binary decision diagrams (BDDs) [5] are used to eﬃciently construct
+and represent the initial Boolean function F . The order of Boolean variables is
+set to hold [b11, . . . , bu1] ≺ ··· ≺ [b1m, . . . , bum] , where the variables inside the
+square brackets can be in arbitrary order, on constructing F as a BDD. For
+example, Fig. 1(b) shows a BDD that represents the initial Boolean formula F
+that is obtained from the data set in Fig. 1(a). In Fig. 1(b), square nodes,
+ellipsoidal nodes and double-squared nodes are referred to as terminal nodes,
+variable nodes and function nodes, respectively. Boolean variables that variable
+nodes represent are on the left side. Solid lines, dashed lines and dotted lines
+are true edges, false edges and complement edges, respectively. A path from a
+function node to the terminal 1 corresponds to a conjunction of literals. If the
+path contains an even number of complement edges, the conjunction is included
+in the function.
+
+4 Proposed Method
+
+4.1 Outline
+
+In the proposed method, we calculate the leave-one-out density based on the
+normalized data z(i) = σ
+ρLOO (i,C) =
+
+(cid:4)
+(cid:4) z(j) ∈ C, j = 1, . . . , N, j (cid:3)= i
+
+as follows:
+
+z(j)
+
+(cid:6)
+
+(cid:2)
+x(i)
+(cid:2)(cid:3)
+
+#
+
+(cid:5)(cid:6)
+
+(1)
+
+(2)
+
+where C is a region such that z(i) ∈ C. The outlier score is given as:
+
+vol (C)
+
+S (i) = max
+C∈ ˜C(i)
+
+ρLOO (i,C)
+
+490
+
+T. Kutsuna and A. Yamamoto
+
+where ˜C(i) is a set of hypercubes deﬁned as:
+˜C (i) = {R (Ll(i)) | l = 0, . . . , m},
+(cid:13)
+L0(i) = 1, Ll(i) =
+
+(cid:13)
+
+i(cid:2)=1,...,u
+
+j(cid:2)=1,...,l
+
+˜bi(cid:2)j(cid:2)
+
+(l = 1, . . . , m)
+
+(3)
+
+where ˜bi(cid:2)j(cid:2) are assignments of Boolean variables that is obtained by coding z(i)
+with CodeZ. For example, the datum in the region [5, 6) × [2, 3) in Fig. 1(a) is
+coded as (˜b11, ˜b21, ˜b12, ˜b22, ˜b13, ˜b23) = (1, 0, 0, 1, 1, 0). From (3), the set ˜C(i) for
+
+this datum is derived as
+
+˜C(i) = {[0, 8) × [0, 8), [4, 8) × [0, 4), [4, 6) × [2, 4), [5, 6) × [2, 3)}
+
+which are shown as bold squares in Fig. 2.
+
+z2
+
+z2
+
+z2
+
+z2
+
+z1
+
+z1
+Fig. 2. Bold squares show ˜C(i) for the data shown as the x-mark. The leave-one-out
+density ρLOO of the datum are 18
+1 for each hypercube. The outlier score
+(cid:3) ≈ 0.38.
+of the datum is evaluated as max
+
+4 and 0
+, 1
+4
+
+16 , 1
+, 6
+16
+
+, 0
+1
+
+64 , 6
+
+(cid:2)
+
+18
+64
+
+z1
+
+z1
+
+We assume that there is no duplicate in D, that is, at least one of the attributes
+has a diﬀerent value for x(i) and x(j) if i (cid:3)= j. Then, we can construct the initial
+region G so that each datum in D is allocated in a distinct unit hypercube by
+setting m large enough and using an appropriate example normalizer. In this
+case, the number of data inside a region can be calculated as the volume of
+the region unless the boundary of the region goes across a unit hypercube in
+which a datum exists. Therefore, the leave-one-out density deﬁned as (1) can be
+calculated based on the initial region as follows for C ∈ ˜C(i):
+
+vol (GLOO (i) ∩ C)
+
+ρLOO (i,C) =
+
+vol (C)
+where GLOO is the leave-one-out region deﬁned as:
+(cid:11)
+
+GLOO (i) = G \ ν
+
+(cid:10)
+z(i)
+
+.
+
+(4)
+
+(5)
+
+For example, Fig. 2 illustrates the calculation of the leave-one-out density for
+the datum shown as the x-mark.
+
+Outlier Detection Based on Leave-One-Out Density
+
+491
+
+4.2 BDD Based Implementation
+
+The Number of Minterms Calculation. A minterm is a conjunction of
+Boolean variables in which each Boolean variable in the domain appears once.
+Let #A be a function that returns the number of minterms of a Boolean function
+on the assumption that the domain of the function is A. For example, #a(1) = 2
+and #{a,b}(1) = 4 where a and b are Boolean variables.
+Lemma 1. For a Boolean formula A that is deﬁned on B, it holds that:
+
+vol (R (A)) = #B (A) .
+
+Let N +
+
+Proof. Since a minterm represents a unit hypercube in the initial region method,
+the number of minterms equals to the volume of the region that A represents.
+α be a Boolean function that node α in a BDD represents being con-
+nected with a non-complement edge. Also, let N −
+α be a Boolean function being
+connected with a complement edge. Both of N +
+α and N −
+(cid:2)N +
+(cid:6)
+α represent regions in-
+side H. For example, Fig. 3 shows R
+and R
+where E and G are
+nodes in Fig. 1(b). It is possible to eﬃciently calculate the number of minterms
+of N +
+α for each node α in a BDD in a depth-ﬁrst manner [15]. For
+α and N −
+example, Table 1 shows the number of minterms of N +
+(cid:6)
+α for each node
+are equal to the volumes
+in Fig. 1(b). We can see that #B
+E
+of regions which are shown in Fig. 3.
+
+α and N −
+
+(cid:2)N −
+
+(cid:2)N −
+
+(cid:2)N +
+
+and #B
+
+(cid:6)
+
+E
+
+(cid:6)
+
+G
+
+G
+
+b21
+
+b22
+
+b23
+
+z2
+
+b22
+
+b21
+
+b23
+
+z2
+
+z1
+b13
+b12
+b11
+
+Fig. 3. Examples of regions that BDD nodes represent: R
+(right) where E and G are nodes in Fig. 1(b)
+
+(cid:3)
+
+(cid:2)N −
+
+E
+
+z1
+b13
+b11
+b12
+(cid:2)N +
+
+G
+
+(left) and R
+
+(cid:3)
+
+(cid:6) ⊆
+(cid:6) ⊆ C ∈ ˜C(i), it is derived from (4) and (5) that the following equa-
+
+The Leave-One-Out Density Calculation. Because of the fact that ν
+G and ν
+tion holds for C ∈ ˜C(i):
+
+(cid:2)
+z(i)
+
+z(i)
+
+(cid:2)
+
+ρLOO (i,C) =
+
+vol (G ∩ C) − 1
+
+vol (C)
+
+.
+
+(6)
+
+492
+
+T. Kutsuna and A. Yamamoto
+
+Table 1. The number of minterms of N +
+
+α and N −
+
+α for each node α in Fig. 1(b)
+
+α
+
+(cid:2)N +
+(cid:2)N −
+
+α
+
+α
+
+#B
+#B
+
+(cid:3)
+(cid:3)
+
+A B C D E F G H I J K L M N O P Q R S 1
+45 44 46 52 36 44 16 40 48 56 24 32 24 8 32 48 32 16 32 64
+19 20 18 12 28 20 48 24 16 8 40 32 40 56 32 16 32 48 32 0
+
+By replacing C in (6) with R (Ll (i)), the following equation is derived.
+vol (R (F ∧ Ll (i))) − 1
+ρLOO (i, R (Ll (i))) =
+
+vol (G ∩ R (Ll (i))) − 1
+
+=
+
+vol (R (Ll (i)))
+
+vol (R (Ll (i)))
+
+From Lemma 1, (7) is transformed as follows:
+
+ρLOO (i, R (Ll (i))) =
+
+#B (F ∧ Ll (i)) − 1
+
+#B (Ll (i))
+
+#B (F ∧ Ll (i)) − 1
+
+2(m−l)u
+
+=
+
+(7)
+
+(8)
+
+Lemma 2. In a BDD that represents F , let αi,l be the node that can be reached
+from the function node through the path deﬁned by Ll (i). Let c be the number
+of complement edges on the path. Then, it holds that:
+
+#B (F ∧ Ll (i)) =
+
+⎧
+⎨
+
+⎩
+
+#B
+
+#B
+
+(cid:11)
+(cid:11)
+
+(cid:10)N +
+(cid:10)N −
+
+αi,l
+
+αi,l
+
+/2lu
+/2lu
+
+if c is even,
+if c is odd.
+
+Proof. F ∧ Ll (i) means that l × u Boolean variables that appear in Ll (i) are
+ﬁxed to speciﬁc values in F . On the other hand, N +
+αi,l ) means F with l× u
+Boolean variables in Ll (i) smoothed1 if c is even (odd). Therefore, the number
+of minterms of N +
+Theorem 1. The leave-one-out density ρLOO is evaluated based on a BDD that
+represents the initial Boolean function F as follows:
+(cid:11)
+(cid:11)
+
+αi,l ) is 2lu times larger than that of F ∧ Ll (i).
+
+αi,l (N −
+
+αi,l (N −
+
+⎧
+⎨
+
+αi,l
+
+ρLOO (i, R (Ll (i))) =
+
+(cid:10)
+#B
+(cid:10)
+#B
+
+(cid:10)N +
+(cid:10)N −
+
+αi,l
+
+(cid:11) − 2lu
+(cid:11) − 2lu
+
+if c is even,
+if c is odd.
+
+/2mu
+/2mu
+
+⎩
+
+Proof. It follows from (8) and Lemma 2 immediately.
+
+It is worth mentioning that we can evaluate the leave-one-out density from the
+initial Boolean function F straightforwardly without any leave-one-out opera-
+tion by using Theorem 1. For example, we consider a data set in Fig. 1(a) and
+the datum in [5, 6)× [2, 3). The path of the datum is F • A ◦ B◦ E ◦ K ◦ Q ◦ S • 1
+in Fig. 1(b), where ◦ and • mean non-complement and complement edges, re-
+spectively. The leave-one-out density of the datum is calculated from Theorem 1
+and Table 1 as follows:
+
+(cid:2)
+#B
+
+(cid:6)
+
+(cid:2)N −
+(cid:10)
+
+A
+
+#B
+
+(cid:6) − 20
+(cid:10)N −
+
+Q
+
+(cid:11)
+
+(cid:11) − 24
+
+/26 = 18/64,
+
+(cid:2)N −
+
+E
+
+(cid:2)
+#B
+(cid:2)
+
+(cid:6) − 22
+(cid:2)N +
+
+(cid:6)
+(cid:6) − 26
+
+1
+
+(cid:6)
+
+/26 = 6/16,
+
+/26 = 0.
+
+/26 = 1/4,
+
+#B
+
+We can see that these values are equal to those in Fig. 2.
+1 Smoothing a Boolean function f with respect to x means (f ∧ x) ∨ (f ∧ x).
+
+Outlier Detection Based on Leave-One-Out Density
+
+493
+
+4.3 The Proposed Algorithm and Computational Complexity
+
+We propose Algorithm 1 that calculates the outlier score of each datum in D.In
+Algorithm 1, the time complexity of constructing the initial Boolean function F
+is approximately O(M N ), where M is the number of nodes of the created BDD,
+because logical operations between BDDs are practically almost linear to the size
+of the BDDs [3]. The size of the created BDD depends on the characteristics of
+the data set and can be exponentially large in the worst case, but, it is compact
+for realistic data sets used in our experiments. The time complexity of calculating
+the number of minterms is O(M ) as mentioned in Sect. 4.2. The time complexity
+of calculating the outlier score is O(muN ) because the depth of the BDD is mu.
+Consequently, the time complexity of Algorithm 1 is O((M + mu)N ). Therefore,
+the proposed method can deal with a large data set eﬃciently unless the number
+of Boolean variables and the created BDD are intractably huge.
+
+Algorithm 1: The outlier score calculation.
+
+Input: A data set D.
+Output: The outlier score S of each datum in D.
+
+1 Construct the initial Boolean function F as a BDD.;
+2 Calculate the number of minterms of each node of the BDD.;
+3 for i ← 1 to N do
+
+4
+
+5
+
+Search the path that CodeZ(z(i)) represents in the BDD and
+evaluate ρLOO (i, R (Ll (i))) for l = 0, . . . , m by using Theorem 1.;
+S (i) ← maxl=0,...,m ρLOO (i, R (Ll (i)));
+
+4.4 Dealing with Categorical Attributes
+
+The proposed method can be extended in order to deal with a data set that
+consists of both continuous attributes and categorical attributes. Let y(i) be a
+vector of categorical attributes of the i-th datum. We extend the leave-one-out
+density deﬁned as (1) as follows:
+
+ρLOO (i,C) =
+
+#
+
+(cid:2)(cid:3)
+
+z(j)
+
+(cid:4)(cid:4) z(j) ∈ C, y(j) = y(i), j = 1, . . . , N, j (cid:3)= i
+
+(cid:5)(cid:6)
+
+vol (C)
+
+Then, the outlier score deﬁned as (2) can be evaluated very eﬃciently in the
+same manner as mentioned in the previous sections. The details are skipped
+because of the page limit.
+
+5 Experimental Results
+
+We compare the proposed method with existing methods, the one-class support
+vector machine (OCSVM) and the local outlier factor (LOF). The proposed
+method is referred to as ODBDD. We implemented ODBDD as a C program
+
+494
+
+T. Kutsuna and A. Yamamoto
+
+with the help of CUDD [14]. The ksvm function in the kernlab package [9] is
+used for OCSVM and the lofactor function in the DMwR package [16] is used
+for LOF. The parameter m that deﬁnes the size of the hypercube H is ﬁxed
+to m = 16 in ODBDD. In OCSVM, the Gaussian kernel is used and the kernel
+parameter γ is set to one of the 10%, 50% and 90% quantiles of the distance
+between samples [6], which are referred to as γ0.1, γ0.5 and γ0.9, respectively. The
+parameter ν is ﬁxed to ν = 0.1 in OCSVM. In LOF, the number of neighbors
+is set to either k = 10 or k = 50. In OCSVM and LOF, continuous attributes
+are scaled and categorical attributes are coded by using dummy variables. The
+accuracy is evaluated in terms of the area under an ROC curve (AUC) [8]. The
+experiment was performed on a Microsoft Windows 7 machine with an Intel
+Core i7 CPU (3.20 GHz) and 64 GB RAM.
+
+5.1 Evaluation with Synthetic Data Sets
+
+Ten data set is a synthetic data set that consists of two continuous attributes
+and no categorical attribute. The 95 % data of Ten data set distributes inside
+the shape “10” randomly. The remaining 5 % data distributes outside randomly,
+which are regarded as outliers. The number of data is set to 103, 104, 105 or 106.
+An example of Ten-103 data set is shown in the left side of Fig. 4.
+
+0
+1
+
+.
+
+5
+
+.
+
+0
+
+0
+0
+
+.
+
+.
+
+5
+0
+−
+
+0
+
+.
+
+1
+−
+
+0
+1
+
+.
+
+5
+
+.
+
+0
+
+0
+0
+
+.
+
+.
+
+5
+0
+−
+
+0
+
+.
+
+1
+−
+
+−1.0
+
+−0.5
+
+0.0
+
+0.5
+
+1.0
+
+−1.0
+
+−0.5
+
+0.0
+
+0.5
+
+1.0
+
+Fig. 4. An example of Ten-103 data set in which true outliers are shown as cross-
+marks (left). X-marks mean outliers detected by the proposed method (right).
+
+Table 2 shows the mean and the standard deviation of computation time over
+10 random trials for Ten data set. We can see that the computation time of the
+proposed method increases moderately compared to the other methods.
+
+Table 3 shows the mean and the standard deviation of AUC values over 10
+random trials for Ten data set. From Table 3, the accuracy of the proposed
+method is comparable to those of the other methods. For example, the outliers
+detected by ODBDD is shown in the right side of Fig. 4, in which the top 5 %
+of the data are detected as outliers based on the outlier score of ODBDD.
+
+Outlier Detection Based on Leave-One-Out Density
+
+495
+
+Table 2. The mean and the std. dev. of comp. time for Ten data set (sec)
+
+OCSVM (ν = 0.1)
+
+LOF
+
+k = 50
+Data set ODBDD
+Ten-103
+0.1 (0.0)
+0.5 (0.0)
+Ten-104
+0.3 (0.0)
+24.8 (0.3)
+Ten-105
+2.3 (0.0) 294.5 (5.7) 267.3 (4.0) 250.6 (4.0) 2942.0 (38.4) 3052.1 (34.3)
+Ten-106 30.1 (0.9)
+
+k = 10
+0.4 (0.0)
+22.6 (0.1)
+
+γ = γ0.1
+0.0 (0.0)
+3.0 (0.1)
+
+γ = γ0.5
+0.0 (0.0)
+2.7 (0.1)
+
+γ = γ0.9
+0.0 (0.0)
+2.6 (0.1)
+
+timeout
+
+timeout
+
+timeout
+
+timeout
+
+timeout
+
+The timeout limit is 3600 seconds.
+
+Table 3. The mean and the std. dev. of AUC values for Ten data set
+
+OCSVM (ν = 0.1)
+
+LOF
+
+γ = γ0.1
+
+γ = γ0.5
+
+Data set ODBDD
+Ten-103 0.97 (0.02) 0.79 (0.02) 0.80 (0.03) 0.95 (0.01) 0.99 (0.01) 0.97 (0.02)
+Ten-104 0.99 (0.00) 0.80 (0.02) 0.82 (0.02) 0.97 (0.00) 0.82 (0.02) 1.00 (0.00)
+Ten-105 0.99 (0.00) 0.80 (0.00) 0.82 (0.00) 0.97 (0.00) 0.60 (0.01) 0.77 (0.01)
+Ten-106 1.00 (0.00)
+
+timeout
+
+timeout
+
+timeout
+
+timeout
+
+timeout
+
+γ = γ0.9
+
+k = 10
+
+k = 50
+
+5.2 Evaluation with Realistic Data Sets
+
+We use seven data sets from UCI machine learning repository [1] as shown in
+Table 4, where Na is the size of the original data set. All of these data sets are
+originally arranged for the classiﬁcation task. In order to apply these data sets
+to the evaluation of outlier detection algorithms, we randomly picked out data
+from each data set to generate a new data set as follows: 1) Pick out all the data
+whose class are Cm where Cm is the class of the maximum data size. Let Nm be
+the number of data that belong to class Cm. 2) Pick out No = round(0.01Nm)
+data randomly from the remaining data set, which are regarded as outliers.
+
+Table 4. An overview of UCI data sets used in the experiment
+
+Data set
+abalone
+adult
+bank
+ionosphere
+magic
+shuttle
+yeast
+
+Na
+4177
+32561
+45211
+351
+19020
+43500
+1484
+
+Nm
+689
+24720
+39922
+225
+12332
+34108
+463
+
+No # of cate. attr. # of cont. attr.
+7
+6
+7
+34
+10
+8
+8
+
+7
+248
+400
+3
+124
+342
+5
+
+1
+8
+9
+0
+0
+0
+0
+
+Table 5 shows the mean and the standard deviation of computation time over
+10 random trials for UCI data sets. The computation time varies drastically
+depending on the size of the data set in both OCSVM and LOF. On the other
+hand, ODBDD works quite fast for all of the data sets.
+
+496
+
+T. Kutsuna and A. Yamamoto
+
+Table 5. The mean and the std. dev. of comp. time for UCI data sets (sec)
+
+OCSVM (ν = 0.1)
+
+LOF
+
+γ = γ0.9
+0.0 (0.0) 0.0 (0.0) 0.0 (0.0)
+
+γ = γ0.5
+
+Data set ODBDD γ = γ0.1
+abalone
+adult
+bank
+0.0 (0.0) 0.0 (0.0) 0.0 (0.0)
+ionosphere 0.2 (0.0)
+2.4 (0.0)
+magic
+4.6 (0.1) 4.1 (0.1) 4.0 (0.1)
+2.9 (0.1) 35.6 (0.4) 32.3 (0.3) 31.0 (0.3)
+shuttle
+0.0 (0.0) 0.0 (0.0) 0.0 (0.0)
+0.2 (0.0)
+yeast
+
+0.2 (0.0)
+(0.0)
+3.1 (0.1) 26.5 (0.2) 24.5 (0.1) 24.2 (0.1) 2688.9 (320.0) 2935.3 (459.5)
+6.0 (0.0) 66.2 (0.4) 61.5 (0.5) 60.0 (0.3) 2784.8 (672.6) 2328.6 (155.7)
+(0.0)
+(0.1)
+398.4 (10.9) 424.4 (12.5)
+(0.0)
+
+k = 50
+0.4
+
+k = 10
+0.3
+
+(0.0)
+(0.7)
+
+0.2
+
+(0.0)
+
+0.2
+
+0.1
+52.3
+
+0.1
+56.6
+
+(0.0)
+
+Table 6 shows the mean and the standard deviation of AUC values over 10
+random trials. Although some results of ODBDD are not as good as the best
+result of the other methods, ODBDD achieves similar accuracy to the others.
+
+Table 6. The mean and the std. dev. of AUC values for UCI data sets
+
+OCSVM (ν = 0.1)
+
+LOF
+
+γ = γ0.1
+
+γ = γ0.5
+
+γ = γ0.9
+
+ODBDD
+
+Data set
+0.59 (0.13) 0.59 (0.08) 0.57 (0.08) 0.58 (0.08) 0.61 (0.11) 0.66 (0.15)
+abalone
+0.59 (0.02) 0.62 (0.01) 0.62 (0.01) 0.61 (0.01) 0.46 (0.02) 0.52 (0.03)
+adult
+0.61 (0.02) 0.62 (0.01) 0.62 (0.01) 0.62 (0.01) 0.62 (0.01) 0.69 (0.01)
+bank
+ionosphere 0.87 (0.12) 0.79 (0.08) 0.87 (0.09) 0.64 (0.13) 0.94 (0.07) 0.95 (0.08)
+0.79 (0.02) 0.64 (0.03) 0.67 (0.03) 0.71 (0.03) 0.85 (0.03) 0.83 (0.03)
+magic
+0.93 (0.01) 0.78 (0.01) 0.89 (0.01) 0.93 (0.00) 0.44 (0.02) 0.69 (0.03)
+shuttle
+yeast
+0.65 (0.15) 0.66 (0.11) 0.64 (0.10) 0.55 (0.06) 0.69 (0.15) 0.73 (0.12)
+
+k = 10
+
+k = 50
+
+6 Conclusions
+
+In this work, we proposed a novel approach for outlier detection. A score of
+being an outlier is deﬁned based on the leave-one-out density, which is evaluated
+very eﬃciently by processing a binary decision diagram that represents a data
+set in a logical formula. The proposed method can deal with a large data set
+eﬃciently, because the time complexity is near linear unless the created BDD
+gets intractably huge.
+This work can be extended in several ways. First, the region set ˜D(i) is en-
+riched by using various normalizers. Then, the accuracy of outlier detection is
+expected to improve. A simple approach to generate various normalizers is to
+incorporate a random rotation into a normalizer. Another extension is to em-
+ploy nonlinear normalizers. If we use nonlinear normalizers, a hypercube in a
+projected space corresponds to a nonlinear region in the original space, which
+may lead to more precise outlier detection.
+
+The proposed method may suﬀer from the curse of dimensionality when a
+data set has many attributes and the number of data is not enough, because the
+leave-one-out density is zero in almost every subregion of the whole hypercube
+
+Outlier Detection Based on Leave-One-Out Density
+
+497
+
+in such a situation. A simple solution is to embed some dimension reduction
+method into a normalizer.
+
+Although we have conducted experiments with several data sets mainly to
+compare the proposed method to other methods, it is necessary to apply the
+proposed method to other real world problems in order to examine the practical
+usefulness of the proposed method and reveal problems to tackle in future.
+
+References
+
+1. Bache, K., Lichman, M.: UCI machine learning repository (2013),
+
+http://archive.ics.uci.edu/ml
+
+2. Beckmann, N., Kriegel, H., Schneider, R., Seeger, B.: The R*-tree: an eﬃcient
+and robust access method for points and rectangles. SIGMOD Rec. 19(2), 322–331
+(1990)
+
+3. Brace, K., Rudell, R., Bryant, R.: Eﬃcient implementation of a BDD package. In:
+
+The 27th ACM/IEEE Design Automation Conference, pp. 40–45 (1990)
+
+4. Breunig, M., Kriegel, H., Ng, R., Sander, J.: LOF: Identifying density-based local
+
+outliers. In: SIGMOD Conference, pp. 93–104 (2000)
+
+5. Bryant, R.: Graph-based algorithms for boolean function manipulation. IEEE
+
+Trans. Computers 35(8), 677–691 (1986)
+
+6. Caputo, B., Sim, K., Furesjo, F., Smola, A.: Appearance-based object recognition
+using svms: Which kernel should I use? In: NIPS Workshop on Statistical Methods
+for Computational Experiments in Visual Processing and Computer Vision (2002)
+7. Chandola, V., Banerjee, A., Kumar, V.: Anomaly detection: A survey. ACM Com-
+
+puting Surveys (CSUR) 41(3), 15 (2009)
+
+8. Fawcett, T.: An introduction to ROC analysis. Pattern Recognition Letters 27(8),
+
+861–874 (2006)
+
+9. Karatzoglou, A., Smola, A., Hornik, K., Zeileis, A.: kernlab – an S4 package for
+
+kernel methods in R. Journal of Statistical Software 11(9), 1–20 (2004)
+
+10. Kutsuna, T.: A binary decision diagram-based one-class classiﬁer. In: The 10th
+
+IEEE International Conference on Data Mining, pp. 284–293 (December 2010)
+
+11. Kutsuna, T., Yamamoto, A.: A parameter-free approach for one-class classiﬁcation
+using binary decision diagrams. Intelligent Data Analysis 18(5) (to appear, 2014)
+12. Lazarevic, A., Ertoz, L., Kumar, V., Ozgur, A., Srivastava, J.: A comparative study
+of anomaly detection schemes in network intrusion detection. In: Proceedings of
+SIAM Conference on Data Mining (2003)
+
+13. Sch¨olkopf, B., Platt, J., Shawe-Taylor, J., Smola, A., Williamson, R.: Estimat-
+ing the support of a high-dimensional distribution. Neural Computation 13(7),
+1443–1471 (2001)
+
+14. Somenzi, F.: CUDD: CU decision diagram package,
+
+http://vlsi.colorado.edu/~fabio/CUDD/
+
+15. Somenzi, F.: Binary decision diagrams. In: Calculational System Design, vol. 173,
+
+pp. 303–366. IOS Press (1999)
+
+16. Torgo, L.: Data Mining with R, learning with case studies (2010)
+
+

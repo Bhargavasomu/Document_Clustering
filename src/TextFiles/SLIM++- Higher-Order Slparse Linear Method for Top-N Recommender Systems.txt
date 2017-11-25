@@ -1,0 +1,1189 @@
+HOSLIM: Higher-Order Sparse LInear Method
+
+for Top-N Recommender Systems
+
+Evangelia Christakopoulou and George Karypis
+
+University of Minnesota, Minneapolis, MN
+
+Computer Science & Engineering
+{evangel,karypis}@cs.umn.edu
+
+Abstract. Current top-N recommendation methods compute the rec-
+ommendations by taking into account only relations between pairs of
+items, thus leading to potential unused information when higher-order re-
+lations between the items exist. Past attempts to incorporate the
+higher-order information were done in the context of neighborhood-based
+methods. However, in many datasets, they did not lead to signiﬁcant
+improvements in the recommendation quality. We developed a top-N
+recommendation method that revisits the issue of higher-order relations,
+in the context of the model-based Sparse LInear Method (SLIM). The
+approach followed (Higher-Order Sparse LInear Method, or HOSLIM)
+learns two sparse aggregation coeﬃcient matrices S and S(cid:2)
+that cap-
+ture the item-item and itemset-item similarities, respectively. Matrix S(cid:2)
+allows HOSLIM to capture higher-order relations, whose complexity is
+determined by the length of the itemset. Following the spirit of SLIM,
+matrices S and S(cid:2)
+are estimated using an elastic net formulation, which
+promotes model sparsity. We conducted extensive experiments which
+show that higher-order interactions exist in real datasets and when in-
+corporated in the HOSLIM framework, the recommendations made are
+improved. The experimental results show that the greater the presence
+of higher-order relations, the more substantial the improvement in rec-
+ommendation quality is, over the best existing methods. In addition, our
+experiments show that the performance of HOSLIM remains good when
+we select S(cid:2)
+such that its number of nonzeros is comparable to S, which
+reduces the time required to compute the recommendations.
+
+1
+
+Introduction
+
+In many widely-used recommender systems [1], users are provided with a ranked
+list of items in which they will likely be interested in. In these systems, which are
+referred to as top-N recommendation systems, the main goal is to identify the
+most suitable items for a user, so as to encourage possible purchases. In the last
+decade, several algorithms for top-N recommendation tasks have been developed
+[12], the most popular of which are the neighborhood-based (which focus either
+on users or items) and the matrix-factorization methods. The neighborhood-
+based algorithms [6] focus on identifying similar users/items based on a user-
+item purchase/rating matrix. The matrix-factorization algorithms [5] factorize
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part II, LNAI 8444, pp. 38–49, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+HOSLIM: Higher-Order Sparse LInear Method
+
+39
+
+the user-item matrix into lower rank user factor and item factor matrices, which
+represent both the users and the items in a common latent space.
+
+Though matrix factorization methods have been shown to be superior for
+solving the problem of rating prediction, item-based neighborhood methods are
+shown to be superior for the top-N recommendation problem [3, 6, 9, 10]. In fact
+the winning method in the recent million song dataset challenge [3] was a rather
+straightforward item-based neighborhood top-N recommendation approach.
+
+The traditional approaches for developing item-based top-N recommendation
+methods (k-Nearest Neighbors, or k-NN) [6] use various vector-space similarity
+measures (e.g., cosine, extended Jaccard, Pearson correlation coeﬃcient, etc.) to
+identify for each item the k most similar other items based on the sets of users
+that co-purchased these items. Then, given a set of items that have already
+been purchased by a user, they derive their recommendations by combining the
+most similar unpurchased items to those already purchased. In recent years, the
+performance of these item-based neighborhood schemes has been signiﬁcantly
+improved by using supervised learning methods to learn a model that both cap-
+tures the similarities (or aggregation coeﬃcients) and also identiﬁes the sets of
+neighbors that lead to the best overall performance [9,10]. One of these methods
+is SLIM [10], which learns a sparse aggregation coeﬃcient matrix from the user-
+purchase matrix, by solving an optimization problem. It was shown that SLIM
+outperforms other top-N recommender methods [10].
+
+However, there is an inherent limitation to both the old and the new top-N
+recommendation methods as they capture only pairwise relations between items
+and they are not capable of capturing higher-order relations. For example, in a
+grocery store, users tend to often buy items that form the ingredients in recipes.
+Similarly, the purchase of a phone is often combined with the purchase of a screen
+protector and a case. In both of these examples, purchasing a subset of items
+in the set signiﬁcantly increases the likelihood of purchasing the rest. Ignoring
+these types of relations, when present, can lead to suboptimal recommendations.
+The potential of improving the performance of top-N recommendation meth-
+ods was recognized by Mukund et al. [6], who incorporated combinations of
+items (i.e., itemsets) in their method. In that work, the most similar items were
+identiﬁed not only for each individual item, but also for all suﬃciently frequent
+itemsets that are present in the active user’s basket. This method referred to
+as HOKNN (Higher-Order k-NN) computes the recommendations by combining
+itemsets of diﬀerent size. However, in most datasets this method did not lead to
+signiﬁcant improvements. We believe that the reason for this is that the recom-
+mendation score of an item is computed simply by an item-item or itemset-item
+similarity measure, which does not take into account the subtle relations that
+exist when these individual predictors are combined.
+
+In this paper, we revisit the issue of utilizing higher-order information, in the
+context of model-based methods. The research question answered is whether the
+incorporation of higher-order information in the recently developed model-based
+top-N recommendation methods will improve the recommendation quality fur-
+ther. The contribution of this paper is two-fold: First, we verify the existence
+
+40
+
+E. Christakopoulou and G. Karypis
+
+of higher-order information in real-world datasets, which suggests that higher-
+order relations do exist and thus if properly taken into account, they can lead
+to performance improvements. Second, we develop an approach referred to as
+Higher-Order Sparse Linear Method, (HOSLIM) in which the itemsets capturing
+the higher-order information are treated as additional items and their contri-
+bution to the overall recommendation score is estimated using the model-based
+framework introduced by SLIM. We conduct a comprehensive set of experiments
+on diﬀerent datasets from various applications. The results show that this combi-
+nation improves the recommendation quality beyond the current best results of
+top-N recommendation. In addition, we show the eﬀect of the support threshold
+chosen on the quality of the method. Finally, we present the requirements that
+need to be satisﬁed in order to ensure that HOSLIM computes the predictions
+in an eﬃcient way.
+
+The rest of the paper is organized as follows. Section 2 introduces the nota-
+tions used in this paper. Section 3 presents the related work. Section 4 explains
+the method proposed. Section 5 provides the evaluation methodology and the
+dataset characteristics. In Section 6, we provide the results of the experimental
+evaluation. Finally, Section 7 contains some concluding remarks.
+
+2 Notations
+
+In this paper, all vectors are represented by bold lower case letters and they are
+column vectors (e.g., p, q). Row vectors are represented by having the transpose
+superscript T , (e.g., pT ). All matrices are represented by upper case letters (e.g.,
+R, W ). The ith row of a matrix A is represented by aT
+i . A predicted value is
+denoted by having a ∼ over it (e.g., ˜r).
+
+The number of users will be denoted by n and the number of items will be
+denoted by m. Matrix R will be used to represent the user-item implicit feedback
+matrix of size n× m, containing the items that the users have purchased/viewed.
+Symbols u and i will be used to denote individual users and items, respectively.
+An entry (u, i) in R, rui, will be used to represent the feedback information for
+user u on item i. R is a binary matrix. If the user has provided feedback for a
+particular item, then the corresponding entry in R is 1, otherwise it is 0. We will
+refer to the items that the user has bought/viewed as purchased items and to
+the rest as unpurchased items.
+Let I be the set of sets of items that are co-purchased by at least σ users in
+R, where σ denotes the minimum support threshold. We will refer to these sets
+as itemsets and we will use p to denote the cardinality of I (i.e., p = |I|). Let R(cid:3)
+be a matrix whose columns correspond to the diﬀerent itemsets in I (the size
+of this matrix is n × p). In this matrix r(cid:3)
+uj will be one, if user u has purchased
+all the items corresponding to the itemset of the jth column of R(cid:3)
+and zero
+otherwise. We refer to R(cid:3)
+as the user-itemset implicit feedback matrix. We will
+use Ij to denote the set of items that constitute the itemset of the jth column
+of R(cid:3)
+. In the rest of the paper, every itemset will be of size two (unless stated
+otherwise) and considered to be frequent, even if it is not explicitly stated.
+
+HOSLIM: Higher-Order Sparse LInear Method
+
+41
+
+3 Related Work
+
+In this paper, we combine the idea of higher-order models introduced by HOKNN
+with SLIM. The overview of these two methods is presented in the following
+subsections.
+
+3.1 Higher-Order k-Nearest Neighbors Top-N Recommendation
+
+Algorithm (HOKNN)
+
+Mukund et al. [6] had pointed out that the recommendations could potentially
+be improved, by taking into account higher-order relations, beyond relations
+between pairs of items. They did that by incorporating combinations of items
+(itemsets) in the following way: The most similar items are found not for each
+individual item, as it is typically done in the neighborhood-based models, but
+for all possible itemsets up to a particular size l.
+
+3.2 Sparse LInear Method for top-N Recommendation (SLIM)
+
+SLIM computes the recommendation score on an unpurchased item i of a user
+u as a sparse aggregation of all the user’s purchased items:
+
+˜rui = rT
+
+u si,
+
+(1)
+
+where rT
+u is the row-vector of R corresponding to user u and si is a sparse size-m
+column vector which is learned by solving the following optimization problem:
+
+||ri − Rsi||2
+
+2 +
+
+1
+2
+
+si
+
+minimize
+subject to si ≥ 0
+sii = 0,
+
+||si||2
+
+2 + λ||si||1,
+
+β
+2
+
+(2)
+
+where ||si||2
+2 is the l2 norm of si and ||si||1 is the entry-wise l1 norm of si.
+The l1 regularization gets used so that sparse solutions are found [13]. The l2
+regularization prevents overﬁtting. The constants β and λ are regularization
+parameters. The non-negativity constraint is applied so that the matrix learned
+will be a positive aggregation of coeﬃcients. The sii = 0 constraint makes sure
+that when computing the weights of an item, that item itself is not used as
+this would lead to trivial solutions. All the si vectors can be put together into
+a matrix S, which can be thought of as an item-item similarity matrix that is
+learned from the data. So, the model introduced by SLIM can be presented as
+˜R = RS.
+
+4 HOSLIM: Higher-Order Sparse LInear Method for
+
+Top-N Recommendation
+
+The ideas of the higher-order models can be combined with the SLIM learning
+framework in order to estimate the various item-item and itemset-item similari-
+ties. In this approach, the likelihood that a user will purchase a particular item is
+
+42
+
+E. Christakopoulou and G. Karypis
+
+computed as a sparse aggregation of both the items purchased and the itemsets
+that it supports. The predicted score for user u on item i is given by
+
+˜rui = rT
+
+u si + r
+
+(cid:3)T
+u s
+
+(cid:3)
+
+i,
+
+(3)
+(cid:3)
+
+i
+
+(5)
+
+where si is a sparse vector of size m of aggregation coeﬃcients for items and s
+is sparse vector of size p of aggregation coeﬃcients for itemsets.
+
+Thus, the model can be presented as:
+
+˜R = RS + R(cid:3)S(cid:3),
+
+(4)
+
+where R is the user-item implicit feedback matrix, R(cid:3)
+is the user-itemset implicit
+feedback matrix, S is the sparse coeﬃcient matrix learned corresponding to items
+(size m× m) and S(cid:3)
+is the sparse coeﬃcient matrix learned corresponding to item-
+sets (size p × m). The ith columns of S and S(cid:3)
+
+i of Equation 3.
+
+are the si and s
+
+(cid:3)
+
+Top-N recommendation gets done for the uth user by computing the scores
+for all the unpurchased items, sorting them and then taking the top-N values.
+The sparse matrices S and S(cid:3)
+encode the similarities (or aggregation coeﬃ-
+cients) between the items/itemsets and the items. The ith columns of S and S(cid:3)
+can be estimated by solving the following optimization problem:
+i||2
+||s
+(cid:3)
+i||1
++λ||si||1 + λ||s
+(cid:3)
+
+||ri − Rsi − R(cid:3)
+
+i||2
+2 +
+
+||si||2
+
+minimize
+
+si,s(cid:2)
+
+2 +
+
+β
+2
+
+(cid:3)
+
+s
+
+β
+2
+
+1
+2
+
+i
+
+2
+
+subject to si ≥ 0
+i ≥ 0
+(cid:3)
+s
+sii = 0, and
+ji = 0, where {i ∈ Ij}.
+s(cid:3)
+
+The constraint sii = 0 makes sure that when computing rui, the element rui
+is not used. If this constraint was not enforced, then an item would recommend
+itself. Following the same logic, the constraint s(cid:3)
+ji = 0 ensures that the itemsets
+j for which i ∈ Ij will not contribute to the computation of rui.
+
+The optimization problem of Equation 5 can be solved using coordinate de-
+
+scent and soft thresholding [7].
+
+5 Experimental Evaluation
+
+5.1 Datasets
+
+We evaluated the performance of HOSLIM on a wide variety of datasets, both
+synthetic and real. The datasets we used include point-of-sales, transactions,
+movie ratings and social bookmarking. Their characteristics are shown in Table 1.
+The groceries dataset corresponds to transactions of a local grocery store.
+Each user corresponds to a customer and the items correspond to the distinct
+products purchased over a period of one year. The synthetic dataset was gen-
+erated by using the IBM synthetic dataset generator [2], which simulates the
+
+HOSLIM: Higher-Order Sparse LInear Method
+
+43
+
+Table 1. Dataset Characteristics
+
+Name
+
+#Users #Items #Transactions Density
+
+Average
+
+Basket Size
+
+groceries
+synthetic
+delicious
+ml
+retail
+bms-pos
+bms1
+ctlg3
+
+63,035
+5000
+2,989
+943
+85146
+435,319
+26,667
+56,593
+
+15,846
+1000
+2,000
+1,681
+16470
+1,657
+496
+39,079
+
+1,997,686
+68,597
+243,441
+99,057
+820,414
+2,851,423
+90,037
+
+0.2%
+1.37%
+4.07%
+6.24%
+0.06%
+0.39%
+0.68%
+394,654 0.017%
+
+31.69
+13.72
+81.44
+105.04
+
+9.64
+6.55
+3.37
+6.97
+
+Columns corresponding to #users, #items and #transactions
+show the number of users, number of
+items and number of
+transactions, respectively,
+in each dataset. The column corre-
+sponding to density shows the density of each dataset (i.e.,
+density=#transactions/(#users×#items)). The average basket size
+is the average number of transactions for each user.
+
+behavior of customers in a retail environment. The parameters we used for gen-
+erating the dataset were: average size of itemset= 4 and total number of itemsets
+existent= 1, 200. The delicious dataset [11] was obtained from the eponymous
+social bookmarking site. The items on this dataset correspond to tags. A non-
+zero entry indicates that the corresponding user wrote a post using the cor-
+responding tag. The ml dataset corresponds to MovieLens 100K dataset, [8]
+which represents movie ratings. All the ratings were converted to one, showing
+whether a user rated a movie or not. The retail dataset [4] contains the retail
+market basket data from a Belgian retail store. The bms-pos dataset [14] con-
+tains several years worth of point-of-sales data from a large electronics retailer.
+The bms1 dataset [14] contains several months worth of clickstream data from
+an e-commerce website. The ctlg3 dataset corresponds to the catalog purchasing
+transactions of a major mail-order catalog retailer.
+
+5.2 Evaluation Methodology
+
+We employed a 10-fold leave-one-out cross-validation to evaluate the perfor-
+mance of the proposed model. For each fold, one item was selected randomly for
+each user and this was placed in the test set. The rest of the data comprised
+the training set. We used only the data in the training set for both the itemset
+discovery and model learning.
+
+We measured the quality of the recommendations by comparing the size-N
+recommendation list of each user and the item of that user in the test set. The
+quality measure used was the hit-rate (HR). HR is deﬁned as follows,
+
+HR =
+
+#hits
+#users
+
+,
+
+(6)
+
+44
+
+E. Christakopoulou and G. Karypis
+
+where “#users” is the total number of users (n) and “#hits” is the number of
+users whose item in the test set is present in the size-N recommendation list.
+
+5.3 Model Selection
+
+We performed an extensive search over the parameter space of the various meth-
+ods, in order to ﬁnd the set of parameters that gives us the best performance for
+all the methods. We only report the performance corresponding to the param-
+eters that lead to the best results. The l1 regularization λ was chosen from the
+set of values: {0.0001, 0.001, 0.01, 0.1, 1, 2, 5}. The lF regularization parameter β
+ranged in the set: {0.01, 0.1, 1, 3, 5, 7, 10}. The larger β and λ were, the stronger
+the regularizations were. The number of neighbors examined lied in the interval
+[1 − 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]. The
+support threshold σ took on values {10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65,
+70, 75, 80, 85, 90, 95, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650,
+700, 750, 800, 850, 900, 950, 1000, 1500, 2000, 2500, 3000}.
+
+6 Experimental Results
+
+The experimental evaluation consists of two parts. First, we analyze the various
+datasets in order to assess the extent to which higher-order relations exist in
+them. Second, we present the performance of HOSLIM and compare it to SLIM
+as well as HOKNN.
+
+6.1 Verifying the Existence of Higher-Order Relations
+
+We veriﬁed the existence of higher-order relations in the datasets, by measuring
+how prevalent are the itemsets with strong association between the items that
+comprise it (beyond pairwise associations). In order to identify such itemsets,
+(which will be referred to as “good”), we conducted the following experiment.
+We found all frequent itemsets of size 3 with σ equal to 10. For each of these
+itemsets we computed two quality metrics. The ﬁrst is
+
+dependency max =
+
+P (ABC)
+
+max(P (AB), P (AC), P (BC))
+
+,
+
+(7)
+
+which measures how much greater the probability of a purchase of all the items
+of an itemset is than the maximum probability of the purchase of an induced
+pair. The second is
+
+dependency min =
+
+P (ABC)
+
+min(P (AB), P (AC), P (BC))
+
+,
+
+(8)
+
+which measures how much greater the probability of the purchase of all the
+items of an itemset is than the minimum probability of the purchase of an
+induced pair. These metrics are suited for identifying the “good” itemsets, as
+
+HOSLIM: Higher-Order Sparse LInear Method
+
+45
+
+Table 2. Coverage by Aﬀected Users/Non-zeros
+
+Name
+
+groceries
+synthetic
+delicious
+ml
+retail
+bms-pos
+bms1
+ctlg3
+
+max≥ 2
+
+users non-zeros
+68.30
+95.17
+76.50
+98.04
+81.33
+59.02
+69.77
+99.47
+13.69
+23.54
+81.51
+59.66
+63.18
+31.52
+34.95
+24.85
+
+Percentage (%) with at least one
+“good” itemset of dependency:
+max≥ 5
+
+min≥ 2
+
+users non-zeros
+47.91
+88.11
+75.83
+98.00
+55.34
+22.88
+3.75
+28.42
+4.10
+8.85
+44.77
+32.61
+60.82
+29.47
+34.94
+24.81
+
+users non-zeros
+84.69
+97.53
+76.80
+98.06
+81.80
+59.97
+77.94
+99.89
+40.66
+49.70
+91.92
+66.71
+63.22
+31.55
+34.95
+24.85
+
+min≥ 5
+
+users non-zeros
+73.09
+96.36
+76.79
+98.06
+72.57
+44.14
+37.62
+63.63
+25.63
+38.48
+80.09
+51.53
+63.21
+31.54
+34.95
+24.85
+
+The percentage of users/non-zeros with at least one “good” itemset. The itemsets
+considered have a support threshold of 10, except in the case of delicious and ml,
+where the support threshold is 50, (as delicious and ml are dense datasets and thus
+a large number of itemsets is induced).
+
+they discard the itemsets that are frequent just because their induced pairs are
+frequent. Instead, the above-mentioned metrics discover the frequent itemsets
+that have all or some infrequent induced pairs, meaning that these itemsets
+contain higher-order information.
+
+Given these metrics, we then selected the itemsets of size three that have
+quality metrics greater than 2 and 5. The higher the quality cut-oﬀ, the more
+certain we are that a speciﬁc itemset is “good”.
+
+For these sets of high quality itemsets, we analyzed how well they cover the
+original datasets. We used two metrics of coverage. The ﬁrst is the percentage of
+users that have at least one “good” itemset, while the second is the percentage of
+the non-zeros in the user-item matrix R covered by at least one “good” itemset
+(shown in Table 2). A non-zero in R is considered to be covered, when the
+corresponding item of the non-zero value participates in at least one “good”
+itemset supported by the associated user.
+
+We can see from Table 2 that not all datasets have uniform coverage with
+respect to high quality itemsets. The groceries and synthetic datasets contain a
+large number of “good” itemsets that cover a large fraction of non-zeros in R
+and nearly all the users. On the other hand, the ml, retail and ctlg3 datasets
+contain “good” itemsets that have signiﬁcantly lower coverage with respect to
+both coverage metrics. The coverage characteristics of the good itemsets that
+exist in the remaining datasets is somewhere in between these two extremes.
+These results suggest that the potential gains that HOSLIM can achieve will
+vary across the diﬀerent datasets and should perform better for groceries and
+synthetic datasets.
+
+46
+
+E. Christakopoulou and G. Karypis
+
+Table 3. Comparison of 1st order with 2nd order models
+
+p
+
+SLIM models
+
+SLIM
+
+HOSLIM
+
+Improved
+
+k-NN
+
+k-NN models
+HOKNN
+
+Improved
+
+β
+Dataset
+groceries
+5
+synthetic 0.1
+10
+delicious
+ml
+1
+retail
+bms-pos
+bms1
+ctlg3
+
+λ
+0.001
+0.1
+0.01
+5
+10 0.0001
+2
+0.01
+0.1
+
+7
+15
+5
+
+λ
+
+HR
+0.259
+0.733
+0.148
+0.338 180
+0.310
+0.502
+0.588
+0.581
+
+σ β
+HR
+10 10 0.0001 0.338
+1 0.860
+10
+3
+0.01 0.156
+50 10
+5 0.0001 0.349
+0.1 0.317
+5 0.509
+0.001 0.594
+0.1 0.582
+
+10 10
+20 10
+10 10
+15
+5
+
+%
+32.03
+17.33
+5.41
+3.25
+2.26
+1.39
+1.02
+0.17
+
+nnbrs
+1000
+41
+80
+15
+1000
+700
+200
+700
+
+HR nnbrs σ
+0.174
+800 10
+0.697
+47 10
+0.134
+80 10
+0.267
+15 10
+0.281 1,000 10
+0.478
+600 10
+0.571
+200 10
+0.559
+700 11
+
+HR
+0.240
+0.769
+0.134
+0.267
+0.282
+0.480
+0.571
+0.559
+
+%
+37.93
+10.33
+0
+0
+0.36
+0.42
+0
+0
+
+For each method, columns corresponding to the best HR and the set of parameters
+with which it is achieved are shown. For SLIM (1st order), the set of parameters con-
+sists of the l2 regularization parameter β and the l1 regularization parameter λ. For
+HOSLIM (2nd order), the parameters are β, λ and the support threshold σ. For k-
+NN (1st order), the parameter used is the number of nearest neighbors (nnbrs). For
+HOKNN (2nd order), the parameters are the number of nearest neighbors (nnbrs) and
+the support threshold σ. The columns “Improved” show the percentage of improve-
+ment of the 2nd order models above the 1st order models. More speciﬁcally, the 1st
+column “Improved” shows the percentage of improvement of HOSLIM beyond SLIM.
+The 2nd column “Improved” shows the percentage of improvement of HOKNN be-
+yond k-NN.
+
+6.2 Performance Comparison
+
+Table 3 shows the performance achieved by HOSLIM, SLIM, k-NN and HOKNN.
+The results show that HOSLIM produces recommendations that are better than
+the other methods in nearly all the datasets. We can also see that the incorpora-
+tion of higher-order information improves the recommendation quality, especially
+in the HOSLIM framework.
+
+Moreover, we can observe that the greater the existence of higher-order rela-
+tions in the dataset, the more signiﬁcant the improvement in recommendation
+quality is. For example, the most signiﬁcant improvement happens in the gro-
+ceries and the synthetic datasets, in which the higher-order relations are the
+greatest (as seen from Table 2). On the other hand, the ctlg3 dataset does not
+beneﬁt from higher-order models, since there are not enough higher-order re-
+lations. These results are to a large extent in agreement with our expectations
+based on the analysis presented in the previous section. The datasets for which
+HOSLIM achieves the highest improvement are those that contain the largest
+number of users and non-zeros that are covered by high-quality itemsets.
+
+Figure 1 demonstrates the performance of the methods for diﬀerent values
+of N (i.e., 5, 10, 15 and 20). HOSLIM outperforms the other methods for all
+diﬀerent values of N as well. We choose N to be quite small, as a user will not
+see an item that exists in the bottom of a top-100 or top-200 list.
+
+HOSLIM: Higher-Order Sparse LInear Method
+
+47
+
+k-NN
+HOKNN
+
+SLIM
+HOSLIM
+
+k-NN
+HOKNN
+
+SLIM
+HOSLIM
+
+R
+H
+
+ 0.4
+
+ 0.2
+
+ 0
+
+5
+
+10
+
+15
+
+20
+
+N
+
+R
+H
+
+ 0.4
+
+ 0.2
+
+ 0
+
+5
+
+10
+
+15
+
+20
+
+N
+
+R
+H
+
+ 1
+
+ 0.8
+
+ 0.6
+
+ 0.4
+
+ 0.2
+
+ 0
+
+k-NN
+HOKNN
+
+SLIM
+HOSLIM
+
+5
+
+10
+
+15
+
+20
+
+N
+
+(a) Groceries Dataset
+
+(b) Retail Dataset
+
+(c) Synthetic Dataset
+
+Fig. 1. HR for diﬀerent values of N
+
+ 0.35
+
+R
+H
+
+ 0.3
+
+HOSLIM
+SLIM
+
+ 0.32
+
+R
+H
+
+ 0.31
+
+HOSLIM
+SLIM
+
+ 0.25
+
+ 10
+
+ 100
+
+(cid:109)
+
+ 1000
+
+ 0.3
+
+ 10
+
+ 100
+
+ 1000
+
+ 10000
+
+(cid:109)
+
+R
+H
+
+ 0.85
+
+ 0.8
+
+ 0.75
+
+ 0.7
+
+ 10
+
+HOSLIM
+SLIM
+
+ 100
+
+(cid:109)
+
+(a) Groceries Dataset
+
+(b) Retail Dataset
+
+(c) Synthetic Dataset
+
+Fig. 2. Eﬀect of the support threshold on HR
+
+6.3 Performance only on the Users Covered by “Good” Itemsets
+
+In order to better understand how the existence of “good” itemsets aﬀects the
+performance of HOSLIM, we computed the correlation coeﬃcient of the per-
+centage improvement of HOSLIM beyond SLIM (presented in Table 3) with
+the product of the aﬀected users coverage and the number of non-zeros cov-
+erage (presented in Table 2). The correlation coeﬃcient is 0.712, indicating a
+strong positive correlation between the coverage (in terms of users and non-zeros)
+of higher-order itemsets in the dataset and the performance gains achieved by
+HOSLIM.
+
+6.4 Sensitivity on the Support of the Itemsets
+
+As there are lots of possible choices for support threshold, we analyzed the
+performance of HOSLIM, with varying support threshold σ. The reason behind
+this is that we wanted to see the trend of the performance of HOSLIM with
+respect to σ. Ideally, we would like HOSLIM to perform better than SLIM, for
+as many values of σ, as possible; not for just a few of them.
+
+Figure 2 shows the sensitivity of HOSLIM to the support threshold σ. We
+can see that there is a wide range of support thresholds for which HOSLIM
+outperforms SLIM. Also, a low support threshold means that HOSLIM beneﬁts
+more from the itemsets, leading to a better HR.
+
+48
+
+E. Christakopoulou and G. Karypis
+
+Table 4. Comparison of unconstrained HOSLIM with constrained HOSLIM and SLIM
+
+Dataset
+
+groceries
+synthetic
+delicious
+ml
+retail
+bms-pos
+bms1
+ctlg3
+
+constrained unconstrained
+HOSLIM HR HOSLIM HR
+
+SLIM HR
+
+0.327
+0.860
+0.154
+0.340
+0.317
+0.509
+0.594
+0.582
+
+0.338
+0.860
+0.156
+0.349
+0.317
+0.509
+0.594
+0.582
+
+0.259
+0.733
+0.148
+0.338
+0.310
+0.502
+0.588
+0.581
+
+The performance of HOSLIM under the constraint
+)+nnz(SHOSLIM) ≤ 2nnz(SSLIM ) is compared
+nnz(S(cid:2)
+to that of HOSLIM without any constraints and SLIM.
+
+6.5 Eﬃcient Recommendation by Controlling the Complexity
+
+Until this point, the model selected was the one producing the best recommen-
+dations, with no further constraints. However, in order for HOSLIM to be used
+in real-life scenarios, it also needs to be applied fast. In other words, the model
+should compute the recommendations fast and this means that it should have
+non-prohibitive complexity.
+
+The question that normally arises is the following: If we ﬁnd a way to control
+the complexity, how much will the performance of HOSLIM be aﬀected? In
+order to answer this question, we did the following experiment: As the cost of
+computing the top-N recommendation list depends on the number of non-zeros
+in the model, we selected from all learned models the ones that satisﬁed the
+constraint:
+
+nnz(S(cid:3)
+
+) + nnz(SHOSLIM ) ≤ 2nnz(SSLIM ).
+
+(9)
+
+With this constraint, we increased the complexity of HOSLIM little beyond the
+original SLIM (since the original number of non-zeros is now at most doubled).
+Table 4 shows the HRs of SLIM and constrained and unconstrained HOSLIM.
+It can be observed that the HR of the constrained HOSLIM model is close to
+the optimal one. This shows that a simple model can incorporate the itemset
+information and improve the recommendation quality in an eﬃcient way, making
+the approach proposed in this paper usable, in real-world scenarios.
+
+7 Conclusion
+
+In this paper, we revisited the research question of the existence of higher-order
+information in real-world datasets and whether its incorporation could help the
+recommendation quality. This was done in the light of recent advances in the top-
+N recommendation methods. By coupling the incorporation of higher-order asso-
+ciations (beyond pairwise) with state-of-the-art top-N recommendation methods
+
+HOSLIM: Higher-Order Sparse LInear Method
+
+49
+
+like SLIM, the quality of the recommendations made was improved beyond the
+current best results.
+
+References
+
+1. Adomavicius, G., Tuzhilin, A.: Toward the next generation of recommender sys-
+tems: A survey of the state-of-the-art and possible extensions. IEEE Transactions
+on Knowledge and Data Engineering 17(6), 734–749 (2005)
+
+2. Agrawal, R., Srikant, R., et al.: Fast algorithms for mining association rules. In:
+Proc. 20th Int. Conf. Very Large Data Bases, VLDB, vol. 1215, pp. 487–499 (1994)
+3. Aiolli, F.: A preliminary study on a recommender system for the million songs
+dataset challenge. Preference Learning: Problems and Applications in AI, 1 (2012)
+4. Brijs, T., Swinnen, G., Vanhoof, K., Wets, G.: Using association rules for product
+assortment decisions: A case study. In: Proceedings of the Fifth ACM SIGKDD
+International Conference on Knowledge Discovery and Data Mining, pp. 254–260.
+ACM (1999)
+
+5. Cremonesi, P., Koren, Y., Turrin, R.: Performance of recommender algorithms on
+top-n recommendation tasks. In: Proceedings of the Fourth ACM Conference on
+Recommender Systems, pp. 39–46. ACM (2010)
+
+6. Deshpande, M., Karypis, G.: Item-based top-n recommendation algorithms. ACM
+
+Transactions on Information Systems (TOIS) 22(1), 143–177 (2004)
+
+7. Friedman, J., Hastie, T., Tibshirani, R.: Regularization paths for generalized linear
+
+models via coordinate descent. Journal of Statistical Software 33(1), 1 (2010)
+
+8. Herlocker, J.L., Konstan, J.A., Borchers, A., Riedl, J.: An algorithmic framework
+for performing collaborative ﬁltering. In: Proceedings of the 22nd Annual Inter-
+national ACM SIGIR Conference on Research and Development in Information
+Retrieval, pp. 230–237. ACM (1999)
+
+9. Kabbur, S., Ning, X., Karypis, G.: Fism: Factored item similarity models for top-n
+
+recommender systems (2013)
+
+10. Ning, X., Karypis, G.: Slim: Sparse linear methods for top-n recommender sys-
+tems. In: 2011 IEEE 11th International Conference on Data Mining (ICDM), pp.
+497–506. IEEE (2011)
+
+11. Pan, R., Zhou, Y., Cao, B., Liu, N.N., Lukose, R., Scholz, M., Yang, Q.: One-class
+collaborative ﬁltering. In: Eighth IEEE International Conference on Data Mining,
+ICDM 2008, pp. 502–511. IEEE (2008)
+
+12. Ricci, F., Shapira, B.: Recommender systems handbook. Springer (2011)
+13. Tibshirani, R.: Regression shrinkage and selection via the lasso. Journal of the
+
+Royal Statistical Society. Series B (Methodological), 267–288 (1996)
+
+14. Zheng, Z., Kohavi, R., Mason, L.: Real world performance of association rule al-
+gorithms. In: Proceedings of the Seventh ACM SIGKDD International Conference
+on Knowledge Discovery and Data Mining, pp. 401–406. ACM (2001)
+
+

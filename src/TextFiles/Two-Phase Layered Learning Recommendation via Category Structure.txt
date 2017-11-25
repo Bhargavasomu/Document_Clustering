@@ -1,0 +1,1213 @@
+Two-Phase Layered Learning Recommendation
+
+via Category Structure
+
+Ke Ji1, Hong Shen2,3, Hui Tian4, Yanbo Wu1, and Jun Wu1
+
+1 School of Computer and Information Tech., Beijing Jiaotong University, China
+2 School of Information Science and Technology, Sun Yat-sen University, China
+
+4 School of Electronics and Info. Engineering, Beijing Jiaotong University, China
+
+3 School of Computer Science, University of Adelaide, Australia
+{12120425,htian,ybwu,wuj}@bjtu.edu.cn, hongsh01@gmail.com,
+
+Abstract. Context and social network information have been intro-
+duced to improve recommendation systems. However, most existing work
+still models users’ rating for every item directly. This approach has two
+disadvantages: high cost for handling large amount of items and unable
+to handle the dynamic update of items. Generally, items are classiﬁed
+into many categories. Items in the same category have similar/relevant
+content, and hence may attract users of the same interest. These char-
+acteristics determine that we can utilize the item’s content similarity to
+overcome the diﬃcultiess of large amount and dynamic update of items.
+In this paper, aiming at fusing the category structure, we propose a novel
+two-phase layered learning recommendation framework, which is matrix
+factorization approach and can be seen as a greedy layer-wise training:
+ﬁrst learn user’s average rating to every category, and then, based on
+this, learn more accurate estimates of user’s rating for individual item
+with content and social relation ensembled. Based on two kinds of clas-
+siﬁcations, we design two layered gradient algorithms in our framework.
+Systematic experiments on real data demonstrate that our algorithms
+outperform other state-of-the-art methods, especially for recommending
+new items.
+
+Keywords: Collaborative ﬁltering, Matrix Factorization, Recommender
+Systems, Layered Learning.
+
+1
+
+Introduction
+
+With the rapid development of the Internet, information growth has gone be-
+yond the capacity of our social infrustucture. Recommendation systems that can
+suggest users with useful information become a powerful way to solve the infor-
+mation overload. A successful technique in recommendation systems is collabo-
+rative ﬁltering (CF) [1]. It has been applied in many areas, such ase ecommerce
+(e.g., Amazon) and social networks (e.g., Twitter). Two primary approaches to
+CF are memory based [2] and model based [3,4] algorithms. The basic diﬀer-
+ence is that memory based algorithms predict the missing rating based on sim-
+ilar users or items which can be found from the whole user-item rating matrix
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part II, LNAI 8444, pp. 13–24, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+14
+
+K. Ji et al.
+
+(Figure 1(a)) using the similarity measurement (PCC, VSS [5]), whereas model
+based algorithms explore the training data to train a model, which can make
+fast prediction using only a few parameters of the model instead of manipulating
+the whole matrix.
+
+Traditional CF algorithms have several challenges. Due to the sparsity, they
+cannot make reliable recommendation for lazy users who have rated few items
+or cold start users who have never rated any items because of insuﬃcient data
+to capture their tastes accurately. Mining purely the rating matrix may give un-
+realistic recommendation. In order to solve these problems, lots of studies have
+been done. Matrix factorization can solve the sparsity problem [4]. Context-
+aware algorithms [6] that incorporate contextual information have improved the
+accuracy. With the popularity of online social networks, social recommenda-
+tion models [7,8,9,10,11] that incorporate social networks information (Figure
+1(b)) not only improve the recommendation quality, but also solve the cold start
+problem.
+
+Even so, there are still some drawbacks. They typically model users’ rating
+for every item. As the number of items increases, the rating matrix becomes
+very large so that matrix operations in all CF algorithms become exceedingly
+expensive which may even go beyond the physical computation/storage power.
+Beside that, attention to an individual item does not reveal users’ tastes ex-
+plicitly, and provides no ability to deal with new items to arrive in the future.
+There is therefore an urgent need to establish a general system that can provide
+scalable solutions for both the large amount and dynamic update of data. As
+nowadays we can easily get a greater variety of data than ever before, informa-
+tion extraction methods that can extract keyword from item content (Figure
+1(c)) are widely adopted. There are classiﬁcation methods that can accurately
+classify the items into many categories (Figure 1(d)). Intuitively, for items un-
+der the same category, their content is relevant, and hence the user’s tastes to
+them may well be similar. This means that we can explore the category structure
+to ﬁnd user’s similar tastes. Since this information is comparatively static, we
+can use it to improve the scalability of a recommendation system. However, the
+current models cannot be adopted to incorporate this information. Therefore,
+a more ﬂexible recommendation mechanism that can eﬃciently integrate this
+information is needed.
+
+(a) rating matrix
+
+(b) social network
+
+(c) keyword
+
+(d) category
+
+Fig. 1. A Toy Example
+
+Two-Phase Layered Learning Recommendation via Category Structure
+
+15
+
+To address the above problems, we apply a new strategy of layered learning
+toconsider separately diﬀerent factors in diﬀerent layers. Motivated by this idea,
+we propose a two-phase layered learning recommendation framework integrat-
+ing various information. The main process is deﬁned as: we ﬁrst learn user’s
+average tastes to every category of items in phase one, then we regard them as
+baseline estimates and learn more accurate estimates of user’s rating for each
+item with content and social relation ensembled in phase two. We employ matrix
+factorization to factorize diﬀerent user preference matrixes: user-category pref-
+erence matrix and user-keyword preference matrix. According to the two kinds
+of classiﬁcation, we design two layered gradient algorithms in our framework,
+and conduct experiments on real dataset. The experimental result and analysis
+demonstrate that our framework not only increases the classiﬁcation accuracy,
+but also has good performance for dynamic updates of items.
+
+The rest of this paper is organized as follows. In Section 2, we introduce the
+related work. Our recommendation framework is formulated in Section 3, and
+experimental results are reported in Section 4. Section 5 is the conclusion.
+
+2 Related Work
+
+2.1 Matrix Factorization(MF)
+
+Matrix factorization is one of the most popular approaches for low-dimensional
+matrix decomposition. Here, we review the basic MF method [4]. The rating
+matrix R∈RM×N (M is the number of users and N is the number of items)
+can be predicted by U V T with the user latent factor matrix U∈RD×M and item
+latent factor matrix V ∈RD×N , where D is the dimension of the vectors. In order
+to learn the two matrices, the sum-of-squared-error function L is deﬁned (with
+Frobenius regularization (cid:3) . (cid:3)F ).
+
+L =
+
+M(cid:2)
+
+N(cid:2)
+
+i=1
+
+j=1
+
+(cid:3)
+Rij − U T
+
+i Vj
+
+(cid:4)2
+
+Iij
+
++ λ1(cid:3)U(cid:3)2
+
+F + λ2(cid:3)V (cid:3)2
+
+F
+
+(1)
+
+where λ1 or λ2 is the extent of regularization and Iij is the indicator function
+that is equal to 1 if user i rated item j and equal to 0 otherwise. The optimization
+problem arg minU,V L can be solved using gradient descent method.
+
+2.2 Classiﬁcation Based on Flat Approache and Top-Down
+
+Approache
+
+Classiﬁcation is an important data analysis method. It can help us better un-
+derstand data. Classiﬁcation can be artiﬁcial, also can be automatic based on
+machine learning. According to the division structure, there are two main clas-
+siﬁcation methods: ﬂat approach and top-down approach [12] (Figure 2). Flat
+approach divides the data into multi-category directly, not considering the hi-
+erarchical relation between categories. Top-down approach uses the divide and
+
+16
+
+K. Ji et al.
+
+conquer technique: classify the current category into some small-scale subcate-
+gories, perform the step iteratively until a reasonable classiﬁcation. In this paper,
+we introduce the category of items to ﬁnd the similarity among items.
+
+(a) Flat Approaches
+
+(b) Top-down Approaches
+
+Fig. 2. Two kinds of classiﬁcations
+
+2.3 Social Recommendation
+
+Traditional recommendation systems assume users are i.i.d (independent and
+identically distributed). In real life, people’s decision is often aﬀected by friends’
+action or recommendation. How to utilize social information has been extensively
+studied. Trust-aware models [7,9,13] fusing users’ social network graph with the
+rating matrix move an important step forward for recommendation systems. Re-
+cently, social-based models make some further improvements. [10] proposed two
+better methods to leverage the social relation. [8] revealed two important factors:
+individual preference and interpersonal inﬂuence for better utilization of social
+information. CircleCon [11] used the domain-speciﬁc “Trust Circles” to extend
+the SocialMF [7]. However, all of them give no consideration to item content
+and the similarity among items. In this paper, we incorporate this information
+to elaborate recommendation.
+
+3 Layered Learning Frameworks for Recommendation
+
+We introduce the problem description, basic idea and deﬁne notations in Section
+3.1, and present two layered gradient algorithms in Section 3.2 and 3.3.
+
+3.1 Preliminaries
+
+Because of the weakness of directly modeling every rating mentioned in Section
+1, we take advantage of user’s tastes to the information of items and indirectly
+
+Two-Phase Layered Learning Recommendation via Category Structure
+
+17
+
+model the rating. Choosing the appropriate category and keyword from the infor-
+mation, we can present the rating matrix as the combination of the user-category
+preference matrix and user-keyword preference matrix. The ﬁrst problem is how
+to fuse the two matrices into the CF model. We apply the two-phase layered
+learning strategy: Find user’s average tastes to every category and En-
+semble it with content and social relation. The second problem is how to
+deal with diﬀerent classiﬁcations. For the ﬂat approach, we directly learn user’s
+tastes to every category , whereas for the top-down approach, we apply the same
+layered learning strategy: after learning user’s average taste to current category,
+we learn their tastes to the subcategories.
+
+Suppose that we have M users, N items and K keywords. Every item belongs
+to one category. For the ﬂat approach, we assume that the values of a category
+are discrete variables in the range c = {1, 2, . . . , n}. For the top-down approach,
+we assume that the category is expressed hierarchically as a string c1.c2.c3.c4,
+where the categories are delimited by the character ‘.’, ordered in top-down
+fashion (i.e., category ‘c1’ is a parent category of ‘c2’, and category ‘c3’ is a
+parent category of ‘c4’, and so on). ci = {1, 2, . . . , ni} is the set of discrete values
+of a category in the i-th layer. The rating matrix is denoted by R ∈ RM×N . We
+also have a directed social follow graph G = (ν, ε) where ν represents the users
+and the edge set ε represents the following relationships between users.
+
+3.2 Layered Learning Framework on Flat Approach
+
+For the ﬂat approach, we directly learn user’s average tastes to every category.
+
+Phase One: Find User’s Average Tastes to Every Category. We associate
+user i with factor vector Ui ∈ RD and category k with factor vector Ck ∈ RD.
+Rij can be computed by ˆRij = U T
+i CCa(j), where Ca(j) is the category that item
+j belongs to. The sum-of-squared-error function L1 is deﬁned:
+
+M(cid:2)
+
+N(cid:2)
+
+(cid:5)
+Rij − ˆRij
+
+(cid:6)2
+
+Iij
+
+L1 =
+
+i=1
+
+j=1
+
++ λu(cid:3)U(cid:3)2
+
+F + λc(cid:3)C(cid:3)2
+
+F
+
+(2)
+
+We perform gradient descent in Ui and Ck (Eq.3 and 4) to minimize L1.
+(cid:6)
+∂L1
+∂Ui
+
+ˆRij − Rij
+
+ˆRij − Rij
+
+∂L1
+∂Ck
+
+Iij CCa(j)
+
++λuUi,
+
+(cid:2)
+
+(cid:2)
+
+(cid:5)
+
+(cid:5)
+
+(cid:6)
+
+N(cid:2)
+
+j=1
+
+=
+
+=
+
+j∈φ(k)
+
+i∈ϕ(j)
+
++λcCk
+
+(3)
+where φ (k) is the set of the items belong to category k, ϕ (j) is the set of users
+who have rated item j and λu or λc is the extent of regularization. After the
+optimization, we can get the user-category preference matrix Rc = U T C. The
+matrix base, where baseij = Rc
+i CCa(j) means user i’s average taste
+to item j’s category is taken as the initial prediction to R.
+
+iCa(j) = U T
+
+Phase Two: Ensemble User’s Rating with Content and Social Relation.
+Although we have user’s tastes to every category, user’s preference for individual
+
+18
+
+K. Ji et al.
+
+Algorithm 1. Layered gradient algorithm for ﬂat approach
+(cid:2)
+Require: 0 < αu, αc, αk < 1, t = 0.
+< L(t)
+Ensure: L(0)
+Phase one:
+(0)
+Initialization:U
+for t = 1, 2,·· · do
+i
+
+k ) ≥ 0, L(0)
+
+≥ 0, L(t+1)
+
+(0)
+1 (U
+i
+
+(0)
+U
+i
+
+(0)
+k
+
+(0)
+z
+
+, C
+
+, C
+
+(cid:3)
+
+, k
+
+(0)
+
+2
+
+1
+
+1 , L(t+1)
+
+2
+
+< L(t)
+2 .
+
+Calculate ∂L(t−1)
+− αu
+(t−1)
+(t)
+i = U
+i
+
+1
+∂Ui
+
+U
+
+, ∂L(t−1)
+∂L(t−1)
+
+1
+∂Ck
+
+1
+∂Ui
+
+end for
+
+(t)
+k = C
+
+(t−1)
+k
+
+− αc
+
+∂L(t−1)
+
+1
+∂Ck
+
+, C
+
+Generate the baseline estimate matrix base whose elements are baseij = U T
+Phase two:
+← Ui
+Initialization: K
+for t = 1, 2,·· · do
+
+(0)
+(0)
+z . Take current value Ui as the initial value: U
+i
+
+i CCa(j)
+
+Calculate ∂L(t−1)
+− αu
+(t−1)
+(t)
+i = U
+i
+
+2
+∂Ui
+
+U
+
+2
+
+, ∂L(t−1)
+∂L(t−1)
+
+∂Kz
+
+2
+∂Ui
+
+end for
+
+, K
+
+(t)
+z = K
+
+(t−1)
+z
+
+− αk
+
+∂L(t−1)
+
+2
+
+∂Kz
+
+item is around the average estimate. For example, a user’s taste to one category
+is 3, but the user’s rating for individual item may be some higher 3.3 or some
+lower 2.9. We introduce user’s preference for item’s keywords to help optimize
+the initial estimates. We associate keyword t with factor vector Kt ∈ RD. The
+user-keyword preference matrix is denoted by RK = U T K. I (j) is the set of
+the keywords extracted from item j. User i’s preference for item j’s keywords is
+denoted by ˜Rij =
+i Kt. Given the baseij, we deﬁne the
+new prediction: ˆRij = baseij + ˜Rij . The error function is redeﬁned:
+
+t∈I(j)
+
+t∈I(j)
+
+it =
+
+RK
+
+(cid:7)
+
+(cid:7)
+
+U T
+
+M(cid:2)
+
+N(cid:2)
+
+(cid:5)
+Rij − baseij − ˜Rij
+
+(cid:6)2
+
+Iij
+
+L =
+
+i=1
+
+j=1
+
++ λu(cid:3)U(cid:3)2
+
+F + λk(cid:3)K(cid:3)2
+
+F
+
+(4)
+
+Beside item content, we have social network information. Inspired by SoReg
+[10], with the same assumption that if user i has a friend f , there is a similarity
+between their tastes, the regularization term to impose constraints between one
+user and their friends is formulated as:
+
+λf
+
+M(cid:2)
+
+N(cid:2)
+
+i=1
+
+f∈F +(i)
+
+Sim (i, f )(cid:3)Ui − Uf(cid:3)2
+
+F
+
+(5)
+
+where F + (i) is the set of outlink friends of user i and Sim (i, f ) ∈ [0, 1] is the
+similarity function. We use PCC to compute this value. We change Eq.4 to L2:
+
+L2 = L +
+
+λf
+2
+
+M(cid:2)
+
+N(cid:2)
+
+i=1
+
+f∈F +(i)
+
+Sim (i, f )(cid:3)Ui − Uf(cid:3)2
+
+F
+
+(6)
+
+We perform gradient descent in Ui and Kz (Eq.7 and 8) to minimize L2.
+
+Two-Phase Layered Learning Recommendation via Category Structure
+
+19
+
+∂L2
+∂Ui
+
+N(cid:4)
+
+=
+
+Iij
+
+j=1
+
+⎛
+⎝ (cid:4)
+t∈I(j)
+
+⎞
+⎠
+
+(cid:2)
+
+Kt
+
+baseij + ˜Rij − Rij
+
+(cid:3)
+
++ λf
+
+|F +(i)|(cid:4)
+
+f∈F +(i)
+
+Sim (i, f ) (Ui − Uf )
+
+|F−(i)|(cid:4)
+
++ λf
+
+g∈F−(i)
+
+Sim (i, g) (Ui − Ug) + λuUi
+
+(7)
+
+(8)
+
+∂L2
+∂Kz
+
+=
+
+(cid:2)
+
+(cid:2)
+
+j∈ψ(z)
+
+i∈ϕ(j)
+
+(cid:5)
+
+Ui
+
+baseij + ˜Rij − Rij
+
+(cid:6)
+
++ ηKz
+
+where ψ (z) is the set of the items that contain the keyword z, F−
+of inlink friends of user i and | F + (i) |/| F−
+in the set F + (i)/F−
+
+(i). The whole algorithm is presented in Algorithm 1.
+
+(i) is the set
+(i) | denote the number of friends
+
+3.3 Layered Learning Framework on Top-Down Approach
+
+In order to adapt our framework to the multi-layer category, we do some adjust-
+ments to Algorithm 1. The improved algorithm is shown in Algorithm 2.
+
+Phase One: Find User’s Average Tastes to Every Category. Suppose
+that the category has L layers. Cal (j) is the category that item j belongs to
+i ∈ RD and category
+in the l-th layer. We associate user i with latent factor U l
+k ∈ RD in the l-th layer. In the 1st layer, the method
+k with latent factor Cl
+is consistent with phase one of Algorithm 1. In the l-th layer, user’s taste to
+(cid:4)T CCal(j). Given user’s average taste
+item’s category is denoted by ˜Rl
+ij =
+in the l − 1-th layer, Rij can be predicted by
+to the parent category basel−1
+basel−1
+
+(cid:3)
+U l
+i
+
+ij
+
+ij + ˜Rl
+
+1 given by:
+
+ij. The sum-of-squared-error function Ll
+M(cid:2)
+
+N(cid:2)
+
+(cid:6)
+
+(cid:5)
+Rij − basel−1
+
+ij − ˜Rl
+
+Iij
+
+ij
+
+Ll
+1 =
+
+2
+
++ λu(cid:3)U l(cid:3)2
+
+F + λc(cid:3)Cl(cid:3)2
+
+F
+
+(9)
+
+i=1
+
+j=1
+
+We perform gradient descent in U l
+l-th layer given by Eq.9.
+N(cid:2)
+
+∂Ll
+1
+∂U l
+i
+
+∂Ll
+1
+∂Cl
+k
+
+=
+
+=
+
+j=1
+(cid:2)
+
+j=∈φl(k)
+
+i=∈ϕ(t)
+
+i and Cl
+
+k (Eq.10 and 11) to minimize Ll
+
+1 in the
+
+(cid:5)
+
+basel−1
+
+ij + ˜Rl
+
+ij − Rij
+
+(cid:6)
+
++ λuU l
+i
+
+(10)
+
+Iij CCal(j)
+
+(cid:2)
+
+(cid:5)
+
+U l
+i
+
+basel−1
+
+ij + ˜Rl
+
+ij − Rij
+
+(cid:6)
+
++ λcCl
+k
+
+(11)
+
+where φl (k) is the set of the items belonging to category j in the l-th layer. Then
+basic estimate basel
+ij =
+basel−1
+
+(cid:4)T CCal(j). Repeat the operation down the categories until the
+
+ij for the category in the l-th layer is given by: basel
+
+(cid:3)
+U l
+i
+
+ij +
+
+20
+
+K. Ji et al.
+
+(0)
+
+2
+
+1
+
+2
+
+(cid:3)
+
+(cid:2)
+
+, k
+
+(0)
+z
+
+(0)
+1 (U
+i
+
+k ) ≥ 0, L(0)
+
+Algorithm 2. Layered gradient algorithm for top-down approach
+Require:0 < αu, αc, αk < 1, t = 0, l = 1.
+1 , L(t+1)
+Ensure: L(0)
+(0)
+U
+, C
+i
+Phase one:
+for l = 1, 2, ··· , L do
+Initialization:U l
+fort = 1, 2, ··· do
+i
+Calculate ∂Ll
+(t) = U l
+U l
+i
+i
+
+(0) ← U l−1
+, ∂Ll
+∂Ll
+
+≥ 0, L(t+1)
+
+(t−1) − αu
+
+(t−1) − αk
+
+(t−1)
+1
+∂U l
+i
+
+< L(t)
+
+, C l
+k
+
+(t) = C l
+k
+
+(t−1)
+
+1
+∂Cl
+k
+(t−1)
+
+(t−1)
+
+∂Ll
+
+(0)
+
+, C l
+k
+
+i
+
+1
+∂U l
+i
+
+1
+∂Cl
+k
+
+< L(t)
+2 .
+
+end for
+Generate the baseline estimate matrix basel in the l-th layer.
+basel
+end for
+
+ij = basel−1
+
+(cid:9)
+U l
+i
+
+CCal(j)
+
+ij +
+
+(cid:10)T
+
+Generate the baseline estimate matrix base whose elements are baseij = baseL
+ij
+Phase two:
+
+(0)
+(0)
+z . Take current value Ui as the initial value:U
+Initialization:K
+i
+The following process is the same as phase two in Algorithm 1
+
+← U L
+
+i
+
+lowest layer. Finally, we can get the more accurate baseline estimate baseij =
+baseL
+
+ij in the L-th layer.
+
+Phase Two: Ensemble User’s Rating with Content and Social Relation.
+Given the baseline estimate base, the phase is the same as the phase two in
+Algorithm 1.
+
+4 Experimental Results
+
+4.1 Datasets and Metrics
+
+In our experiments, we use the real Tencent Weibo1 data published by KDD
+Cup 20122. Beside the social network information, it contains much context
+information such as keyword, category and timestamp. The items have been
+organized using four-layer categories, such as “1.2.5.8”; each category belongs
+to another category, and all categories together form a hierarchy. This structure
+is suitable for our framework. We predict user’s action to items, where “1”
+represents that the user accepts the item, and “0” otherwise.
+
+We extract a small dataset over a period of time randomly. It is much bigger
+and richer than other datasets used by [7,11]. The statistics of the dataset are
+summarized in Table 1.
+
+For the ﬂat approach, we only use the categories in the 4th layer. The density
+12518×3610 = 0.84%. We divide the dataset into three
+of the rating matrix is
+parts: the training set Rtrain., test set Rtest, and set Rnew containing all items
+not in Rtrain.
+
+379598
+
+1
+
+2
+
+http://t.qq.com/
+http://www.kddcup2012.org/
+
+Two-Phase Layered Learning Recommendation via Category Structure
+
+21
+
+Table 1. Statistics of dataset extracted
+
+(a) The basic statistics
+
+Description Number
+
+Description
+
+user
+item
+
+keyword
+Social link
+
+user-item rating
+item-keyword pair
+
+12518
+3610
+1102 Min.Num.of Rating per user
+3898 Max.Num.of rating per user
+
+Number
+375989
+85107
+
+1
+325
+
+(b) Category
+
+category Number
+1st layer
+2nd layer
+3rd layer
+4th layer
+
+6
+23
+83
+258
+
+The evaluation metrics we use in our experiments are two popular error met-
+rics: Mean Absolute Error (MAE) and Root Mean Square Error (RMSE). A
+smaller MAE or RMSE value means higher accuracy.
+
+4.2 Implementation and Comparisons
+
+We compare our algorithms with four state-of-art CF algorithms.
+
+– PMF [4]: It is a Low-rank matrix factorization based on minimizing the
+sum-of-squared-error. It does not take into account the social information.
+– SocialMF [7] is a trust-based model incorporating the mechanism of trust
+
+propagation. It can reduce recommendation error for cold start users.
+
+– SoReg [10]: It is a matrix factorization model with social regularization,
+which treats dissimilar tastes of friends with diﬀerent social regularization.
+– CircleCon [11]: It incorporates the concept of circle-based recommendation,
+
+which only considers the trust circle speciﬁc to one category.
+
+We call our Algorithm 1/Algorithm 2 proposed in section 3 LLR1/LLR2. In all
+the experiments, the tradeoﬀ parameter settings are λu = λc = λk = λf = 0.001.
+JAMA3 is an open matrix package for Java, developed at NIST and the Uni-
+versity of Maryland. It provides the fundamental operations of numerical linear
+algebra. All algorithms are implemented using this library.
+
+4.3 Impacts of Diﬀerent Factors
+
+The Number of Layers of Category: The diﬀerence between LLR1 and LLR2
+is the number of layers of category. The results of LLR1/LLR2 (Figure 3) show
+in phase one, LLR1 achieves 0.1906/0.2910 on MAE/RMSE, but for LLR2, the
+training of each layer decreases the values: the training of the 1st layer and 2nd
+layer reduce the values greatly, the training of the 3rd layer and 4th layer have
+made only minor changes to the results of the 2nd layer, and after the training
+of the 4th layer, the values can be reduced to 0.1503/0.2739. Contrasts looked,
+LLR2 has smaller prediction error than LLR1 in phase one. So our framework
+beneﬁts more from the top-down approaches than the ﬂat approach. We believe
+classiﬁcation based on hierarchy can better model the similarity among items.
+
+3
+
+http://math.nist.gov/javanumerics/jama/
+
+22
+
+K. Ji et al.
+
+(a) MAE for LLR1
+
+(b) MAE for LLR2
+
+(c) RMSE for LLR1
+
+(d) RMSE for LLR2
+
+Fig. 3. The results of diﬀerent phases of LLR1 and LLR2 (Dimensionality = 5)
+
+The Item Content and Social Networks Information: After we get the
+baseline estimate, we discuss how the content and social information may con-
+tribute to improving the values. The results of phase two (Figure 3) show
+we get more accurate estimate of user’s rating for individual item: LLR1 and
+LLR2 achieve 0.1440/0.2751 and 0.1417/0.2702 on MAE/RMSE respectively. For
+LLR1, this information improves the accuracy as high as 24.44%/5.46% in con-
+trast to phase one. For LLR2, this information improves as high as 5.72%/1.35%.
+The improvement demonstrates that the content and social information are help-
+ful to boost the performance, especially for LLR1, although classiﬁcation on the
+ﬂat approach improves much less than LLR2 based on the top-down approach
+in phase one, the information signiﬁcantly enhance more accuracy than LLR2
+in phase two. Overall, ﬁnal results show LLR2 achieves better performance than
+LLR1.
+
+4.4 Analysis of Recommendation Performance
+
+Figure 4 shows the results of the algorithms on diﬀerent amounts of training
+data (25%, 50%, 75%). We observe PMF has the worst MAE/RMSE. SocialMF
+and SoReg have almost the same accuracy, both superior to PMF, but SoReg is
+a bit lower because it uses better social regularization terms. CircleCon viewed
+as an extension of SocialMF is better than the three algorithms. This demon-
+strates only considering the trust circle belong to one category is useful for learn-
+ing user’s tastes. Our algorithms have the minimum of MAE/RMSE: when the
+training is 25%, LLR2 gets the decrease by 5.57%/2.99% over CircleCon/SoReg
+, when the training is 50%, the decrease is 13.68%/10.18% over CircleCon, when
+the training is 75%, the decrease is 20.88%/6.37% over CircleCon. Experiments
+demonstrate that our algorithms have higher accuracy than purely using the
+user-item rating matrix, purely utilizing social networks information or purely
+considering category-speciﬁc circles.
+
+Two-Phase Layered Learning Recommendation via Category Structure
+
+23
+
+(a) MAE
+
+(b) RMSE
+
+Fig. 4. Performance comparison with other algorithms (Dimensionality = 5)
+
+4.5 Performance on Dynamic Update of Items
+
+We analyze the performance of our algorithms on dynamic update of items, i.e.,
+addition of new items. Except some very special items, usually we can know the
+keywords and category of new items before their addition. The predicted value
+of Rijnew in Rnew can be computed by baseijnew + ˜Rijnew . Figure 5 shows the
+results of our algorithms on training data (25%, 50%, 75%). We observe although
+the new items are not in the rating matrix, our algorithms still make very good
+prediction using the new item’s category and keywords.
+
+(a) MAE
+
+(b) RMSE
+
+Fig. 5. The results on addition of new items (Dimensionality = 5)
+
+5 Conclusion
+
+In this paper, based on the similarity in the classiﬁcation, we proposed a novel
+two-phase layered learning framework, which incorporates the category, item
+content and social networks information. For two kind of classiﬁcations, we de-
+signed two layered gradient algorithms in our framework. We conducted exten-
+sive experiments on real data. Comparison results of diﬀerent phases of LLR1
+and LLR2 show that the top-down approaches are more helpful to ﬁnd user’s
+similar tastes than the ﬂat approach, and item content and social networks in-
+formation contribute to improve the classiﬁcation accuracy. The analysis results
+show that our algorithms outperform other state-of-the-art methods. The results
+also show that our algorithms has good scalability for the dynamic update of
+items to cope with addition of new items.
+
+24
+
+K. Ji et al.
+
+Acknowledgement. This work is supported by National Science Foundation
+of China under its General Projects funding # 61170232 and # 61100218, Fun-
+damental Research Funds for the Central Universities # 2012JBZ017, Research
+Initiative Grant of Sun Yat-Sen University (Project 985), State Key Labora-
+tory of Rail Traﬃc Control and Safety Research Grant # RCS2012ZT011. The
+corresponding author is Hong Shen.
+
+References
+
+1. Su, X., Khoshgoftaar, T.M.: A survey of collaborative ﬁltering techniques. Adv. in
+
+Artif. Intell. 2009, 4:2–4:2 (2009)
+
+2. Wang, J., de Vries, A.P., Reinders, M.J.T.: Unifying user-based and item-based
+collaborative ﬁltering approaches by similarity fusion. In: Proceedings of the 29th
+Annual International ACM SIGIR Conference on Research and Development in
+Information Retrieval, SIGIR 2006, pp. 501–508. ACM, New York (2006)
+
+3. Hofmann, T.: Latent semantic models for collaborative ﬁltering. ACM Trans. Inf.
+
+Syst. 22(1), 89–115 (2004)
+
+4. Salakhutdinov, R., Mnih, A.: Probabilistic matrix factorization. In: Platt, J.,
+Koller, D., Singer, Y., Roweis, S. (eds.) Advances in Neural Information Processing
+Systems 20, pp. 1257–1264. MIT Press, Cambridge (2008)
+
+5. Breese, J.S., Heckerman, D., Kadie, C.: Empirical analysis of predictive algorithms
+for collaborative ﬁltering. In: Proceedings of the Fourteenth Conference on Uncer-
+tainty in Artiﬁcial intelligence, UAI 1998, pp. 43–52. Morgan Kaufmann Publishers
+Inc., San Francisco (1998)
+
+6. Baltrunas, L., Ludwig, B., Ricci, F.: Matrix factorization techniques for context
+aware recommendation. In: Proceedings of the Fifth ACM Conference on Recom-
+mender Systems, RecSys 2011, pp. 301–304. ACM, New York (2011)
+
+7. Jamali, M., Ester, M.: A matrix factorization technique with trust propagation for
+recommendation in social networks. In: Proceedings of the Fourth ACM Conference
+on Recommender Systems, RecSys 2010, pp. 135–142. ACM, New York (2010)
+
+8. Jiang, M., Cui, P., Liu, R., Yang, Q., Wang, F., Zhu, W., Yang, S.: Social contextual
+recommendation. In: Proceedings of the 21st ACM International Conference on
+Information and Knowledge Management, CIKM 2012, pp. 45–54. ACM, New York
+(2012)
+
+9. Ma, H., King, I., Lyu, M.R.: Learning to recommend with social trust ensemble.
+In: Proceedings of the 32nd International ACM SIGIR Conference on Research and
+Development in Information Retrieval, SIGIR 2009, pp. 203–210. ACM, New York
+(2009)
+
+10. Ma, H., Zhou, D., Liu, C., Lyu, M.R., King, I.: Recommender systems with social
+regularization. In: Proceedings of the Fourth ACM International Conference on
+Web Search and Data Mining, WSDM 2011, pp. 287–296. ACM, New York (2011)
+11. Yang, X., Steck, H., Liu, Y.: Circle-based recommendation in online social net-
+works. In: Proceedings of the 18th ACM SIGKDD International Conference on
+Knowledge Discovery and Data Mining, KDD 2012, pp. 1267–1275. ACM, New
+York (2012)
+
+12. Silla Jr., C.N., Freitas, A.A.: A survey of hierarchical classiﬁcation across diﬀerent
+
+application domains. Data Min. Knowl. Discov. 22(1-2), 31–72 (2011)
+
+13. Bedi, P., Kaur, H., Marwaha, S.: Trust based recommender system for semantic
+
+web. In: IJCAI, pp. 2677–2682 (2007)
+
+

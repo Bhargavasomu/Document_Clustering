@@ -1,0 +1,1359 @@
+Learning from Multiple Observers
+
+with Unknown Expertise
+
+Han Xiao, Huang Xiao, and Claudia Eckert
+
+Institute of Informatics
+
+Technische Universit¨at M¨unchen, Germany
+
+{xiaoh,xiaohu,claudia.eckert}@in.tum.de
+
+Abstract. Internet has emerged as a powerful technology for collecting labeled
+data from a large number of users around the world at very low cost. Conse-
+quently, each instance is often associated with a handful of labels, precluding any
+assessment of an individual user’s quality. We present a probabilistic model for
+regression when there are multiple yet some unreliable observers providing con-
+tinuous responses. Our approach simultaneously learns the regression function
+and the expertise of each observer that allow us to predict the ground truth and
+observers’ responses on the new data. Experimental results on both synthetic and
+real-world data sets indicate that the proposed method has clear advantages over
+“taking the average” baseline and some state-of-art models.
+
+1 Introduction
+
+With the recent advent of social web services, the data can now be shared and pro-
+cessed by a large number of users. As a consequence, researchers are faced with data
+sets that are labeled by multiple users. For example, Wikipedia provides a feedback tool
+to engage readers in the assessment of article quality based on four criteria, i.e. “trust-
+worthy”, “objective”, “complete” and “well-written”. The Amazon Mechanical Turk
+is an online system that allows the requesters to hire users from all over the world to
+perform crowdsourcing tasks. Galaxy Zoo is a website where visitors label astronomi-
+cal images. While providing large amounts of cheap labeled data in a short time, these
+platforms usually have little quality control over users. Thus, the response of each user
+can vary widely, and in some cases may even be adversarial. A natural question to ask
+is how to integrate opinions from multiple users for obtaining an objective opinion. The
+commonly used “majority vote” and “take the average” heuristics completely ignore
+the individual expertise and may fail in the settings with non-Gaussian or adversarial
+noise. This casts a challenge of learning from multiple sources for the machine learning
+and data mining researchers [2].
+
+Despite these web applications, one can ﬁnd this problem in wide range of domains.
+Recently, sensor networks have been deployed for the scientiﬁc monitoring of remote
+and hostile environments. For example, researchers deployed a 16-node sensor network
+on a tree to study its elevation under different weather fronts [9]. Each node samples
+climate data at regular time intervals and the statistics are collected. Using sensor data
+in this manner presents many novel challenges, such as fusing noisy readings from sev-
+eral sensors, detecting faulty and aging sensors. Importantly, it is necessary to use the
+
+J. Pei et al. (Eds.): PAKDD 2013, Part I, LNAI 7818, pp. 595–606, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+596
+
+H. Xiao, H. Xiao, and C. Eckert
+
+trends and correlations observed in previous data to predict the value of environmental
+parameters into the future, or to predict the reading of a sensor that is temporarily un-
+available (e.g. due to network outages). However, these tasks may have to be performed
+with only limited knowledge of the location, reliability, and accuracy of each sensor.
+
+In this work, the labeler (including user, annotator and sensor) mentioned above is
+referred to as the observer. Given an instance, the label (e.g. annotation, reading) pro-
+vided by an observer is called the response. Unlike the conventional supervised learn-
+ing scenario, in our setting each instance is associated with a set of responses, yet the
+ground truth is unknown as some responses may be subjective or come from unreliable
+observers. We concentrate on the regression problem with continuous responses from
+multiple observers. Speciﬁcally, our method provides a principled way to answer the
+following questions:
+
+1. How to learn a regression function to predict the ground truth precluding the prior
+
+knowledge of observers?
+
+2. How to estimate the expertise of each observer without knowing the ground truth?
+
+2 Related Work and Novel Contributions
+
+There is a number of studies dealing with the setting involving multiple labelers, yet
+most of them focus on the classiﬁcation problem. Early work such as [3,4,8] focus on
+estimating the error rates of observers. In the machine learning community, the prob-
+lem of estimating the ground truth from multiple noisy labels is addressed in [7]. In-
+stead of estimating the ground truth and learning the classiﬁer separately, recent interest
+has shifted towards on learning classiﬁers directly from such data. Authors of [2] pro-
+vide a general theory of selecting the most informative samples from each source for
+model training. Later, a probabilistic framework is presented by [5,6] to address the
+classiﬁcation, regression and ordinal regression problem with multiple annotators. The
+framework is based on a simple assumption that the expertise of each annotator does not
+depend on the given data. This assumption is infringed in [10,13] and later is extended
+to the active learning scenario [12]. There are some other related work that focus on
+different settings [1,11].
+
+The above studies paid little attention to the regression problem under multiple ob-
+servers, which is the main core of this paper. Moreover, our work differs from the related
+work in various aspects. First, we employ a less-parametric method, i.e. the Gaussian
+process (GP), to model the observers and the regression function. This allows us to
+associate the observer’s expertise with both ground truth and input instance. Moreover,
+our model is presented in an extensible probabilistic framework. The missing data and
+prior knowledge can be straightforwardly incorporated into the model.
+
+The rest of this paper is organized as follows. Section 3 formulates the problem and
+introduces a probabilistic framework. The framework consists of two parts. The re-
+gression model is introduced in Section 3.2. A linear and a non-linear observer model
+is proposed in Section 3.3 and Section 3.4, respectively. Section 4 reports the exper-
+imental results on both synthetic and real-world data sets. Conclusions are drawn in
+Section 5.
+
+Learning from Multiple Observers with Unknown Expertise
+
+597
+
+L and the response space Y ⊆ R
+
+3 Probabilistic Formulation
+Denote the instance space X ⊆ R
+D and the ground
+truth space Z ⊆ R
+D. Given N instances x1, . . . , xN where xn ∈ X , denote the ob-
+jective ground truth for xn as zn ∈ Z. In our setting, the ground truth is unknown.
+Instead, we have multiple responses yn,1, . . . , yn,M ∈ Y for xn provided by M dif-
+ferent observers. For compactness, the N × L matrix of instance xn,l is represented as
+. The N × M × D tensor of observers’ responses yn,m,d is denoted
+X := [x1, . . . , xN ]
+by Y := [y1,1, . . . , y1,M ; . . . ; yN,1, . . . , yN,M ]. The N × D matrix of ground truth
+zn,d is denoted by Z := [z1, . . . , zN ]
+
+(cid:2)
+
+Given the training data X and Y, our goal is threefold. First, it is of interest to get
+an estimate of the unknown ground truth Z. The second goal is to learn a regression
+function f : X → Z which generalizes well on unseen instances. Finally, for each
+observer we want to model its expertise as a function of the input instance and the
+ground truth, i.e. g : X × Z → Y.
+
+(cid:2)
+
+.
+
+3.1 Probabilistic Framework
+
+To formulate this problem from the probabilistic perspective, we consider the training
+data X and Y as random variables. The ground truth Z is unknown and hence is a latent
+variable. In general, the observed response Y depends both on the unknown ground
+truth and the instance. That is, observers may exhibit varying levels of expertise on
+different instances. On Wikipedia the assumption is particularly true for the novice
+readers, whereas the rating from an expert reader is consistent across different types
+of articles. Figure 1 illustrates the conditional dependence between X, Y and Z with a
+graphical model. As a consequence, the joint conditional distribution can be expressed
+as
+
+p(Y, Z, X) = p(Z| X)p(Y | Z, X)p(X)
+M(cid:2)
+
+D(cid:2)
+
+∝ N(cid:2)
+
+p(zn,d | xn)
+
+p(yn,m,d | xn, zn,d),
+
+(1)
+
+n=1
+
+d=1
+
+m=1
+
+where the term p(X) is dropped as we are more interested in the other two conditional
+distributions. There are two underlying assumptions in this model. First, each dimen-
+sion of the ground truth is independent, but is not identically distributed. Second, all
+observers respond independently.
+
+Note that the ﬁrst term in (1) indicates the probabilistic dependence between the
+ground truth and the input instance, whereas the second term characterizes the ob-
+servers’ expertise. Previous work have explored different parametric methods to model
+these two conditional distributions [10,13,5,12,6]. A distinguishing factor in this pa-
+per is that, we employ the Gaussian process as the backbone to construct the model.
+Speciﬁcally, the generative process of Y can be interpreted as follows
+
+zn,d = fd(xn) + n,
+
+yn,m,d = gm,d(xn, zn,d) + ξm,d,
+
+(2)
+(3)
+
+598
+
+H. Xiao, H. Xiao, and C. Eckert
+
+xn
+
+zn
+
+yn,m
+
+M
+
+N
+
+Fig. 1. Graphical model of instances X, unknown ground truth Z and responses Y from M
+different observers. Only the shaded variables are observed.
+
+where  and ξ is independent identically distributed Gaussian noise, respectively. Note
+that the choice of {fd} and {gm,d} characterizes the regression function and the ob-
+servers, respectively. In particular, an ideal observer would have gm,d(zn,d) = zn,d on
+every d. Therefore, our goal can be understood as searching {fd} and {gm,d} given
+the training data. Intuitively, if two instances are close to each other in X , then their
+corresponding ground truth should be close in Z through the mapping of {fd}, which
+in turn restricts the searching space of {gm,d} when Y is known.
+
+3.2 Regression Model
+We ﬁrst concentrate on Eq. (2) and represent functions {fd} by the Gaussian process
+with some non-linear kernel. Speciﬁcally, the conditional distribution of the ground
+truth given the training instances is assumed to be
+
+p(Z| X) =
+
+D(cid:2)
+
+d=1
+
+N (z:,d | 0, Kd) ,
+
+(4)
+
+where the dth dimension of the ground truth is denoted as z:,d. We introduce a N × N
+kernel matrix Kd that depends on X, where each element is given by the value of a
+composite covariance function kd : X × X → R0+, made up of several contributions
+as follows
+
+(cid:3)
+
+(cid:4)
+
+kd(xi, xj) := κ2
+
+1,d exp
+
+− κ2
+2,d
+2
+
+(cid:6)xi − xj(cid:6)2
+
++ κ2
+
+3,d + κ2
+
+4,dx(cid:2)
+
+i xj + κ2
+
+5,dδ(xi, xj). (5)
+
+The noise term  in Eq. (2) is folded into the Kronecker delta function δ(xi, xj). The
+covariance function involves an exponential of a quadratic term, with the addition of a
+constant bias, a linear and a noise terms. For each dimension, the parameters need to be
+learned from the data are κ1,d, . . . , κ5,d.
+
+3.3 Linear Observer Model
+To model the observer’s expertise, we now concentrate on (3) and assume that {gm,d} is
+a linear mapping from Z to Y, which does not depend on the instance at all.
+
+Learning from Multiple Observers with Unknown Expertise
+
+599
+
+Denote y:,m,d the dth dimension response of all training instances provided by the mth
+observer. The second conditional distribution in (1) is assumed to be
+
+p(Y | Z, X) = p(Y | Z) =
+
+(6)
+where 1 is an all-ones vector with length N and I is a N × N identity matrix. Each
+observer is characterized by 3 × D parameters, i.e. wm,d, μm,d, σm,d ∈ R.
+
+m=1
+
+d=1
+
+,
+
+y:,m,d
+
+(cid:6)(cid:6) wm,dz:,d + μm,d1, σ2
+
+(cid:7)
+m,dI
+
+M(cid:2)
+
+D(cid:2)
+
+N (cid:5)
+
+Parameter Estimation. Now we can combine Eq. (6) with Eq. (4) and estimate the
+set of all parameters, i.e. Θ := {{κ1,d, . . . , κ5,d},{wm,d},{μm,d},{σm,d}}, by max-
+imizing the likelihood function p(Y | X, Θ). In the linear observer model, the latent
+variable Z can be marginalized out, which yields
+
+p(Y | X, Θ) =
+
+M(cid:2)
+
+D(cid:2)
+
+m=1
+
+d=1
+
+N (cid:5)
+
+μm,d1, w2
+
+m,dKd + σ2
+
+(cid:7)
+m,dI
+
+.
+(cid:9)N
+
+The maximum likelihood estimator of μm,d is given by (cid:8)μm,d = 1
+n=1 yn,m,d. We
+hereinafter use the short-hand y:,m,d := y:,m,d − (cid:8)μm,d1. As a consequence, the log-
+likelihood function is given by
+
+N
+
+F LOB := log p(Y | X, Θ) =
+
+log p(y:,m,d | X, Θ)
+
+M(cid:10)
+
+D(cid:10)
+
+m=1
+
+d=1
+
+M(cid:10)
+
+D(cid:10)
+
+m=1
+
+d=1
+
+=
+
+− N
+2
+
+log(2π) − 1
+2
+
+log |C| − 1
+2
+
+(cid:5)
+y(cid:2)
+:,m,dC−1y:,m,d
+
+(cid:7)
+
+,
+
+tr
+
+(7)
+
+where C := w2
+the partial derivatives of F LOB with respect to the parameters and obtain
+
+m,dI. To ﬁnd the parameters by maximizing Eq. (7), we take
+
+m,dKd + σ2
+
+(8)
+
+(9)
+
+∂F LOB
+∂wm,d
+∂F LOB
+∂σm,d
+
+= wm,dtr
+
+= σm,dtr
+
+M(cid:10)
+
+(cid:5)
+BC−1Kd
+
+(cid:7)
+
+,
+
+,
+
+(cid:7)
+
+(cid:5)
+BC−1
+(cid:11)
+BC−1 ∂Kd
+∂κi,d
+
+m,dtr
+
+(cid:12)
+
+=
+
+1
+2
+
+m=1
+
+∂F LOB
+w2
+∂κi,d
+:,m,d − I and ∂Kd
+where B := C−1y:,m,dy(cid:2)
+∂κi,d is a matrix of element-wise partial deriva-
+tives of Eq. (5) with respect to κ1,d, . . . , κ5,d. As there exists no closed-form solution,
+we resort to L-BFGS quasi-Newton method to maximize F LOB. Essentially, in each it-
+eration the gradients are computed by Eqs. (8) to (10) and the parameters are updated
+accordingly.
+
+(10)
+
+,
+
+Estimate of Ground Truth. Note that the ground truth Z is marginalized out from
+Eq. (7) and still remains unknown. To estimate the ground truth of all training instances,
+
+H. Xiao, H. Xiao, and C. Eckert
+
+600
+we need to ﬁnd the posterior of Z, i.e. p(Z| Y, X) = p(Y | Z, X)p(Z| X)/p(Y | X).
+By using the property of Gaussian distribution, one can show that the posterior of z:,d
+follows N (u, V), where
+M(cid:10)
+
+(cid:4)−1
+
+M(cid:10)
+
+(cid:3)
+
+(cid:4)
+
+(cid:3)
+
+u = V
+
+y:,m,d
+
+, V =
+
+wm,d
+σ2
+m,d
+
+m=1
+
+m,d
+
+w2
+σ2
+m,d
+
+I + K−1
+
+d
+
+m=1
+
+.
+
+(11)
+
+The above computation is repeated D times on every dimension to obtain the estimate
+of ground truth (cid:8)Z.
+
+Prediction on New Instance. Given a new instance x∗, we are interested in predicting
+the ground truth z∗ by using the learned regression function. This can be derived from
+the joint distribution
+
+(cid:11)
+
+(cid:13)
+
+(cid:13)
+
+(cid:14)
+
+(cid:8)z:,d
+z∗,d
+
+∼ N
+
+(cid:14)(cid:12)
+
+k(cid:2)
+∗
+
+Kd
+k∗ kd(x∗, x∗)
+
+(12)
+where k∗ := [kd(x∗, x1), . . . , kd(x∗, xN )]. It turns out that p(z∗,f | X, (cid:8)z:,d, x∗) follows
+a Gaussian distribution. Hence, the best estimate for the ground truth is
+
+,
+
+0,
+
+(cid:8)z∗,d = k∗K−1
+
+d (cid:8)z:,d,
+
+and the uncertainty is captured in its variance
+
+var((cid:8)z∗,d) = kd(x∗, x∗) − k∗K−1
+
+d k(cid:2)
+∗ .
+
+As a consequence, the response from an observer can be also predicted by
+
+(cid:8)y∗,m,d = (1 + (cid:8)wm,d)(cid:8)z∗,d + (cid:8)μm,d,
+
+with variance (cid:8)σm,d.
+
+(13)
+
+(14)
+
+(15)
+
+Priors on Parameters. Note that wm,d is an important indicator of the observer’s
+expertise. On the one hand, a genuine observer would have wm,d close to 1, whereas
+an adversarial observer gives wm,d close to −1. On the other hand, we encourage wm,d
+to be a small value unless supported by the data. Without any knowledge on observers,
+we can only expect that wm,d takes value either around 1 or −1, which inspires the
+following penalty function
+
+penalty(wm,d) :=
+
+⎧
+⎨
+⎩
+
+η(wm,d − 1)2
+0
+η(wm,d + 1)2
+
+if wm,d > 1;
+if −1 ≤ wm,d ≤ 1;
+if wm,d < −1,
+
+(16)
+
+where η controls the value of penalty as shown in Fig. 2 (see “general”). When wm,d
+takes value between [−1, 1], there is no penalty and the gradient is given by Eq. (8)
+directly. When |wm,d| > 1 we penalize wm,d and keep it from being too large. This
+allows our model to search a reasonable solution for wm,d without over-ﬁtting on the
+training data.
+
+Learning from Multiple Observers with Unknown Expertise
+
+601
+
+In the case that observers are highly reliable, the learned wm,d should be close to
+1 and μm,d, σm,d close to 0. One can add a Laplacian prior for observers’ parameters,
+which leads to an L1 regularization. The penalty term induced by the Laplacian prior
+for wm,d is −( 1
+λ|wm,d − 1|), where a smaller value of λ suggests that the
+observer is more reliable. The maximization of F LOB can be carried out by computing
+the sub-gradient of wm,d, μm,d and σm,d, respectively.
+
+2 log λ +
+
+(cid:18)
+
+2
+
+8
+
+6
+
+4
+
+2
+
+ 
+0
+−3
+
+General η=0.5
+General η=2
+Laplace λ=1
+Laplace λ=2
+Gaussian
+
+−2
+
+−1
+
+0
+
+1
+
+2
+
+ 
+
+3
+
+Fig. 2. Penalty functions of wm,d induced by different prior models. The “general” penalty func-
+tion corresponds to Eq. (16). Similar penalty functions can be added to μm,d and σm,d as well.
+
+The relationship between observers can be incorporated into the model as well. For
+example, the demographic information of users or the geographic location of sensors
+can be represented as a M × M proximity matrix P. In particular, we expect two ob-
+servers have similar parameters if they are highly correlated in P. Assuming P is a
+positive deﬁnite matrix, we can set the prior distribution of w:,d set as N (w:,d | 1, P).
+As a consequence, we add a penalty term − (cid:9)D
+:,dPw:,d) to Eq. (6). The gra-
+dient of wm,d is computed by Eq. (8) with an additional term −2Pm,:w:,d. Figure 2
+illustrates different penalty functions of wm,d.
+
+d=1 tr(w(cid:2)
+
+Missing Responses. The model can be extended to handle the training data with miss-
+ing responses. First of all, we partition the responses Y = (Yo, Yu), where Yo rep-
+resents the observed part and Yu is the missing part of the responses. Consequently,
+the latent variables in our model consists of Z and Yu. The expectation maximization
+(EM) algorithm can be developed for estimating the model parameters. In the E-step,
+we ﬁx the model parameter Θ and compute the sufﬁcient statistics of (cid:8)Z by Eq. (11) and
+then update (cid:8)Yu by its prediction using Eq. (15). In the M-step, we use L-BFGS to max-
+imize log p( (cid:8)Y, (cid:8)Z| X, Θ) and update Θ. The two steps are repeated until the likelihood
+reaches a local maximum.
+
+3.4 Non-linear Observer Model
+
+The assumptions behind the linear observer model may not be appropriate in some
+scenarios. For instance, if the thermistor is being used to measure the temperature of
+the environment, due to the self-heating effect the electrical heating may introduce a
+
+602
+
+H. Xiao, H. Xiao, and C. Eckert
+
+signiﬁcant error, which is known as a nonlinear function of the actual environment tem-
+perature. Moreover, the observers’ responses may depend on the input instance. With
+these considerations in mind, we propose a more sophisticated model which assumes
+that {gm,d} is a nonlinear mapping from X × Z to Y. By representing {gm,d} as the
+Gaussian process, the second conditional distribution in (1) has the form of
+
+M(cid:2)
+
+D(cid:2)
+
+p(Y | Z, X) =
+
+N (y:,m,d | 0, Sm,d) ,
+
+(17)
+where Y is connected with X and Z by a N × N kernel matrix Sm,d. The (i, j)th
+element in Sm,d is given by
+
+m=1
+
+d=1
+
+(cid:20)
+
+sm,d ({zi, xi},{zj, xj}) := φ2
+
+m,1,d exp
+
+(zi,d − zj,d)2
+
++ φ2
+
+m,3,d
+
+(cid:19)
+− φ2
+
+m,2,d
+2
+
+(cid:19)
+
++ φ2
+
+m,4,dzi,dzj,d + φ2
+
+m,5,dδ(zi,d, zj,d)
+
++ φ2
+
+m,6,d exp
+
+− 1
+2
+
+L(cid:10)
+
+l=1
+
+m,l,d(xi,l − xj,l)2
+η2
+
+(cid:20)
+
+,
+
+(18)
+
+where xi,l is the lth dimension of the instance xi. This covariance function has a similar
+form as Eq. (5), but with the addition of an automatic relevance determination kernel
+on X. By incorporating a separate parameter ηm,l,d for each input dimension l, we can
+optimize these parameters to infer the relative importance of different dimensions of an
+instance from the data. One can see that, as ηm,l,d becomes small, the response yn,m,d
+becomes relatively insensitive to xn,l. This allows us to detect the dimensions of X that
+substantially affect the observer’s response.
+
+Parameter Estimation. The observer model in Eq. (17) can be combined with Eq. (4)
+to form our new model,
+
+(cid:21)
+
+p(Y | X, Θ) =
+
+p(Y | Z, X, Θ)p(Z| X, Θ)dZ,
+
+where Θ := {{κ1,d, . . . , κ5,d},{φm,1,d, . . . , φm,6,d},{ηm,l,d}} is the set of model pa-
+rameters to be inferred from the data. Unfortunately, such marginalization of Z in-
+tractable as the latent variable z appears nonlinear in the kernel matrix. Instead, we
+seek a maximum a posterior (MAP) solution by maximizing
+
+log p(Z, Θ | Y, X) = log p(Y | Z, X, Θ) + log p(Z| X, Θ) + constant,
+with respect to Z and Θ. Substituting Eq. (17) and Eq. (4) into Eq. (19) gives
+
+(19)
+
+F NLOB := log p(Z, Θ | Y, X) = − 1
+2
+D(cid:10)
+(cid:5)
+ln|Kd| + tr(K−1
+
+m=1
+
+d=1
+
+(cid:7)
+d z:,dz(cid:2)
+:,d)
+
+D(cid:10)
+
+M(cid:10)
+
+(cid:22)
+
+ln|Sm,d| + tr(S−1
+
+m,dy:,m,dy(cid:2)
+
+(cid:23)
+:,m,d)
+
++ constant.
+
+(20)
+
+− 1
+2
+
+d=1
+
+Learning from Multiple Observers with Unknown Expertise
+
+603
+
+The partial derivative of F NLOB with respect to the latent variable is given by
+
+(cid:11)(cid:22)
+
+∂F NLOB
+∂z:,d
+
+= tr
+
+S−1
+m,dy(cid:2)
+
+:,m,dy:,m,dS−1
+
+m,d − S−1
+
+m,d
+
+− K−1
+
+d z:,d.
+
+(21)
+
+(cid:12)
+
+(cid:23)
+
+∂Sm,d
+∂z:,d
+
+The gradients with respect to the parameters of kernel matrix can be likewise derived as
+in the linear observer model. Finally, these gradients are used in the L-BFGS algorithm
+for maximizing F NLOB.
+
+When the algorithm converges, the estimate of ground truth is directly given by the
+stationary point of F NLOB. Predicting the response of a new instance can be carried out
+in the same way as in Eq. (11). Moreover, the estimation of the mth observer’s response
+is given by
+
+(cid:8)y∗,m,d = s∗S−1
+
+m,d(cid:8)y:,m,d,
+
+where s∗ := [sm,d((cid:8)z∗, (cid:8)z1, x∗, x1), . . . , sm,d((cid:8)z∗, (cid:8)zN , x∗, xN )].
+
+Initialization. Note that seeking the MAP solution of Z and Θ simultaneously may
+lead to a bad local optimum. Speciﬁcally, the model may stuck in a solution where
+{fd} is too trivial (e.g. close to a constant) and {gm,d} is too complicated (e.g. highly
+non-linear), which contradicts our intuition. To mitigate this problem, we ﬁrst ﬁt the
+training data with the linear observer model. The idea is to ﬁnd an initial approximation
+of {fd} by restricting {gm,d} as linear. Then, we take (cid:8)Z estimated by the linear observer
+model as the initialization of the ground truth, and train the nonlinear observer model
+to further reﬁne {fd} and {gm,d}.
+
+4 Experimental Results
+
+To evaluate the performance of our algorithm on predicting the ground truth and the ob-
+servers’ responses, we set up two experiments1. First, the effectiveness of our models
+is demonstrated on the synthetic data. The second experiment is conducted on the real-
+world data. In both experiments, the ground truth is known and observers’ responses
+are simulated by mapping the ground truth with some random nonlinear functions. As
+a consequence, the performance can be evaluated straightforwardly. Two metrics are
+considered here, i.e. the mean absolute normalized error (MANE) and the Pearson cor-
+relation coefﬁcient (PCC). In MANE, we ﬁrst rescale the actual value and its predicted
+value into [0, 1] respectively, and then measure the mean absolute error. MANE value
+close to 0 and PCC value close to 1 indicate that the algorithm performs well. In partic-
+ular, the expected MANE of a random predictor is 0.5.
+
+The proposed linear observer model (LOB) and nonlinear observer model (NLOB)
+are compared with several baselines. We ﬁrst refer SVR and GPR as the Support Vec-
+tor Regression and Gaussian Process Regression trained with the ground truth, respec-
+tively. Then we combine responses from multiple observers by taking the average and
+then using it for training, which we denote as SVR-AVG and GPR-AVG, respectively.
+
+1 For reproducing the experimental results, our MATLAB implementation is available at
+
+http://home.in.tum.de/˜xiaoh.
+
+604
+
+H. Xiao, H. Xiao, and C. Eckert
+
+Ground truth
+
+Ob.1
+
+Ob.2
+1
+
+ 
+
+Ob.3
+
+Ob.4
+1
+
+0.5
+
+.
+
+p
+s
+e
+r
+ 
+
+2
+
+.
+
+b
+O
+
+0
+
+0
+
+1
+
+0.5
+
+1
+
+.
+
+p
+s
+e
+r
+ 
+
+1
+
+.
+
+b
+O
+
+0.5
+
+0
+
+0
+1
+
+.
+
+p
+s
+e
+r
+ 
+3
+
+.
+
+b
+O
+
+0.5
+
+0.5
+
+1
+
+.
+
+p
+s
+e
+r
+ 
+4
+
+.
+
+b
+O
+
+0.5
+
+1
+
+)
+a
+(
+
+a
+
+0.5
+
+0
+
+ 
+0
+
+1
+(b) SVR−AVG
+
+2
+
+MANE:0.38, PCC:0.00
+
+0
+
+2
+
+4
+
+3
+
+4
+
+5
+
+6
+
+0
+
+0
+
+0.5
+
+Ground truth
+
+1
+
+0
+
+0
+
+0.5
+
+Ground truth
+
+1
+
+(c) GPR−AVG 
+MANE:0.29, PCC:0.50
+
+(d) LOB
+
+MANE:0.13, PCC:0.73
+
+1
+
+0.5
+
+2
+
+4
+
+0
+
+0
+
+6
+
+2
+
+4
+
+6
+
+1
+
+0.5
+
+0
+
+0
+
+6
+
+NLOB
+
+1
+
+MANE:0.09, PCC:0.89
+
+)
+e
+(
+
+0.5
+
+1
+
+0.5
+
+.
+p
+s
+e
+r
+ 
+1
+.
+b
+O
+
+0
+
+0
+
+1
+
+.
+p
+s
+e
+r
+ 
+3
+.
+b
+O
+
+0.5
+
+1
+
+0.5
+
+.
+p
+s
+e
+r
+ 
+2
+.
+b
+O
+
+0.5
+
+1
+
+0
+
+0
+
+1
+
+0.5
+
+1
+
+0.5
+
+.
+p
+s
+e
+r
+ 
+4
+.
+b
+O
+
+0
+
+0
+
+1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+0
+
+0
+
+0.5
+
+Ground truth
+
+1
+
+0
+
+0
+
+0.5
+
+Ground truth
+
+1
+
+Fig. 3. (a) Synthetic data generated for the experiment. Responses from observers are represented
+by markers with different colors. The right panel illustrates randomly generated {gm} used for
+simulating four observers. Shaded area represents the pointwise variance. Note that the 4th ob-
+server is adversarial, as his response tends to be the opposite of the ground truth. (b, c, d) Pre-
+dicted ground truth on the test set by applying SVR-AVG, GPR-AVG and LOB, respectively. (e)
+Predicted ground truth and learned observer functions given by NLOB.
+
+For a fair comparison, the covariance function of x in GPR and GPR-AVG has the same
+composite form as in Eq. (5). In addition to these non-parametric methods, Raykar
+refers to the model in which both p(Z| X) and p(Y | Z) are Gaussian in the spirit
+of [6].
+
+Learning from Multiple Observers with Unknown Expertise
+
+605
+
+4.1 Synthetic Examples
+
+To create one-dimensional synthetic data (i.e. L := 1 and D := 1), we set f (x) :=
+sin(6x) sin( x
+2 ). The training instances X are generated by randomly sampling 30 points
+in [0, 2π] from the uniform distribution. The test instances are obtained using a dis-
+cretization of [0, 2π] with equal space of 0.05, which results in 126 points. Four simu-
+lated observers are obtained by setting the corresponding {gm} as a random nonlinear
+monotonic function. For a training instance x, the mth observer provides its response by
+gm(f (x)) plus some Gaussian noise. An illustration of our synthetic data is depicted in
+Fig. 3(a). Figure 3(b, c, d, e) shows the results given by the baselines and our method.
+Not surprisingly, taking the average of observers’ responses is not an effective solu-
+tion. In contrast, our LOB and NLOB models outperform baseline methods signiﬁcantly,
+which yield lower MANE and higher PCC. Moreover, the observers’ functions learned
+by NLOB are very close to those predeﬁned {gm} in Fig. 3(a).
+
+4.2 On Real-World Data
+We download four real-world data sets from UCI Machine Learning Repository, namely
+AUTO, COMMUNITY, CONCRETE and WINE. On each data set, we randomly select 500
+instances and generate 20 observers in the same manner as in Section 4.1. The number
+of adversarial observers is ﬁxed to 6. The experiment is conducted with 10-fold cross-
+validation. The prediction result of the ground truth and observers’ responses is summa-
+rized in Table 1. It is notable that the proposed LOB and NLOB signiﬁcantly outperform
+SVR/GPR-AVG and Raykar on inferring the ground truth. In general, additional im-
+provements are observed when NLOB is used. Comparing it with the SVR/GPR column,
+one can see that the regression function learned by NLOB is almost as good as the one
+trained using the ground truth. We remark that the promising performance of NLOB is
+achieved by merely learning from a set of observers without any prior knowledge of
+their expertise and the ground truth. Furthermore, LOB and NLOB also show encourag-
+ing performance on predicting responses of observers, which can be proved useful in
+many applications such as the recommendation system.
+
+Table 1. Prediction of the ground truth and observers’ responses. In each cell, the upper value
+is MANE, while PCC is at the bottom. For the ground truth and the average baselines we only
+report the best performance, where a superscript S denotes that the performance is achieved by
+SVR or SVR-AVG; for GPR and GPR-AVG we use the superscript G. The best model on each data
+set is highlighted by bold font. Note that only LOB and NLOB can predict observers’ responses.
+
+Data set
+
+AUTO
+
+COMMUNITY
+
+CONCRETE
+
+WINE
+
+LOB
+
+NLOB
+
+Observers’ responses
+LOB
+NLOB
+
+SVR/GPR
+
+SVR/GPR-AVG
+
+Ground truth
+Raykar
+
+0.19 ± 0.05G 0.21 ± 0.07G 0.25 ± 0.08 0.26 ± 0.05 0.20 ± 0.04 0.26 ± 0.04 0.25 ± 0.09
+0.84 ± 0.07G 0.63 ± 0.43G 0.50 ± 0.22 0.84 ± 0.05 0.82 ± 0.08 0.75 ± 0.05 0.70 ± 0.11
+0.15 ± 0.03G 0.27 ± 0.08S 0.22 ± 0.10 0.17 ± 0.03 0.16 ± 0.03 0.26 ± 0.04 0.25 ± 0.09
+0.80 ± 0.08G 0.44 ± 0.38S 0.70 ± 0.13 0.76 ± 0.04 0.77 ± 0.04 0.62 ± 0.09 0.55 ± 0.15
+0.15 ± 0.02G 0.22 ± 0.08G 0.20 ± 0.08 0.18 ± 0.07 0.17 ± 0.06 0.26 ± 0.04 0.15 ± 0.06
+0.76 ± 0.08G 0.60 ± 0.46G 0.66 ± 0.21 0.78 ± 0.11 0.79 ± 0.09 0.66 ± 0.18 0.72 ± 0.15
+0.20 ± 0.06G 0.30 ± 0.05S 0.29 ± 0.06 0.27 ± 0.09 0.25 ± 0.07 0.32 ± 0.07 0.24 ± 0.07
+0.67 ± 0.12G 0.52 ± 0.30G 0.38 ± 0.19 0.58 ± 0.20 0.61 ± 0.17 0.47 ± 0.18 0.48 ± 0.15
+
+606
+
+H. Xiao, H. Xiao, and C. Eckert
+
+5 Conclusion
+
+This paper investigates the regression problem under multiple observers providing re-
+sponses that are not absolutely accurate. The problem involves learning a regression
+function and observers’ expertise from such data without any prior information of the
+observers. Based on the Gaussian process, we propose a probabilistic framework and
+develop two models. Our approach provides an estimate of the ground truth and also
+predicts the responses of each observer given new instances. Experiments show that the
+proposed method outperforms several baselines and leads to a performance close to the
+model trained with the ground truth.
+
+There are many opportunities for future research. One possible direction is to extend
+our model with multiple kernel learning. The idea is to let the algorithm pick or com-
+posite different covariance functions instead of ﬁxing the combination in advance. As a
+consequence, the algorithm may learn complex ﬁts for the observers by selecting mul-
+tiple kernels in a data-dependent way. Moreover, it would be highly beneﬁcial to design
+active sampling methods for selecting which instance and whose response should be
+learned next.
+
+References
+
+1. Chen, S., Zhang, J., Chen, G., Zhang, C.: What if the irresponsible teachers are dominating?
+
+In: Proc. 24th AAAI (2010)
+
+2. Crammer, K., Kearns, M., Wortman, J.: Learning from multiple sources. JMLR 9, 1757–1774
+
+(2008)
+
+3. Dawid, A., Skene, A.: Maximum likelihood estimation of observer error-rates using the em
+
+algorithm. Applied Statistics, 20–28 (1979)
+
+4. Hui, S., Walter, S.: Estimating the error rates of diagnostic tests. Biometrics, 167–171 (1980)
+5. Raykar, V., Yu, S., Zhao, L., Jerebko, A., Florin, C., Valadez, G., Bogoni, L., Moy, L.: Su-
+pervised learning from multiple experts: Whom to trust when everyone lies a bit. In: Proc.
+26th ICML, pp. 889–896. ACM (2009)
+
+6. Raykar, V., Yu, S., Zhao, L., Valadez, G., Florin, C., Bogoni, L., Moy, L.: Learning from
+
+crowds. JMLR 11, 1297–1322 (2010)
+
+7. Smyth, P., Fayyad, U., Burl, M., Perona, P., Baldi, P.: Inferring ground truth from subjective
+
+labelling of venus images. In: Proc. 9th NIPS, pp. 1085–1092 (1995)
+
+8. Spiegelhalter, D., Stovin, P.: An analysis of repeated biopsies following cardiac transplanta-
+
+tion. Statistics in Medicine 2(1), 33–40 (1983)
+
+9. Tubaishat, M., Madria, S.: Sensor networks: an overview. IEEE Potentials 22(2), 20–23
+
+(2003)
+
+10. Whitehill, J., Ruvolo, P., Wu, T., Bergsma, J., Movellan, J.: Whose vote should count more:
+Optimal integration of labels from labelers of unknown expertise. In: Proc. 23rd NIPS,
+vol. 22, pp. 2035–2043 (2009)
+
+11. Wu, O., Hu, W., Gao, J.: Learning to rank under multiple annotators. In: Proc. 22nd IJCAI
+
+(2011)
+
+12. Yan, Y., Rosales, R., Fung, G., Dy, J.: Active learning from crowds. In: Proc. 28th ICML
+
+(2011)
+
+13. Yan, Y., Rosales, R., Fung, G., Schmidt, M., Hermosillo, G., Bogoni, L., Moy, L., Dy, J.,
+Malvern, P.: Modeling annotator expertise: Learning when everybody knows a bit of some-
+thing. In: Proc. AISTATS (2010)
+
+

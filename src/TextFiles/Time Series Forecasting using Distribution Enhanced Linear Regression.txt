@@ -1,0 +1,1182 @@
+Time Series Forecasting Using Distribution
+
+Enhanced Linear Regression
+
+Goce Ristanoski1,2, Wei Liu2, and James Bailey1,2
+
+2 Department of Computing and Information Systems, The University of Melbourne,
+
+1 NICTA Victoria Laboratory
+
+Australia
+
+g.ristanoski@student.unimelb.edu.au,
+
+{wei.liu,baileyj}@unimelb.edu.au
+
+Abstract. Amongst the wealth of available machine learning algorithms
+for forecasting time series, linear regression has remained one of the most
+important and widely used methods, due to its simplicity and inter-
+pretability. A disadvantage, however, is that a linear regression model
+may often have higher error than models that are produced by more so-
+phisticated techniques. In this paper, we investigate the use of a grouping
+based quadratic mean loss function for improving the performance of lin-
+ear regression. In particular, we propose segmenting the input time series
+into groups and simultaneously optimizing both the average loss of each
+group and the variance of the loss between groups, over the entire series.
+This aims to produce a linear model that has low overall error, is less
+sensitive to distribution changes in the time series and is more robust to
+outliers. We experimentally investigate the performance of our method
+and ﬁnd that it can build models which are diﬀerent from those produced
+by standard linear regression, whilst achieving signiﬁcant reductions in
+prediction errors.
+
+Keywords: Time series prediction, samples grouping, quadratic mean.
+
+1
+
+Introduction
+
+The forecasting of time series is a well known and signiﬁcant prediction task.
+Many methods have been proposed in this area, ranging from the simple to the
+very sophisticated. An important class of techniques includes methods which
+learn a model based on optimizing a regularized risk function, such as linear
+regression, Gaussian processes, neural networks and support vector machines.
+Common drawbacks in the development of time series forecasting methods are
+that many of them are applicable to only a speciﬁc type of time series, such as
+medical data or stock market series; they may require certain conditions to be
+fulﬁlled; or the improvement in performance is associated with a high increase
+in complexity.
+
+Linear regression is one of the most popular and widely used techniques for
+time series prediction, since it is simple, intuitive and produces models with a
+
+J. Pei et al. (Eds.): PAKDD 2013, Part I, LNAI 7818, pp. 484–495, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+Time Series Forecasting Using Distribution Enhanced Linear Regression
+
+485
+
+high degree of interpretability. Its performance is also often surprisingly good
+compared to more complex methods. Nevertheless, reduction of prediction error
+is a key concern and it remains attractive to consider techniques for improving
+the behavior of standard linear regression, particularly for challenging circum-
+stances. Such circumstances include non stationary and noisy time series, where
+changes in the distribution of the series often occur over time.
+
+Given these issues, this paper investigates a modiﬁcation of linear regression
+that takes a diﬀerent perspective. Given a single univariate time series, instead
+of optimizing the arithmetic mean of the loss over all training samples, we pro-
+pose to optimize the quadratic mean of the loss over groups of training samples.
+In particular, the univariate time series is segmented into a number of groups,
+where each group contains one or more samples. A linear model is then learned
+which simultaneously optimizes both the average loss of each group, as well as
+the variance of the loss across groups. In other words, there are two concur-
+rent optimization objectives. First, the model which is produced should have
+low overall error rate - this is achieved by ensuring the average loss within each
+group is small. Second, the groups should not vary too much with respect to the
+error rate of each individual group - this ensures that there is no single group
+which can signiﬁcantly bias the characteristics of the output model. A primary
+question is how should the univariate time series be segmented into groups ?
+Our proposal is to segment the samples according to their distribution charac-
+teristics. The intuition here is that we would like to learn a model which is not
+biased towards any single distribution, since we do not know which distribution
+the future behavior of the time series will most resemble.
+
+We experimentally evaluate the performance of our technique using 20
+real stock market datasets, 5 non-ﬁnancial time series datasets and 5 synthetic
+datasets. We ﬁnd that our new method (which we call QMReg) can produce
+linear models which are quite diﬀerent from those of standard linear regression,
+and often have signiﬁcantly less error, with empirical reductions typically in the
+range of 10%-30%. Our proposed method is an intuitive technique that ensures
+more evenly distributed, less volatile error and sensitivity to changes in the dis-
+tribution of the series.
+
+2 Related Work
+
+Data mining researchers have a range of diﬀerent types of classiﬁcation and re-
+gression algorithms at their disposal, and many of them have been applied to the
+time series forecasting problem. Artiﬁcial Neural Networks(ANNs) [17], Support
+Vector Machines [13] and Hidden Markov Models [20] [9] are other methods that
+have been used with some success for ﬁnancial time series forecasting, and clus-
+tering has been used as an aid in the forecasting process as well.
+
+The practical use of linear regression along with statistical knowledge is
+embodied in the Autoregressive Integrated Moving Average (ARIMA) models,
+which are descriptive, intuitive and often perform as well as advanced models.
+Weighted linear regression and AutoRegressive Conditional Heteroskedasticity
+
+486
+
+G. Ristanoski, W. Liu, and J. Bailey
+
+(ARCH) models are more complex modiﬁcations of linear regression, which re-
+quire some additional statistical expertise.
+
+Robust regression is a more complex type of linear regression that assesses
+the statistical properties of the data samples when learning a model [15], by han-
+dling the outliers in the data, and assigning appropriate weights (or losses) to
+reduce their inﬂuence [18]. Incorrect labelling of a sample as an outlier can be a
+concern when using robust regression. Choosing the most appropriate approach
+often requires statistical expertise by the user.
+
+Since our method is based on grouping of instances as input to a loss mini-
+mization function, a potentially related area of research is regularized multitask
+learning [16], where the objective is to learn multiple classiﬁcation tasks simul-
+taneously, rather than independently. However, to our knowledge, research in
+multitask learning has not used a quadratic mean loss function for the simulta-
+neous optimization of loss across groups, as is done in this paper.
+
+3 Distribution Based Quadratic Mean Convex
+
+Optimization
+
+We propose an algorithm that has two phases: (1) detection of distribution
+change points to segment the time series into groups, and (2) training the re-
+gression model using a quadratic mean to minimize both the individual loss of
+each group and the variance of the loss across groups.
+
+3.1 Time Series Segmentation - Distribution Change Points
+
+Detection
+
+Distribution changes in time series variables are from a continuous process, sub-
+ject to a set of external factors [1] [5]. The task of breaking up the samples of a
+dataset into segments or groups based on distribution or similarities is not an un-
+familiar challenge - simple clustering be eﬀective in many cases. When it comes
+to time series, as we may prefer to preserve the time element, distribution based
+methods can also be used. Potential candidate tests for non-parametric change
+point detection methods include the Wilcoxon rank sum method (WXN) and
+the kernel change method (KCD) [14]. They can be applied for this task as they
+are understandable and easy to introduce in the learning process. The Wilcoxon
+rank sum method (WXN) assess whether two sets of data samples follow the
+same distribution according to a statistical measure. It is an easy to implement
+statistical test, and no a-priori knowledge is required (other than speciﬁcation
+of an appropriate p-value, commonly set to 0.05).
+
+The WXN paradigm is as follows: for a ﬁxed window of m points, [1, m],
+we appoint after it another sliding window of the same length, [m + 1, 2m]. We
+move the second window and compare if the samples in both windows follow the
+same distribution: if that is the case, we continue moving the second window,
+until the distribution changes. The change point will be at the last sample of the
+second window (point 2m + p), p>0, where we detect the group window v for
+
+Time Series Forecasting Using Distribution Enhanced Linear Regression
+
+487
+
+that group of samples; we move the ﬁrst window just after that point [2m+p+1,
+3m + p], the second window comes after the ﬁrst one [3m + p + 1, 4m + p] and
+we repeat the process for the rest of the dataset(Figure 1). The choice of the
+window size m can vary, and we choose it to be the same size as the testing set.
+
+Fig. 1. The Wilcoxon method with a ﬁxed reference window and a sliding window
+
+3.2 Quadratic Mean Based Empirical Loss Function
+
+The quadratic mean is deﬁned as the square root of the average of the squares
+of each element in a set. In the case of just two errors, 1 and 2, the values of
+the quadratic mean QM and the arithmetic mean AM can be written as:
+
+(cid:2)
+
+(cid:2)
+
+AM =
+
+1 + 2
+
+2
+
+, QM =
+
+2
+1 + 2
+2
+
+2
+
+=
+
+AM 2 + (
+
+1 − 2
+
+2
+
+)2
+
+(1)
+
+This shows that the quadratic mean is lower bounded by the arithmetic mean,
+and this bound is reached when 1=2. This form of optimization was successfully
+tested for the scenario of imbalanced relational datasets [7] where there are only
+two groups (positive and negative classes). The more advanced form we use in
+our methods is specialised for the case of time series and permits any number of
+groups.
+
+Many machine learning methods address the learning process as ﬁnding
+the minimum of the regularized risk function. For n training samples (xi, yi)
+(i=1,..,n), where xi ∈ R
+d is the feature vector of the i–th training sample, d is
+the number of features, and yi ∈ {–1, 1} is the true label for the i–th training
+sample (in the case of classiﬁcation) and yi ∈ R in the case of regression, the
+regularized risk function is:
+
+∗
+
+w
+
+= argminw λwT w + Remp(w)
+
+(2)
+
+w is the weight vector which also includes the bias term b (which makes x
+
+having and additional bias feature xd+1 ≡ 1), and λ is a positive parameter that
+balances the two items in Equation 2, and Remp(w) = 1
+i=1 l(xi, yi, w). The
+n
+loss function l(xi,yi,w) in Remp(w) measures the distance between a true label
+yi and the predicted label from the forecasting done using w, and in the case of
+Linear Regression it has the form of 1
+
+(cid:3)n
+
+2 (wT x-y)2.
+
+(cid:4)(cid:3)k
+
+QM
+emp,k(w) =
+
+R
+
+j=1 fj(w)2
+
+k
+
+(cid:3)nj
+
+fj(w) =
+
+i=1 l(xji, yji, w)
+
+nj
+
+(cid:5)
+
+QM
+emp,k(w) =
+
+R
+
+μ2 + σ2
+
+(cid:3)j=k
+
+(3)
+
+(4)
+
+(5)
+
+488
+
+G. Ristanoski, W. Liu, and J. Bailey
+
+We investigate the use of the quadratic mean as a risk function which balances
+k values, instead of just two values. Each value represents the average loss for
+a group of instances. The grouping of instances can be conducted in a range of
+ways. A simple way is to segment the time series data into k groups by their
+distribution, and we use the Wilcoxon method for that purpose. Each group
+consists of consecutive data samples, and may vary in size depending on the
+distribution of the underlying data. The eﬀect of using the quadratic mean is to
+produce a model which optimizes the average loss for each group, as well as the
+variance of the average loss across the k groups.
+
+The details behind the groups error optimization are as follows: with n sam-
+ples, we denote the sizes of k groups as n1, n2,..,nk, where n1+n2+..+nk=n.
+The empirical loss function of k group has the form of:
+
+where fj is the average error for group j consisting of nj consecutive samples
+following the same distribution
+
+where xji is the i-th sample of group j, and yji is the i-th output of group j.
+After some manipulation, it can be rewritten as
+
+where μ is the mean error of the k groups 1
+j=1 fj(w) and σ is the standard
+k
+deviation of the error across groups 1, . . . , k. This form clearly shows the overall
+loss is the sum of two components, the average loss per group and the variance
+across groups.
+
+An ideal w minimizes the square root of the average of squares of errors per
+group, while keeping the structural risk minimization as well, therefore resulting
+in the ﬁnal optimization function
+
+∗
+
+w
+
+= arg min
+
+w
+
+λwT w + RQM
+
+emp(w)
+
+(6)
+
+This form of calculation of the loss function is the form we use for the proposed
+QMReg model, and this empirical loss function introduces robustness in the
+algorithm, making it capable of minimizing the eﬀect of outliers and the error
+per distribution group. By using linear optimization methods, such as the bundle
+method [6], we can calculate the subradients of the empirical loss and use them to
+iteratively update the w vector in a direction that minimizes the quadratic mean
+2 (wT x-
+loss presented at Formula 3. The loss for a given sample is l(xi,yi,w)= 1
+(xi,yi,w)=(wT x − y)2. Using this
+y)2, and it’s gradient will have the from of l
+in the calculation of the loss for a group in Equation 4, for the k groups of
+
+(cid:4)
+
+Time Series Forecasting Using Distribution Enhanced Linear Regression
+
+489
+
+W indow2 (which follows W indow1)
+
+Algorithm 1. Bundle methods for solving the k-group quadratic mean mini-
+mization problem
+Input: convergence threshold ; initial weight vector w0;
+1: // Step 1: Change point detection
+2: Initialize distribution windows W indow1 (starting form the ﬁrst sample) and
+3: Initialize iteration index k ← 1, initialize group window vk as empty
+4: repeat
+5:
+
+if samples in W indow1 and W indow2 have diﬀerent distribution (according to
+Wilcoxon rank sum test) - change point detected then
+vk ← samples starting W indow1 till end of W indow2
+Set W indow1 after vk, W indow2 follows W indow1
+k ← k+1
+
+Move W indow2 one sample further
+
+else
+
+end if
+
+6:
+7:
+8:
+9:
+10:
+11:
+12: until all samples passed
+13: // Step 2: Weight vector training:
+14: Initialize iteration index t ← 0;
+15: repeat
+16:
+17:
+18:
+19:
+20:
+21:
+22: until t ≤  or t − t−1 ≈ 0
+23: Return wt
+
+Q
+
+t ← t + 1;
+Compute subgradient at ← ∂wR
+emp,k(wt−1);
+Compute bias bt ← R
+t−1at;
+Update the lower bound Rlb
+Update wt ← arg minw J t(w) = λwT w+Rlb
+Compute current gap t ← min0≤i≤t J(wi) – J t(wt)
+
+emp,k(wt−1) – wT
+
+t (w) = max1≤i≤t wT ai+bi;
+
+t (w);
+
+Q
+
+samples, the subgradient function will have the form of Equation 7, and the
+detailed pseudo-code of the entire learning process is presented as Algorithm 1.
+
+(cid:2)(cid:3)k
+
+∂wRQ
+
+emp,k(w) = ∂w
+
+j=1 fj (w)
+
+k
+
+2
+
+=
+
+1
+2
+
+(
+
+(cid:3)k
+
+k(cid:4)
+
+j=1
+
+2
+
+− 1
+
+2 (
+
+)
+
+2fj (w)f(cid:3)
+k
+
+j (w)
+
+)
+
+(7)
+
+j=1 fj (w)
+
+k
+
+3.3 ”Every Sample as a Group” Strategy
+
+We compare our method of k groups with 2 extreme cases - when there is only
+one group, and when every single instance is a group. It can be easily shown that
+in the case of 1 group, the quadratic mean is equivalent to the standard linear
+regression model. As a single instance can be represented as a group, we inves-
+tigate this research direction as well. The resulting model is QMSampleGroup.
+In this case the quadratic mean will try to minimize the variance of error across
+the entire set of samples.
+
+490
+
+G. Ristanoski, W. Liu, and J. Bailey
+
+4 Experiments and Results
+
+Evaluation of the performance of the QMReg method was the main target of
+the experimental work we conducted. To achieve this goal in the experiments
+both real datasets and synthetic datasets were used. We tested 20 real stock
+market time series datasets obtained from [11], in the time frame of 2000-2012.
+We obtained daily stock market closing prices, one of the most often analysed
+types of data [1]. The sizes of the datasets are between 200 and 600 samples,
+divided on training set and test set.
+
+A synthetic dataset was created, and 4 diﬀerent versions of it were also
+tested (Table 1). The initial set represented a visible deterministic trend, after
+which 2 types of changes were introduced: increasing or decreasing the last sam-
+ples, and adding diﬀerent amounts of noise, in order to test the newly proposed
+algorithm the ability to work with noisy data. We also performed testing on
+5 non-ﬁnancial time series, revealing opportunities for application of quadratic
+mean based approach in the non-ﬁnancial time series domain [12].
+
+Table 1. Synthetic datasets description
+
+Dataset
+Simulated sample 1 Visible deterministic trend
+Simulated sample 2 Deterministic trend, structural break(in same direction), caused
+
+Description
+
+by increasing the last samples, noise(10% of original value)
+Simulated sample 3 Deterministic trend, structural break(in opposite direction),
+
+caused by decreasing the last samples, noise(10% of orig. value)
+
+Simulated sample 4 Deterministic trend, structural break(in same direction), last
+
+samples increased further, noise(25% of original value)
+
+Simulated sample 5 Deterministic trend, structural break(in opposite direction),
+last samples decreased further, noise(25% of original value)
+
+4.1 Testing and Results
+
+Comparison between 6 methods was conducted in order to evaluate the ef-
+fect of the QMReg methodology: Standard Least Squares Linear Regression
+(LS, regressing to past 4 values), Distribution based Quadratic Mean Linear
+Regression (QMReg, regressing to past 4 values), Quadratic Mean Linear Re-
+gression with every sample as a group (QMSampleGroup, regressing to past 4
+values), ARIMA(3,0,1), Robust Regression (Huber M -estimator) and SVM Re-
+gression(SVM, α = 1, C=1, =0.001, ξ=ξ
+=0.001),). The Root Mean Square
+Error(RMSE) was chosen as a performance metric, and we also calculate the
+error reduction (ER) compared to the Least Squares models:
+RMSE of LS − RMSE of QS methods
+
+∗
+
+∗ 100.
+
+ER =
+
+RMSE of LS
+
+From the results presented in Table 2, we can clearly see that the QMReg method
+performed signiﬁcantly better than the standard Least Squares linear regression,
+
+Time Series Forecasting Using Distribution Enhanced Linear Regression
+
+491
+
+Table 2. Root Mean Square Error (RMSE) and Error reduction (ER) of QMReg and
+QMGroupSample methods compared to LS(in %)
+
+LS QMReg QM
+
+ARIMA Robust SVM
+
+RMSE
+
+ER
+QMReg
+
+Regress. Regress.
+
+Datasets
+
+0.725 0.625
+Amazon.com
+3.75 3.513
+Apple
+0.913 0.645
+American Express
+0.129 0.1163
+British Airways
+1.36 1.22
+Boeing
+0.558 0.378
+Coke
+0.996 0.69
+Colgate Plamolive
+0.66 0.615
+Ebay
+1.99 1.13
+Fedex
+0.276 0.273
+Ford
+0.889 0.554
+Hewlett-Packard
+7.54 7.17
+IBM
+0.932 0.819
+Intel
+1.18 1.12
+Island Paciﬁc
+0.439 0.382
+Johnson & Johnson
+0.756 0.71
+McDonalds
+0.439 0.256
+Microsoft
+0.619 0.618
+Starbucks
+2.391 2.1
+Siemens
+0.75 0.565
+Walt Disney
+1.82 1.79
+Simulated sample 1
+5.6
+Simulated sample 2
+2.65 1.88
+Simulated sample 3
+2.52 2.14
+Simulated sample 4
+8.6
+Simulated sample 5
+0.241 0.225
+Chemical process
+Temperature anomalies 14.38 13.52
+Radioactivity
+Airline passengers
+Chocolate
+Wilcoxon signed
+rank test p-value
+
+1.838
+
+6.9
+
+Sample
+Group
+0.628
+3.4
+0.64
+0.118
+1.23
+0.428
+0.714
+0.622
+1.132
+0.275
+0.581
+7.826
+0.83
+1.085
+0.413
+0.716
+0.383
+0.614
+2.12
+0.54
+1.668
+1.949
+1.898
+2.81
+7.39
+0.274
+13.57
+14.44
+46.6
+1635
+
+1.85
+16.1
+1.61
+0.228
+8.28
+1.04
+1.6
+2.17
+1.67
+0.85
+1.94
+25.6
+2.36
+1.11
+1.1
+2.5
+0.91
+1.86
+3.4
+3.2
+11.87
+12
+11.9
+12.8
+8.26
+0.36
+16.3
+10.1
+118.8
+1970
+
+0.6269
+3.566
+0.635
+0.121
+1.188
+0.375
+0.693
+0.616
+1.098
+0.273
+0.566
+7.725
+0.832
+1.113
+0.392
+0.719
+0.258
+0.621
+2.097
+0.542
+1.81
+1.781
+1.982
+2.31
+6.77
+0.234
+13.53
+11.197
+48.398
+1680
+
+0.629
+3.44
+0.642
+0.1182
+1.15
+0.382
+0.707
+0.614
+0.87
+0.267
+0.589
+7.443
+0.838
+1.1
+0.399
+0.704
+0.27
+0.624
+2.1
+0.552
+1.96
+1.843
+2.06
+2.17
+2.67
+0.228
+13.57
+10.72
+56.3
+1686
+
+13.8
+6.3
+29.4
+9.6
+10.3
+32.3
+30.7
+6.8
+43.2
+1.1
+37.7
+4.9
+12.1
+5.1
+13.0
+6.1
+41.7
+0.2
+12.2
+24.7
+1.6
+67.2
+29.1
+15.1
+19.8
+6.6
+6.0
+15.8
+8.0
+21.7
+
+14.63 12.315
+49.78 45.81
+1764 1382
+base 1.83E-06 1.3E-04 3.56E-05 9.78E-06 9.31E-05
+
+base
+
+0.00286 1.30E-05 0.2563
+base
+1.43E-05 0.1682
+
+0.2845
+0.2845
+
+much better than the ARIMA model, and very similar to the Robust Regression
+and SVM, and was the method with the most stable convergence towards the
+optimal weight vector as well, which was not always the case with Least Squares.
+The performance of the QMReg method was mostly greater for datasets where
+higher number of groups was detected. The SVM output arguable less easy
+to interpret - support vector samples in the dataset are not as much of use as
+simple coeﬃcients for the features. With similar performance as SVM regression,
+
+492
+
+G. Ristanoski, W. Liu, and J. Bailey
+
+Fig. 2. Error between the groups of the loss, for Microsoft dataset
+
+Fig. 3. Robust regression and QMReg comparison - the pluses are the outliers, and the
+black dots are future samples to be predicted. Robust regression considers the points at
+the very end as possible outliers, while QMReg detects the subtle change of direction
+and adjusts the line accordingly.
+
+QMReg does show potential for use in cases when one is not familiar with more
+complex forecasting methods, but can interpret the output of a linear regression
+model. The objective of the QMReg to reduce the loss between groups can be seen
+from Figure 2 which graphically shows how the errors per group are minimized
+and made more even when QM grouping in performed.
+
+The Robust regression is easy to interpret too, but a more statistical analysis
+of the data is required - the non-parametric QMReg can be used as a black-box
+method, and still deliver similar results. The diﬀerence with Robust regression
+can be seen from Figure 3: the crossed points are outliers, and red points are
+
+Time Series Forecasting Using Distribution Enhanced Linear Regression
+
+493
+
+the test samples. We can notice that both methods are dealing successfully with
+the outliers, but the subtle change in the distribution is more correctly detected
+by the QMReg method, while robust regression is considering the end points as
+possible outliers and still keeps the line towards the overall mean. It is this subtle
+change detection that further leads to lower error for QMReg (RMSE=0.89) than
+the Robust regression error (RMSE=2.09). We can see the QMReg is highly
+competitive when compared to Robust regression, and based on Figure 3 we
+believe it may have the potential to deal with non-stationary behaviour better.
+
+4.2 Loss Function Analysis
+
+By performing grouping among the training set, the QM methods tend to mini-
+mize not only the overall training error, but the error per group. This results in a
+lower variance in the loss, as it can be seen from Table 3: the standard deviation
+in QMReg method was at its best up to 58% less than the one of the LS method.
+The grouping performed in the case of QMReg was also conducted for LS. The
+loss per group was calculated, and standard deviation among the loss per group
+showed that the QM method indeed minimizes the loss amongst the groups:
+Table 3 shows the standard deviation of the error per group is statistically lower
+in the case of QMReg when compared to LS.
+
+5 Conclusion and Future Work
+
+Time series forecasting is a classic prediction problem, for which linear regression
+is one of the best known and most widely used methods. In this paper, we have
+proposed a technique that enhances standard linear regression, by employing an
+optimization objective which explicitly recognises diﬀerent groups of samples.
+Each group corresponds to a segment of the time series whose samples have
+similar distribution characteristics. Our objective simultaneously minimizes the
+expected loss of each group, as well as the variance of the loss across the groups.
+By doing so, we ensure a model that produces more stable, less volatile predic-
+tions, and capable of additionally minimizing the eﬀect of outliers or noisy data.
+The experimental study highlighted the promise of our approach, showing
+that it could produce linear models diﬀerent to that of standard linear regression
+and which also achieved consistent reductions in error in the range 10% to 30%
+on average, up to 40% error reduction in some cases. As the performance of our
+proposed method is comparable to more advanced forecasting methods(SVM re-
+gression and Robust Regression), our model has an advantage that it improves
+the performance of linear regression while avoiding unnecessary complexity and
+unwanted parameters, so it can be used by more general practitioners on diverse
+types of time series.
+
+For future work, we would like to investigate the use of weighted groupings,
+for cases where the quality of a group with respect to the prediction task can be
+estimated, and introduce the time element in the learning process even further.
+
+494
+
+G. Ristanoski, W. Liu, and J. Bailey
+
+Table 3. Loss function mean and standard deviation for entire training set, and stan-
+dard deviation of loss across groups per training set
+
+Loss function
+
+Standard deviation for
+
+Dataset
+
+LS
+
+QMReg
+
+st. dev. mean
+0.5081
+1.1087
+
+st. dev.
+0.8229
+
+loss across groups
+LS
+QMReg
+mean
+0.7074
+0.4888
+Amazon.com
+15.1928 27.2601 13.9676 26.0380 8.8954
+Apple
+0.8372
+2.2984
+0.8179
+1.1356
+American Express
+0.0203
+0.0483
+0.0303
+0.0199
+British Airways
+0.9353
+3.5453
+1.1735
+2.2065
+Boeing
+0.2504
+1.1622
+0.5104
+0.4660
+Coke
+0.7759
+2.8065
+1.2410
+1.3929
+Colgate Plamolive
+0.2224
+0.4295
+0.1550
+0.2531
+Ebay
+2.5329
+9.3358
+6.4903
+3.9518
+Fedex
+0.0681
+0.1184
+0.0485
+0.0680
+Ford
+2.2101
+0.5336
+0.9649
+0.9802
+Hewlett-Packard
+133.895 60.431
+85.553
+IBM
+2.4139
+1.1098
+1.2986
+Intel
+0.5165
+1.3706
+0.9762
+Island Paciﬁc
+0.2372
+0.4612
+0.2526
+Johnson & Johnson
+0.2742
+0.7640
+0.3491
+McDonalds
+0.1980
+0.6304
+0.2600
+Microsoft
+0.4354
+0.1672
+0.1654
+Starbucks
+4.0694
+6.1569
+4.6880
+Siemens
+0.2374
+0.7747
+0.4286
+Walt Disney
+3.5835
+3.2914
+2.9072
+Simulated sample 1
+14.5109 26.8793 4.6307
+Simulated sample 2
+9.3680
+18.8459 3.7615
+Simulated sample 3
+40.6497 86.3151 31.5504 80.3505 38.3393
+Simulated sample 4
+93.7317 133.0539 53.3164 104.7921 51.9541
+Simulated sample 5
+0.0756
+0.1442
+Chemical process
+0.0680
+206.57
+368.44
+Temperature anomalies 232.47
+230.35
+180.35
+175.04
+Radioactivity
+809.82
+Airline passengers
+1418.44 796.04
+Chocolate
+1499216 2158796 952022
+Wilcoxon signed rank
+test p-value
+
+1.5941
+0.0398
+1.5959
+0.8432
+2.1025
+0.4208
+3.9214
+0.1191
+1.2165
+123.244 52.7541
+2.0457
+0.8315
+0.4137
+0.5731
+0.5074
+0.4239
+5.4571
+0.4255
+2.7637
+15.8900 13.8375
+8.3814
+
+0.3139
+8.3127
+0.5714
+0.0156
+0.4683
+0.2234
+0.5965
+0.1060
+1.3231
+0.0481
+0.4411
+56.8021
+0.4592
+0.1660
+0.1343
+0.1650
+0.0867
+0.1232
+1.2753
+0.1434
+0.6042
+5.0620
+1.6188
+29.8716
+29.3767
+0.0277
+52.8821
+31.9748
+
+0.0339
+16.7000
+46.7919
+
+0.1653
+318.60
+244.17
+1130.33 490.8909 426.3732
+1486350 622544.00 467145.00
+0.0001816
+
+0.6658
+0.4787
+0.1572
+0.2595
+0.1563
+0.1295
+1.7561
+0.3840
+0.8706
+
+base
+
+2.72E-05 3.90E-05 base
+
+5.8793
+
+References
+
+1. Tsay, R.S.: Analysis of Financial Time Series. Wiley-Interscience (2005)
+2. Hulten, G., Spencer, L., et al.: Mining time-changing data streams. In: Proceedings
+of the Seventh ACM SIGKDD International Conference on Knowledge Discovery
+and Data Mining, San Francisco, California, pp. 97–106 (2001)
+
+3. Keogh, E., Kasetty, S.: On the Need for Time Series Data Mining Benchmarks: A
+Survey and Empirical Demonstration. Data Mining and Knowledge Discovery 7(4),
+349–371 (2003)
+
+Time Series Forecasting Using Distribution Enhanced Linear Regression
+
+495
+
+4. Dong, G., Han, J., et al.: Online mining of changes from data streams: Research
+problems and preliminary results. In: Proceedings of the 2003 ACM SIGMOD
+Workshop on Management and Processing of Data Streams (2003)
+
+5. Liu, X., Zhang, R., et al.: Incremental Detection of Distribution Change in Stock
+Order Streams. In: 26th International Conference on Data Engineering Conference,
+ICDE (2010)
+
+6. Teo, C.H., Vishwanthan, S.V.N., Smola, A.J., Le, Q.V.: Bundle methods for reg-
+ularized risk minimization. Journal of Machine Learning Research 11, 311–365
+(2010)
+
+7. Liu, W., Chawla, S.: A Quadratic Mean based Supervised Learning Model for
+Managing Data Skewness. In: Proceedings of the Eleventh SIAM International
+Conference on Data Mining, pp. 188–198 (2011)
+
+8. Vellaisamy, K., Li, J.: Multidimensional decision support indicator (mDSI) for time
+series stock trend prediction. In: Zhou, Z.-H., Li, H., Yang, Q. (eds.) PAKDD 2007.
+LNCS (LNAI), vol. 4426, pp. 841–848. Springer, Heidelberg (2007)
+
+9. Cheng, H., Tan, P.-N., Gao, J., Scripps, J.: Multistep-ahead time series prediction.
+In: Ng, W.-K., Kitsuregawa, M., Li, J., Chang, K. (eds.) PAKDD 2006. LNCS
+(LNAI), vol. 3918, pp. 765–774. Springer, Heidelberg (2006)
+
+10. Liu, Z., Yu, J.X., Lin, X., Lu, H., Wang, W.: Locating motifs in time-series data.
+In: Ho, T.-B., Cheung, D., Liu, H. (eds.) PAKDD 2005. LNCS (LNAI), vol. 3518,
+pp. 343–353. Springer, Heidelberg (2005)
+
+11. Web enabled scientiﬁc services and applications,
+
+http://www.wessa.net/stocksdata.wasp
+
+12. Hyndman, R.J.: S&P quarterly index online database,
+http://robjhyndman.com/tsdldata/data/9-17b.dat
+
+13. Muller, K.-R., Smola, A.J., R¨atsch, G., Sch¨olkopf, B., Kohlmorgen, J., Vapnik, V.:
+
+Using Support Vector Machines for Time Series Prediction (2000)
+
+14. Liu, X., Wu, X., Wang, H., Zhang, R., Bailey, J., Kotagiri, R.: Mining distribution
+change in stock order streams. In: IEEE 26th International Conference on Data
+Engineering, ICDE (2010)
+
+15. Wilcox, R.R.: Introduction to Robust Estimation and Hypothesis Testing. Elsevier
+
+Academic Press, New York (2005)
+
+16. Evgeniou, T., Pontil, M.: Regularized multi–task learning. In: Proceedings of the
+Tenth ACM SIGKDD International Conference on Knowledge Discovery and Data
+Mining, pp. 109–117 (2004)
+
+17. Adhikari, R., Agrawal, R.K.: A novel weighted ensemble technique for time series
+forecasting. In: Tan, P.-N., Chawla, S., Ho, C.K., Bailey, J. (eds.) PAKDD 2012,
+Part I. LNCS, vol. 7301, pp. 38–49. Springer, Heidelberg (2012)
+
+18. Khoa, N.L.D., Chawla, S.: Robust outlier detection using commute time and
+eigenspace embedding. In: Zaki, M.J., Yu, J.X., Ravindran, B., Pudi, V. (eds.)
+PAKDD 2010, Part II. LNCS, vol. 6119, pp. 422–434. Springer, Heidelberg (2010)
+19. Widiputra, H., Pears, R., Kasabov, N.: Multiple time-series prediction through
+multiple time-series relationships proﬁling and clustered recurring trends. In:
+Huang, J.Z., Cao, L., Srivastava, J. (eds.) PAKDD 2011, Part II. LNCS, vol. 6635,
+pp. 161–172. Springer, Heidelberg (2011)
+
+20. Cheng, H., Tan, P.-N.: Semi-supervised learning with data calibration for long-term
+time series forecasting. In: Proceeding of the 14th ACM SIGKDD International
+Conference on Knowledge Discovery and Data Mining (2008)
+
+21. Meesrikamolkul, W., Niennattrakul, V., Ratanamahatana, C.A.: Shape-based clus-
+tering for time series data. In: Tan, P.-N., Chawla, S., Ho, C.K., Bailey, J. (eds.)
+PAKDD 2012, Part I. LNCS, vol. 7301, pp. 530–541. Springer, Heidelberg (2012)
+
+

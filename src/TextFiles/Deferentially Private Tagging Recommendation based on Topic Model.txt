@@ -1,0 +1,1421 @@
+Deferentially Private Tagging Recommendation
+
+Based on Topic Model
+
+Tianqing Zhu, Gang Li(cid:2), Wanlei Zhou, Ping Xiong, and Cao Yuan
+
+School of Information Technology, Deakin University, Australia
+
+School of Information, Zhongnan University of Economics and Law, China
+
+School of Mathematics and Computer, Wuhan Polytechnic University, China
+
+tianqing.e.zhu@gmail.com, {gang.li,wanlei.zhou}@deakin.edu.au,
+
+pingxiong@znufe.edu.cn, yc@whpu.edu.cn
+
+Abstract. Tagging recommender system allows Internet users to an-
+notate resources with personalized tags and provides users the freedom
+to obtain recommendations. However, It is usually confronted with se-
+rious privacy concerns, because adversaries may re-identify a user and
+her/his sensitive tags with only a little background information. This
+paper proposes a privacy preserving tagging release algorithm, PriTop,
+which is designed to protect users under the notion of diﬀerential pri-
+vacy. The proposed PriTop algorithm includes three privacy preserving
+operations: Private Topic Model Generation structures the uncontrolled
+tags, Private Weight Perturbation adds Laplace noise into the weights
+to hide the numbers of tags; while Private Tag Selection ﬁnally ﬁnds the
+most suitable replacement tags for the original tags. We present exten-
+sive experimental results on four real world datasets and results suggest
+the proposed PriTop algorithm can successfully retain the utility of the
+datasets while preserving privacy.
+
+Keywords: Privacy Preserving, Diﬀerential Privacy, Recommendation,
+Tagging.
+
+1
+
+Introduction
+
+The widespread success of social network web sites introduces a new concept
+called the tagging recommender system [9]. These social network web sites usu-
+ally enable users to annotate resources with customized tags, which in turn
+facilitates the recommendation of resources. But the issue of privacy in the rec-
+ommender process has generally been overlooked [11]. An adversary with back-
+ground information may re-identify a particular user in a tagging dataset and
+obtain the user’s historical tagging records [8]. How to preserve privacy in tagging
+recommender systems is an emerging issue that needs to be addressed.
+
+Over the last decade, a variety of privacy preserving approaches have been
+proposed for traditional recommender systems [11]. For example, cryptography is
+used in the rating data for multi-party data sharing [15]. Perturbation adds noise
+
+(cid:2) Corresponding author.
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part I, LNAI 8443, pp. 557–568, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+558
+
+T. Zhu et al.
+
+to the users’ ratings before rating prediction [12], and obfuscation replaces a cer-
+tain percentage of ratings with random values [1]. However, these approaches can
+hardly be applied in tagging recommender systems due to the semantic property
+of tags. To overcome the deﬁciency, the tag suppression method has recently been
+proposed to protect a user’s privacy by modeling users’ proﬁles and eliminating
+selected sensitive tags [11]. However, this method only releases an incomplete
+dataset that signiﬁcantly aﬀects the recommendation performance. Moreover,
+most existing approaches suﬀer from one common weakness: the privacy notions
+are weak and hard to prove theoretically, thus impairing the credibility of the
+ﬁnal results. Accordingly, a more rigid privacy notion is needed.
+
+Recently, diﬀerential privacy provides a strict privacy guarantee for individ-
+uals [6]. It applies a randomized mechanism suitable for both numeric and non-
+numeric values and has been proven eﬀective in recommender systems [16,17].
+This paper introduces diﬀerential privacy into tagging recommender systems,
+with the aim of preventing re-identiﬁcation of users and avoiding the association
+of sensitive tags (e.g., healthcare tags) with a particular user. However, although
+these characteristics make diﬀerential privacy a promising method for tagging
+recommendation, there remain some barriers: First, the naive diﬀerential privacy
+mechanism only focuses on releasing statistical information that can barely re-
+tain the structure of the tagging dataset. this naive mechanism lists all the tags,
+counts the number and adds noise to the statistical output, but ignores the rela-
+tionship among users, resources and tags. This simple statistical information is
+inadequate for recommendations; Second, Diﬀerential privacy introduces a large
+amount of noise due to the sparsity of the tagging dataset. For a dataset with
+millions of tags, the mechanism will result in a large magnitude of noise.
+
+Both barriers imply the naive diﬀerential privacy mechanism can not be sim-
+ply applied in tagging recommender systems. To overcome the ﬁrst barrier, we
+generate a synthetic dataset retaining the relationship among tags, resources and
+users rather than releasing statistical information. The second barrier can be
+addressed by shrinking the randomized domain, because the noise will decrease
+when the randomized range is limited. The topic model method is a possible
+way to structure tags into groups and limit the randomized domain. Therefore,
+we propose a tailored diﬀerential privacy mechanism that optimizes the perfor-
+mance of recommendation with a ﬁxed level of privacy. The contributions can
+be summarized as follows:
+
+– We maintain an acceptable utility of the tagging dataset by designing a prac-
+tical private tagging release algorithm, PriTop, with a rigid privacy guaran-
+tee.
+
+– In PriTop, a novel private topic model-based method is proposed to structure
+the tags and to shrink the randomized domain. The eﬀectiveness of the
+proposed method is veriﬁed by extensive experiments on real-world datasets.
+– With diﬀerential privacy composition properties, a theoretical privacy and
+utility analysis conﬁrms an improved trade-oﬀ between privacy and utility.
+
+Deferentially Private Tagging Recommendation Based on Topic Model
+
+559
+
+2 Preliminaries and Related Work
+
+(cid:3)
+Let G be a dataset to be protected, two datasets G and G
+are neighbor-
+ing datasets if they diﬀer in only one record. Diﬀerential privacy provides a
+randomization mechanism M to mask the diﬀerence between the neighboring
+datasets [6]. We use (cid:2)G to represent the synthetic dataset after applying M .
+In tagging recommendation, dataset G contains users U = {u1, u2,···}, re-
+sources R = {r1, r2,···} and tags T = {t1, t2,···}. For a particular user ua ∈ U
+and a resource rb ∈ R, T (ua, rb) represents all tags ﬂagged by the ua on rb, and
+use T (ua) to denote all tags utilized by ua. The recommended tags for ua on
+a given resource r are represented by T p(ua, r). A user ua’s proﬁle P (ua) =<
+T (ua), W (ua) > is usually modeled by his tagging records, including tag’s names
+T (ua) = {t1, ..., t|T (ua)|} and weights W (ua) = {w1, ..., w|T (ua)|} [11].
+
+Diﬀerential privacy acquires the intuition that releasing an aggregated report
+should not reveal too much information about any individual in the dataset [6].
+Deﬁnition 1 (-Diﬀerential Privacy ). A randomized mechanism M gives
+-diﬀerential privacy if for every set of outcomes Ω, M satisﬁes: P r[M(G) ∈
+Ω] ≤ exp() · P r[M(G
+(cid:3)
+
+) ∈ Ω], where  is the privacy budget.
+
+M is associated with the sensitivity [7], which measures the maximal change
+
+of the query f when removing one record from G.
+Deﬁnition 2 (Sensitivity ). For f : G → R, the sensitivity of f is deﬁned as
+Δf = maxG,G(cid:2) ||f (G) − f (G
+(cid:3)
+
+)||1,
+
+Two mechanisms are utilized in diﬀerential privacy: the Laplace mechanism
+and the Exponential mechanism. The Laplace mechanism is suitable for numeric
+output and adds controlled noise to the outcome of a query [7]:
+Deﬁnition 3 (Laplace Mechanism). Given a function f : G → R
+anism, M(R) = f (R) + Laplace(
+
+ )d, provides the -diﬀerential privacy.
+
+d, the mech-
+
+Δf
+
+The Exponential mechanism focuses on non-numeric queries and pairs with
+an application dependent score function q(G, ψ), which represents how good an
+output scheme ψ is for dataset G:
+
+Deﬁnition 4 (Exponential Mechanism).
+M is -diﬀerential privacy if: M(G) = {return ψ ∝ exp(
+
+[10] An Exponential mechanism
+
+q(G,ψ)
+
+2Δq
+
+)}.
+
+Privacy violations in recommender systems have been well studied since
+2001. The ﬁrst study concerned with this issue was undertaken by Ramakr-
+ishnan et al. [13]. They claimed users who rated items across disjointed domains
+could face a privacy risk through statistical database queries. Recently, Calan-
+drino et al. [4] presented a more serious privacy violation. By observing temporal
+changes in the public outputs of a recommender system, they inferred a partic-
+ular user’s historical rating and behavior with background information.
+
+Several traditional privacy preserving methods have been employed in CF, in-
+cluding cryptographic [5,15], perturbation [12] and obfuscation [1]. Cryptographic
+
+560
+
+T. Zhu et al.
+
+is suitable for multiple parties but induces extra computational cost [5,15]; Ob-
+fuscation is easy to understand and to implement, but the utility will decrease
+signiﬁcantly [1]. Perturbation preserves high level of privacy by adding noise to
+the original dataset, but the magnitude of noise is hard to control [12].
+
+The privacy in tagging recommendation systems is more complicated due to
+its unique structure and semantic content. Parra-Arnau et al. [11] proposed the
+tag suppression by eliminating sensitive tags from users’ proﬁle. They applied
+a clustering method to structure tags and suppressed the less represented ones.
+This approach only releases an incomplete dataset, and sensitive tags are sub-
+jective. When publicly sharing the dataset, users still have the potential to be
+identiﬁed. The privacy issue in tagging recommender systems remains largely
+unexplored, and we attempt to ﬁll this void in this paper.
+
+3 Private Tagging Release
+In a tagging dataset G, users’ proﬁle is represented as P = {P (u1), ..., P (u|U|)}.
+pose tags in P (ua) are represented by T (u) = {t1, ..., t|T|} and weights are de-
+noted as W (ua) = {w1, ..., w|T|}, where wi = 0 indicates that ti is unused.
+
+Diﬀerential privacy assumes all tags have probabilities to appear in P (ua). Sup-
+
+Diﬀerential privacy will add noise to the weight W (ua) and release a noisy
+proﬁle (cid:2)P (ua) =< T (ua), (cid:3)W (ua) >. However, this process will introduce large
+noise because lots of weights will change from zero to a positive value. To
+reduce the noise is to shrink the randomized domain, which refers to the di-
+minished number of zero weights in the proﬁle. Accordingly, we structure the
+tags into K topics Z = {z1, ...zK} and deﬁne a topic-based proﬁle Pz(ua) =<
+Tz(ua), Wz(ua) >, where Tz(ua) = {Tz1(ua), ..., TzK (ua)} represents tags in each
+topic and Wz(ua) = {wz1(ua), ..., wzK (ua)} is the frequency of tags. Compared
+to W (ua), Wz(ua) is less sparse. The total noise added will signiﬁcantly diminish.
+In this section, we propose a Private Topic-based Tagging Release (PriTop)
+algorithm to publish users’ proﬁles by masking their exact tags and weights under
+diﬀerential privacy. As described in Alg. 1, three private operations are involved:
+Private Topic Model Generation creates multiple private topics by masking the
+topic distribution on tags. Topic Weight Perturbation masks the weights of tags
+to prevent inferring how many tags a user has annotated on a topic. Private Tag
+Selection uses privately selected tags replace the original tags.
+
+3.1 Private Topic Model Generation
+
+This operation categorizes tags into topics to eliminate the randomization do-
+main. We introduce diﬀerential privacy to Latent Dirichlet Allocation (LDA) [2]
+to generate a private LDA model, which is constructed in three steps: LDA Model
+Construction, Private Model Generation and Topic-based Proﬁle Generation.
+
+LDA Model Construction. The ﬁrst step constructs the LDA model by Gibbs
+Sampling [14]. In this model, a resource is considered as a document and a tag is
+
+Deferentially Private Tagging Recommendation Based on Topic Model
+
+561
+
+Algorithm 1. Private Topic-based Tagging Release (PriTop) Algorithm
+Require: G, privacy parameter , K.
+Ensure: (cid:2)G
+
+1. Divided privacy budget into /2, /4 and /4;
+2. Private Topic Generation: create topic-based user proﬁles P (ua) based on the
+private topic model with /2 privacy budget;
+for each user ua do
+
+3. Topic Weight Perturbation: add Laplace noise to the weights with /4;
+for each topic zk in P (ua) do
+
+4. Private Tag Selection: Select tags according to the (cid:3)W (ua) with /4;
+
+end for
+
+end for
+5. Output (cid:2)G for tagging recommendations;
+
+interpreted as a word. Let Z = {z1, ...zK} be a group of topics, Eq. 1 represents
+
+a standard LDA model to specify the distribution over tag t.
+
+P r(t|r) =
+
+K
+
+(cid:4)
+
+l=1
+
+P r(t|zl)P r(zl|r)
+
+(1)
+
+where P r(t|zl) is the probability of tag t under a topic zl and P r(zl|r) is the
+probability of sampling a tag from topic z in the resource r.
+To estimate topic-tag distribution P r(t|z) and the resource-topic distribu-
+tion P r(z|r) in Eq. 1, Gibbs Sampling iterates multiple times over each tag t
+of resource r and samples the new topic z for the tag based on the posterior
+probability P r(z|ti, r, Z−i) by Eq. 2 until the model converges.
+
+P r(z|ti, r, Z−i) ∝
+
+(cid:5)|T|
+
+CT K
+ti CT K
+
+tK + β
+tiK + |T|β
+
+CRK
+
+rk + α
+
+(cid:5)K
+
+K=1 CRK
+
+riK + Kα
+
+(2)
+
+where CT K is the count of topic-tag assignments and CRK counts the resource-
+topic assignments. Z−i represents topic-tag assignment and resource-topic as-
+signment except the current z for ti. α and β are parameters of Dirichlet priors.
+Simultaneously, the evaluation on P r(t|z) and P r(z|r) is formulated as follows:
+
+P r(t|z) =
+
+(cid:5)|T|
+
+CT K
+ti CT K
+
+tk + β
+tiK + |T|β
+
+, P r(z|r) =
+
+CRK
+
+rK + α
+
+(cid:5)K
+
+k=1 CRK
+
+riK + Kα
+
+After converging, the LDA model is generated by P r(z|t, r), P (t|z) and P (z|r).
+
+Private Model Generation. The second step adds Laplace noise to the ﬁnal
+counts in the LDA model. There are four diﬀerence counts in Eq. 2. If we changed
+ti CT K
+the topic assignment on current ti, the CT K
+tiK
+will increase by one. Similarly, if the CRK
+riK will
+
+tK will decrease by 1 and
+(cid:5)K
+
+rK decreases by 1, the
+
+K=1 CRK
+
+(cid:5)|T|
+
+562
+
+T. Zhu et al.
+
+increase by 1 accordingly. So we sample two groups of Laplace noise and add
+them to four count parameters. The new (cid:3)P r(z|t, r) is evaluated by Eq. 3:
+
+(cid:3)P r(z|t, r) ∝
+
+(cid:5)|T|
+
+CT K
+ti CT K
+
+tK + η1 + β
+tiK − η1 + |T|β
+
+CRK
+
+(cid:5)K
+
+rK + η2 + α
+rik − η2 + Kα
+
+K=1 CRK
+
+(3)
+
+where η1 and η2 are both sampled from Laplace( 2
+
+ ) with the sensitivity as 1.
+
+Topic-based Proﬁle Generation. The third step creates topic-based user
+
+proﬁles. For each user with tags T (ua) = {t1, ..., t|T (ua)|} and related resources
+R(ua) = {r1, ..., r|R(ua)|}, each tag can be assigned to a particular topic zl ∈ Z
+according to the (cid:3)P r(z|t, r). So the user proﬁle can be represented by a topic-based
+Pz(ua) =< Tz(ua), Wz(ua) > with the weight Wz(ua) = {w1(ua), ..., wK (ua)}.
+
+3.2 Topic Weight Perturbation
+
+After generating Pz(ua), we will add Laplace noise to mask the weights of tags
+ )K. Noise implies the revision of
+in each topic: (cid:3)Wz(ua) = Wz(ua) + Laplace( 4
+the list Tz(ua). Positive noise indicates new tags being added, while negative one
+indicates tags being deleted from the list. For positive noise in the topic zl, the
+operation will choose the tags with the highest probability in the current topic
+zj according to the P r(t|z). For negative noise, the operation will delete the tag
+with the lowest probability in the current topic zl.
+
+(cid:6)Tzl(ua) = Tzl(ua) + tnew, (cid:6)Tzl(ua) = Tzl(ua) − tdelete
+
+(4)
+
+where tnew = max
+
+i=1 P r(ti|zl) and tdelete = min
+|T|
+
+i=1 P r(ti|zl).
+|T|
+
+After perturbation, we use (cid:6)Pz(ua) =< (cid:6)Tz(ua), (cid:3)Wz(ua) > to represent the
+noisy topic-based user proﬁle. However, the (cid:6)Pz(ua) still has the high probability
+to be re-identiﬁed because it retains a major part of the original tags. The next
+operation will replace all tags in (cid:6)T (ua) to preserve privacy.
+
+3.3 Private Tag Selection
+
+Private Tag Selection adopts the Exponential mechanism to privately select tags
+from a list of candidates. Speciﬁcally, for a particular tag ti, the operation ﬁrst
+locates the topic zl to which it belongs and all tags in ˆTzl(ua) are then included in
+a candidate list I. Each tag in I is associated with a probability based on a score
+function and the sensitivity of the function. The selection of tags is performed
+based on the allocated probabilities.
+The score function is deﬁned as the Jensen-shannon (JS ) divergence between
+P r(z|ti = ti) and P r(z|ti = tj). Because the JS divergence is bounded by 1, the
+score function q for a target tag ti is deﬁned as qi(I, tj) = (1 − DJS(P ri||P rj)),
+where tj ∈ I are the candidate tags for replacement and DJS refers to JS
+divergence. The sensitivity for q is measured by the maximal distance of two
+
+Deferentially Private Tagging Recommendation Based on Topic Model
+
+563
+
+tags, which is 1. Based on the score function and sensitivity, the probability
+arranged to each tags tj is computed by Eq. 5 with the privacy budget 
+4 .
+
+P rtj∈I (tj) = exp
+
+(cid:7)
+
+ · qi(I, tj )
+
+8
+
+(cid:8)
+
+(cid:7)
+
+/
+
+(cid:4)
+
+j∈zl
+
+exp
+
+ · qi(I, tj )
+
+8
+
+(cid:8)
+
+.
+
+(5)
+
+where zl is the topic in which tj belongs to.
+
+4 Algorithm Analysis
+
+4.1 Privacy Analysis
+
+To analyze the privacy guarantee, we apply two composition properties of diﬀer-
+ential privacy [10]. The sequential composition accumulates  of each step when a
+series of private analysis is performed sequentially on a dataset. The parallel com-
+position ensures the maximal  when each private step is applied on disjointed
+subsets of the dataset. The PriTop algorithm contains three private operations
+and the  is consequently divided into three pieces: 
+
+2 , 
+
+4 and 
+
+4 , respectively.
+
+
+
+– Topic Weight Perturbation preserves 
+4
+
+2 . According to sequential composition, it preserves 
+
+– Private Topic Model Generation is performed on the whole dataset with the
+2 -diﬀerential privacy.
+−diﬀerential privacy for each user. As
+a user’s proﬁle is independent, according to parallel composition, it preserves
+
+4 -diﬀerential privacy.
+
+– Private Tag Selection processes the Exponential mechanism successively. For
+a user u, each selection is performed on the individual tags, according to
+sequential composition, each user guarantees 
+4 -diﬀerential privacy. Similar
+to the Topic Weight Perturbation, every user can be considered as subsets.
+Thus, the Private Tag Selection guarantees 
+
+4 -diﬀerential privacy.
+
+Consequently, the proposed PriTop algorithm preserves -diﬀerential privacy.
+
+4.2 Utility Analysis
+
+u∈U (
+
+Given a target user ua, the utility level of the proposed PriTop algorithm is
+highly dependent on the distance between P (ua) and (cid:2)P (ua), which is referred
+(cid:2)
+t∈P (ua ) d(t,(cid:3)t)
+to as semantic loss [11]: SLoss = 1|U| (cid:5)
+max d·|T (u)| ), where (cid:2)t is the new
+tag replacing the tag t. If we consider each private step as a query f , we then
+apply a utility deﬁnition in diﬀerential privacy suggested by Blum et al [3].
+Accordingly, we demonstrate the SLoss is bounded by a certain value α with a
+high probability.
+Deﬁnition 5 ((α,δ)-usefulness). A mechanism M is (α,δ)-useful for a set of
+query F , if with probability 1− δ, for every query f ∈ F and every dataset G, for
+(cid:2)G = M(G), we have maxf∈F |f ( (cid:2)G) − f (G)| ≤ α, where F is a group of queries.
+
+564
+
+T. Zhu et al.
+
+Theorem 41 For any user u ∈ U , for all δ > 0, with probability at least 1 −
+δ, the SLoss1 of the user in the perturbation is less than α. When |T (u)| ≥
+K·exp(
+δ
+
+, the perturbation operation is satisﬁed with (α, δ)-useful.
+
+−αa
+
+)
+
+4
+
+max d|T (ua)| exp(− αa
+K·d(tai,(cid:3)tai)
+
+Proof. The perturbation adds Laplace noise with /4 to the weight. According
+to the property of Laplace(b): P r(|γ| > t) = exp(− t
+b ), we have P r(SLoss1 >
+αa) =
+4 ). As the perturbation step adds new tags or delete
+tags, the d(tai, (cid:2)tai) will be less than 1, we obtain the evaluation on the SLoss1:
+P r(SLoss1 < αa) ≤ 1− K·exp(− αa
+|T (ua)| ≥ 1−δ, Thus |T (ua)| ≥
+|T (ua)|
+K·exp(
+δ
+value, α = maxua∈U αa, we have |T (u)| ≥ K·exp(
+
+. The average semantic loss for all the users is less than the maximal
+
+. Let 1− K·exp(− αa
+
+−αa
+
+−α
+
+4 )
+
+4 )
+
+4 )
+
+.
+
+)
+
+4
+
+δ
+
+The theorem 41 reveals the semantic loss of perturbation depends on the
+
+number of tags a user has. More tags results in a lower semantic loss.
+Theorem 42 For any user u ∈ U , for all δ > 0, with probability at least 1 − δ,
+the SLoss2 of the user in the private selection is less than α. When Q ≤ exp( 
+8 )
+1−δα ,
+where Q is the normalization factor that depends on the topic that t ∈ T (u)
+belongs to, the private selection operation is satisﬁed with (α, δ)-useful.
+
+Proof. According to Marlkov’s inequality, we get P r(SLoss2 > αa) ≤ E(SLoss2)
+
+αa
+
+.
+
+exp( 
+8 )
+Qi
+
+For each tag tai in (cid:2)Pa, the probability of ‘unchange’ in the private selection is
+proportional to exp( 
+8 )
+, where Qi is the normalization factor depending on the
+Qi
+topic tai belongs to. We then obtain E(SLoss2) =
+
+max d|T (ua)| (1 −
+
+d(tai,(cid:3)tai)
+
+) and estimate SLoss2 as P r(SLoss2 > αa) ≤ (cid:2)
+≥ 1 − δ, Q ≤ exp( 
+
+When d(tai, (cid:2)tai) = 1 and Q = max Qi, it is simpliﬁed as P r(SLoss2 ≤ αa) ≥
+1 − 1− 1
+Q exp( 
+8 )
+1−δαa . Similar to the proof of
+theorem 41, We obtain Q ≤ exp( 
+j∈zl exp
+
+αa
+1−δα , where Qi =
+
+. Let 1 − 1− 1
+
+(cid:9) ·d(ti,tj)
+
+|T (ua)|αa
+
+ti∈T (ua)
+ti∈T (ua ) d(tai,(cid:3)tai)(1− exp( 
+
+Q exp( 
+8 )
+
+8
+Qi
+
+)
+
+)
+
+αa
+
+8 )
+
+8 )
+
+8
+
+.
+
+(cid:5)
+
+(cid:5)
+
+(cid:10)
+
+.
+
+The theorem 42 shows the semantic loss of private selection mainly depends
+on the  and Qi, which measures by the total distance inside topic z to which ti
+belongs. The shorter distance leads to a smaller Qi and less semantic loss.
+
+5 Experiment and Analysis
+
+We conduct experiment on three datasets: Del.icio.us, MovieLens and Last.fm.
+Del.icio.us dataset was retrieved from the Del.icio.us website by the Distributed
+Artiﬁcial Intelligence Laboratory (DAI-Labor), and includes around 132 million
+resources and 950, 000 users. We extracted a subset with 3, 000 users, 34, 212
+bookmarks and 12, 183 tags. MovieLens and Last.fm datasets were obtained
+from HetRec 2011. All datasets are structured as triples (user, resource, tag),
+and ﬁltered by removing added tags like “imported”, “public”, etc.
+
+Deferentially Private Tagging Recommendation Based on Topic Model
+
+565
+
+0.15
+
+0.14
+
+0.13
+
+0.12
+
+0.11
+
+0.1
+
+0.09
+
+0.08
+
+s
+s
+o
+L
+
+ 
+c
+i
+t
+
+n
+a
+m
+e
+S
+
+0.07
+
+ 
+10
+
+20
+
+30
+
+ 
+
+epsilon=0.1
+epsilon=0.3
+epsilon=0.5
+epsilon=0.7
+epsilon=1.0
+
+0.2
+
+0.18
+
+0.16
+
+0.14
+
+0.12
+
+0.1
+
+0.08
+
+s
+s
+o
+L
+
+ 
+c
+i
+t
+
+n
+a
+m
+e
+S
+
+80
+
+90
+
+100
+
+0.06
+
+ 
+10
+
+20
+
+30
+
+ 
+
+epsilon=0.1
+epsilon=0.3
+epsilon=0.5
+epsilon=0.7
+epsilon=1.0
+
+0.12
+
+0.11
+
+0.1
+
+0.09
+
+0.08
+
+s
+s
+o
+L
+
+ 
+c
+i
+t
+
+n
+a
+m
+e
+S
+
+80
+
+90
+
+100
+
+0.07
+
+ 
+10
+
+20
+
+30
+
+40
+
+50
+
+60
+
+70
+
+Number of Topic K
+
+40
+
+50
+
+60
+
+70
+
+Number of Topic K
+
+ 
+
+epsilon=0.1
+epsilon=0.3
+epsilon=0.5
+epsilon=0.7
+epsilon=1.0
+
+80
+
+90
+
+100
+
+40
+
+50
+
+60
+
+70
+
+Number of Topic K
+
+(a) Semantic Loss in Del.icio.us
+
+(b) Semantic Loss in MovieLens
+
+(c) Semantic Loss in Last.fm
+
+Fig. 1. Semantic Loss on Diﬀerent Datasets
+
+5.1 Semantic Loss Analysis
+
+To maintain consistency with previous research, we compare the semantic loss
+of PriTop with tag suppression [11]. For the PriTop algorithm, we selected  =
+0.1, 0.3, 0.5, 0.7 and 1.0 to represent diﬀerent privacy levels and the number of
+topic K varies from 10 to 100 with a step of 10. In tag suppression [11], the
+semantic loss exhibits a linear relationship with the eliminate parameter σ.
+When we choose the representative value σ = 0.8, the sematic loss is 0.2.
+
+It can be observed from Fig. 1 that the semantic loss of the PriTop algorithm
+in a variety of datasets was less than 0.2 with diﬀerent privacy budgets, which
+indicates that PriTop outperforms tag suppression on all conﬁgurations. Specif-
+ically, the PriTop obtains a considerably lower semantic loss when  = 1. For
+example, in Fig. 1a, when K = 90 and  = 1, the semantic loss is 0.0767, which
+is 62% lower than tag suppression with SLoss = 0.2. This trend is retained when
+K equals other values and in other ﬁgures, such as Fig. 1b and 1c. All ﬁgures
+show that PriTop obtains a stable semantic loss at a lower level, and retains
+more utility than tag suppression. This is because PriTop retains the relationship
+between tags and resources, and makes the proﬁles of users meaningful.
+
+5.2 Performance of Tagging Recommendation
+
+To investigates the eﬀectiveness of PriTop in the context of tagging recommen-
+dations, we apply a state-of-the-art tagging recommender system, FolkRank [9],
+to measure the degradation of privacy preserving recommendations. We use Re-
+call to quantify the performance and N is the number of recommended tags.
+The following experiments compare the PriTop with tag suppression with N
+varies from 1 to 10. For PriTop, we chose K = 100, and test the performance
+when  = 1 and 0.5. For tag suppression, we ﬁx σ = 0.8 and 0.6, corresponding
+to suppression rates of 0.2 and 0.4, respectively.
+
+Fig. 2 presents the recall of recommendation results. It is observed that the
+proposed PriTop algorithm signiﬁcantly outperforms the tag suppression method
+on both privacy budgets. Speciﬁcally, as shown in Fig. 2a, when N = 1, PriTop
+achieves a recall at 0.0704 with the  = 1 which outperforms the result from
+the tag suppression with σ = 0.6, 0.0407, by 42.19%. This trend is retained
+
+566
+
+T. Zhu et al.
+
+ 
+
+ 
+
+FR Non−private
+epsilon=1.0
+epsilon=0.5
+sigma=0.8
+sigma=0.6
+
+0.25
+
+0.2
+
+l
+l
+
+a
+c
+e
+R
+
+0.15
+
+0.1
+
+0.05
+
+ 
+1
+
+FR Non−private
+epsilon=1.0
+epsilon=0.5
+sigma=0.8
+sigma=0.6
+
+2
+
+3
+
+4
+
+5
+
+N
+
+6
+
+7
+
+8
+
+9
+
+10
+
+0.45
+
+0.4
+
+0.35
+
+l
+l
+
+a
+c
+e
+R
+
+0.3
+
+0.25
+
+0.2
+
+0.15
+
+0.1
+
+ 
+1
+
+FR Non−private
+epsilon=1.0
+epsilon=0.5
+sigma=0.8
+sigma=0.6
+
+ 
+
+0.24
+
+0.22
+
+0.2
+
+0.18
+
+0.16
+
+0.14
+
+0.12
+
+0.1
+
+0.08
+
+0.06
+
+0.04
+
+l
+l
+
+a
+c
+e
+R
+
+2
+
+3
+
+4
+
+5
+
+N
+
+6
+
+7
+
+8
+
+9
+
+10
+
+ 
+1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+
+8
+
+9
+
+10
+
+N
+
+(a) Del.icio.us
+
+(b) MovieLens
+
+(c) Last.fm
+
+Fig. 2. FolkRank Recall Result
+
+as the increasing of N . When N = 5, PriTop achieves a recall at 0.1799 with
+the  = 1 which outperforms the result from the tag suppression by 37.19%
+when σ = 0.6, 0.113. When N reaches 10, the PriTop still retains 36.09% higher
+on recall than tag suppression. Even we choose the lower privacy budget with
+ = 0.5 and a higher eliminate parameter sigma = 0.8, the improvement is still
+signiﬁcant. The PriTop has a recall of 0.1382, which is also 7.67% higher than tag
+suppression with a recall of 0.1276. The improvement of PriTop is more obvious
+when N = 10. It achieves recalls of 0.1882 and 0.2408 when  = 1 and  = 0.5,
+respectively. But tag suppression only achieves recalls of 0.1538 and 0.1881 with
+σ = 0.6 and σ = 0.8. Similar trends can also be observed in Fig. 2b and 2c.
+In the MovieLens dataset, when N = 10 and  = 1.0, the recall of PriTop is
+0.4445, which is 27.33% higher than tag suppression with σ = 0.8. With the
+same conﬁguration, PriTop is 22.43% and 25.22% higher than tag suppression
+in Last.fm and Bibsonomy datasets. The experimental results show the PriTop
+algorithm outperforms tag suppression in variety of N , which implies that PriTop
+can retain more useful information for recommendations than simply deleting
+the tags. In addition, the performance of PriTop is very close to the non-private
+baseline. For example in Fig. 2a, when  = 1, the recall of the De.licio.us dataset
+is 0.2408, which is only 3.00% lower than the non-private recommender result.
+Other datasets show the same trend. As shown in Fig. 2b and 2c, with the
+same conﬁguration, the PriTop result is 3.62% lower than the non-private result
+on the MovieLens dataset, and 7.58% lower on the Last.fm dataset. The results
+indicate that PriTop algorithm achieves the privacy preserving objective while
+retaining a high accuracy of recommendations.
+
+To show the statistical eﬀectiveness of PriTop, we apply a paired t test (with
+a 95% conﬁdence) to examine the diﬀerence on the performance of PriTop with
+ = 1.0 and tag suppression with σ = 0.2. The statistics for results are shown
+in Table 1. All t values are greater than 6 and all p values are less than 0.0001,
+thus indicating improvement on recall are statistically signiﬁcant.
+
+Deferentially Private Tagging Recommendation Based on Topic Model
+
+567
+
+0.26
+
+0.24
+
+0.22
+
+0.2
+
+l
+l
+
+a
+c
+e
+R
+
+0.18
+
+0.16
+
+0.14
+
+0.12
+
+0.1
+
+0.08
+
+ 
+0.1
+
+N=3
+N=5
+N=10
+
+ 
+
+N=3
+N=5
+N=10
+
+ 
+
+0.5
+
+0.45
+
+0.4
+
+0.35
+
+0.3
+
+0.25
+
+0.2
+
+0.15
+
+l
+l
+
+a
+c
+e
+R
+
+N=3
+N=5
+N=10
+
+ 
+
+0.22
+
+0.2
+
+0.18
+
+0.16
+
+0.14
+
+0.12
+
+0.1
+
+0.08
+
+l
+l
+
+a
+c
+e
+R
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+0.6
+epsilon
+
+0.7
+
+0.8
+
+0.9
+
+1
+
+0.1
+
+ 
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+0.6
+epsilon
+
+0.7
+
+0.8
+
+0.9
+
+1
+
+0.06
+
+ 
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+0.6
+epsilon
+
+0.7
+
+0.8
+
+0.9
+
+1
+
+(a) Del.icio.us
+
+(b) MovieLens
+
+(c) Last.fm
+
+Fig. 3. Impact of Privacy Budget in FolkRank Recall Result
+
+Table 1. Paired-t-test betwee PriTop and Tag Suppression
+
+t
+
+df
+
+p-value
+De.licio.us Recall 9 11.3276 < 0.0001
+MovieLens Recall 9 9.0957 < 0.0001
+Last.fm Recall 9 10.7546 < 0.0001
+
+5.3 Impact of Privacy Budget
+
+In the context of diﬀerential privacy, the lower  represents a higher privacy level.
+To achieve a comprehensive examination of PriTop, we evaluate the performance
+of recommendation under diverse privacy levels.
+
+Fig. 3 shows the recall on the three datasets. It presents the recommendation
+performance achieved by PriTop when the privacy budget  varies from 0.1 to 1
+with a step of 0.1. It is clear the recall of tag recommendations is signiﬁcantly
+aﬀected by the required privacy budget. The recall increases as  increases. For
+example, as plotted in Fig. 3a on the Del.icio.us dataset, when N = 10, PriTop
+achieves a recall at 0.1538 with  = 0.1 and 0.2408 with  = 1. The reason is the
+privacy and utility issues are two opposite components of the datasets. We have
+to sacriﬁce the utility to obtain the privacy, therefore our purpose is to obtain
+an optimal utility when ﬁxing the privacy at an acceptable level.
+
+As a summary, results on a real tagging recommender system conﬁrm the
+
+practical eﬀectiveness of the PriTop algorithm.
+
+6 Conclusions
+
+Privacy preserving is one of the most important aspects in recommender systems.
+However, when we introduce the diﬀerential privacy, the solution fails to retain
+the relationship among users, resources and tags; and introduces a large volume
+of noise, which signiﬁcantly aﬀects the recommendation performance.
+
+This paper proposes an eﬀective privacy tagging release algorithm PriTop
+with the following contributions: 1) We propose a private tagging release al-
+gorithm to protect users from being re-identiﬁed in a tagging dataset. 2) A
+
+568
+
+T. Zhu et al.
+
+private topic model is designed to reduce the magnitude of noise by shrinking
+the randomization domain. 3) A better trade-oﬀ between privacy and utility
+is obtained by taking the advantage of the diﬀerentially private composition
+properties. These contributions provide a practical way to apply a rigid privacy
+notion to a tagging recommender system without high utility costs.
+
+References
+
+1. Berkovsky, S., Eytani, Y., Kuﬂik, T., Ricci, F.: Enhancing privacy and preserving
+
+accuracy of a distributed collaborative ﬁltering. In: RecSys (2007)
+
+2. Blei, D.M., Ng, A.Y., Jordan, M.I.: Latent dirichlet allocation. The Journal of
+
+Machine Learning Research 3, 993–1022 (2003)
+
+3. Blum, A., Ligett, K., Roth, A.: A learning theory approach to non-interactive
+
+database privacy. In: STOC, pp. 609–618 (2008)
+
+4. Calandrino, J.A., Kilzer, A., Narayanan, A., Felten, E.W., Shmatikov, V.: “You
+
+might also like:” privacy risks of collaborative ﬁltering. In: SP (2011)
+
+5. Canny, J.: Collaborative ﬁltering with privacy. In: S&P 2002, pp. 45–57. IEEE
+
+(2002)
+
+6. Dwork, C.: A ﬁrm foundation for private data analysis. Commun. ACM 54(1),
+
+86–95 (2011)
+
+7. Dwork, C., McSherry, F., Nissim, K., Smith, A.: Calibrating noise to sensitivity in
+private data analysis. In: Halevi, S., Rabin, T. (eds.) TCC 2006. LNCS, vol. 3876,
+pp. 265–284. Springer, Heidelberg (2006)
+
+8. Fung, B.C.M., Wang, K., Chen, R., Yu, P.S.: Privacy-preserving data publishing:
+
+A survey of recent developments. ACM Comput. Surv. (2010)
+
+9. J¨aschke, R., Marinho, L., Hotho, A., Schmidt-Thieme, L., Stumme, G.: Tag rec-
+ommendations in folksonomies. In: Kok, J.N., Koronacki, J., Lopez de Mantaras,
+R., Matwin, S., Mladeniˇc, D., Skowron, A. (eds.) PKDD 2007. LNCS (LNAI),
+vol. 4702, pp. 506–514. Springer, Heidelberg (2007)
+
+10. McSherry, F., Talwar, K.: Mechanism design via diﬀerential privacy. In: FOCS
+
+2007, pp. 94–103 (2007)
+
+11. Parra-Arnau, J., Perego, A., Ferrari, E., Forne, J., Rebollo-Monedero, D.: Privacy-
+preserving enhanced collaborative tagging. IEEE Transactions on Knowledge and
+Data Engineering 99(PrePrints), 1 (2013)
+
+12. Polat, H., Du, W.: ICDM, pp. 625–628 (November 2003)
+13. Ramakrishnan, N., Keller, B.J., Mirza, B.J., Grama, A.Y., Karypis, G.: Privacy
+
+risks in recommender systems. IEEE Internet Computing 5(6), 54–62 (2001)
+
+14. Steyvers, M., Griﬃths, T.: Probabilistic topic models. In: Handbook of Latent
+
+Semantic Analysis, vol. 427(7), pp. 424–440 (2007)
+
+15. Zhan, J., Hsieh, C.-L., Wang, I.-C., Hsu, T.S., Liau, C.-J., Wang, D.-W.: Privacy-
+preserving collaborative recommender systems. IEEE Transactions on Systems,
+Man, and Cybernetics, Part C 40(4), 472–476 (2010)
+
+16. Zhu, T., Li, G., Ren, Y., Zhou, W., Xiong, P.: Diﬀerential privacy for neighborhood-
+
+based collaborative ﬁltering. In: ASONAM (2013)
+
+17. Zhu, T., Li, G., Ren, Y., Zhou, W., Xiong, P.: Privacy preserving for tagging
+recommender systems. In: The 2013 IEEE/WIC/ACM International Conference
+on Web Intelligence (2013)
+
+

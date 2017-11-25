@@ -1,0 +1,642 @@
+Fast Orthogonal Nonnegative Matrix
+
+Tri-Factorization for Simultaneous Clustering
+
+Zhao Li1, Xindong Wu1,2, and Zhenyu Lu1
+
+1 Department of Computer Science, University of Vermont, Unite States
+
+2 School of Computer Science and Information Engineering, Hefei University of
+
+Technology, Hefei 230009, PR China
+{zhaoli,xwu,zlu}@cems.uvm.edu
+
+Abstract. Orthogonal Nonnegative Matrix Tri-Factorization (ONMTF),
+a dimension reduction method using three small matrices to approxi-
+mate an input data matrix, clusters the rows and columns of an input
+data matrix simultaneously. However, ONMTF is computationally ex-
+pensive due to an intensive computation of the Lagrangian multipliers for
+the orthogonal constraints. In this paper, we introduce Fast Orthogonal
+Nonnegative Matrix Tri-Factorization (FONT), which uses approximate
+constants instead of computing the Lagrangian multipliers. As a result,
+FONT reduces the computational complexity signiﬁcantly. Experiments
+on document datasets show that FONT outperforms ONMTF in terms
+of clustering quality and running time. Moreover, FONT is further ac-
+celerated by incorporating Alternating Least Squares, and can be much
+faster than ONMTF.
+
+Keywords: Nonnegative Matrix Factorization, Orthogonality, Alterative
+Least Square.
+
+1 Introduction
+
+Dimension reduction is a useful method for analyzing data of high dimensions so
+that further computational methods can be applied. Traditional methods, such as
+principal component analysis (PCA) and independent component analysis (ICA)
+are typically used to reduce the number of variables and detect the relationship
+among variables. However, these methods cannot guarantee nonnegativity, and
+are hard to model and interpret the underlying data. Nonnegative matrix factor-
+ization (NMF) [7,8], using two lower-rank nonnegative matrices W ∈ R
+m×k and
+m×n (k (cid:3) min(m, n)), has
+H ∈ R
+gained its popularity in many real applications, such as face recognition, text
+mining, signal processing, etc [1].
+
+k×n to approximate the original data V ∈ R
+
+Take documents in the vector space model for instance. The documents are
+encoded as a term-by-document matrix V with nonnegative elements, and each
+column of V represents a document and each row a term. NMF produces k basic
+topics as the columns of the factor W and the coeﬃcient matrix H. Observed
+from H, it is easy to derive how each document is fractionally constructed by
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part II, LNAI 6119, pp. 214–221, 2010.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2010
+
+Fast ONMTF for Simultaneous Clustering
+
+215
+
+the resulting k basic topics. Also, the factor H is regarded as a cluster indicator
+matrix for document clustering, each row of which suggests which documents are
+included in a certain topic. Similarly, the factor W can be treated as a cluster
+indicator matrix for word clustering. Traditional clustering algorithms, taking
+k-means for instance, require the product between the row vectors or column
+vectors to be 0 that only one value exists in each row of H; thus each data point
+only belongs to one cluster, which leads to a hard clustering. It was proved that
+orthogonal nonnegative matrix factorization is equivalent to k-means cluster-
+ing [4]. Compared to rigorous orthogonality of k-means, relaxed orthogonality
+means each data point could belong to more than one cluster, which can im-
+prove clustering quality [5,10]. Simultaneous clustering refers to clustering of
+the rows and columns of a matrix at the same time. The major property of si-
+multaneous clustering is that it adaptively performs feature selection as well as
+clustering, which improves the performance for both of them [2,3,6,12]. Some ap-
+plications such as clustering words and documents simultaneously for an input
+term-by-document matrix, binary data, and system log messages were imple-
+mented [9]. For this purpose, Orthogonal Nonnegative Matrix Tri-Factorization
+(ONMTF) was proposed [5]. It produces two nonnegative indictor matrices W
+and H, and another nonnegative matrix S such that V ≈ W SH. Orthogonality
+constraints were imposed on W and H to achieve relaxed orthogonality. How-
+ever, in their methods, to achieve relaxed orthogonality, Lagrangian multipliers
+have to be determined for the Lagrangian function of ONMTF. Solving the La-
+grangian multipliers accounts for an intensive computation of update rules for
+the factors, especially the factor W whose size is larger than other factors. In
+this paper, we introduce Fast Orthogonal Nonnegative Matrix Tri-Factorization
+(FONT), whose computational complexity is decreased signiﬁcantly by setting
+the Lagrangian multipliers as approximate constants. In addition, FONT is fur-
+ther accelerated by using Alternating Least Squares [11], which leads to a fast
+convergence.
+
+The rest of the paper is organized as follows. In Section 2, related work is re-
+viewed, including NMF and ONMTF. Section 3 introduces our methods in detail,
+followed by the experiments and evaluations in Section 4. Finally, conclusions
+are described in Section 5.
+
+m×k, H ∈ R
+
+2 Related Work
+Given a data matrix V = [v1, v2, ..., vn] ∈ R
+m×n, each column of which rep-
+resents a sample and each row a feature. NMF aims to ﬁnd two nonnegative
+k×n, such that V ≈ W H, where k (cid:3) min(m, n).
+matrices W ∈ R
+There is no guarantee that an exact nonnegative factorization exists. Iterative
+methods become necessary to ﬁnd an approximate solution to NMF which is a
+nonlinear optimization problem with inequality constraints. To ﬁnd an approxi-
+mate factorization of NMF, an objective function has to be deﬁned by using some
+measurements of distance. A widely used distance measurement is the Euclidean
+distance which is deﬁned as:
+
+216
+
+Z. Li, X. Wu, and Z. Lu
+
+(cid:5)V − W H(cid:5)2
+
+s.t. W ≥ 0, H ≥ 0
+
+min
+W,H
+
+(1)
+where the (cid:5)·(cid:5) is Frobenius norm. To ﬁnd a solution to this optimization problem,
+the multiplicative update rules were ﬁrst investigated in [8] as follows:
+
+W := W ∗ (V H T )/(W HH T )
+H := H ∗ (W T V )/(W T W H)
+
+(3)
+where * and / denote elementwise multiplication and division, respectively. ON-
+MTF was conducted for the application of clustering words and documents si-
+multaneously by imposing additional constraints on W and/or H. The objective
+function for ONMTF can be symbolically written as:
+
+F = min
+
+W,S,H≥0
+
+(cid:5)V − W SH(cid:5)2
+
+s.t. HH T = D, W T W = D
+
+(4)
+
+where D is a diagonal matrix. By introducing the Lagrangian multipliers the
+Lagrange L is:
+
+L = (cid:5)V − W SH(cid:5)2 + T r[λw(W T W − D)] + T r[λh(HH T − D)]
+
+The multiplicative update rules for (8) can be computed as follows:
+
+W = W ∗ (V H T ST )/(W (HH T + λw))
+
+S = S ∗ (W T W H T )/(W T SHH T )
+H = H ∗ (ST W T V )/((W T W + λh)H)
+
+(8)
+By solving the minimum W (t+1) and H (t+1), respectively [5]. λw and λh can be
+approximately computed as follows:
+
+(2)
+
+(5)
+
+(6)
+
+(7)
+
+(9)
+
+(11)
+
+λw = D
+
+−1W T V H T ST − HH T
+−1ST W T V H T H − W T W
+
+(10)
+Substituting λw and λh in (7) and (8) respectively, we obtain following update
+rules:
+
+λh = D
+
+W = W ∗ (V H T ST )/(W W T V H T ST )
+H = H ∗ (ST W T V )/(ST W T V H T H)
+
+(12)
+Based on matrix multiplication, the computational complexity of NMF based on
+the Euclidean distance metric at each iteration is O(mnk), and that of ONMTF
+is O(m2n). The computation of the Lagrangian multipliers accounts for an in-
+tensive computation. It becomes worse when m increases, which represents the
+number of words in a vector space model.
+
+Fast ONMTF for Simultaneous Clustering
+
+217
+
+3 Fast Orthogonal Nonnegative Matrix Tri-Factorization
+
+It was proved that the Lagrange L is monotonically non-increasing under the
+above update rules by assuming W T W + λw ≥ 0 and HH T + λh ≥ 0 [5]. We
+note that λw and λh are approximately computed under these assumptions, and
+from (9) and (10) we can see that λw and λh are symmetric matrices of size
+k ∗ k. Since achieving relaxed orthogonality is the purpose of orthogonal matrix
+factorization in this paper, and computing the lagrangian multipliers accounts for
+an intensive computation, we would use constants for λw and λh for decreasing
+computational complexity. By normalizing each column vector of W and each
+row vector of H to unitary Euclidean length at each iteration, λw and λh can
+be approximately denoted by minus identity matrix (λw = λh = −I). Thus,
+we introduce our method Fast Orthogonal Nonnegative Matrix Tri-Factorization
+(FONT).
+
+3.1 FONT
+
+The Lagrange L is rewritten as:
+
+L = min
+
+W,S,H≥0
+
+((cid:5)V − W SH(cid:5)2 + T r(I − W T W ) + T r(I − HH T ))
+
+(13)
+where I is the identity matrix. Noting (cid:5)V −W SH(cid:5)2 = T r(V V T )−2T r(W SHV T )
++ T r(W SHH T ST W T ), the gradient of L with respect to W and H are:
+
+∂L/∂W = −2V H T ST − 2W + 2W SHH T ST
+∂L/∂H = −2ST W T V − 2H + 2ST W T W SH
+
+(15)
+By using the Karush-Kuhn-Tucker conditions the update rules for W and H can
+be inferred as follows:
+
+(14)
+
+(16)
+
+W = W ∗ (V H T ST + W )/(W SHH T ST )
+H = H ∗ (ST W T V + H)/(ST W T W SH)
+
+(17)
+Because of no orthogonality constraint on S, the update rule for S, in both
+FONT and ONMTF, is the same. The computational complexity of FONT, at
+each iteration, is O(mnk), far less than O(m2n) because k (cid:3) min(m, n).
+Now we give the convergence of this algorithm by using the following theorem
+(we use H as an example here, and the case for W can be conducted similarly):
+Theorem 1. The Lagrange L in (13) is non-increasing under the update rule
+in (17).
+
+(cid:4)) is an
+To prove this theorem, we use the auxiliary function approach [8]. G(h, h
+(cid:4)) ≥ F (w) and G(w, w) =
+auxiliary function for F (h) if the conditions G(w, w
+F (w) are satisﬁed. If G is an auxiliary function, then F is nonincreasing under
+
+218
+
+Z. Li, X. Wu, and Z. Lu
+
+the updating rule wt+1 = arg minw G(w, wt). Because F (wt+1) ≤ G(wt+1, wt) ≤
+G(wt, wt) = F (wt) [8]. So it is crucial to ﬁnd an auxiliary function. Now we show
+that
+
+G(h, ht
+
+ij) = Lij(ht
+
+ij) + L
+
+(cid:4)
+ij(ht
+
+ij)(h− ht
+
+ij) + (h− ht
+
+ij)2 ∗ (ST W T W SH)ij/ht
+
+ij (18)
+
+is an auxiliary function for L.
+
+Proof. Apparently, G(h, h) = Lij(h), so we just need to prove that G(h, ht
+Lij(h). We expand Lij(h) using Taylor series.
+
+Lij(h) = Lij(ht
+
+ij) + L
+
+Meanwhile,
+
+(cid:4)
+ij(ht
+
+ij)(h − ht
+
+ij) + [(ST W T W S)ii − 1](h − ht
+
+ij)2
+
+(19)
+
+ij) ≥
+
+(ST W T W SH)ij =
+
+(cid:2)k
+
+p=1(ST W T W S)ipHpj
+
+≥ (ST W T W S)iiHij > ((ST W T W S)ii − 1)ht
+ij) ≥ Lij(h). Theorem 1 then follows that the Lagrangian
+
+(20)
+
+ij
+
+Thus we have G(h, ht
+L is nonincreasing.
+
+3.2 FONT + ALS
+
+However, we still note that the factor W accounts for a larger computation than
+the other two factors, thus we consider to compute W by using Alternating Least
+Squares (ALS). ALS is very fast by exploiting the fact that, while the optimiza-
+tion problem of (1) is not convex in both W and H, it is convex in either W or
+H. Thus, given one matrix, the other matrix can be found with a simple least
+squares computation. W and H are computed by equations W T W H = W T V
+and HH T W T = HAT , respectively. Reviewing (4) for W , F can be rewritten
+as:
+
+(W T W + SHH T ST )W T = W T + SHV T
+
+(21)
+Then an approximate optimal solution to W is obtained by using ALS. To main-
+tain nonnegativity, all negative values in W should be replaced by zero.
+
+4 Experiments
+
+5 document databases from the CLUTO toolkit (http://glaros.dtc.umn.edu/
+gkhome/cluto/cluto/download) were used to evaluate our algorithms. They
+are summarized in Table 1. Considering the large memory requirement for the
+matrix computation, we implemented all algorithms in Matlab R2007b on a 7.1
+teraﬂop computing cluster which is an IBM e1350 with an 1 4-way (Intel Xeon
+MP 3.66GHz) shared memory machine with 32GB. The memory was requested
+between 1G to 15G for diﬀerent datasets. 15G memory was required for the
+ONMTF algorithm to run on 2 largest datasets la12 and class.
+
+Fast ONMTF for Simultaneous Clustering
+
+219
+
+Table 1. Summary of Datasets
+
+Dataset
+classic CACM/CISI/Cranﬁeld/Medline
+reviews
+
+San Jose Mercury(TREC)
+
+Source
+
+klb
+la12
+ohscal
+
+WebACE
+
+LA Times(TREC)
+OHSUMED-233445
+
+4.1 Evaluation Metrics
+
+# Classes # Documents # Words
+
+4
+5
+6
+6
+10
+
+7094
+4069
+2340
+6279
+11162
+
+41681
+18483
+21839
+31472
+11465
+
+We also use purity and entropy to evaluate the clustering performance [5]. Purity
+gives the average ratio of a dominating class in each cluster to the cluster size
+and is deﬁned as:
+
+P (kj) =
+
+max(h(cj , kj))
+
+(22)
+
+1
+kj
+
+where h(c, k) is the number of documents from class c assigned to cluster k. The
+larger the values of purity, the better the clustering result is.
+(cid:2)
+The entropy of each cluster j is calculated using the Ej =
+i pijlog(pij), where
+the sum is taken over all classes. The total entropy for a set of clusters is com-
+puted as the sum of entropies of each cluster weighted by the size of that cluster:
+
+EC =
+
+m(cid:3)
+
+j=1
+
+( Nj
+N
+
+× Ej)
+
+(23)
+
+where Nj is the size of cluster j, and N is the total number of data points.
+Entropy indicates how homogeneous a cluster is. The higher the homogeneity of
+a cluster, the lower the entropy is, and vice versa.
+
+4.2 Performance Comparisons
+
+In contrast to document clustering, there is no prior label information for word
+clustering. Thus, we adopt the class conditional word distribution that was used
+in [5]. Each word belongs to a document class in which the word has the high-
+est frequency of occurring in that class. All algorithms (FONTALS stands for
+FONT combined with ALS) were performed by using the stopping criterion
+1 − F t+1/F t ≤ 0.01, where F is (cid:5)V − W SH(cid:5)2 and calculated by every 100
+iterations. The comparison for both word and document clustering are shown
+in Table 2 and Table 3 respectively. All results were obtained by averaging 10
+independent trails.
+
+We observe that the FONT algorithms (including FONTALS) achieve better
+purity than ONMTF for both words and documents clustering. It also shows
+that FONT obtains lower entropy for word clustering than ONMTF. But for
+document clustering, the clusters obtained by ONMTF are more homogenous
+than FONT and FONTALS. Meanwhile, in Table 4, it is shown that FONT and
+FONTALS are signiﬁcantly faster than ONMTF. In particular, the running time
+
+220
+
+Z. Li, X. Wu, and Z. Lu
+
+Table 2. Comparison of Word Clustering
+
+Dataset
+
+classic
+reviews
+
+klb
+la12
+ohscal
+
+Purity
+
+Entropy
+
+ONMTF FONT FONTALS ONMTF FONT FONTALS
+
+0.5077 0.5153
+0.5905 0.6298
+0.7258 0.7356
+0.4612 0.4823
+0.3740 0.4056
+
+0.5577
+0.6001
+0.7335
+0.4721
+0.2991
+
+0.6956 0.6881
+0.6850 0.6656
+0.4546 0.4486
+0.7693 0.7569
+0.7601 0.7297
+
+0.6309
+0.7003
+0.4478
+0.7794
+0.8331
+
+Table 3. Comparison of Document Clustering
+
+Dataset
+
+classic
+reviews
+
+klb
+la12
+ohscal
+
+Purity
+
+Entropy
+
+ONMTF FONT FONTALS ONMTF FONT FONTALS
+
+0.5484 0.5758
+0.7312 0.7635
+0.8021 0.8095
+0.4978 0.5176
+0.3581 0.3983
+
+0.6072
+0.7540
+0.8118
+0.5379
+0.3616
+
+0.6246 0.6359
+0.7775 0.8097
+0.8317 0.8389
+0.5665 0.5883
+0.4305 0.4682
+
+0.6661
+0.8126
+0.8366
+0.6063
+0.4340
+
+of FONTALS is 12.16 seconds on the largest dataset classic, compared to 36674
+seconds ONMTF used and 1574.2 seconds NMTF used, which indicates that the
+FONT algorithms are eﬀective in terms of clustering quality and running time.
+
+Table 4. Comparison of Running Time (s)
+
+Dataset ONMTF
+classic 3.6674e+4 1.5985e+3
+reviews 2.0048e+4
+1.0852e+4
+4.5239e+4 1.0496e+3
+
+klb
+la12
+ohscal 1.0051e+4
+
+12.16
+25.12
+14.07
+41.45
+37.29
+
+FONT FONTALS
+
+370.36
+275.94
+
+767.86
+
+5 Conclusions
+
+The Orthogonal Nonnegative Matrix Tri-Factorization algorithm needs a large
+computation to achieve relaxed orthogonality, which makes it infeasible for clus-
+tering large datasets in terms of computational complexity and a large require-
+ment of memory. In our research, to achieve relaxed orthogonality, we have
+introduced our method Fast Nonnegative Matrix Tri-Factorization (FONT). By
+using unitary matrix to estimate the Lagrangian multipliers, the computational
+complexity is reduced and clustering quality is improved as well. Meanwhile, by
+using Alternating Least Squares, FONT is further accelerated, which leads to a
+signiﬁcant decrease of running time.
+
+Fast ONMTF for Simultaneous Clustering
+
+221
+
+Acknowledgements
+
+This research is supported by the US National Science Foundation (NSF) under
+grant CCF-0905337 and EPS-0701410, the National Natural Science Foundation
+of China (NSFC) under award 60828005, and the 973 Program of China under
+award 2009CB326203.
+
+References
+
+1. Berry, M.W., Browne, M., Langville, A.N., Pauca, P.V., Plemmons, R.J.: Algo-
+rithms and applications for approximate nonnegative matrix factorization. Com-
+putational Statistics & Data Analysis 52(1), 155–173 (2007)
+
+2. Boley, D.: Principal direction divisive partitioning. Data Min. Knowl. Discov. 2(4),
+
+325–344 (1998)
+
+3. Dhillon, I.S., Mallela, S., Modha, D.S.: Information-theoretic co-clustering. In:
+KDD ’03: Proceedings of the ninth ACM SIGKDD international conference on
+Knowledge discovery and data mining, pp. 89–98. ACM, New York (2003)
+
+4. Ding, C., He, X., Simon, H.D.: On the equivalence of nonnegative matrix factor-
+
+ization and spectral clustering. In: SIAM Data Mining Conference (2005)
+
+5. Ding, C., Li, T., Peng, W., Park, H.: Orthogonal nonnegative matrix tri-
+factorizations for clustering. In: KDD ’06: Proceedings of the 12th ACM SIGKDD
+International Conference on Knowledge Discovery and Data Mining, pp. 126–135.
+ACM, New York (2006)
+
+6. Koyut¨urk, M., Grama, A., Ramakrishnan, N.: Nonorthogonal decomposition of
+binary matrices for bounded-error data compression and analysis. ACM Trans.
+Math. Softw. 32(1), 33–69 (2006)
+
+7. Lee, D.D., Seung, H.S.: Learning the parts of objects by non-negative matrix fac-
+
+torization. Nature 401(6755), 788–791 (1999)
+
+8. Lee, D.D., Seung, H.S.: Algorithms for non-negative matrix factorization. In: Neu-
+
+ral Information Processing Systems, pp. 556–562 (2001)
+
+9. Li, T., Ding, C.: The relationships among various nonnegative matrix factoriza-
+tion methods for clustering. In: ICDM ’06: Proceedings of the Sixth International
+Conference on Data Mining, Washington, DC, USA, pp. 362–371. IEEE Computer
+Society, Los Alamitos (2006)
+
+10. Li, Z., Wu, X., Peng, H.: Nonnegative matrix factorization on orthogonal subspace.
+
+Pattern Recognition Letters (to appear, 2010)
+
+11. Paatero, P., Tapper, U.: Positive matrix factorization: A non-negative factor model
+with optimal utilization of error estimates of data values. Environmetrics 5(2),
+111–126 (1994)
+
+12. Zhang, Z., Li, T., Ding, C., Zhang, X.: Binary matrix factorization with applica-
+tions. In: ICDM ’07: Proceedings of the 2007 Seventh IEEE International Con-
+ference on Data Mining, Washington, DC, USA, pp. 391–400. IEEE Computer
+Society, Los Alamitos (2007)
+
+

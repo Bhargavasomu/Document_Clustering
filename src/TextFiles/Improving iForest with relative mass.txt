@@ -1,0 +1,1200 @@
+Improving iForest with Relative Mass
+
+Sunil Aryal1, Kai Ming Ting2, Jonathan R. Wells1, and Takashi Washio3
+
+1 Monash University, Victoria, Australia
+{sunil.aryal,jonathan.wells}@monash.edu
+2 Federation University, Victoria, Australia
+
+kaiming.ting@federation.edu.au
+3 Osaka University, Osaka, Japan
+washio@ar.sanken.osaka-u.ac.jp
+
+Abstract. iForest uses a collection of isolation trees to detect anoma-
+lies. While it is eﬀective in detecting global anomalies, it fails to detect
+local anomalies in data sets having multiple clusters of normal instances
+because the local anomalies are masked by normal clusters of similar
+density and they become less susceptible to isolation. In this paper, we
+propose a very simple but eﬀective solution to overcome this limitation
+by replacing the global ranking measure based on path length with a local
+ranking measure based on relative mass that takes local data distribu-
+tion into consideration. We demonstrate the utility of relative mass by
+improving the task speciﬁc performance of iForest in anomaly detection
+and information retrieval tasks.
+
+Keywords: Relative mass, iForest, ReFeat, anomaly detection.
+
+1
+
+Introduction
+
+Data mining tasks such as Anomaly Detection (AD) and Information Retrieval
+(IR) require a ranking measure in order to rank data instances. Distance or
+density based methods are widely used to rank instances in these tasks. The
+main problem of these methods is that they are computationally expensive in
+large data sets because of their high time complexities.
+
+Isolation Forest (iForest) [1] is an anomaly detector that does not use distance
+or density measure. It performs an operation to isolate each instance from the
+rest of instances in a given data set. Because anomalies have characteristics of
+being ‘few and diﬀerent’, they are more susceptible to isolation in a tree structure
+than normal instances. Therefore, anomalies have shorter average path lengths
+than those of normal instances over a collection of isolation trees (iTrees).
+
+Though iForest has been shown to perform well [1], we have identiﬁed its
+weakness in detecting local anomalies in data sets having multiple clusters of
+normal instances because the local anomalies are masked by normal clusters
+of similar density; thus they become less susceptible to isolation using iTrees.
+In other words, iForest can not detect local anomalies because the path length
+measures the degree of anomaly globally. It does not consider how isolated an
+instance is from its local neighbourhood.
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part II, LNAI 8444, pp. 510–521, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+Improving iForest with Relative Mass
+
+511
+
+iForest has its foundation in mass estimation [2]. Ting et al [2] have shown
+that the path length is a proxy to mass in a tree-based implementation. From
+this basis, we analyse that iForest’s inability to detect local anomalies can be
+overcome by replacing the global ranking measure based on path length with a
+local ranking measure based on relative mass using the same iTrees. In general,
+relative mass of an instance is a ratio of data mass in two regions covering the
+instance, where one region is a subset of the other. The relative mass measures
+the degree of anomaly locally by considering the data distribution in the local
+regions (superset and subset) covering an instance.
+
+In addition to AD, we show the generality of relative mass in IR that over-
+comes the limitation of a recent IR system called ReFeat [3] that uses iForest as a
+core ranking model. Even though ReFeat performs well in content-based multi-
+media information retrieval (CBMIR) [3], the ranking scheme based on path
+length does not guarantee that two instances having a similar ranking score are
+in the same local neighbourhood. The new ranking scheme based on relative
+mass provides such a guarantee.
+
+The contributions of this paper are as follows:
+
+1. Introduce relative mass as a ranking measure.
+2. Propose ways to apply relative mass, instead of path length (which is a proxy
+
+to mass) to overcome the weaknesses of iForest in AD and IR.
+
+3. Demonstrate the utility of relative mass in AD and IR by improving the
+task speciﬁc performance of iForest and ReFeat using exactly the same im-
+plementation of iTrees as employed in iForest.
+
+The rest of the paper is organised as follows. Section 2 introduces the notion
+of relative mass and proposes ways to apply to AD and IR. Section 3 provides
+the empirical evaluation followed by conclusions in the last section.
+
+2 Relative Mass: A Mass-Based Local Ranking Measure
+
+Rather than using the global ranking measure based on path length in iForest,
+an instance can be ranked using a local ranking measure based on relative mass
+w.r.t its local neighbourhood. In a tree structure, the relative mass of an instance
+is computed as a ratio of mass in two nodes along the path the instance traverses
+from the root to a leaf node. The two nodes used in the calculation of relative
+mass depend on the task speciﬁc requirement.
+• In AD, we are interested in the relative mass of x w.r.t its local neigh-
+bourhood. Hence, the relative mass is computed as the ratio of mass in the
+immediate parent node and the leaf node where x falls.
+• In IR, we are interested in the relative mass of x w.r.t to a query q. Hence,
+the relative mass is computed as the ratio of mass of the leaf node where q
+falls and the lowest node where x and q shared along the path q traverses.
+
+We convert iForest [1] and ReFeat [3] using the relative mass, and named
+the resultant relative mass versions, ReMass-iForest and ReMass-ReFeat, re-
+spectively. We describe iForest and ReMass-iForest in AD in Section 2.1; and
+ReFeat and ReMass-ReFeat in IR in Section 2.2.
+
+512
+
+S. Aryal et al.
+
+2.1 Anomaly Detection: iForest and ReMass-iForest
+
+In this subsection, we ﬁrst discuss iForest and its weakness in detecting local
+anomalies and introduce the new anomaly detector, ReMass-iForest, based on
+the relative mass to overcome the weakness.
+
+iForest
+Given a d-variate database of n instances (D = {x(1), x(2),··· , x(n)}), iForest [1]
+constructs t iTrees (T1, T2,··· , Tt). Each Ti is constructed from a small random
+sub-sample (Di ⊂ D, |Di| = ψ < n) by recursively dividing it into two non-
+empty nodes through a randomly selected attribute and split point. A branch
+stops splitting when the height reaches the maximum (Hmax) or the number of
+instances in the node is less than M inP ts. The default values used in iForest
+are Hmax = log2(ψ) and M inP ts = 1. The anomaly score is estimated as the
+average path length over t iTrees as follows:
+t(cid:2)
+
+1
+t
+
+i=1
+
+L(x) =
+
+(cid:3)i(x)
+
+(1)
+
+where (cid:3)i(x) is the path length of x in Ti
+
+As anomalies are likely to be isolated early, they have shorter average path
+lengths. Once all instances in the given data set have been scored, the instances
+are sorted in ascending order of their scores. The instances at the top of the list
+are reported as anomalies.
+
+iForest runs very fast because it does not require distance calculation and
+
+each iTree is constructed from a small random sub-sample of data.
+
+iForest is eﬀective in detecting global anomalies (e.g., a1 and a2 in Figures 1a
+and 1b) because they are more susceptible to isolation in iTrees. But it fails to
+detect local anomalies (e.g., a1 and a2 in Figure 1c) as they are less susceptible
+to isolation in iTrees. This is because the local anomalies and the normal cluster
+C3 have about the same density. Some fringe instances in the normal cluster C3
+will have shorter average path lengths than those for a1 and a2.
+
+ReMass-iForest
+
+In each iTree Ti, the anomaly score of an instance x w.r.t its local neighbourhood,
+si(x), can be estimated as the ratio of data mass as follows:
+
+si(x) =
+
+m( ˘Ti(x))
+m(Ti(x)) × ψ
+
+(2)
+
+where Ti(x) is the leaf node in Ti in which x falls, ˘Ti(x) is the immediate parent
+of Ti(x), and m(·) is the data mass of a tree node. ψ is a normalisation term
+which is the training data size used to generate Ti.
+si(·) is in (0, 1]. The higher the score the higher the likelihood of x being an
+anomaly. Unlike (cid:3)i(x) in iForest, si(x) measures the degree of anomaly locally.
+
+Improving iForest with Relative Mass
+
+513
+
+a
+
+1
+
+C
+1
+
+a
+
+2
+
+C
+
+2
+
+a
+
+1
+
+a
+
+2
+
+C
+
+1
+
+C
+
+3
+
+a
+1
+
+a
+
+2
+
+C
+
+1
+
+(a) Global anomalies
+
+(b) Global anomalies
+
+(c) Local anomalies
+
+Fig. 1. Global and Local anomalies. Note that both anomalies a1 and a2 are exactly
+the same instances in Figures (a), (b) and (c). In Fig.(a) and Fig.(b), a1 and a2 have
+low density than that in the normal clusters C1 and C2. In Fig.(c), a1, a2 and the
+normal cluster C3 have the same density but a1 and a2 are anomalies relative to the
+normal cluster C1 with a higher density.
+
+The ﬁnal anomaly score can be estimated as the average of local anomaly
+
+scores over t iTrees as follows:
+
+S(x) =
+
+1
+t
+
+t(cid:2)
+
+i=1
+
+si(x)
+
+(3)
+
+Once every instance in the given data set has been scored, instances can be
+ranked in descending order of their anomaly scores. The instances at the top of
+the list are reported as anomalies.
+
+Relation to LOF and DEMass-LOF
+
+(cid:3)
+
+n
+
+x(cid:2)∈N (x,k)
+
+distance(x, x(cid:4))
+
+The idea of relative mass in ReMass-iForest has some relation to the idea of rel-
+ative density in Local Outlier Factor (LOF) [4]. LOF uses k nearest neighbours
+to estimate density ¯fk(x) =
+where N (x, k) is the
+
+|N (x, k)|
+
+set of k nearest neighbours of x. It estimates its anomaly score as the ratio of the
+average density of x’s k nearest neighbours to ¯fk(x). In LOF, the local neigh-
+bourhood is deﬁned by k nearest neighbours which requires distance calculation.
+In contrast, in ReMass-iForest, the local neighbourhood is the immediate parent
+in iTrees. It does not require distance calculation.
+
+DEMass-LOF [5] computes the same anomaly score as LOF from trees, with-
+out distance calculation. The idea of relative density of parent and leaf nodes
+was used in DEMass-LOF. It constructs a forest of t balanced binary trees where
+the height of each tree is b × d (b is a parameter that determines the level of
+division on each attribute and d is the number of attributes). It estimates its
+anomaly score as the ratio of average density of the parent node to the average
+density of the leaf node where x falls. The density of a node is estimated as the
+ratio of mass to volume. It uses mass to estimate density and ranks instances
+based on the density ratio. Like iForest, it is fast because no distance calcula-
+tion is involved. But, it has limitation in dealing problems with even a moderate
+number of dimensions because each tree has 2(b×d) leaf nodes.
+
+514
+
+S. Aryal et al.
+
+Table 1. Ranking measure and complexities (time and space) of ReMass-iForest, iFor-
+est, DEMass-LOF and LOF
+
+Ranking
+Measure
+
+1
+tψ
+
+ReMass-
+iForest
+
+t(cid:2)
+
+i=1
+
+m( ˘Ti(x))
+m(Ti(x))
+
+iForest
+t(cid:2)
+
+(cid:3)i(x)
+
+i=1
+
+1
+t
+
+DEMass
+
+-LOF
+
+(cid:3)t
+(cid:3)t
+
+i=1
+
+i=1
+
+m( ˘Ti(x))
+
+˘vi
+
+m(Ti(x))
+
+vi
+
+(cid:3)
+
+LOF
+
+x(cid:2)∈N(x,k)
+¯fk(x)
+
+¯fk(x(cid:2))
+|N(x,k)|
+
+Time
+
+Complexity
+
+Space
+
+O(t(n + ψ) log ψ) O(t(n + ψ) log ψ) O(t(n + ψ)bd)
+
+O(tψ)
+
+O(tψ)
+
+O(tdψ)
+
+Complexity
+˘vi and vi are the volumes of nodes ˘Ti(x) and Ti(x), respectively.
+
+O(dn2)
+
+O(dn)
+
+In contrast to LOF and DEMass-LOF, ReMass-iForest does not require den-
+sity estimation, it uses relative mass directly in order to estimate the local
+anomaly score from each iTree.
+
+The ranking measure and complexities (time and space) of ReMass-iForest,
+
+iForest, DEMass-LOF and LOF are provided in Table 1.
+
+2.2 Information Retrieval: ReFeat and ReMass-ReFeat
+
+In this subsection, we ﬁrst describe how ReFeat uses iForest in IR and its weak-
+ness. Then, we introduce a new IR system, ReMass-ReFeat, based on the relative
+mass to overcome the weakness.
+
+ReFeat
+
+(cid:2)i(q)
+
+c − 1 (where c
+Given a query instance q, ReFeat [3] assigns a weight wi(q) =
+is a normalisation constant) to each Ti. The relevance feedback process [6] allows
+user to reﬁne the retrieved result by providing some ‘relevant’ and ‘irrelevant’
+examples for the query. Let Q = P∪N is a set of feedback instances to the query
+q where P and N are the sets of positive and negative feedbacks, respectively.
+Note that P includes q. In a relevance feedback round, ReFeat assigns a weight to
+wi(y+)−
+Ti using positive and negative feedback instances as: wi(Q) =
+), where 0 ≤ γ ≤ 1 is a trade-oﬀ parameter for the relative
+γ 1|N|
+contribution of positive and negative feedbacks. The relevance of x w.r.t Q is
+estimated as the weighted average of its path lengths over t iTrees as follows:
+
+1|P|
+
+y−∈N
+
+y+∈P
+
+−
+
+wi(y
+
+(cid:2)
+
+(cid:2)
+
+RReF eat(x|Q) =
+
+1
+t
+
+t(cid:2)
+
+i=1
+
+(wi(Q) × (cid:3)i(x))
+
+(4)
+
+Even though ReFeat has been shown to have superior retrieval performance
+over other existing methods in CBMIR, the ranking scheme does not guarantee
+
+Improving iForest with Relative Mass
+
+515
+
+that two instances having similar ranking scores are in the same local neighbour-
+hood. Two instances can have similar score if they have equal path lengths in an
+iTree even though they lie in two diﬀerent branches which shares few common
+nodes. This eﬀect will degrade the performance of ReFeat especially when the
+tree height (h) is increased. Hence, ReFeat must use a low h (2 or 3) in order to
+reduce this weakness. The superior performance of ReFeat is mainly due to its
+large ensemble size (t = 1000). We will discuss the eﬀect of h and t in ReFeat in
+Section 3.2. In a nutshell, ReFeat does not consider the positions of instances in
+the feature space as it computes the path length in iTrees.
+
+ReMass-ReFeat
+In each iTree Ti, the relevance of x w.r.t. q, ri(x|q), is estimated using relative
+mass as follows:
+
+ri(x|q) =
+
+m(Ti(q))
+m(Ti(x, q))
+
+(5)
+
+where Ti(x, q) is the smallest region in Ti where x and q appear together.
+
+In equation 5, the numerator corresponds with wi(q) in ReFeat. The denom-
+inator term measures how relevant x is to q. In contrast, ReFeat’s (cid:3)i(x) is inde-
+pendent of q (it does not examine whether x and q are in the same locality [3]);
+whereas m(Ti(x, q)) measures how close x and q are in the feature space. In each
+Ti, ri(x|q) is in the range of (0, 1]. The higher the score the more relevance of x
+w.r.t q. If x and q lie in the same leaf node in Ti, ri(x|q) is 1. This relevance mea-
+sure gives a high score to an instance which lies deeper in the branch where q lies.
+The ﬁnal relevance score of x w.r.t q, R(x|q), is the average over t iTrees:
+
+R(x|q) =
+
+1
+t
+
+t(cid:2)
+
+i=1
+
+ri(x|q)
+
+(6)
+
+Once the relevance score of each instance is estimated, the scores can be sorted
+in descending order. The instances at the top of the list are regarded as the most
+relevant instances to q.
+
+ReMass-ReFeat estimates the relevance score with relevance feedback as fol-
+
+lows:
+
+R(x|Q) =
+
+1|P|
+
+R(x|y+) − γ 1|N|
+
+(cid:2)
+
+y+∈P
+
+(cid:2)
+
+y−∈N
+
+R(x|y
+
+−
+
+)
+
+(7)
+
+Note that equations 5 and 6 do not make use of any distance or similarity
+measure, and R(x|q) is not a metric as it does not satisfy all metric axioms. It
+has the following characteristics. For x, y ∈ D,
+i. 0 < R(x|y) ≤ 1 (Non-negativity)
+ii. R(x|x) = R(y|y) = 1 (Equal self-similarity; maximal similarity)
+iii. R(x|y) (cid:6)= R(y|x) (Asymmetric)
+
+Note that ReMass-ReFeat and ReFeat have the same time complexities. If
+indices of data instances falling in each node are recorded in the modelling
+stage, the joint mass of q and every x ∈ D can be estimated in one search from
+
+516
+
+S. Aryal et al.
+
+Table 2. Time and space complexities of ReMass-ReFeat and ReFeat
+
+ReMass-ReFeat
+
+ReFeat
+
+Time
+
+O(t(n + ψ) log ψ) (Model building) O(t(n + ψ) log ψ) (Model building)
+
+Complexity O(t(n + log ψ)) (On-line query)
+
+O(t(n + log ψ)) (On-line query)
+
+Space
+
+Complexity
+
+O(t(n + ψ))
+
+O(n + tψ)
+
+the root to Ti(q) in each tree. But, it will increase the space complexity as it
+requires to store n indices in each iTree. The time and space complexities of
+ReMass-ReFeat and ReFeat are provided in Table 2.
+
+3 Empirical Evaluation
+
+In this section, we evaluate the utility of relative mass in AD and CBMIR tasks.
+In AD, we compared ReMass-iForest with iForest [1], DEMass-LOF [5] and LOF
+[4]. In CBMIR, we compared ReMass-ReFeat with ReFeat [3] and the other ex-
+isting CBMIR systems: MRBIR [7], InstRank [8] and Qsim [9]. Both the AD
+and CBMIR experiments were conducted in unsupervised learning settings. The
+labels of instances were not used in the model building process. They were used
+as the ground truth in the evaluation stage. The AD results were measured in
+terms of the area under ROC curve (AUC). In CBMIR, the precision at the
+top 50 retrieved results (P@50) [3] was used as the performance measure. The
+presented result was the average over 20 runs for all randomised algorithms. A
+two-standard-error signiﬁcance test was conducted to check whether the diﬀer-
+ence in performance of two methods was signiﬁcant.
+
+We used the same MATLAB implementation of iForest provided by the au-
+thors of ReFeat [3], the JAVA implementation of DEMass-LOF in the WEKA
+[10] platform, and the JAVA implementation of LOF in the ELKI [11] platform.
+We present the empirical evaluation results in the following two subsections.
+
+3.1 Anomaly Detection: ReMass-iForest versus iForest
+
+In the ﬁrst experiment, we used a synthetic data set to demonstrate the strength
+of ReMass-iForest over iForest to detect local anomalies. The data set has 263
+normal instances in three clusters and 12 anomalies representing global, local
+and clustered anomalies. The data distribution is shown in Figure 2a. Instances
+a1, a2 and a3 are global anomalies; four instances in A4 and two instances in A5
+are clustered anomalies; and a6, a7 and a8 are local anomalies; C1, C2 and C3
+are normal instances in three clusters of varying densities.
+
+Figures 2b-2d show the anomaly scores of all data instances obtained from
+iForest and ReMass-iForest. With iForest, local anomalies a6, a7 and a8 had lower
+anomaly scores than some normal instances in C3; and it produced AUC of 0.98.
+In contrast, ReMass-iForest had ranked local anomalies a6, a7, a8 higher than any
+instances in normal clusters C1, C2 and C3 along with global anomalies a1, a2
+and a3. But, ReMass-iForest with M inP ts = 1 had some problem in ranking
+
+Improving iForest with Relative Mass
+
+517
+
+a
+
+3a
+
+2
+
+a
+
+1
+
+A
+
+4
+
+a
+8 A
+5
+
+a
+
+a
+
+6
+
+7
+
+a
+
+1
+
+C
+3
+
+a
+2
+
+A
+
+5
+
+C
+1
+
+a
+
+8
+
+a
+
+7
+
+a
+6
+
+C
+2
+
+a
+
+3
+
+A
+4
+
+(a) Data distribution
+
+(b) iForest(M inP ts = 1)
+
+a
+2
+
+a
+
+3
+
+a
+
+1
+
+a
+
+8
+
+A
+
+5
+
+a
+
+a
+7
+
+6
+
+A
+4
+
+a
+
+2
+
+a
+
+3
+
+A
+
+4
+
+a
+1
+
+A
+
+5
+
+a
+8
+
+a
+
+a
+7
+
+6
+
+(c) ReMass-iForest(M inP ts = 1)
+
+(d) ReMass-iForest(M inP ts = 5)
+
+Fig. 2. Anomaly scores by iForest and ReMass-iForest using t = 100, ψ = 256. Note
+that in anomaly score plots, instances are represented by their values on x1 dimension.
+Anomalies are represented by black lines and normal instances are represented by gray
+lines. The height of lines represents the anomaly scores. In order to diﬀerentiate the scores
+of normal and anomaly instances, the maximum score for normal instances is subtracted
+from the anomaly scores so that all normal instances have score of zero or less.
+
+clustered anomalies in A4 and produced AUC of 0.99. One fringe instance in
+the cluster C3 was ranked higher than two clustered anomalies in A4. This is
+because cluster anomalies have similar mass ratio w.r.t their parents as that for
+the instances in sparse normal cluster C3. Clustered anomalies were correctly
+ranked and AUC of 1.0 was achieved when M inP ts was increased to 5. The
+performance of iForest did not improve when M inP ts was increased to any
+values in the range (2, 3, 4, 5 and 10).
+
+In the second experiment, we used the ten benchmark data sets previously
+employed by Liu et al (2008) [1]. In ReMass-iForest, iForest and DEMass-LOF,
+the parameter t was set to 100 as default and the best value for the sub-sample
+size ψ was searched from 8, 16, 32, 64, 128 to 256. In ReMass-iForest, M inP ts
+was set to 5 as default. iForest uses the default settings as speciﬁed in [1], i.e,
+M inP ts = 1. The level of subdivision (b) for each attribute in DEMass-LOF
+was searched from 1, 2, 3, 4, 5, and 6. In LOF, the best k was searched between
+5 and 4000 (or to n
+4 for small data sets), with steps from 5, 10, 20, 40, 60, 80,
+150, 250, 300, 500, 1000, 2000, 3000 to 4000. The best results were reported.
+
+518
+
+S. Aryal et al.
+
+Table 3. AUC and runtime (seconds) of ReMass-iForest (RM), iForest (IF), DEMass-
+LOF (DM), and LOF in benchmark datasets
+
+AUC
+
+Runtime
+
+Data set
+
+n
+Http 567K
+286K
+262K
+95K
+49K
+11K
+6K
+683
+452
+351
+
+ForestCover
+Mulcross
+Smtp
+Shuttle
+Mammography
+Satellite
+Breastw
+Arrhythmia
+Ionosphere
+
+d RM
+3 1.00
+10 0.96
+4 1.00
+3 0.88
+9 1.00
+6 0.86
+36 0.71
+9 0.99
+274 0.80
+32 0.89
+
+1.00
+0.88
+1.00
+0.88
+1.00
+0.86
+0.70
+0.99
+0.81
+0.85
+
+IF DM LOF RM IF DM LOF
+19965
+2918
+2169
+373
+656
+127
+24
+0.4
+1
+0.3
+
+1.00
+0.94
+1.00
+0.95
+0.98
+0.68
+0.79
+0.96
+0.80
+0.90
+
+0.99
+0.87
+0.99
+0.78
+0.95
+0.86
+0.55
+0.98
+0.52
+0.85
+
+19
+4
+16
+16
+7
+5
+0.6
+0.3
+5
+0.5
+
+71
+42
+20
+10
+4
+1
+1
+0.1
+0.3
+2
+
+99
+56
+23
+12
+9
+1
+4
+0.4
+0.5
+3
+
+The characteristics of the data sets, AUC and runtime (seconds) of ReMass-
+iForest, iForest, DEMass-LOF and LOF are presented in Table 3.
+
+In terms of AUC, ReMass-iForest had better or at least similar results to
+iForest. Based on the two-standard-error signiﬁcance test, it produced better
+results than iForest in the ForestCover and Ionosphere data sets. Most of these
+datasets do not have local anomalies. So, both methods had similar AUC in
+eight data sets. Note that iForest did not improve AUC when M inP ts was
+set to 5. ReMass-iForest had produced signiﬁcantly better AUC than DEMass-
+LOF in relatively high dimensional data sets (Arrhythmia - 274, Satellite - 36,
+Ionosphere - 32, ForestCover - 10, Shuttle - 9). These results show that DEMass-
+LOF has problem in handling data sets with a moderate number of dimensions
+(9 or 10). ReMass-iForest was competitive to LOF. It was better than LOF in
+the Mammography data set, worse in the Smtp and Satellite data sets, and equal
+performance in the other seven data sets.
+
+As shown in Table 3, the runtime of ReMass-iForest, iForest and DEMass-
+LOF were of the same order of magnitude whereas LOF was upto three order of
+magnitude slower in large data sets. Note that we can not conduct a head-to-head
+comparison of runtime of ReMass-iForest and iForest with DEMass-LOF and
+LOF because they were implemented in diﬀerent platforms (MATLAB versus
+JAVA). The results are included here just to provide an idea about the order of
+magnitude of runtime. The diﬀerence in runtime of ReMass-iForest and iForest
+was due to the diﬀerence in ψ and M inP ts. M inP ts = 5 results in smaller size
+iTrees in ReMass-iForest than those in iForest (M inP ts = 1). Hence, ReMass-
+iForest runs faster than iForest even though the same ψ is used.
+
+3.2 CBMIR: ReMass-ReFeat versus ReFeat
+
+The performance of ReMass-ReFeat was evaluated against that of ReFeat in
+music and image retrieval tasks with GTZAN music data set [12] and COREL
+image data set [13], respectively. GTZAN is a data set of 1000 songs uniformly
+distributed in 10 genres. Each song is represented by 230 features. COREL is a
+data set of 10,000 images uniformly distributed over 100 categories. Each image
+
+Improving iForest with Relative Mass
+
+519
+
+0.6
+
+0.55
+
+0.5
+
+0.45
+
+0.4
+
+0.35
+
+0.3
+
+0
+5
+@
+P
+
+ 
+
+0.35
+
+0.3
+
+0.25
+
+0.2
+
+0.15
+
+0.1
+
+0
+5
+@
+P
+
+0.25
+
+ 
+
+Query
+
+1
+
+2
+
+3
+
+Feedback Round
+
+4
+
+5
+
+0.05
+
+ 
+
+Query
+
+1
+
+2
+
+3
+
+Feedback Round
+
+ 
+
+4
+
+5
+
+(a) GTZAN
+
+(b) COREL
+
+Fig. 3. Precision at top 50 returned results (P@50)
+
+is represented by 67 features. These are the same data sets used in [3] to evaluate
+the performance of ReFeat. The results of the existing CBMIR systems InstRank,
+Qsim and MRBIR were taken from [3].
+
+We conducted our experiments using the same experimental design as in [3].
+Initially ﬁve queries were chosen randomly from each class. For each query, in-
+stances from the same class were regarded as relevant and the other classes were
+irrelevant. At each round of feedback, two relevant (instances from the same
+class) and two irrelevant (instances from the other classes) instances were pro-
+vided. Upto ﬁve rounds of feedback were conducted for each query. The instance
+was not used in ranking if it was used as a feedback instance. The feedback
+process was repeated ﬁve times with diﬀerent relevant and irrelevant feedbacks.
+The above process was repeated 20 times and average P@50 was reported.
+
+In ReMass-ReFeat, the parameters ψ and M inP ts were set as default to 256
+and 1, respectively. In ReFeat, ψ was set to 4 for GTZAN and 8 for COREL as
+reported in [3]. Other settings of ψ in ReFeat were found to perform worse than
+these settings. In order to show how their retrieval performance varies when
+ensemble size was increased, we used two settings for t: ReMass-ReFeat and
+ReFeat with (i) t = 100 (RM-100 and RF-100) and (ii) t = 1000 (RM-1000 and
+RF-1000). The feedback parameter γ was set as default to 0.5 in ReMass-ReFeat
+and 0.25 in ReFeat (as used in [3]).
+
+P@50 of ReMass-ReFeat (RM-100 and RM-1000), ReFeat (RF-100 and RF-
+1000), InstRank, MRBIR and Qsim in the GTZAN and COREL data sets are
+shown in Figure 3. P@50 curves in both the data sets show that ReMass-ReFeat
+(RM-1000) has better retrieval performance than all contenders, especially in
+feedback rounds. In round 1 or no feedback (query only), ReMass-ReFeat (RM-
+1000) and ReFeat (RF-1000) produced similar retrieval performance but in latter
+feedback rounds, RM-1000 produced better results than RF-1000.
+
+It is interesting to note that the performance of RF-100 was worse than that of
+RM-100 in all feedback rounds including query only (no feedback). In GTZAN,
+
+520
+
+S. Aryal et al.
+
+RF-100 had worst performance than all contenders. The increase in P@50 from
+RF-100 to RF-1000 was a lot larger than that of RM-100 to RM-1000. This
+result shows that the retrieval performance of ReFeat is mainly due to the large
+ensemble size of 1000. The diﬀerence in P@50 of RM-100 and RF-1000 was
+decreasing in subsequent feedback rounds. This indicates that ReMass-ReFeat
+produces better result than ReFeat even with a smaller ensemble size if more
+feedback instances are available.
+
+In terms of runtime, ReMass-ReFeat had slightly higher runtime than ReFeat
+because of the higher ψ that allows trees to grow deeper (256 vs. 4 in GTZAN
+and 8 in COREL). The model building time of RM-1000 was 21 seconds (vs. 4
+seconds of RF-1000) in COREL and 20 seconds (vs. 2 seconds of RF-1000) in
+GTZAN. The on-line retrieval time for one query of RM-1000 was 0.9 seconds
+(vs. 0.3 seconds of RF-1000) in COREL and 0.2 seconds (vs. 0.2 seconds of
+RF-1000) in GTZAN.
+
+ 
+
+0.6
+
+0.5
+
+0.4
+
+0.3
+
+0
+5
+@
+P
+
+Figure 4 shows the eﬀect of ψ
+on the P@50 of ReMass-ReFeat and
+ReFeat at feedback round 5 (one run)
+in the GTZAN data set. In ReFeat,
+when ψ was increased above 4, the
+retrieval performance degraded. This
+is due to the increase in the height
+of iTrees (h = log2(ψ)) and instances
+falling in two distinct branches hav-
+ing similar relevance score based on
+the same path lengths. In contrast,
+ReMass-ReFeat improved its retrieval
+performance up to 64 and then re-
+mained almost ﬂat beyond that. Sim-
+ilar eﬀect was observed in the COREL data set where the performance of ReFeat
+degraded when ψ was set above 8.
+
+Fig. 4. P@50 at feedback round 5 with
+varying sample size (ψ) in the GTZAN data
+set
+
+RM−1000
+RF−1000
+
+64
+
+128 256
+
+0.1
+ 
+2
+
+4
+
+8
+
+16
+
+32
+
+0.2
+
+ψ
+
+4 Conclusions
+
+While the relative mass was motivated to overcome the weakness of iForest in
+detecting local anomalies, we have shown that the idea has a wider application.
+In information retrieval, we apply it to overcome the weakness of a state-of-the-
+art system called ReFeat. Our empirical evaluations show that ReMass-iForest
+and ReMass-ReFeat perform better than iForest and ReFeat, respectively, in
+terms of task-speciﬁc performance. In comparison with other state-of-the-art
+systems in both tasks, ReMass-iForest and ReMass-ReFeat are found to be either
+competitive or better.
+
+The idea of relative mass in ReMass-iForest is similar to that of relative den-
+sity in LOF and our empirical results show that ReMass-iForest and LOF have
+similar anomaly detection performance. However, ReMass-iForest runs signiﬁ-
+cantly faster than LOF in large data sets because it does not require distance or
+density calculations.
+
+Improving iForest with Relative Mass
+
+521
+
+Acknowledgement. This work is partially supported by the U.S. Air Force
+Research Laboratory, under agreement#FA2386-13-1-4043. Sunil Aryal is sup-
+ported by Australian Postgraduate Award (APA), Monash University. The paper
+on mass-based similarity measure [14] has inspired us in creating the relevance
+score based on relative mass used in ReMass-ReFeat; though the motivations of
+the two papers diﬀer.
+
+References
+
+1. Liu, F.T., Ting, K.M., Zhou, Z.H.: Isolation forest. In: Proceedings of the Eighth
+
+IEEE International Conference on Data Mining, pp. 413–422 (2008)
+
+2. Ting, K.M., Zhou, G.T., Liu, F.T., Tan, S.C.: Mass estimation. Machine Learn-
+
+ing 90(1), 127–160 (2013)
+
+3. Zhou, G.T., Ting, K.M., Liu, F.T., Yin, Y.: Relevance feature mapping for content-
+based multimedia information retrieval. Pattern Recognition 45(4), 1707–1720
+(2012)
+
+4. Breunig, M.M., Kriegel, H.P., Ng, R.T., Sander, J.: LOF: Identifying Density-
+Based Local Outliers. In: Proceedings of ACM SIGMOD International Conference
+on Management of Data, pp. 93–104 (2000)
+
+5. Ting, K., Washio, T., Wells, J., Liu, F., Aryal, S.: DEMass: a new density estimator
+
+for big data. Knowledge and Information Systems 35(3), 493–524 (2013)
+
+6. Rui, Y., Huang, T., Ortega, M., Mehrotra, S.: Relevance feedback: a power tool
+for interactive content-based image retrieval. IEEE Transactions on Circuits and
+Systems for Video Technology 8(5), 644–655 (1998)
+
+7. He, J., Li, M., Zhang, H.J., Tong, H., Zhang, C.: Manifold-ranking based image
+retrieval. In: Proceedings of the 12th Annual ACM International Conference on
+Multimedia, pp. 9–16. ACM, New York (2004)
+
+8. Giacinto, G., Roli, F.: Instance-based relevance feedback for image retrieval. In:
+Advances in Neural Information Processing Systems, vol. 17, pp. 489–496 (2005)
+9. Zhou, Z.H., Dai, H.B.: Query-sensitive similarity measure for content-based image
+retrieval. In: Proceedings of the Sixth International Conference on Data Mining,
+pp. 1211–1215 (2006)
+
+10. Hall, M., Frank, E., Holmes, G., Pfahringer, B., Reutemann, P., Witten, I.H.: The
+
+WEKA Data Mining Software: An Update. SIGKDD Explorations 11(1) (2009)
+
+11. Achtert, E., Hettab, A., Kriegel, H.-P., Schubert, E., Zimek, A.: Spatial outlier
+detection: Data, algorithms, visualizations. In: Pfoser, D., Tao, Y., Mouratidis, K.,
+Nascimento, M.A., Mokbel, M., Shekhar, S., Huang, Y. (eds.) SSTD 2011. LNCS,
+vol. 6849, pp. 512–516. Springer, Heidelberg (2011)
+
+12. Tzanetakis, G., Cook, P.: Musical genre classiﬁcation of audio signals. IEEE Trans-
+
+actions on Speech and Audio Processing 10(5), 293–302 (2002)
+
+13. Zhou, Z.H., Chen, K.J., Dai, H.B.: Enhancing relevance feedback in image retrieval
+using unlabeled data. ACM Transactions on Information Systems 24(2), 219–244
+(2006)
+
+14. Ting, K.M., Fernando, T.L., Webb, G.I.: Mass-based Similarity Measure: An
+Eﬀective Alternative to Distance-based Similarity Measures. Technical Report
+2013/276, Calyton School of IT, Monash University, Australia (2013)
+
+

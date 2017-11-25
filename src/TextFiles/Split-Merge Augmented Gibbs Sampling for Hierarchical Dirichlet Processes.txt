@@ -1,0 +1,1165 @@
+Split-Merge Augmented Gibbs Sampling
+
+for Hierarchical Dirichlet Processes
+
+Santu Rana, Dinh Phung, and Svetha Venkatesh
+
+Center for Pattern Recognition and Data Analytics
+
+Deakin University
+
+Waurn Ponds, VIC 3216
+
+Abstract. The Hierarchical Dirichlet Process (HDP) model is an im-
+portant tool for topic analysis. Inference can be performed through a
+Gibbs sampler using the auxiliary variable method. We propose a split-
+merge procedure to augment this method of inference, facilitating faster
+convergence. Whilst the incremental Gibbs sampler changes topic assign-
+ments of each word conditioned on the previous observations and model
+hyper-parameters, the split-merge sampler changes the topic assignments
+over a group of words in a single move. This allows eﬃcient exploration
+of state space. We evaluate the proposed sampler on a synthetic test set
+and two benchmark document corpus and show that the proposed sam-
+pler enables the MCMC chain to converge faster to the desired stationary
+distribution.
+
+1 Introduction
+
+The hierarchical Dirichlet process (HDP) [1] is an important tool for Bayesian
+nonparametric topic modelling, particularly when mixed-membership exists, such
+as in a document collection. Each document is modelled as a group of words,
+generated from the underlying latent topic. It is an extension of Latent Dirichlet
+Allocation (LDA) [2], allowing unbounded latent dimensionality, with capacity
+to automatically infer the number of topics in a document set. The HDP is a
+hierarchial version of the Drichilet process (DP) clustering model, where a cor-
+pus of documents are assumed to be generated from a set of top-level topics
+with independent mixing distribution. In contrast to the DP mixture model for
+which the metaphor is a Chinese Resturant Process (CRP), a HDP can be ex-
+pressed using a metaphor of Chinese Restaurant Franchise (CRF), where a set
+of dishes is shared across a collection of franchise restaurants, each having tables
+generated using a CRP from the customers arriving at that franchise.
+
+As with Bayesian nonparametric models, exact posterior inference is not
+tractable. MCMC or variational approximation are used for approximate poste-
+rior inference. In this paper, we focus on MCMC sampling, wherein posterior is
+computed from the empirical distribution of samples from a Markov chain, whose
+stationary distribution is the posterior of interest. [1] propose two MCMC sam-
+pling schemes, one based on the CRF and the other on the auxiliary variable
+
+J. Pei et al. (Eds.): PAKDD 2013, Part II, LNAI 7819, pp. 546–557, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+Split-Merge Augmented Gibbs Sampling for Hierarchical Dirichlet Processes
+
+547
+
+method. In many cases the use of auxiliary variable sampling method is pre-
+ferred to keep the sampling simple and easily extendable to elaborate models
+such as iHMM [1]. The basic MCMC sampler for the HDP is an incremental
+Gibbs sampler - the topic is sampled for a single observation, one at a time,
+conditioned on preceding observations and model hyperparameters. Since, only
+one state change takes place at a time, mixing may be slow, requiring many
+Gibbs iterations for the MCMC chain to converge to its stationary distribution.
+Whereas CRF based sampling is staightforward in formulation, the implemen-
+tation is tedious, requiring tracking of individual table assignments for each
+restaurant, and then tracking the dish preference for each table. The auxiliary
+variable split-merge sampler is based on directly sampling the topic assignment
+(dish) of the words (customers) in the documents and thus straightforward in
+implementation.
+
+Split-merge MCMC samplers have been proposed for Bayesian nonparametric
+models, such as for DPM to accelerate mixing [3]. In a split-merge setting, a
+group of observations are moved together in the state space based on whether
+splitting or merging of topics are accepted based on a Metropolis-Hastings ratio.
+In practice, each sampling run consists of a Gibbs sampling followed by a split-
+merge proposal evaluation. Since, the state change may occur for a group of
+points at each iteration, the MCMC chain can quickly traverse the state-space
+and potentially converge faster than if only the Gibbs sampler is used.
+
+Motivated by this, we propose a split-merge procedure for the HDP to accel-
+erate the mixing of the MCMC chain for the auxiliary variable sampling scheme
+called the Split-Merge Augmented Gibbs sampler. Assuming each word (cus-
+tomer) in the document corpus has been assigned to a topic(dish) at the higher
+level, we evaluate a split-merge proposal on the customer-dish relationship i.e.
+we either propose to split all the customers in all the franchise restaurants who
+share the same dish into two diﬀerent dishes or propose merging the set of all
+customers sharing two diﬀerent dishes. In contrast to the CRF based split-merge
+sampling scheme [4], we do not worry about the lower-level customer-table as-
+signments and thus the proposed split-merge scheme is eﬀective at both levels
+of the HDP.
+
+We evaluate and analyze the proposed algorithm on synthetic data and two
+benchmark document corpus, - NIPS abstracts and 20 News Group data. In
+synthetic experiments, we generate topics with low separability and show that
+the incremental Gibbs sampler is unable to recover all the correct topics; however,
+our split-merge augmented Gibbs sampler is able to recover all topics correctly.
+For the document corpus, we evaluate the performance of Gibbs vs our sampler
+based on the perplexity of held-out data and show that our proposed method is
+able to produce lower perplexity in similar time.
+
+The layout is as follows: Related background on HDP and inference tech-
+niques is described in the section 2; in the section 3, we detail the split-merge
+procedure after brieﬂy reviewing the Gibbs sampling procedure based on the
+auxiliary variable scheme. Experimental results are discussed in section 4 and
+ﬁnally, section 5 concludes our discussion.
+
+548
+
+S. Rana, D. Phung, and S. Venkatesh
+
+2 Related Background
+
+Dirichlet Proess (DP) mixture model for clustering with theoretically unbounded
+mixture component has been ﬁrst studied in [5] with [6] giving a stick-breaking
+construction for the DP prior. Hierarchical Dirichlet Process (HDP) extends the
+DP in two level where the bottom level DP uses the top-level DP as the base
+measure was ﬁrst proposed in [1]. This is a mixed-membership model where
+a group is sampled from a mixture of topics and has been used extensively
+for document analysis [7], multi-population haplotype phasing [8], image/object
+retrieval [9] etc.
+
+Split-merge sampling for DP mixture model was ﬁrst proposed in [3] and
+splitting of a single cluster by running a Restricted Gibbs sampler on the subset
+of points belonging to that topic is described. Whilst a merge proposal is easy
+to generate, generating a split proposal takes some work as a random split will
+most likely to be a bad proposal and they would be rejected. Hence, the need
+for the Restricted Gibbs sampler. Using the same framework [10] proposed a
+slightly diﬀerent split-merge algorithm by having a simpler split routine using a
+sequential allocation scheme. In contrast to running a Gibbs sampler to generate
+a split proposal they proposed a single run sequential allocation scheme to gen-
+erate the split, thus reducing the overhead cost. Split-merge sampler for HDP
+based on the Chinese Restaurant Franchise sampling scheme has been proposed
+in [4]. This perform splitting or merging only at the top level assignments using
+the similar procedure for the DP with additional factors coming from the bottom
+level when computing the prior clustering probability.
+
+3 Framework
+
+3.1 Hierarchical Dirichlet Process
+
+The hierarchical Dirichlet process is a distribution over a set of random prob-
+ability measure over (Θ,B). It is a hierarchical version of the DP, where a set
+j=1 are deﬁned for each group
+of group level random probability measures (Gj )J
+which shares a global random probability measure G0 at the higher level. The
+global measure G0 is a draw from a DP with a base measure H and a concen-
+tration parameter γ. The group speciﬁc random measures Gj are subsequently
+drawn from a DP with G0 as its base measure,
+G0 ∼ DP (γ, H)
+
+(1)
+
+Gj/G0 ∼ DP (α0, G0)
+
+(2)
+
+with j denoting the group. Since Gj are drawn from the almost surely discrete
+distribution of G0, it ensures that the top level atoms are shared across the
+groups. In the topic model context each document is a group of words and the
+
+Split-Merge Augmented Gibbs Sampling for Hierarchical Dirichlet Processes
+
+549
+
+γ
+
+0α
+
+β
+
+πj
+
+jiz
+
+xji
+
+nj
+
+J
+
+H
+
+θk
+
+8
+
+Fig. 1. The HDP model
+
+atoms (topics) are the distribution over words. The stick-breaking representation
+of G0 can be expressed as,
+
+∞(cid:2)
+
+G0 =
+where θk ∼ H independently and (βk)∞
+such that (βk)∞
+can be expressed as,
+
+k=1
+k=1 admitting stick-breaking construction
+k=1 ∼ Stick(γ). Since, G0 is used as the base measure for Gj, it
+
+βkδθk
+
+(3)
+
+∞(cid:2)
+
+(4)
+where it can be shown that [1] πj ∼ DP (α0, β). The stick-breaking representa-
+tion for HDP is given below,
+
+πjkδθk
+
+Gj =
+
+k=1
+
+β|γ ∼ Stick(γ)
+πj|α0,,β ∼ DP (α0, β)
+θk|H ∼ H
+
+zji|πj ∼ πj
+xji|zji, (θk)∞
+
+k=1 ∼ F (θzji
+
+)
+
+(5)
+
+3.2 Posterior Inference with Auxiliary Variable
+
+With the stick breaking representation of 5, the state space consists of (z, π, β, θ).
+Since z and π forms a conjugate pair, π can be integrated out giving the condi-
+tional probability of z given β as.
+
+P (z|β) =
+
+J(cid:3)
+
+j=1
+
+Γ (α0)
+
+Γ (α0 + nj)
+
+K(cid:3)
+
+k=1
+
+Γ (α0βk + njk)
+
+Γ (α0βk)
+
+(6)
+
+S. Rana, D. Phung, and S. Venkatesh
+
+550
+From 6 the prior probability for zji given z−ji and β can be expressed as,
+
+(α0βk + n−ji
+
+)
+
+f or k = 1, ...K, u
+
+(7)
+
+p(zji = k|z−ji, β) =
+
+jk
+α0 + nj
+(cid:4)∞
+where β =[β1β2...βu] such that βu =
+we can have the sampling formula of zji as,
+
+k=K+1 βk. Adding the likelihood term
+
+p(zji = k|z−ji, β) ∝ (α0βk + n−ji
+
+jk
+
+)f (xji/θk)
+
+f or k = 1, ...K, u
+
+(8)
+
+where θu is sampled from its prior H. If a new topic (K + 1) is created then we
+set βK+1 = bβu, where b ∼ Beta(1, γ). To sample β we use the auxiliary variable
+method as outlined in [Teh]. We ﬁrst sample the auxiliary variable m from,
+
+q(mjk = m|z, m−jk, β) ∝ s(njk, m)(α0βk)m
+
+(9)
+
+where s(njk, m) are the unsigned Stirling numbers of the ﬁrst kind. Subsequently,
+β is sampled from,
+
+q(β|z, m) ∝ βγ−1
+
+u
+
+K(cid:3)
+
+k=1
+
+j mjk−1
+
+(cid:2)
+
+β
+
+k
+
+(10)
+
+Eq 8910 completes the Gibbs sampling formula for HDP inference. For elabora-
+tion please refer to [1,7].
+
+3.3 Split-Merge procedure
+
+The split-merge proposal is a form of Metropolis-Hasting algorithm where the
+algorithm draws a new candidate state C∗ from a distribution with density π(C)
+according to a proposal density q(C∗/C) and then evaluation of the proposal
+based on the Metropolis-Hasting ratio of
+
+a(C∗, C) = min[1,
+
+q(C|C∗)π(C∗)
+q(C∗|C)π(C)
+
+]
+
+The proposal C∗is accepted with the probability a(C∗, C). If it is accepted the
+state changes to C∗ or it remains at C. For HDP mixture model the above
+formula takes the form of
+
+a(C∗, C) = min[1,
+
+q(C|C∗)P (C∗)L(C∗|x)
+q(C∗|C)P (C)L(C|x)
+
+From this prior distribution of P (z|β) (Eq. 7) we can use the Polya’s urn
+] for a particular document j given
+metaphor to create a sequence [zji1 zji2 ...zjnj
+β as,
+
+Split-Merge Augmented Gibbs Sampling for Hierarchical Dirichlet Processes
+
+551
+
+P (zji = k|c1, c2, ..., ck; zj1, zj2, ..., zji−1; β) =
+
+=
+
+α0βk + n<i
+jck
+α0 + i − 1
+α0βu
+α0 + i − 1
+
+f or k <= K
+
+f or k = K + 1
+
+αK
+0 βu1 βu2...βuk
+
+where ck is the k(cid:5)th topic. Given this assignement scheme, the probability of a
+particular conﬁguration of word assignments C = {njc1 , njc2, ..., njcK
+}J
+j=1 to the
+topic set {ck}K
+
+k=1 can be expressed as,
+
+k=1 < α0βk >njk
+
+P (C|β) =
+(cid:4)∞
+l=k
+
+(cid:5)
+(cid:5)nj
+(11)
+i=1(α0 + i − 1)
+= α0βk(α0βk + 1)...(α0βk + njk − 1)
+where βuk
+denotes the rising factorial and can be computed as the ratio of two gamma
+functions. For a split proposal a particular topic k is splitted in k1 and k2 and
+the new conﬁguaration is denoted as Csplit. After we generate new latent as-
+signements zsplit corresponding to Csplit, we resample βusing 9 and 10 to obtain
+βsplit.The conﬁguration probability of P (Csplit/βsplit) can now be computed as,
+
+βl and < α0βk >njk
+
+J
+j=1
+
+J
+j=1
+
+(cid:5)
+
+(cid:5)
+
+=
+
+K
+
+P (Csplit|βsplit) =
+
+αK+1
+
+0
+
+(cid:5)
+βu1 βu2...βuk+1
+(cid:5)nj
+i=1(α0 + i − 1)
+
+J
+j=1
+
+J
+j=1
+
+(cid:5)
+
+(cid:5)
+
+K+1
+k=1 < α0βk >njk
+
+(12)
+
+Now we can compute P (Csplit|βsplit)
+proposal when topics k1 and k2 are merged into a single topic k and βmerge
+sampled with the new zmerge, then we have,
+
+as the ratio of 12 and 11. Similarly for merge
+is
+
+P (C|β)
+
+k
+
+P (Cmerge|βmerge) =
+
+αK−1
+
+0
+
+(cid:5)
+K−1
+βu1 βu2 ...βuk−1
+k=1 < α0βk >njk
+(cid:5)
+i=1(α0 + i − 1)
+
+J
+j=1
+
+J
+j=1
+
+(cid:5)
+
+(cid:5)
+
+nj
+
+(13)
+
+from which the ratio P (Csplit|βsplit)
+can be computed from 13 and 11. In our
+proposed method we will use the conditional conﬁguration probability ratio in
+place of P (C
+
+P (C) as our target distribution is π(C|β).
+
+The likelihood term L(C/x) is computed over all the words of all the docu-
+
+P (C|β)
+
+∗)
+
+ments and is given as,
+
+L(C|x) =
+
+ˆ
+
+J(cid:3)
+
+nj(cid:3)
+
+j=1
+
+i=1
+
+f (xji, θ)dHji,cji
+
+(θ)
+
+where Hji,cjiis the posterior distribution of θ based on the prior G0 and all the
+observations xj(cid:3),i(cid:3) such that j(cid:5) < j and i(cid:5) < i. The above integral is analytically
+tractable if G0 is conjugate prior. We can express the above likelihood equation
+as a product over topics such that,
+
+552
+
+S. Rana, D. Phung, and S. Venkatesh
+ˆ
+
+J(cid:3)
+
+K(cid:3)
+
+(cid:3)
+
+L(C|x) =
+
+j=1
+
+c=1
+
+i:Cji=c
+
+f (xji, θ)dHji,c(θ)
+
+Expressing this way now we can compute the ratio of likelihoods between a split
+proposal Csplit and the existing conﬁguration C as,
+
+L(C split|x)
+
+L(C|x)
+
+=
+
+(cid:2)
+
+(cid:2)
+
+J
+j=1
+
+i:C
+
+split
+ji
+
+=k1
+
+f (xji, θ)dHji,k1(θ)
+´
+
+(cid:2)
+
+(cid:2)
+
+J
+j=1
+
+i:Cji
+
+=k
+
+(cid:2)
+
+(cid:2)
+
+J
+j=1
+
+i:C
+
+=k2
+f (xji, θ)dHji,k(θ)
+
+split
+ji
+
+´
+
+f (xji, θ)dHji,k2(θ)
+
+(14)
+
+´
+
+´
+
+Similarly, for merge proposal the ratio of likelihood is,
+L(Cmerge|x)
+
+i:Cmerge
+
+J
+j=1
+
+´
+
+(cid:2)
+
+(cid:2)
+
+=k
+f (xji, θ)dHji,k1(θ)
+
+ji
+
+(cid:2)
+
+´
+f (xji, θ)dHji,k(θ)
+J
+j=1
+
+(cid:2)
+
+L(C|x)
+
+=
+
+(cid:2)
+
+(cid:2)
+
+J
+j=1
+
+i:Cji=k2
+
+i:Cji=k1
+
+f (xji, θ)dHji,k2(θ)
+(15)
+To evaluate the proposal density q(C∗|C) we need to create an algorithm for cre-
+ating C∗ from the existing conﬁguaration C. Here we use sequential assignment
+method similar to [10] for that. Let us assume that we are generating a split
+proposal for the topic k into two topics k1 and k2. We need to divide the words
+S = {njck
+}J
+j=1. We start with
+a random word from a random document as the seed for the topic k1 and sim-
+ilarly for topic k2 i.e. Sk1 = {xjr1,ir1}(jr1,ir1)∈S and Sk1 = {xjr2,ir2}(jr2,ir2)∈S
+such that (jr1, ir1) (cid:4)= (jr2, ir2). The rest of the words from the set S can be
+assigned by sampling from,
+
+j=1 into two sets Sk1 = {njk1
+}J
+
+j=1 and Sk2 = {njk2
+}J
+
+P (kji = k1|Sk1 , Sk2 , θ, xji)
+
+=
+
+(α0βsplit
+
+k1
+
++|Sj
+
+k
+
+P (kji = k2|Sk1 , Sk2 , θ, xji)
+
+=
+
+(α0βsplit
+
+k1
+
++|Sj
+
+k
+
++|Sj
+(α0βsplit
+|−1)p(xji|θSk1
+
+k1
+
+|−1)p(xji|θSk1
+k1
++|Sj
+)+(α0βsplit
+
+k2
+
+k2
+
+(16)
+
+)
+
+|−1)p(xji|θSk2
+
+)
+
++|Sj
+(α0βsplit
+|−1)p(xji|θSk1
+
+k2
+
+|−1)p(xji|θSk2
+k2
++|Sj
+)+(α0βsplit
+
+k2
+
+k2
+
+(17)
+
+)
+
+|−1)p(xji|θSk2
+= βsplit
+
+)
+
+k2
+
+k1 and βsplit
+
+can be assigned as βsplit
+
+where, a simple allocation of βsplit
+βk/2. The proposal probability q(Csplit|C) is computed as a product of the above
+probabilities based on the actual assignment. The reverse proposal probability
+q(C|Csplit) = 1 since the set of two sets of words can only be combined in a
+single way. We propose merge proposal as combining the two topics k1 and k2into
+a single topic k. In this case q(Cmerge|C) = 1, however, to compute the reverse
+proposal probability q(C|Cmerge) we need to create a dummy split proposal
+and compute q(C|Cmerge) = q(Cdummysplit|Cmerge) following the previously
+described split procedure.
+
+=
+
+k1
+
+k2
+
+Split-Merge Augmented Gibbs Sampling for Hierarchical Dirichlet Processes
+
+553
+
+Our split-merge procedure runs after each Gibbs iteration and at each run
+of aplit-merge procedure we either select to perform a split or merge. Till now
+we have not discussed whether a split or a merge proposal is to be evaluated.
+The simplest way to determine that by way of sampling two random words
+from the document corpus and then depending on whether they belong to the
+same topic or not we evaluate a split or merge proposal respectively. Whilst this
+scheme works ﬁne it is understood that with the increasing number of topics
+we may encounter more merge proposal being evaluated than split proposals.
+To circumvent that we propose sampling from a binary random variable with
+equal probability of selecting a merge or split proposal at each run. When a split
+proposal has to be created we ﬁrst select a topic at random and then proceed
+with splitting that topic, similarly when a merge proposal has to be created
+we select two topics at random and then proceed with the merging. From our
+experience this provides faster convergence than the naive method.
+
+4 Experiments
+
+We evaluate our proposed split-merge algorithm for HDP topic models for both
+synthetic and real world data. In all experiments, we run the normal conditional
+Gibbs sampler and the proposed split-merge augmented Gibbs sampler for the
+HDP model, with identical initialization of state space and variables. The nor-
+mal Gibbs sampler visits each document and all words within it sequentially,
+assigning each to one to an existing topic or creating a new one based on the
+predictive likelihood of the word. The split-merge augmented Gibbs sampler
+runs a Gibbs iteration followed by the split-merge procedure. A split or a merge
+is proposed based on user-deﬁned selection probability (a simple scheme is to
+have equal probability of acceptance). Depending on whether a split or merge
+has been selected, we pick two words randomly from a single topic or from two
+diﬀerent topics for split and merge respectively. We then propose the split or the
+merge and accept them based on its acceptance probability.
+
+4.1 Synthetic Data
+
+We use synthetic data to demonstrate the performance of our proposed split-
+merge augmented sampler in comparison to the simple conditional Gibbs sam-
+pler. We generate 10 topics from a vocabulary size of 10. The topics are created
+such that the ﬁrst topic uses all the words with equal probability, and the rest
+use lesser number of words, with the last topic using only a single word, as shown
+in the Fig 2a. Fig 2b shows the extracted four groups. The topic mixture for each
+group has been generated as a random simplex.
+
+Both the Gibbs sampler and the split-merge augmented Gibbs samplers are
+run for 1000 iterations and the posterior for the cluster number is shown in
+the Fig 3b and Fig 3a respectively. Whilst the naive conditional sampler fails
+to recover exact topics even after 1000 iterations, the split-merge augmented
+Gibbs Sampler is able to ﬁnd the correct number of topics within the ﬁrst 25
+
+554
+
+S. Rana, D. Phung, and S. Venkatesh
+
+Algorithm 1. Split-merge augmented Gibbs sampler for HDP
+For each iteration:
+
+– Perform Gibbs sampling using auxiliary variable scheme (Eq. 8,9, and10).
+– Choose a split or merge decision by sampling t ∼ Bern(0.5) with t = 0 indicating
+
+– If split:
+
+a split and t = 1 indicating a merge.
+• Randomly select a topic to split.
+• Split the chosen topic into two and generate zsplit using Eq. 16 and 17.
+• Resample βsplit using Eq. 9 and 10.
+• Compute the proposal likelihood ratio ( P (Csplit|βsplit)
+• Compute likelihoods ratio ( L(Csplit|x)
+) from Eq. 14.
+L(C|x)
+• Set q(C|Csplit) = 1 and compute q(Csplit|C) from Eq. 16 and 17 by multiply-
+• Compute the Metropolis Hasting ratio
+
+ing the assignment probabilities.
+
+P (C|β)
+
+) from Eq. 12 and 11.
+
+a(Csplit, C) = min[1,
+
+q(C|Csplit)P (Csplit|βsplit)L(Csplit|x)
+
+q(Csplit|C)P (C|β)L(C|x)
+
+– if merge:
+
+• Accept the split proposal with probability a(Csplit, C).
+• Set z = zsplit and β = βsplit.
+• Randomly select two topics.
+• Merge them into two and generate zmerge and resample βmerge.
+• Create a dummy split following the split algorithm as outlined above to obtain
+
+a(Cmerge, Cdummysplit) =
+q(Cdummysplit|Cmerge)P (Cmerge|βmerge)L(Cmerge|x)
+
+q(Cmerge|Cdummysplit)P (Cdummysplit|βdummysplit)L(Cdummysplit|x)
+
+min[1,
+
+• Accept the merge proposal with probability a(Cmerge, Cdummysplit).
+• Set z = zmerge and β = βmerge.
+
+(a) The 10 topics
+
+(b) The four groups.
+
+Fig. 2. Synthetic experimental set up (a) the 10 topics, (b) the 4 groups represented
+as a bag of words
+
+Split-Merge Augmented Gibbs Sampling for Hierarchical Dirichlet Processes
+
+555
+
+iterations. This is a signiﬁcant speed up. The reason the naive Gibbs sampler
+fails to separate the topic is because they are not easily separable, however,
+our algorithm is able to split topics that are hard to separate. Fig 3a shows the
+split-merge acceptance ratio after each iteration. As expected the ratio falls with
+increasing number of samples, once all 10 topics have been recovered correctly.
+The confusion matrix for the topics as recovered by the two sampling algorithms
+is shown in Fig 4. Since the ﬁrst few topics have a higher overlap, they are
+hard to separate.Thus it is nor surprising that the naive Gibbs sampling fails to
+separate them, however, our algorithm, with its capability to explore state-space
+in an eﬃcient way, is able to separate the topics.
+
+s
+r
+e
+t
+s
+u
+c
+ 
+f
+
+l
+
+o
+
+ 
+.
+
+o
+N
+
+16
+
+14
+
+12
+
+10
+
+8
+
+6
+
+4
+
+2
+
+0
+
+0
+0
+
+mode K
+K
+Split-merge acceptance ratio
+
+0.5
+
+100
+100
+
+200
+200
+
+300
+300
+
+400
+400
+
+500
+500
+
+600
+600
+
+700
+700
+
+800
+800
+
+900
+900
+
+0
+1000
+1000
+
+Iteraions
+
+o
+
+i
+t
+
+t
+
+a
+r
+ 
+e
+c
+n
+a
+p
+e
+c
+c
+a
+e
+g
+r
+e
+M
+
+ 
+
+-
+t
+i
+l
+
+p
+S
+
+(a) Combined Gibbs and Split-Merge
+sampler
+
+1
+
+10
+
+mode K
+K
+
+s
+r
+e
+t
+s
+u
+c
+ 
+f
+
+l
+
+o
+
+ 
+.
+
+o
+N
+
+8
+
+6
+
+4
+
+2
+
+0
+
+0
+
+100
+
+200
+
+300
+
+400
+
+500
+
+600
+
+700
+
+800
+
+900
+
+1000
+
+Iterations
+
+(b) Gibbs sampler
+
+Fig. 3. Posterior K on synthetic data for (a) combined Gibbs and Split-Merge sampler,
+and (b) only the Gibbs sampler
+
+Group 1
+
+Group 2
+
+Group 1
+
+Group 2
+
+Group 3
+
+Group 4
+
+Group 3
+
+Group 4
+
+Fig. 4. Confusion matrix for topic mixtures for the four synthetic groups. Naive Gibbs
+sampler is in left and the split-merge augmented sampler is in right
+
+556
+
+S. Rana, D. Phung, and S. Venkatesh
+
+4.2 Document Corpus
+
+We used NIPS abstract data and 20 News Group data to study the convergence
+of our proposed method. NIPS0-12 data is a collection of abstracts published in
+the NIPS conference from the year 1988-1999. We select 1392 abstracts consisting
+of 263K words. The Dirichlet prior is set at Dir(0.5). Both the Gibbs sampler
+and our sampler was initialized with the same initial topic distribution. We used
+random 80% of the data for topic modelling and the rest 20% data for perplexity
+computation. We run them for the same time and plot the the perplexity at each
+iteration in Fig 5a.
+
+(a) NIPS corpus
+
+(b) 20 News Group corpus
+
+Fig. 5. Perplexity on the held-out data between the Split-Merge augmented Gibbs
+sampler and the Gibbs sampler on (a) NIPS corpus and (b) on 20 News Group corpus
+
+The 20 News Group data contains 16242 documents with vocabulary size of
+100. The Dirichlet parameter is set at 0.05. Similar to above setting, we learn our
+model with a random set of 80% of documents and the remaining 20% are used
+for perplexity computation. Both the Gibbs and our algorithm are run with the
+same initialization. Perplexity at each iteration is reported in Fig 5b. Superior
+perplexity is observed, although the algorithms ran for the same time.
+
+5 Conclusion
+
+In this paper we proposed a novel split-merge algorithm for HDP based on
+the direct conditional assignement of words-to-topics. The incremental Gibbs
+sampler can often be slow to mix and may often fail to provide a good posterior
+estimate in a limited time. The split-merge sampler with its ability to make
+a bigger move across the state-space mixes faster and often lead to very good
+posterior estimates. We experimented on both synthetic and real world data
+and demonstrate the convergence speedup of the proposed combined Gibbs and
+split-merge sampler over the plain Gibbs sampling method.
+
+Split-Merge Augmented Gibbs Sampling for Hierarchical Dirichlet Processes
+
+557
+
+References
+
+1. Teh, Y., Jordan, M., Beal, M., Blei, D.: Hierarchical Dirichlet processes. Journal
+
+of the American Statistical Association 101(476), 1566–1581 (2006)
+
+2. Blei, D., Ng, A., Jordan, M.: Latent Dirichlet allocation. Journal of MachineRe-
+
+search 3, 993–1022 (2003)
+
+3. Jain, S., Neal, R.: A split-merge Markov chain Monte Carlo procedure for the
+Dirichlet process mixture model. Journal of Computational and Graphical Statis-
+tics 13(1), 158–182 (2004)
+
+4. Wang, C., Blei, D.: A split-merge mcmc algorithm for the hierarchical dirichlet
+
+process. Arxiv preprint arXiv:1201.1657 (2012)
+
+5. Antoniak, C.: Mixtures of Dirichlet processes with applications to Bayesian non-
+
+parametric problems. The Annals of Statistics 2(6), 1152–1174 (1974)
+
+6. Sethuraman, J.: A constructive deﬁnition of Dirichlet priors. Statistica Sinica 4(2),
+
+639–650 (1994)
+
+7. Teh, Y., Jordan, M.: Hierarchical Bayesian nonparametric models with applica-
+tions. In: Hjort, N., Holmes, C., Müller, P., Walker, S. (eds.) Bayesian Nonpara-
+metrics: Principles and Practice, p. 158. Cambridge University Press (2009)
+
+8. Xing, E., Sohn, K., Jordan, M., Teh, Y.: Bayesian multi-population haplotype
+inference via a hierarchical dirichlet process mixture. In: Proceedings of the 23rd
+International Conference on Machine Learning, pp. 1049–1056. ACM (2006)
+
+9. Li, L., Fei-Fei, L.: Optimol: automatic online picture collection via incremental
+model learning. International Journal of Computer Vision 88(2), 147–168 (2010)
+10. Dahl, D.: Sequentially-allocated merge-split sampler for conjugate and nonconju-
+gate dirichlet process mixture models. Journal of Computational and Graphical-
+Statistics (2005)
+
+

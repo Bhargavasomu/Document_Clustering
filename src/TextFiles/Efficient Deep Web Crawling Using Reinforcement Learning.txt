@@ -1,0 +1,1021 @@
+ 
+
+Efficient Deep Web Crawling  
+Using Reinforcement Learning 
+
+Lu Jiang, Zhaohui Wu, Qian Feng, Jun Liu, and Qinghua Zheng 
+
+MOE KLINNS Lab and SKLMS Lab, Xi’an Jiaotong University 
+
+No.28, Xianning West Road, Xi'an 710049, P.R.China 
+
+roadjiang@yahoo.com, wzh@stu.xjtu.edu.cn, qfeng@stu.xjtu.edu.cn, 
+
+liukeen@mail.xjtu.edu.cn, qhzheng@mail.xjtu.edu.cn 
+
+Abstract. Deep web refers to the hidden part of the Web that remains unavail-
+able for standard Web crawlers. To obtain content of Deep Web is challenging 
+and has been acknowledged as a significant gap in the coverage of search en-
+gines.  To  this  end,  the paper  proposes  a  novel  deep  web  crawling  framework 
+based on reinforcement learning, in which the crawler is regarded as an agent 
+and deep web database as the environment. The agent perceives its current state 
+and  selects  an  action  (query)  to  submit  to  the  environment  according  to  Q-
+value. The framework not only enables crawlers to learn a promising crawling 
+strategy from its own experience, but also allows for utilizing diverse features 
+of query keywords. Experimental results show that the method outperforms the 
+state  of  art  methods  in  terms  of  crawling  capability  and  breaks  through  the  
+assumption of full-text search implied by existing methods.  
+
+Keywords: Hidden Web, Deep Web Crawling, Reinforcement Learning. 
+
+1   Introduction 
+
+Deep  web  or  hidden  web  refers  to  World Wide  Web  content  that  is  not  part  of  the 
+surface Web, which is directly indexed by search engines. Studies [1] show deep web 
+content is particularly important. Not only its size is estimated as hundreds of times 
+larger  than  the  so-called  surface  Web,  but  also  it  provides  users  with  high  quality 
+information. However, to obtain such content of deep web is challenging and has been 
+acknowledged as a significant gap in the coverage of search engines [2]. Surfacing is 
+a common  solution to provide users  deep  web content search service1, in  which the 
+crawler pre-computes the submissions for deep web forms and exhaustively indexes 
+the response results off-line as other static HTML pages. The approach enables lever-
+aging  the  existing  search  engine  infrastructure  hence  adopted  by  most  of  crawlers, 
+such  as  HiWE  (Hidden  Web  Exposer)  [3],  Hidden  Web  crawler  [4]  and  Google’s 
+Deep Web crawler [2]. 
+
+One  critical  challenge  in  surfacing  approach  is  how  a  crawler  can  automatically 
+generate promising queries so that it can carry out efficient surfacing. The challenge 
+has been studied by several researches such as [2], [4], [5], [6], [7]. In these methods, 
+                                                           
+1 We may use crawl and surface interchangeably in the rest of the paper. 
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part I, LNAI 6118, pp. 428–439, 2010. 
+© Springer-Verlag Berlin Heidelberg 2010 
+
+ 
+
+Efficient Deep Web Crawling Using Reinforcement Learning 
+
+429 
+
+candidate  query  keywords  are  generated  from  the  obtained  records,  and  then  their 
+harvest rates, i.e. the promise to obtain new records, are calculated according to their 
+local statistics, such as DF (Document Frequency) and TF (Term Frequency). The one 
+with  the  maximum  expected  harvest  rate  will  be  selected  for  the  next  query.  Their 
+basic  idea  is  similar  while  the  difference  is  that  they  choose  different  strategies  to 
+derive the estimated harvest rate of each query candidate. 
+
+However, to the best of our knowledge, existing methods suffer from the following 
+three deficiencies. Firstly, the future reward of each query  is ignored,  which is also 
+known as “myopia problem” [8]. The next query is selected according to the harvest 
+rate defined as the immediate reward at current step. This inherent deficiency makes 
+the existing methods fail to look ahead to future steps thus cannot make a decision of 
+long-term  interest.  Secondly,  the  existing  methods  solely  utilize  the  statistic  of  ac-
+quired  data  records  while  ignoring  the  experience  gained  from  previous  queries, 
+which  usually  results  in  reducing  the  efficiency  of  crawling.  For  example  when  a 
+crawler  issues  an  unpromising  keyword  which  brings  few  or  even  no  response  re-
+cords,  as  the  acquired  data  record  hardly  accumulates,  the  statistic  of  the  data  will 
+remain the same. Therefore, it is likely that the crawler will make the same mistakes 
+in its future decisions. Finally, existing  methods relied on a critical assumption that 
+full-text  search  are  provided  by  deep  web  databases,  in  which  all  of  the  words  in 
+every  document  are  indexed.  However,  this  assumption  is  too  strong  to  hold  in  the 
+cases  of  databases  providing  non  full-text  search  interfaces,  in  which  some  words 
+appearing  on  the  pages  e.g.  noisy  words  and  template  words  are  excluded  from  the 
+index. The disagreement leads to that the existing estimation techniques for full-text 
+databases, e.g. Zipf’ Law [4], [9] can hardly be applied to non full-text databases. E.g. 
+Fig.  1  illustrates  the  keywords  distribution  on  AbeBooks  (www.abebooks.com),  in 
+which x-axis represents document frequency ranks of keywords in the data corpus and 
+y-axis denotes the percent of response records brought by the keywords. As one can 
+see, the Zipf curve fails to simulate the distribution of keyword response. 
+
+Fig. 1. Keywords distribution on AbeBooks 
+
+ 
+
+In  this  paper,  we  present  a  formal  framework  based  on  the  RL  (Reinforcement 
+Learning) [10] for deep web crawling. In the framework, a crawler is regarded as an 
+agent and deep web database as the environment. The agent perceives its current state 
+
+ 
+
+430 
+
+L. Jiang et al. 
+
+and  selects  an  action  (query)  to  submit  to  the  environment  according  to  long-term 
+reward.  The  environment  responds  by  giving  the  agent  some  reward  (new  records) 
+and changing it into the next state. Each action is encoded as a tuple using its linguis-
+tic, statistic and HTML features. The rewards of unexecuted actions are evaluated by 
+their  executed  neighbors.  Because  of  the  learning  policy,  a  crawler  can  avoid  using 
+unpromising  queries,  as  long  as  some  of  them  have  been  issued.  The  experimental 
+results on 5 real world deep web sites show that the reinforcement learning crawling 
+method relaxes the assumption of full-text search and outperforms existing methods. 
+To sum up, the main contributions of our work are: 
+
+1)  We introduce a formal framework for the deep web surfacing problem. To the 
+best of our knowledge, ours is the first work that introduces machine learning 
+approaches to the deep web surfacing problem. 
+
+2)  We formalize the problem in the framework and propose an efficient and ap-
+plicable surfacing algorithm working well on both full-text and non full-text 
+databases. 
+
+3)  We develop a Q-value approximation algorithm allows for a crawler selecting 
+a  query  according  to  the  long-term  reward,  which  overcomes  the  myopia 
+problem to some extent. 
+
+The rest of this paper is organized as follows: Section 2 gives a brief introduction of 
+related  work. Section 3 presents the  formal reinforcement  learning  framework. Sec-
+tion 4 discusses the crawling algorithm and key issues in it. The experimental results 
+are discussed in Section 5 whereas conclusions and future work are presented in the 
+final section. 
+
+2   Related Work 
+
+The sate-of-the-art deep web crawling approaches generate new keywords by analyz-
+ing statistic of current acquired records returned from previous queries. Barbosa L. et 
+al. first introduced the ideas, and presented a query selection method which generated 
+the  next  query  using  the  most  frequent  keywords  in  the  acquired  records  [5].  How-
+ever, queries with the most frequent keywords in hand do not ensure that more new 
+records are returned from the deep web database. Ntoulas A. et al. proposed a greedy 
+query selection method based on the expected harvest rate [4]. In the method, the one 
+with the maximum expected harvest rate will be selected for the next query. Ping W. 
+et al. modeled each web database as a distinct attribute-value graph and a greedy link-
+based query selection method was proposed to approximate the optimal solution [8]. 
+Lu J. et al. resolved the problem using set-covering sampling method [7]. Liu J. et al. 
+extended  the  Ntoulas’s  method  to  entire  form  by  introducing  a  novel  concept  MEP 
+(Minimum Executable Pattern). In the method, a MEP set is build and then promising 
+keywords are selected by joint harvest rate of a keyword and its pattern. By selecting 
+among  multiple  MEPs,  the  crawler  achieves  better  results  [6].  Jayant  M.  et  al.  
+improved  the  keyword  selection  algorithm  by  ranking  keywords  by  their  TFIDF 
+(Term Frequency Inverse Document Frequency) [2]. Jiang L. et al. present a method 
+to  evaluate  a  keyword  by  its  HTML  features  besides  TF  and  DF  using  supervised 
+learning [11]. 
+
+ 
+
+ 
+
+Efficient Deep Web Crawling Using Reinforcement Learning 
+
+431 
+
+3   Reinforcement Learning Framework 
+
+In this section, we propose a formal framework for the deep web crawling based on 
+RL and formalize the crawling problem under the framework. First of all we give an 
+overview of the RL framework.  
+
+Fig. 2. Overview of the reinforcement learning framework 
+
+ 
+
+The  relation  between  a  crawler  and  a  deep  web  database  is  illustrated  in  Fig.  2. 
+From the figure, one can conclude that at any given step, an agent (crawler) perceives 
+its state and selects an action (query). The environment responds by giving the agent 
+some (possibly zero) reward (new records) and changing the agent into the successor 
+state. More formally we have 
+
+Definition 1. Suppose 
+
+ and 
+
+ are two sets of states and actions respectively. A state 
+ represents the acquired portion of the deep web database records at the step  . 
+ (  for  short)  denotes  a  query  to  the  deep  web  database  with  the 
+ with 
+
+,  which  causes  a  transition  from  state 
+
+ to  some  successor  state 
+
+An  action 
+keyword 
+the probability
+
+. 
+
+Definition  2.  The  process  of  deep  web  crawling  is  defined  as  a  discrete  Decision 
+Process 
+ and  transition 
+probabilities  distribution 
+.  A  crawling  process  follows  a  specific  issue  policy 
+
+ consisting  of  a  set  of  states 
+
+,  a  set  of  actions 
+
+, which is a mapping from the set of states to the set of actions. 
+
+In the paper, we assume that the decision process is a deterministic process i.e. 
+
+ 
+is subjected to a uniform distribution. During the process, after execution of an action 
+the agent is responded by giving a collection of data records by the environment. The 
+response record can be defined as: 
+
+Definition  3.  Suppose 
+ is  the  collection  of  all  data  records  residing  in  deep  web 
+database. After execution of action 
+ 
+represents the collection of data records responded by the environment. Likewise the 
+portion of the new records in the response record set retrieved by action 
+ is 
+denoted as
+
+, the response record set
+
+ at state 
+
+ at state 
+
+ (
+
+). 
+
+ 
+
+432 
+
+L. Jiang et al. 
+
+Suppose a crawling process follows an issue policy , the portion of new records in 
+
+the response records of action 
+
+ at state 
+
+ can be formulated as 
+
+Note  that  the  response  record  set  of  an  action  is  irrelevant  to  the  state  hence 
+
+ 
+
+(1) 
+
+, 
+
+There  are 
+
+. 
+two 
+
+tion 
+cuting  action 
+from equation 
+
+important  functions 
+
+the  process.  Transition  function 
+ denotes the successor state of the given state and action. Reward func-
+ by exe-
+,  i.e.  the  portion  of  new  records  brought  by  executing ,  computed 
+
+is the reward received at the transition  from state 
+
+ to state 
+
+in 
+
+ is  either  unknown  or  cannot  be  obtained  beforehand,  the 
+Though  in  some  cases 
+absence of the value does not influence the calculation of the reward as they are rela-
+tive values to rank actions in the same baseline. 
+
+ 
+
+(2) 
+
+The transition of actions causes a cost. In the paper, the cost is measured in terms 
+is  the  cost  of  issuing  an 
+
+. 
+
+is proportional to the average time of handling a response record. 
+
+of  time  consumed,  i.e.
+action and 
+
+The expectation conditioned on the current state   and the policy 
+
+ is called state-
+
+value function
+
+ of state , computed from 
+
+ 
+
+(3) 
+
+in which 
+ is referred as the step length and 
+lices, there must exist an optimal policy, noted 
+. 
+
+). To simplify notations, we write 
+Based on the presentations above, the formal definition of deep web crawling prob-
+
+ is the discount factor. Among all po-
+, 
+
+ defined as
+
+ (
+
+lem can be defined as: 
+
+Problem.  Under  the  constraint
+
+,
+
+ that  maximizes  the  accumulative  reward  value.  Here 
+
+ find  such  policy 
+ 
+
+is the maximum cost constraint. 
+
+4   Algorithm 
+
+In this section we discuss how to resolve the deep web crawling problem defined in 
+Section 3. There are two crucial factors in solving the problem i.e. the reward of each 
+action r and the reward of an issue policy Q-value. Section 4.1 and 4.2 introduces the 
+methods  for  the  action  reward  calculation  and  Q-value  approximation  respectively. 
+Finally  an  adaptive  algorithm  for  surfacing  deep  web  is  presented  in  the  end  of  
+Section 4.2. 
+
+4.1   Reward Calculation 
+
+Before specifying the method for the action reward calculation, we need the definition 
+of the document frequency. 
+
+ 
+
+ 
+
+Efficient Deep Web Crawling Using Reinforcement Learning 
+
+433 
+
+ and  the  issue  policy 
+
+ (
+
+Definition  4.  Suppose  on  the  current  state 
+frequency  of  action 
+ denoted  by 
+number of documents containing keyword 
+
+,  the  document 
+ for  short)  is  the 
+. 
+Note that the document frequency of each action is a known statistic. Since records 
+,  the  number  of  documents 
+ can be counted up in the acquired record set. Relying on Def. 4, 
+
+of 
+containing keyword 
+the following theorem can be established. 
+
+ having  been  retrieved  at  the  step 
+
+ in acquired record set 
+
+Theorem 1. At state 
+
+, the reward of each action 
+
+ in 
+
+ can be calculated from 
+
+Proof: By incorporating Eq. (1) into Eq. (2) we have 
+
+Eq. (5) can be further rewritten as 
+
+. 
+
+. 
+
+. 
+
+(4) 
+
+(5) 
+
+(6) 
+
+The  intersection  part  in  Eq.  (6)  denotes  the  collection  of  documents  containing  the 
+keyword  of  action a in  the  data  set 
+.  According  to  the  Def.  4  the 
+value equals to the document frequency of the action, i.e. 
+
+ 
+
+(7) 
+
+Consequently the Eq. (4) could be proved by incorporating Eq. (7) into Eq. (6). 
+
+The absence of 
+
+ in Eq. (4) does not affect the final result for the same reason de-
+scribed in Section 3. According to Eq. (4) for an executed action, as response record 
+ is acquired, the reward can be calculated. In contrast, the reward calcula-
+set 
+tion for an unexecuted action directly through Eq. (4) is infeasible. Nevertheless, the 
+response  record  set  of  an  unexecuted  action  can  be  estimated  by  generalizing  from 
+those executed. Before proceeding any further, we define the action training and can-
+didate set. 
+
+Definition 5. Suppose at state 
+Similarly, candidate set 
+current state. Each action in either 
+Based on Def. 4, for an action 
+
+, training set 
+
+. 
+ is a set of available action candidates for submission in the 
+
+ is a set of executed actions, 
+
+ or 
+
+ is encoded in the same vector space. 
+
+ in 
+
+, its reward can be estimated as: 
+
+. 
+
+(8) 
+
+in which 
+two  actions.  Since  the  response  record  set 
+state 
+
+ is a kernel function used to evaluate the distance between the given 
+ of  an  action  is  irrelevant  to  the 
+ i.e. 
+. Accordingly, the intuition behind the Eq. (8) is to estimate the 
+
+,  the  response  record  set  can  be  rewritten  to  the  current  state 
+
+ 
+
+434 
+
+L. Jiang et al. 
+
+ by  evaluating  those  in 
+
+.  As  all  response  record  sets  of 
+reward  for  an  action  in 
+executed action are at the current state, the size of response record set of an action in 
+.  Once  the  size  of  
+response record set of an unexecuted is calculated by Eq. (8), the value can then be 
+applied in Eq. (4) to calculate its reward. 
+
+ can  be  learnt  from  those  sharing  the  similar  features  in 
+
+Now  the  action  rewards  for  both  executed  and  unexecuted  actions  can  be  calcu-
+lated  from  Eq.  (4).  In  the  rest  of  the  subsection,  we  will  discuss  how  to  calculate  
+ in  Eq.  (8).  Calculating  the  similarity  of  actions  requires 
+kernel  function 
+encoding them in a feature space. We incorporate three types of features i.e. linguistic 
+features, statistical features and HTML features to establish the feature space [11].  
+
+Linguistic  features  consist  of  POS  (Part  of  Speech),  length  and  language  of  a  
+keyword  (action).  Length  is  the  number  of  characters  in  the  keyword.  Language 
+represents the language that a keyword falls into. It takes effect in multilingual deep 
+web database.  
+
+Statistical features include TF (Term Frequency), DF (Document Frequency) and 
+RIDF (Residual Inverse Document Frequency) of a keyword in the acquired records. 
+The value of RIDF is computed as: 
+
+ 
+
+(9) 
+
+RIDF  tends  to  highlight  technical  terminology,  names,  and  good  keywords  and  to 
+exhibit nonrandom distributions over documents [12].  
+
+The HTML format usually plays an important role in indicating the semantics of 
+the  presented  data.  This  brings  us  to  consider  the  HTML  information  of  keywords. 
+We propose two HTML features tag-attribute and location. Tag-attribute feature en-
+codes HTML tag and attribute information of a keyword, and location represents the 
+depth of the keyword’s node in the DOM tree derived from the HTML document. The 
+features may imply the semantic information of a keyword hence is useful in distin-
+guishing unpromising keywords.  
+
+For linguistic and HTML features whose values are discrete, the liner kernel is as-
+signed.  Considering  that  value  of  statistical  feature  tends  to  a  Gaussian  distribution 
+over documents, the Gaussian kernel is adopted to evaluate similarity upon the statis-
+tical features, which is formulated as 
+
+. 
+
+(10) 
+
+The  final  kernel  function  is  hybrid  of  these  kernels.  Suppose
+
+ 
+) are weights for linguistic, HTML and statistical kernel respectively, 
+
+(
+the kernel function to evaluate similarity of two actions is 
+
+, 
+
+and 
+
+In experiments the weight of statistical features usually accounts for a larger part. 
+
+4.2   Q-Value Approximation and Surfacing Algorithm 
+
+. 
+
+(11) 
+
+Once the reward of each action is obtained, given the problem definition in Section 3, 
+the agent can find an optimal policy 
+ of each state can be calculated. The 
+calculation of 
+
+could be well solved when the agent uses Q-function [13], [14]: 
+
+ if the 
+
+ 
+
+ 
+
+Efficient Deep Web Crawling Using Reinforcement Learning 
+
+435 
+
+. 
+
+(12) 
+
+ from state  , plus the value discounted by 
+
+ represents the reward received immediately upon executing 
+ thereafter. Using Eq. (3), we can 
+
+Here Q-function 
+action 
+rewrite Q-function as 
+
+. 
+
+(13) 
+
+To  simplify  the  notion,  here  we  let 
+garded as important as those for the present. 
+length looking ahead to the future reward. If 
+Q-value equals to the immediate reward i.e. 
+represents  the  long-term  reward.  However,  as  the  action  reward  at  state 
+available at state 
+make the following assumption: assume at the current state, the action set 
+enlarge in the  next 
+reasonable. Under the assumptions, Theorem 2 could be established. 
+
+ i.e.  the  reward  for  the  future  steps  are  re-
+ is a critical parameter denoting the step 
+, the future reward is ignored and 
+, Q-value 
+ is  un-
+, the Q-value has to be approximated. To estimate the Q-value, we 
+ will not 
+ is not very large the assumption is 
+
+). When 
+
+. When 
+
+ steps (
+
+Theorem  2.  At  state 
+can be estimated as: 
+
+ when 
+
+ the  Q-value  of  an  action 
+
+ (
+
+,
+
+) 
+
+(14) 
+
+ 
+
+Proof:  To  simplify  the  notion,  let
+
+, 
+. First of all, because the action set will not enlarge, the optimal Q-
+value can be searched in the action set at the current state. According to the Eq. (13), 
+when h =1 the Q-value can be formulated as 
+
+,
+
+. 
+
+(15) 
+
+Following  the  method  described  in  Section  4.1, 
+
+ can  be  calculated;  whereas 
+
+is unknown at state 
+
+. Therefore rewrite the Eq. (15) as 
+
+. 
+
+(16) 
+
+Because  the  response  records  are  independent  with  each  others,  the  capture-mark-
+recapture [15] method can be applied to estimate the overlaps records: 
+
+Further Eq. (17) can be transformed into 
+
+By incorporating Eq. (18) into Eq. (16) we have 
+
+. 
+
+(17) 
+
+. 
+
+(18) 
+
+ 
+
+(19) 
+
+Note that according to the characteristics of response record set in Def. 3 and Eq. (5): 
+
+. 
+
+(20) 
+
+ 
+
+436 
+
+L. Jiang et al. 
+
+Following Eq. (5) and Eq. (20), Eq. (19) can be reformulated as  
+
+ 
+
+(21) 
+
+Then the Theorem 2 can be derived by incorporating Eq. (7) into Eq. (21). 
+
+As all the factors in the Eq. (14) are either calculated or can be statistically numer-
+ated, the Q-value of each action can be approximated based on the acquired data set. 
+Now,  we  can  approximate  Q-value  with  a  given  step  length  by  iteratively  applying 
+Eq. (14). Due to the lack of space, we cannot present the details here. Note if h goes 
+too  big,  the  assumption  may  not  hold  and  the  future  state  may  diverge  from  the  
+experienced state rendering the approximation for future reward imprecise.  
+
+We develop an adaptive algorithm for deep web surfacing based on the framework, 
+as  shown  in  Algorithm  1.  The  algorithm  takes  the  current  state  and  last  executed  
+action as input and outputs the next optimal action.  
+
+ 
+
+Algorithm 1: Adaptive RL surfacing algorithm 
+      Output: 
+
+ 
+
+, 
+
+following Eq.(4); 
+
+ 
+
+ in 
+
+ do 
+
+ then 
+
+Input: 
+1:   calculate the reward of action
+2:   for each document 
+3:      for each keyword 
+4:          if action 
+5          else then update TF and DF of action
+6:      end for 
+7:   end for 
+8:   change the current state to 
+9:   
+10:  for each 
+11:  for each 
+
+; 
+
+; 
+
+; 
+
+;  update candidate set
+; 
+ update its reward using Eq. (8) and Eq. (4); 
+ calculate its Q-value using Eq. (14); 
+
+; 
+
+12:  return 
+
+; 
+
+ 
+Specifically, the surfacing algorithm first calculates the reward of the last executed 
+action and then updates the action set through Step 2 to Step 7, which causes the agent 
+to transit from its state 
+. Then the training and candidate 
+set are updated in accord with the new action set in Step 9. After that the algorithm 
+estimates the reward and Q-value for each action in candidate set in Step 10 and Step 
+11 respectively. The action that maximizes Q-value will be returned as the next to be 
+executed action. 
+
+ to the successor state 
+
+5   Experiments 
+
+To demonstrate the efficiency of our proposed approach for deep web crawling,  we 
+execute our algorithm on five real world deep web databases with different scales and 
+domains. The detailed information about these databases is listed in Tab.1. In the case 
+
+ 
+
+ 
+
+Efficient Deep Web Crawling Using Reinforcement Learning 
+
+437 
+
+of  AbeBooks,  as  its  large  scale,  the  agent  restricted  to  crawling  the  “historical  fic-
+tions”  category  to  accelerate  the  experiment.  Queries  to  the  site  are  applied  to  the 
+textbox “keywords”. Regarding Wikicfp, Yahoo movie, which are the typical medium 
+Deep Web databases, we utilize the only generic search textboxes as their query inter-
+faces. As for Baidu Baike and Google Music, the sites are multilingual sites consist-
+ing  of  both  English  and  Chinese.  On  the  sites  we  select  the  rewarding  textbox  
+“Keyword Tag” and “Singer” as their query interfaces. 
+
+To compare our RL method with existing ones, we choose following three methods 
+
+as baseline methods: (Suppose at state 
+
+, the agent is to evaluate an action  ) 
+
+(cid:132)  Random [4], [7], [8]: the reward of an action is assigned to a random float i.e.  
+
+(cid:132)  GF (Generic Frequency) [5], [7], [8]: the reward of an action is evaluated by 
+
+the generic DF of the action at current state, i.e. 
+
+. 
+
+. 
+
+(cid:132)  Zipf [4], [6], [9]: The size of response record set of each action is estimated 
+ 
+
+ ,where 
+
+, 
+
+ and 
+
+by  Zipf-Mandelbrot’s  Law  [16]: 
+are parameters and 
+
+ is the DF rank of the action. 
+
+All  methods  above  (including  RL)  share  the  same  candidate  set  generation  policy 
+which selects the top 500 actions with highest RIDF. It is interesting to note that RL is 
+more  general  compared  with  the  baseline  methods.  If  future  reward  of  an  action  is 
+ignored i.e. 
+ and the reward of an action is determined by a presumed distribu-
+tion,  the  RL  degenerates  to  Zipf,  i.e. 
+.  Further  if  the  acquired  
+, the RL degenerates to the GF, 
+portion of an action is ignored too i.e. 
+i.e. 
+
+. 
+
+Table 1. Experiment web sites and their experimental results 
+
+DB Name 
+
+AbeBooks 
+Wikicfp 
+
+www.abebooks.com 
+www.wikicfp.com 
+
+Yahoo movie  movies.yahoo.com/mv/search 
+Google music 
+Baidu Baike 
+
+www.google.cn/music/ 
+
+Baike.baidu.com 
+
+URL 
+
+Domain 
+
+Harvest 
+
+Book 
+
+Conference 
+
+Movie 
+Music 
+
+Wikipedia 
+
+90,224 
+4,125 
+126,710 
+85,378 
+820,180 
+
+Estimated 
+Database 
+110,000 
+5,200 
+128,000 
+110,000 
+1,000,000 
+
+#Queries 
+
+322 
+499 
+367 
+592 
+1,950 
+
+5.1   Effectiveness of RL Method 
+
+Our interest is to discover their records as many as possible with affordable cost. To 
+make  the  results  more  intelligible,  we  roughly  use  harvest  (Fourth  column)  i.e.  the 
+number of actual retrieved records and number of queries (Sixth column) to evaluate 
+the crawling effects. Tab. 1 shows that our method is quite efficient. In the first four 
+cases  the  agent  achieves  more  than  80%  coverage  by  issuing  around  500  hundred 
+queries. 
+
+5.2   Performance Comparison with Baseline Method 
+
+We performed our  method as  well as the baseline  methods on the experiment  sites. 
+The  experimental  results  are  displayed  in  Fig.  3  in  which  the  y-axis  denotes  the  
+
+ 
+
+ 
+
+438 
+
+L. Jiang et al. 
+
+                 (a) Experiment on Baidu Baike                       (b) Experiment on Wikicfp 
+
+ 
+
+ 
+
+Fig. 3. Performance Comparisons with baseline methods 
+
+database coverage, while the x-axis represents the query number (due to the lack of 
+space we only present some results here). In experiments step length was set to 1. As 
+can be seen, the result shows that RL method is more efficient than baseline methods 
+on the experiment websites. We analyzed the queries logs and summarized two rea-
+sons accounting for excellence of RL method. Firstly because the RL method selects a 
+keyword according to the long-term rather than immediate reward, it is able to acquire 
+a  better  awareness  of  the  environment  leading  to  more  accurate  estimation  for  suc-
+ceeding  rewards.  As  we  found  in  experiments  the  rewarding  keywords  are  issued 
+earlier in RL than other methods. Secondly the keywords issued in RL are more rele-
+vant to the pattern selected, e.g. “keywords” on Baidu Baike. This suggests that the 
+agent using RL learns the experience from its previous queries and hence sticks on the 
+keywords matching against more records; whereas the agent using other methods do 
+not make any adjustment when the presumed assumption is not applied. 
+
+6   Conclusion and Future Work 
+
+In this paper we tackle the problem of deep web surfacing. The paper first presents a 
+formal reinforcement learning framework to study the problem and then introduce an 
+adaptive  surfacing  algorithm  based  on  the  framework  and  its  related  methods  for 
+reward calculation and Q-value approximation. The framework enables a crawler to 
+learn an optimal crawling strategy from its experienced queries and allows for it mak-
+ing decisions on long-term rewards. Experimental evaluation on 5 real deep web sites 
+suggests that the method is efficient and applicable. It excels the baseline method and 
+works well on both full-text and non full-text databases. In general, it retrieves more 
+than 80% of the total records by issuing a few hundreds of queries. 
+
+We  are  studying  the  issues  of  deep  web  crawling  in  practical  and  developing  an 
+open source platform for Deep Web crawling: DWIM (Deep Web Intelligent Miner). 
+DWIM is the first open source software in the respect Deep Web crawling and inte-
+grates many crawling policies and keywords selection criteria which can be used as an 
+experimental platform for researches and a crawler engine for developers.  
+
+ 
+
+ 
+
+Efficient Deep Web Crawling Using Reinforcement Learning 
+
+439 
+
+Acknowledgement 
+
+The research was supported by the National High-Tech R&D Program of China under 
+Grant  No.2008AA01Z131,  the  National  Science  Foundation  of  China  under  Grant 
+Nos.60825202, 60803079, 60633020, the National Key Technologies R&D Program 
+of China under Grant Nos.2008BAH26B02, 2009BAH51B00, the Open Project Pro-
+gram of the Key Laboratory of Complex Systems and Intelligence Science, Institute 
+of  Automation,  Chinese  Academy  of  Sciences  under  Grant  No.  20080101,  Cheung 
+Kong Scholar’s Program. 
+
+References 
+
+1.  Lawrence, S., Giles, C.L.: Searching the World Wide Web. Science 280, 98–100 (1998) 
+2.  Madhavan, J., Ko, D., Kot, L., Ganapathy, V., Rasmussen, A., Halevy, A.: Google’s Deep-
+Web  Crawl.  In:  Proceedings  of  VLDB  2008,  Auckland,  New  Zealand,  pp.  1241–1252 
+(2008) 
+
+3.  Raghavan,  S.,  Garcia-Molina,  H.:  Crawling  the  Hidden  Web.  In:  Proceedings  of  VLDB 
+
+2001, Rome, Italy, pp. 129–138 (2001) 
+
+4.  Ntoulas,  A.,  Zerfos,  P.,  Cho,  J.:  Downloading  Textual  Hidden  Web  Content  through  
+
+Keyword Queries. In: Proceedings of JCDL 2005, Denver, USA, pp. 100–109 (2005) 
+
+5.  Barbosa,  L.,  Freire,  J.:  Siphoning  Hidden-Web  Data  through  Keyword-Based  Interfaces. 
+
+In: Proceedings of SBBD 2004, Brasilia, Brazil, pp. 309–321 (2004) 
+
+6.  Liu, J., Wu, Z.H., Jiang, L., Zheng, Q.H., Liu, X.: Crawling Deep Web Content Through 
+
+Query Forms. In: Proceedings of WEBIST 2009, Lisbon, Portugal, pp. 634–642 (2009) 
+
+7.  Lu,  J.,  Wang,  Y.,  Liang,  J.,  Chen,  J.,  Liu,  J.:  An  Approach  to  Deep  Web  Crawling  by 
+Sampling.  In:  Proceedings  of  IEEE/WIC/ACM  Web  Intelligence,  Sydney,  Australia,  pp. 
+718–724 (2008) 
+
+8.  Wu, P., Wen, J.R., Liu, H., Ma, W.Y.: Query Selection Techniques for Efficient Crawling 
+
+of Structured Web Source. In: Proceedings of ICDE 2006, Atlanta, GA, pp. 47–56 (2006) 
+
+9.  Ipeirotis, P., Gravano, L.: Distributed search over the hidden web: Hierarchical database 
+
+sampling and selection. In: VLDB 2002, Hong Kong, China, pp.394–405 (2002) 
+
+10.  Kaelbling, L.P., Littman, M.L., Moore, A.W.: Reinforcement learning: A survey. Journal 
+
+of Artificial Intelligence Research 4, 237–285 (1996) 
+
+11.  Jiang,  L.,  Wu,  Z.H.,  Zheng,  Q.H.,  Liu,  J.:  Learning  Deep  Web  Crawling  with  Diverse  
+Features. In: Proceedings of IEEE/WIC/ACM Web Intelligence, Milan, Italy, pp. 572–575 
+(2009) 
+
+12.  Yamamoto, M., Church, K.W.: Using suffix arrays to compute term frequency and docu-
+ment  frequency  for  all  substrings  in  a  corpus.  Computational  Linguistics 27(1),  1–30 
+(2001) 
+
+13.  Watkins, C.J., Dayan, P.: Q-learning. Machine Learning 8, 279–292 (1992) 
+14.  Ratsaby,  J.:  Incremental  Learning  with  Sample  Queries.  IEEE  Trans.  on  PAMI 20(8),  
+
+883–888 (1998) 
+
+15.  Amstrup, S.C., McDonald, T.L., Manly, B.F.J.: Handbook of capture–recapture analysis. 
+
+Princeton University Press, Princeton (2005) 
+
+16.  Mandelbrot, B.B.: Fractal Geometry of Nature. W. H. Freeman and Company, New York 
+
+(1988) 
+
+17.  Sutton,  R.C.,  Barto,  A.G.:  Reinforcement  learning:  An  Introduction.  The  MIT  Press,  
+
+Cambridge (1998) 
+
+ 
+
+

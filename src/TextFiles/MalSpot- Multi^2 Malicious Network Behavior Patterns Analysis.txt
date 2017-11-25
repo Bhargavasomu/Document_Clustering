@@ -1,0 +1,883 @@
+MalSpot: Multi2 Malicious Network Behavior
+
+Patterns Analysis
+
+Ching-Hao Mao1, Chung-Jung Wu1, Evangelos E. Papalexakis2, Christos
+
+Faloutsos2, and Kuo-Chen Lee1
+
+1 Institute for Information Industry, Taipei, Taiwan
+
+2 Cargegie Mellon University, Pittsburgh, PA, USA
+
+{chmao,cklonger,kclee}@iii.org.tw
+{epapalex,christos}@cs.cmu.edu
+
+Abstract. What are the patterns that typical network attackers ex-
+hibit? For a given malicious network behaviors, are its attacks spread uni-
+formly over time? In this work, we develop MalSpot, multi-resolution
+and multi-linear (Multi2) network analysis system in order to discover
+such malicious patterns, so that we can use them later for attack detec-
+tion, when attacks are concurrent with legitimate traﬃc. We designed
+and deployed MalSpot, which employs multi-linear analysis with dif-
+ferent time resolutions, running on top of MapReduce (Hadoop), and we
+identify patterns across attackers, attacked institutions and variation of
+time scales. We collect over a terabyte of proven malicious traces (along
+with benign ones), from the Taiwanese government security operation
+center (G-SOC) , during the entire year of 2012. We showcase the eﬀec-
+tiveness of MalSpot, by discovering interesting patterns and anomalies
+on this enormous dataset. We observed static and time-evolving pat-
+terns, that a vast majority of the known malicious behavior seem to
+follow.
+
+Keywords: multi-resolution, tensor, anmoaly detection, multi-linear, uncorre-
+lated levels
+
+1
+
+Introduction
+
+In today’s wide interconnected world, malicious network attacks have a long
+incubation period, and as a result, existing state-of-the-art information secu-
+rity/data analysis mechanisms ﬁnd it very challenging to compete against those
+attacks in a timely manner. Information security monitoring enterprises have
+limited information and, hence, fail to see the big picture of the attacks that are
+being orchestrated. However, due to it’s immense scale, the Internet provides us
+with a large variety of data, both structured (e.g. logs), as well as unstructured,
+that can be used in aid of information security analysis. Thus, today’s Internet’s
+scale calls for big data analysis techniques. The main focus of the present work is
+
+to investigate large-scale and stealthy malware behaviour. Our analysis is based
+on considerable number of logs from real security information event management
+systems.
+
+Detection of stealthy attacks is particularly challenging, since, statistically,
+they are hard to distinguish from normal connections. Furthermore, obtaining
+attack data (e.g. through a network sniﬀer or a honeynet) poses challenges in its
+own right. Dainotti et al.[1] employ a horizontal scan of the entire IPv4 address
+space, in order to detect attacks created by the Sality botnet. Chen et al.[8] pro-
+pose a scalable network forensic mechanism for stealthy, self-propagating attack
+detection; However, both these state-of-the-art methods are specialized in terms
+of the attacks they target. Therefore, there is still need for a tool that is able
+to identify attacks without speciﬁc assumptions of their characteristics or their
+behaviour/propagation pattern.
+
+Key to the discovery of malicious patterns is the summarization of the net-
+work behaviour, characteristics, and propagation of a connection. Therefore, we
+need a systematic and scalable approach which is able to eﬀectively summarize
+large heterogeneous pieces of data that represent diﬀerent aspects of the network.
+Such tools can be drawn from time evolving graph mining and tensor analysis
+literature. In particular tensors or multi-dimensional arrays have appeared in nu-
+merous interesting application including clustering, trend & anomaly detection
+[6], and network forensics [3]. In [13] the authors propose GigaTensor, a scalable,
+distributed algorithm for large scale tensor decomposition. In this work, we lever-
+age GigaTensor to the end of stealthy malware detection, without assuming prior
+knowledge on the malware’s behaviour.
+
+A more formal deﬁnition of the problem at hand is as follows
+
+Problem 1. Attack Patterns Discovery in MalSpot
+– Given: (1) intrusion detection system (IDS) event logs, recording (cid:104) event name,
+
+timestamp, target ip (cid:105) (2) Honeynet ﬁrewall logs, recording (cid:104) source ip, tar-
+get ip, timestamp (cid:105)
+
+– Find: (1) the suspicious and common patterns in all three modes/aspects
+of the data, (2) provide an intuitive visualization of the above patterns, and
+(3) scale up in millions of nodes in our network.
+
+Guided by the format of the data at hand, we propose MalSpot which
+choses to formulate the problem as multi-linear solution as well as tensor anal-
+ysis. Additionally, we propose to experiment with the granularity of the time
+window in our data; hence, we propose a multi-resolution approach, which will
+be able to identify diﬀerent types of anomalies, in uncorrelated levels of temporal
+granularity.
+
+Deﬁnition 1 (Uncorrelated Levels) Two diﬀerent levels of temporal gran-
+ularity are called uncorrelated, if the network behavior in those levels, for a
+particular node, or set of nodes, is signiﬁcantly diﬀerent. For instance, a set of
+nodes may experience diﬀerent patterns in network traﬃc in an hourly scale, as
+opposed to a daily scale.
+
+By leveraging multi-level, multi-linear analysis of the aforementioned data,
+we are able to conduct scalable and eﬃcient anomaly detection. Our main con-
+tributions are the following:
+
+– Design of the MalSpot system: leveraging hadoop, our proposed system
+can scale up to arbitrarily big datasets, and it is scales near linearly with
+the network trace size (number of non-zero entries).
+
+– Discoveries: we report that attacks come in diﬀerent ﬂavours: there are, for
+example, attacks that are particularly short in time and stop showing after
+a period of time, while other attacks are more persistent, or focus only on a
+speciﬁc port.
+
+The beneﬁt from using MalSpot as opposed to standard techniques is the fact
+that by doing so, we are able to detect correlations of entities participating in
+a heterogeneous network for a very long term, and additionally detect multi-
+aspect correlations of entities (e.g. using the port number as a dimension), the
+comparison is as shown in Table 1.
+
+Table 1. Qualitative analysis of commercial SIEM event analysis packages, as com-
+pared to our proposed method.
+
+Time Granularity
+
+MalSpot
+Splunk
+ArcSight (HP)
+
+Second to Year
+Second to Day
+Second to Min
+
+Anomaly
+Detection
+(cid:88)
+x
+x
+
+Pattern
+Discovery
+(cid:88)
+x
+x
+
+The rest of this paper is organized as follows: related work is outlined in
+Section 2. We ﬁrst elaborate on MalSpot, in Section 3, we then provide ex-
+perimental studies in Section 4. Finally, Section 5 concludes the discussion and
+highlights future directions.
+
+2 Related Work
+
+For handling huge collections of time-evolving events, [9] proposes a multi-
+resolution clustering scheme for time series data using k-means clustering and
+progressively renes the clusters. In order to discover the streaming pattern in
+multiple time-series, [11] propose SPIRIT (Streaming Pattern dIscoveRy in mul-
+tIple Time-series) which can incrementally ﬁnd correlations and hidden variables
+by means of using principal components analysis (PCA) and singular value de-
+composition (SVD) to summarize the key trends in the entire stream collection.
+In [10] the authors propose TriMine which consider multiple features to provide
+hidden topics modeling and forecast future events. In [4] the authors apply SVD
+
+to compress sensor data sequences by decomposing them into local patterns and
+weight variables.
+
+Tensors and tensor decompositions have been extensively used in a vari-
+ety of ﬁelds, including but not limited to Data Mining, Chemometrics, Signal
+Processing and Psychology. A concise review of tensor decompositions in the
+literature can be found in [5]. In this particular work, we focus on the so called
+CP/PARAFAC decomposition, however, [5] provides an overview of the entire
+variety of decompositions that have been introduced.
+
+In the immediate ﬁeld of interest, anomaly detection, there has been a fair
+amount of tensor applications. In particular, [2] develop a decomposition model
+that is suitable for stream data mining and anomaly detection. The authors of
+[6] introduce a scalable anomaly detection framework using tensors. In [12] the
+authors perform anomaly detection in a (source IP, destination IP, port number)
+dataset, and in [7] the authors operate on (source IP, destination IP, port number,
+timestamp) dataset. Finally, in [3] the authors propose a framework for anomaly
+detection in multi-aspect data that is based in tensor decompositions.
+
+In terms of scalable tensor decompositions, [12] proposes a fast, sparse and
+approximate method that scales very well mostly in multicore environments.
+In [13], the authors propose a MapReduce, scalable and distributed algorithm
+for CP/PARAFAC; this suits better our purpose, since our data resides in a
+distributed ﬁle system.
+
+3 MalSpot
+
+In this section, we describe the MalSpot, an approach for ﬁnding the pat-
+tern in huge data from scalable design. The MalSpot has two modes, i.e.,
+single-resolution mode and multi-resolution mode based on multi-linear analysis
+process. The notations are shown in Table 2.
+
+Initially, given the data description, provided a few lines above, we are able
+to form three mode tensors, whose non-zero entries correspond to the non-zero
+entries of the network logs. Since the logs record counts of events, and due to
+high data skew, it is often the case that a few set of connections will outnumber
+the rest of the connections, in terms of counts. To that end, we have two choices,
+in order to alleviate this issue: We may, either, make our data binary, where the
+tensor, we may take the logarithm of the counts, so that we compress very big
+values.
+Tensor formulation of our problem
+
+In order to form a tensor out of the data that we posses, we create a tensor
+entry for each (i, j, k) triple of, say (source IP, target IP, timestamp) that exists
+in our data log. The choice for the value for each (i, j, k) varies: we can have the
+raw counts of connections, we can compress that value (by taking its logarithm),
+or we can simply indicate that such a triplet exists in our log, by setting that
+value to 1.
+
+Tensor decomposition leverages multi-linear algebra in order to analyze such
+high-order data. The canonical polyadic (CP) or PARAFAC decomposition we
+
+Table 2. Table of Symbols
+
+Notations
+
+Deﬁnitions and Descriptions
+
+D
+
+x1,x2,x3
+A, B, C
+X
+C
+
+R
+k
+λ
+k-means(M,k)
+GigaTensor(χ)
+⊕
+Cov(G+, G∗)
+
+raw data from diﬀerent types of information security logs with three
+diﬀerent kinds of features
+the three features deﬁned in data D
+tensor factor matrices, associated with x1, x2 and x3
+the 3-mode tensor
+covariance matrix for measuring the prioritizing of investigation from
+clusters
+the rank for tensor decomposition
+the number of clusters given for the malicious patterns clustering
+the threshold of the top-n selected result
+scalable k-means algorithms given matrix M
+scalable tensor decomposition [13]
+string concatenation
+covariance measures between clustering groups G+ and G∗
+
+employ can be seen as a generalization of the Singular Value Decomposition
+(SVD) for matrices. CP/PARAFAC decomposes a tensor to the weighted sum
+of outer products of mode-speciﬁc vectors for a 3-order tensor. Formally, for an
+M-mode tensor X of size {I1×I2×···×IM}, its CP/PARAFAC decomposition of
+r where ◦ denotes
+
+rank R yields X ≈(cid:80)R
+the outer product, and(cid:81) is in the sense of vector outer product multiplication
+
+) =(cid:80)R
+
+(cid:81)M
+
+r=1 λ(a(1)
+
+r ◦ ...◦ a(M )
+
+r
+
+r=1
+
+m=1 a(m)
+
+(and not in the traditional multiplication operation).
+
+3.1 Network Malicious Behavior Decomposition
+
+Given the data description, provided a few lines above, we are able to form three
+mode tensors, whose non-zero entries correspond to the non-zero entries of the
+network logs. Since the logs record counts of events, and due to high data skew,
+it is often the case that a few set of connections will outnumber the rest of the
+connections, in terms of counts. To that end, we have two choices, in order to
+alleviate this issue: We may, either, make our data binary, where the tensor,
+instead of counts, stores 1 or 0, depending on whether a speciﬁc triplet exists in
+the logs, or, we may take the logarithm of the counts, so that we compress very
+big values.
+Introduction to tensors
+
+We start by introducing a few deﬁnitions. A tensor is essentially a multi-
+dimensional extension of a matrix; more precisely, a n-mode tensor is a structure
+that is indexed by n indices. For instance, a 1-mode tensor is a vector, a 2-mode
+tensor is a matrix, and a 3-mode tensor is a cubic structure. In this work, we
+focus on three-mode tensors, however, given the appropriate data, we can readily
+extend our techniques to higher modes.
+
+Tensor formulation of our problem
+
+In order to form a tensor out of the data that we posses, we create a tensor
+entry for each (i, j, k) triple of, say (source IP, target IP, timestamp) that exists
+in our data log. The choice for the value for each (i, j, k) varies: we can have the
+raw counts of connections, we can compress that value (by taking its logarithm),
+or we can simply indicate that such a triplet exists in our log, by setting that
+value to 1.
+
+The X is no longer approximate if R is equal to rank(X), however, we often
+want to decompose X to R (cid:28) rank(X), so that we force similar patterns to
+map to the same low rank basis. Forcing R to be small is key to our application,
+because in this way, we force connections behaving similarly to map to the same
+low rank subspace.
+
+3.2 Single Resolution Mode in MalSpot
+
+We obtain suspicious patterns via scalable tensor decomposition, as mentioned
+in previously. In order to ﬁnd out the groups of similar patterns, we use a scalable
+k-means implementation, in MapReduce, so that we cluster diﬀerent malicious
+patterns, produced by the tensor decomposition. For the cluster, we choose to
+use the cosine similarity (or rather its inverse) as a distance measure. The cosine
+distance we used in this study is shown as similarity(p, q) = cos(θ) = p·q
+(cid:107)p(cid:107)(cid:107)q(cid:107)
+where p and q are pairs of columns of the factor matrices A, B or C, produced
+by the decomposition.
+
+Algorithm 1: MalSpot algorithm (single-resolution mode)
+
+Input: Dataset D with x1,x2 and x3, with size of l, m and n, and a
+
+decomposition rank R, clustering number k
+
+Output: Prioritized malicious patterns groups G
+/* step 1: Tensor Construction
+MapReduce:
+key ← x1 ⊕ x2 ⊕ x3
+Map (cid:104) key , 1 (cid:105) ← D
+Tensor X ← Reduce (cid:104) key , count (cid:105), i=1 to |D|
+/* step 2: Decomposition
+(cid:104)A[l×R], B[m×R], C[n×R](cid:105) ← GigaT ensor(X)
+/* step 3: Clustering and Ranking
+ai ∈ columns of A, i = 1...R ← k-means(A, k)
+bi ∈ columns of B, i = 1...R ← k-means(B, k)
+ci ∈ columns of C, i = 1...R ← k-means(C, k)
+{GA | {G1
+{GB | {G1
+{GC | {G1
+
+A}} ← PrioritizeCov(a,λ)
+B}} ← PrioritizeCov(b,λ)
+C}} ← PrioritizeCov(c,λ)
+
+A,...,Gk
+B,...,Gk
+C ,...,Gk
+
+1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+
+8
+
+9
+
+10
+
+11
+
+*/
+
+*/
+
+*/
+
+After clustering, we obtain diﬀerent groups of connections, as summarized
+by decomposing X. Prioritization of each group is helpful for recommending
+groups of anomalous connections to domain experts, for further inspection.
+(cid:80) (G+
+The covariance distance between two clusters G+ and G∗ as Cov(G+, G∗) =
+ters ; we then rank the groups according to(cid:80)k
+.We use the covariance matrix C[k×k] to store all-pairs of clus-
+i=1 C(:, i) and choose the top-k∗
+
+i −G+)(G∗
+
+i −G∗)
+
+n−1
+
+to show to a domain expert, for further inspection.
+
+3.3 Multi Resolution Mode in Malspot
+
+As opposed to the single-resolution mode MalSpot, the multi-resolution version
+takes signiﬁcant changes among diﬀerent temporal granularities into account, in
+order to identify pieces of the data that bear the uncorrelated levels characteristic.
+In order to introduce the multi-resolution mode of MalSpot, let T1, T2, . . . , Tn
+be the diﬀerent time granularities (i.e., hourly, daily, weekly and so on). For
+each Ti, there are k clusters denoted by Gj
+i (j = 1 to k). In order to identify
+uncorrelated levels among these diﬀerent temporal levels of resolution, we use
+the adjacency matreix of Gi, which we denote by Ai. A detailed outline of the
+procedure we follow is shown in Algorithm 2.
+
+Algorithm 2: MalSpot algorithm - (multi-resolution mode)
+Input: For each time scale Ti we have a set of k clusters Gi = {Gj
+
+j=1 Gj
+
+i = D and Gm
+
+i
+
+i = ∅∀m (cid:54)= n
+
+where(cid:83)k
+
+(cid:84) Gn
+
+i | j = 1 to k}
+
+degree of similarity between Fi(a) and Fi+1(a).
+
+Output: data Ni,i+1 that change clusters from Ti to Ti+1 and Ii,i+1(a) the
+/* step 1: Generating Adjacency matrices Ai = {amn} of Gi
+Calculate amn according to (1)
+/* step 2: Generating reduced adjacency matrices Areduce
+Calculate a(cid:48)
+/* step 3: Find data Ni,i+1 that change clusters from Ti to Ti+1
+*/
+Adiﬀ
+Find the minimum number of lines L = {(p, l)} where l represents row number
+or column number that cross the nonzero rows or columns of Adiﬀ
+, p represents
+nonzero row or column entry of I.
+Ni,i+1 ← {p|(p, l) ∈ L for some l}
+/* step 4: Calculate the probability of migration of each datum
+Calculate Ii,i+1(a)∀i and ∀a according to (4)
+
+mn according to (2)
+i+1 − Areduce
+
+i = Areduce
+
+= {a(cid:48)
+
+mn}
+
+*/
+
+*/
+
+i
+
+*/
+
+i
+
+i
+
+1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+(cid:83)k
+
+In Algorithm 2, we have a set of k clusters Gi = {Gj
+i | j = 1 to k} where
+j=1 Gj
+i = D, which are generated iteratively from diﬀerent temporal resolu-
+tions. In the ﬁrst step, we use the adjacency matrices Ai = {amn} in order to
+record whether a member of a cluster changes its cluster assignment between
+diﬀerent resolutions, as shown in Eq. 1
+
+(cid:40)
+
+a.
+
+b.
+
+ 1,
+
+0,
+
+amn ←
+
+if m < n and data m and n are in the same cluster
+
+if m = n and data m itself forms a cluster
+
+(1)
+
+otherwise
+
+(cid:40)
+
+In order to reduce the computational complexity, we summarize the the re-
+mn}, by employing the characteristics
+
+duced adjacency matrices as Areduce
+of transitivity among clusters as shown in Eq. 2.
+
+= {a(cid:48)
+
+i
+
+mn ←
+a(cid:48)
+
+if amn = 1 and apn = 0 ∀p > m
+otherwise
+
+1,
+
+0,
+
+(2)
+
+Fi(a)(cid:84) Ni,i+1 (C denotes change), Ci←i+1(a) = Fi+1(a)(cid:84) Ni,i+1, Ri→i+1(a) =
+
+Let Fi be a function that maps the data in time scale Ti to its cluster. That
+is, Fi : D (cid:55)→ Gi s.t. Fi(a) = Gj
+i . For any a ∈ D, denote Ci→i+1(a) =
+Fi(a)\Ni,i+1 = Fi(a) − Oi→i+1(a) (R denotes that the assignment remain the
+same), Ri←i+1(a) = Fi+1(a)\Ni,i+1, the conditions considering change or no
+change are shown in Eq. 3.
+
+i iﬀ a ∈ Gj
+
+Si,i+1(a) ←
+
+Ci←i+1(a),
+
+Ri←i+1(a),
+
+if a ∈ Ni,i+1
+if a /∈ Ni,i+1
+
+(3)
+
+Ii,i+1(a) is the degree of similarity between Fi(a) and Fi+1(a) is as shown in
+
+Equation (4).
+
+(cid:92)
+(cid:92)
+
+Ri→i+1(a)
+
+ Ci→i+1(a)
+(cid:80)
+(cid:80)
+
+Ii,i+1(a) =
+
+a∈Si,i+1(a) pi,i+1(a)
+a∈Fi+1(a) pi,i+1(a)
+
+where the pi,i+1(a) is given as in Eq. 5.
+
+pi,i+1(a) ← |Si,i+1(a)| − 1
+
+4 Experiments
+
+(4)
+
+(5)
+
+In this section we show the eﬀectiveness of MalSpot in detecting anomalous
+behavior in diverse settings of information security logs, i.e., Security Opera-
+tions Center (SOC) event logs and Honeynet ﬁrewall logs. We design all the
+experiments in order to answer the following questions:
+
+– Q1: Malicious pattern discovery: how can MalSpot eﬀectively identify
+malicious events in a variety of sites or for a long term. Especially, how eﬀec-
+tive is MalSpot in detecting random scanning, and hit-list scan behavior?
+– Q2: Providing insights to domain experts: what is an intuitive and
+concise way of presenting the detected anomalies to domain experts and
+network administrators, so that they can, in turn, validate our methodology,
+as well as further investigate a set of attacks.
+
+4.1 Dataset and Environment
+
+As we mention in the problem deﬁnition, we analyze data coming from three
+diﬀerent sources. We use three diﬀerent types and sources of datasets in our
+experiments to demonstrate MalSpot performances. These two datasets are
+1) a Honeynet dataset, 2) an intrusion detection system (IDS) events dataset
+from Taiwan government; we summarize the datasets in Table 3. The Honeynet
+dataset was collected especially for the purposes of this work, using the Honeynet
+project system from 10 distributed sites in Taiwan3. The IDS events dataset is
+collected from the Security Operation Center of the Taiwanese government, for
+the entire year of 2012. This dataset includes the IDS triggered alerts from 61
+government institutes with 4,081 types of events. These types of events can be
+categorized into 39 classes, Of which 33 classes of attack is deﬁned by Snort IDS,
+the other 6 classes are custom by us (including: blacklist, high threat malware
+behavior and so on). In total, the SOC dataset contains 828,069,066 events, the
+dataset details could be shown as Table 3. .
+
+Table 3. Datasets harvested & analyzed
+
+Dataset
+Honeynet
+
+G-SOC
+(Type)
+G-SOC(Cat) Taiwan oﬃcial
+
+institutes IDS
+
+Description
+Gathered from 10 distributed
+Honeynet sensors in Jan. 2013
+Taiwan oﬃcial
+events in 2012
+
+institutes IDS
+
+Dimension
+368K x 64K x 31
+
+Nonzeros
+3243K
+
+[8187, 361, 52, 12] x 4081 x
+61
+[8187, 361, 52, 12] x 39 x 61 1742K
+
+800M+
+
+events in 2012
+
+We leveraged the scalability of GigaTensor[13] in 16 nodes of a Hadoop cluster
+where each machine has 2 quad-core Intel 2.83 GHz CPU, 8 GB RAM, and
+2 Terabytes disk. The Apache Mahout(Scalable Machine Learning and Data
+Mining)4 version 0.7 is used for supporting clustering algorithms.
+
+4.2 Analysis of the Honeynet data
+
+For this dataset, we set R = 5 as the low rank of the tensor decomposition; after
+decomposing the tensor, we obtain three factor matrices each representing one
+of the three modes of our data: source IP, target IP and timestamp respectively.
+Each column of those factor matrices corresponds to one out of the R latent
+groups, in our low rank representation of the data. Based on this low rank
+embedding of the data, we compare pairs of columns for each factor matrix, in
+order to detect outliers. For example, given the factor matrix A that corresponds
+to the source IP, if we plot, say, columns 1 and 2 against each other, we will see
+
+3 Honeynet project, http://www.Honeynet.org/
+4 Apache Mahout, http://mahout.apache.org/
+
+a scatterplot that contains one point for each source IP; given this scatterplot,
+we are able to detect the outliers. We henceforth refer to the ’score’ for each
+source IP (or any other entity associated to a particular mode of a tensor), as
+expressed by the values of the columns of the corresponding factor matrix, as
+TensorScore. We show our most outstanding results in Figure 1.
+
+(a)
+
+(b)
+
+(c)
+
+Fig. 1. Scatter plot in Honeynet result from both attackers and victims views. (a) In
+1st-2nd concept of source IP view, we observe three diﬀerent cases, case A is POP3
+(port 110) brute force attacks, and case C is port scanning in port 25. Case B contains
+a lot of instances but cannot be separated in this plot ; (b) In 2nd3rd concept sof
+source IP view, case C and D appear in this plot which is medium scale of scanning
+behavior, using ports 22, 23, 135 and 445; (c) In 4th-5th concepts of source IP view,
+case E appears which represents another scanning behavior.
+
+According to the scatterplots obtained from tensor analysis, in Figure 1(a)-
+(c), we may observe the relative attackers’ relations according to diﬀerent direc-
+tions of the TensorScore. In Figure 1(a), we found two outliers (denoted as A
+and C) out of three clusters. After further inspection of the participating of the
+attacks, we found out that the attackers in group A are focused on port port 110
+and perform POP3 probing. The attackers in group C attempted to use ports
+50 79 aiming to perform a large scale port scan. Both attack groups (A and C)
+appear only on a single day (January 10th and January 25th respectively). In
+Figure 1(b) and (c), we are able to discover a new set of anomalies, as we choose
+a diﬀerent couple of latent factor vectors to obtain the TensorScore from. In
+attack group D, we were able to identify an attacker who attempted to trigger
+14,652 connections to 236 target Honeynet system IP addresses, with a duration
+of 8 days. We present the attacks that belong to group E; those attacks focus
+on a particular Microsoft Network security vulnerability that is associated with
+ports 139 and 445.
+
+4.3 IDS Event Result
+
+The IDS events consist of an entire year’s worth of data, collected by the G-SOC
+of Taiwan in 2012. The single resolution mode of MalSpot use the day scale
+
+granularity to analyze these logs. In Fig. 2(a), we illustrate the two groups that
+MalSpot was able to spot in the IDS event logs. The ﬁrst group is associated
+with the Web and native IDS event rules, whereas the second group is related
+to the blacklist-based event rules.
+
+We proceed to the second step of our analysis, by setting k = 5 and cluster
+the tensor decomposition latent groups as shown in Fig. 2(b). This post-analysis,
+forces hosts with similar characteristics to end up in the same cluster. For in-
+stance, cluster 1 contains a vast number of hosts that are related to a large scale
+government institute. In clusters 4 and 5, we mostly observe service-oriented
+information systems tend.
+
+(a)
+
+(b)
+
+Fig. 2. IDS alert events scatterplot: (a) In 3rd-4th concept of event view (IDS alerts),
+we observe three diﬀerent cases, part of alerts are triggered more often and part of them
+triggered rarely; (b) from the organization’s view, we can see 5 groups are clustered
+together.
+
+In order to evaluate the multi-resolution nature of MalSpot, we select 4
+diﬀerent time resolutions, i.e., hour, day, week and month, and seek to identify
+the uncorrelated levels. The result is shown as Fig. 4. In fact, hosts A, B and C
+are grouped as the same cluster in both hourly and daily levels. MalSpot is able
+to select the uncorrelated levels for B and C in weekly and monthly granularities,
+respectively.
+
+In Fig. 3, we use event classes with 4 diﬀerent temporal resolutions to identify
+uncorrelated levels of activity, for various institutes. We identify that institute
+A has an uncorrelated level of activity between weekly and daily granularity,
+as opposed to institutes B and C. From further investigation, institute A has
+suﬀered from a ”system-call detect” event class during the uncorrelated time
+period (e.g., B and C have a uniform distribution of activity during the entire
+year, but A is skewed towards early 2012). Additionally, MalSpot oﬀers huge
+savings in computational time in order to detect the aforementioned attacks,
+when compared to competing methods.
+
+Based on the Fig. 4 (a), we plot the scatter-plots from the hour and week (X-
+axis) versus the triggered event types (Y-axis). We observed a critical diﬀerence
+
+(a)
+
+(b)
+
+Fig. 3. Scatter plot of diﬀerent time resolutions of G-SOC(cat) dataset. Each point in
+the scatter-plot denotes an institution. (a) day resolution and (b) week resolution.
+
+between institute A and institutes B, C with respect to attack periodicity. Insti-
+tutes B and C suﬀered so-called ”WEB-MISC TOP10.dll access” attacks 5 while
+A did not. Fig. 5 shows detail time-event scatter plots. Therefore, MalSpot
+identiﬁes potential malicious behavior between hosts A and B, C employing the
+notion of uncorrelated levels. Host A suﬀered periodic attacks targeted on the
+Windows OS (Windows ANI File Parsing Buﬀer Overﬂow (MS05-002)), whereas
+the periodic attacks of host B and C were concentrated on a malicious relay sta-
+tion.
+
+(a)
+
+(b)
+
+Fig. 4. (a) Scatter plot of diﬀerent time resolutions. Each point in scatterplot denotes
+an institution. (b) The scalability of MalSpot, as the input size grows.
+
+5 This event is generated when an attempt is made to exploit a buﬀer overﬂow in the
+
+Trend Micro InterScan eManager.
+
+−0.1−0.0500.050.10.15−0.200.20.40.60.81st2ndhour−0.200.20.40.60.8−0.4−0.200.20.40.61st2ndday−0.200.20.40.6−0.100.10.20.30.40.50.61st2ndweek−0.200.20.40.6−0.200.20.40.60.811.21st2ndmonthBCABAACAB CC*B*UncorrelatedUncorrelated678934Log10(Number of Tensor Size)Log10(Run Time in Second)  Malspot(a) Host A (hour)
+
+Host B (hour)
+
+Host C (hour)
+
+(a) Host A (week)
+
+Host B (week)
+
+Host C (week)
+
+Fig. 5. Scatter plot of diﬀerent time resolutions. (X-axis is time scale and Y-axis is
+event types). We can see the diﬀerence in the distribution of scatterplots.
+
+5 Conclusion
+
+In this work, we develop a big data analytics system in order to discover mali-
+cious patterns in a variety of network/malware propagation settings, so that we
+can further use them for attack detection and prevention, when attacks are con-
+current with legitimate traﬃc. By conducting large-scale information security
+data analysis, our proposed method, MalSpot, can easily identify the patterns
+in massive IDS logs, spamming delivery logs, and Honeynet ﬁrewall logs, per-
+taining to long-term and stealthy attack behavior.
+
+The contributions of this work are the following:
+
+– Design of the MalSpot system: based on hadoop, it can scale up to
+
+arbitrary-size datasets, and it is nearly linear as the log trace size grows.
+
+– Discoveries: We report very interesting attack patterns, and positively
+
+identiﬁed attacks, as detected by MalSpot.
+
+– Scalability: regardless of data scale or data source variety, MalSpot is
+
+able to detect attacks eﬃciently and eﬀectively.
+
+Acknowledgement
+
+This material is based upon work supported by the National Science Foundation
+under Grants No. IIS-1247489 and CNS-1314632 Research was sponsored by the
+Defense Threat Reduction Agency and was accomplished under contract No.
+HDTRA1-10-1-0120. Also, sponsored by the Army Research Laboratory and
+was accomplished under Cooperative Agreement Number W911NF-09-2-0053.
+This work is also partially supported by a Google Focused Research Award.
+Any opinions, ﬁndings, and conclusions or recommendations expressed in this
+
+material are those of the author(s) and do not necessarily reﬂect the views of
+the funding parties.
+
+References
+
+1. Dainotti, A.: Analysis of a ”/0” stealth scan from a botnet. In: IMC’12. (2012)
+2. J. Sun, S.P., Yu, P.S.: Window-based tensor analysis on high-dimensional and
+
+multi-aspect streams. In: In ICDM. (2006) 1076–1080
+
+3. K. Maruhashi, F.G., Faloutsos, C.: Multiaspectforensics: Pattern mining on large-
+
+scale heterogeneous networks with tensor analysis. In: ASONAM’11. (2011)
+
+4. Kishino, Y., Sakurai, Y., Yanagisawa, Y., Suyama, T., Naya, F.: Svd-based hier-
+archical data gathering for environmental monitoring svd-based hierarchical data
+gathering for environmental monitoring. In: Proceedings of the 2013 ACM Confer-
+ence on Pervasive and Ubiquitous Computing Adjunct Publication. UbiComp ’13
+Adjunct, New York, NY, USA, ACM (2013) 9–12
+
+5. Kolda, T.G., Bader, B.W.: Tensor decompositions and applications. SIAM review
+
+51(3) (2009) 455–500
+
+6. Kolda, T., Sun, J.: Scalable tensor decompositions for multi-aspect data mining.
+
+In: ICDM. (2008)
+
+7. Koutra, D., Papalexakis, E.E., Faloutsos, C.: Tensorsplat: Spotting latent anoma-
+lies in time. In: Informatics (PCI), 2012 16th Panhellenic Conference on, IEEE
+(2012) 144–149
+
+8. Li-Ming Chen, Meng-Chang Chen, W.L., Sun, Y.S.: A scalable network foren-
+sics mechanism for stealthy self-propagating attacks. Computer Communications
+(2013)
+
+9. Lin, J., Vlachos, M., Keogh, E., Gunopulos, D.: Iterative incremental clustering of
+
+time series. In: IN EDBT. (2004) 106–122
+
+10. Matsubara, Y., Sakurai, Y., Faloutsos, C., Iwata, T., Yoshikawa, M.: Fast min-
+ing and forecasting of complex time-stamped events. In: Proceedings of the 18th
+ACM SIGKDD International Conference on Knowledge Discovery and Data Min-
+ing. KDD ’12, New York, NY, USA, ACM (Aug 2012) 271–279
+
+11. Papadimitriou, S., Yu, P.: Optimal multi-scale patterns in time series streams. In:
+Proceedings of the 2006 ACM SIGMOD International Conference on Management
+of Data, New York, NY, USA, ACM (2006) 647–658
+
+12. Papalexakis, E.E., Faloutsos, C., Sidiropoulos, N.D.: Parcube: sparse paralleliz-
+In: Machine Learning and Knowledge Discovery in
+
+able tensor decompositions.
+Databases. Springer (2012) 521–536
+
+13. U. Kang, E. Papalexakis, A.H., Faloutsos, C.: Gigatensor: scaling tensor analysis
+up by 100 times - algorithms and discoveries. In: Proceedings of the 18th ACM
+SIGKDD international conference on Knowledge discovery and data mining. KDD
+’12, New York, NY, USA, ACM (2012) 316–324
+
+

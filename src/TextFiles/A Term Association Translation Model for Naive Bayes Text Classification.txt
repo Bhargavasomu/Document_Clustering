@@ -1,0 +1,935 @@
+A Term Association Translation Model for Naive
+
+Bayes Text Classication
+
+Meng-Sung Wu and Hsin-Min Wang
+
+Institute of Information Science, Academia Sinica, Taipei, Taiwan
+
+{wums,whm}@iis.sinica.edu.tw
+
+Abstract. Text classication (TC) has long been an important research
+topic in information retrieval (IR) related areas. In the literature, the
+bag-of-words (BoW) model has been widely used to represent a docu-
+ment in text classication and many other applications. However, BoW,
+which ignores the relationships between terms, oers a rather poor docu-
+ment representation. Some previous research has shown that incorporat-
+ing language models into the naive Bayes classier (NBC) can improve
+the performance of text classication. Although the widely used N -gram
+language models (LM) can exploit the relationships between words to
+some extent, they cannot model the long-distance dependencies of words.
+In this paper, we study the term association modeling approach within
+the translation LM framework for TC. The new model is called the term
+association translation model (TATM). The innovation is to incorporate
+term associations into the document model. We employ the term trans-
+lation model to model such associative terms in the documents. The
+term association translation model can be learned based on either the
+joint probability (JP) of the associative terms through the Bayes rule or
+the mutual information (MI) of the associative terms. The results of TC
+experiments evaluated on the Reuters-21578 and 20newsgroups corpora
+demonstrate that the new model implemented in both ways outperforms
+the standard NBC method and the NBC with a unigram LM.
+
+Keywords: Term association, mutual information, Bayes, translation language
+model, text classication.
+
+1
+
+Introduction
+
+Text classication (TC) is the task of classifying documents into a set of pre-
+dened categories. It has long been an important research topic in information
+retrieval (IR). Many statistical classication methods and machine learning (ML)
+techniques have been developed to TC, such as the naive Bayes classier [12],
+the support vector machines [10], the k-nearest neighbor method [20], and the
+boosting method [16]. In addition, text classication based on term associations
+[1] is also a promising approach. The performance of text classication highly
+depends on the document representation. Most of the existing methods repre-
+sent a document using a vector space model (VSM) or a language model (LM).
+
+2
+
+Meng-Sung Wu and Hsin-Min Wang
+
+Generally, the bag-of-words (BoW) method is a widely used data representation
+in IR and TC. Under this scheme, each document is modeled as a vector with
+a dimension equal to the size of the dictionary, and each element of the vector
+denotes the frequency that a word appears in the document. Basically, all the
+words are treated independently.
+
+One of the important restrictions in most of the existing TC methods may lie
+in that the individual terms are usually too general and that these methods do
+not consider the associations between words in the documents. In some cases of
+TC, individual words are not sucient to represent the accurate information of
+the document. For example, a document with shuttle launch may be assumed
+to belong to the ball game class. However, if the word NASA is an association
+term, it is very likely that the document should be assigned to the aeronautics
+class.
+
+It is well-known that the relationships between words are very important for
+statistical language modeling. Using LM for TC has been studied recently [2,14].
+Although N -gram LM can exploit the relationships between words, they only
+consider the dependencies of neighboring words [5]. For example, the trigram
+LM is unable to characterize word dependence beyond the span of three succes-
+sive words. In [22], the trigram LM was improved by integrating with the trigger
+pairs, which extract the word relationships from the sequence of historical words.
+Nevertheless, a trigger pair is word order dependent. In other words, a word can
+only be triggered by the previous context. Recent studies have revealed that
+modeling term associations could provide richer semantics of documents for LM
+and IR [4,18,19]. Cao et al. [4] integrated the word co-occurrence information and
+the WordNet information into language models. Wei and Croft [18] investigated
+the use of term associations to improve the performance of LM-based IR. In [19],
+the word associations were integrated into the topic modeling paradigm. Adding
+word associations to represent a document inevitably increases the model's com-
+plexity, but the new information reduces the ambiguity mentioned above. Gen-
+erally, any set of words co-occur in the contexts can be considered having a
+strong association and collected as the associative words, e.g., uneven bars and
+balance in the class of gymnastics and aerofoil and jet engine in the class
+of airplane transportation. However, the associative words are not necessary to
+co-occur in a document. We believe that a language model considering term
+associations would be denitely more useful in TC.
+
+In this paper, we propose a novel model for text classication by incorpo-
+rating the strengths of term associations into the translation LM framework.
+Dierent from the traditional TC techniques and algorithms in the literature,
+we model the associations between words existing in the documents of a class.
+To discover the associative terms in the documents, we learn the translation
+language model based on the joint probability (JP) of the associative terms
+through the Bayes rule and based on the mutual information (MI) of the asso-
+ciative terms.
+
+The remainder of this paper is organized as follows. In Section 2, we briey
+review the framework of the naive Bayes classier and language models. The
+
+A Term Association Translation Model for Naive Bayes Text Classication
+
+3
+
+proposed models for text classication are presented in Section 3. Experimental
+setup and results are discussed in Section 4. Finally, we give the conclusions in
+Section 5.
+
+2 Related Work
+
+2.1 Terminology
+
+We begin by dening the notation and terminology in this paper. A word or
+term is a linguistic building block for text. A word is denoted by w ∈ V =
+{1, 2, . . . ,|V |}, where |V | is number of distinct words/terms. A document, rep-
+resented by d = {w1,··· , wnd}, is an ordered list of nd words. A query, denoted
+by q = {q1,··· , qT}, is a string of T words. A collection of documents is de-
+noted by D = {d1,··· , d|D|}, where |D| is the number of documents in collection
+D. A background model, denoted by MB, is the language model estimated in
+collection D. A set of class labels is denoted by C = {c1,··· , c|C|}, where |C|
+is the number of distinct classes. A LM M is a probability function dened on
+a set of word strings. This includes the important special case of the probability
+P (w|M) of a word w. A class LM, denoted by MC, is the language model
+estimated based on class c.
+
+2.2 Naive Bayes Classier
+
+The naive Bayes classier (NBC) is a popular machine learning technique for
+text classication. The method assumes a probabilistic generative model for text.
+A common and simple representation of a document in TC is the bag of words
+(BoW) model. The model ignores the word order and just captures the number
+of occurrences of each word in the document. The NBC classies a document
+through two stages: the learning stage and the classifying stage. It is assumed
+that the probability of each word in a document is independent to that of other
+words, and each document is drawn from a multinomial distribution of words. In
+the learning stage, the naive Bayes classier estimates the conditional probability
+P (c|d), which represents the probability that a document d belongs to a class c.
+Using the Bayes rule, we have
+
+P (c|d) =
+
+P (d|c)P (c)
+
+P (d)
+
+=
+
+(cid:80)
+P (d|c)P (c)
+c P (d|c)P (c)
+
+,
+
+(1)
+
+where P (d|c) is the likelihood of document d under class c. By assuming that
+all words in d are independent of each other, P (d|c) can be further decomposed
+into the product of individual feature (word) probabilities as follows
+
+P (d|c) =
+
+P (w|c).
+
+(2)
+
+(cid:89)
+
+w∈d
+
+4
+The word probability P (w|c) and the class prior probability P (c) are estimated
+from the training documents with Laplace smoothing as follows
+
+Meng-Sung Wu and Hsin-Min Wang
+
+P (w|c) =
+
+1 + n(w, c)
+|V | + N (c)
+
+,
+
+P (c) =
+
+1 + n(d, c)
+|C| + |D| ,
+
+(3)
+
+(4)
+
+where n(w, c) is the number of times word w occurs in the training documents
+that belong to class c; N (c) is the total number of words in the training doc-
+uments that belong to class c; n(d, c) denotes the number of documents that
+belong to class c; and |D| is total number of training documents.
+
+Several extensions of the naive Bayes classier have been proposed. For exam-
+ple, Nigam et al. [13] combined the Expectation-Maximization (EM) algorithm
+and the naive Bayes classier to learn from both labeled and unlabeled doc-
+uments in a semi-supervised manner. More recently, Dai et al. [7] proposed a
+transfer learning algorithm to learn the naive Bayes classier for text classica-
+tion, which allowed the distributions of the training and test data to be dierent.
+However, these methods all assume that the words in a document are indepen-
+dent of each other; hence, they cannot cope well with the term dependence and
+association.
+
+2.3 Language Models for Information Retrieval
+
+Statistical language modeling plays an important role in automatic speech recog-
+nition (ASR) and IR. Most ASR systems are built by combining the N -gram
+language model and the acoustic hidden Markov model (HMM) to predict the
+best word sequence corresponding to an input speech utterance. In an IR sys-
+tem, the word sequence of an input query is adopted to retrieve the relevant
+text documents. In Ponte and Croft's work that applied LM in IR [15], the re-
+trieval performance was improved by statistical modeling of natural language.
+According to the maximum a posteriori decision rule, the ranking function f (·)
+is established as a posterior probability,
+
+P (dm|q) = arg max
+
+P (q|dm)P (dm).
+
+ˆd = arg max
+dm
+
+f (q, dm) = arg max
+dm
+
+(5)
+Assuming that the documents {d1,··· , d|D|} have an equal prior probability of
+relevance, the ranking can be done according to the likelihood of the N -gram
+language model
+
+dm
+
+T(cid:89)
+
+P (q|dm) = P (q1,··· , qT|dm) =
+
+P (qt|qt−1
+
+t−n+1, dm),
+
+(6)
+
+where each word qt only depends on its n−1 historical words qt−1
+P (qt|qt−1
+
+t−n+1, dm) can be estimated according to the maximum likelihood (ML)
+
+t−n+1 = {qt−n+1,··· , qt−1}.
+
+t=1
+
+A Term Association Translation Model for Naive Bayes Text Classication
+
+5
+
+criterion as follows,
+
+PML(qt|qt−1
+
+t−n+1, dm) =
+
+c(qt
+c(qt−1
+
+t−n+1, dm)
+t−n+1, dm)
+
+,
+
+(7)
+
+t−n+1 in document dm and c(qt−1
+
+where c(qt
+t−n+1, dm) denotes the number of times that word qt follows the his-
+torical words qt−1
+t−n+1, dm) denotes the number
+of times that the historical words qt−1
+t−n+1 occur in document dm. The unigram
+document model is generally adopted in the IR community [15]. However, the
+document terms are often too few to train a reliable ML-based model because
+the unseen words lead to zero unigram probabilities. Zhai and Laerty [21] have
+used several smoothing methods to deal with the data sparseness problem in
+LM-based IR.
+
+Since previous research [4,18,19] has shown that some relationships exist
+between words, we utilize them in the document model rather than using the
+traditional unigram document model for text classication.
+
+3 The Term Association Translation Models
+
+3.1 Language Models for Text Classication
+
+LM was rst introduced to TC by Peng and Schuurmans [14]. The score of a
+class c for a given document d can be estimated by (1). Then, the class of the
+document can be decided as follows
+
+c∗ = arg max
+c∈C
+
+P (c|d) = arg max
+c∈C
+
+P (d|c)P (c).
+
+(8)
+
+Assuming that P (c) is uniformly distributed and applying the unigram class LM
+in the task, the decision can be rewritten as
+
+P (d|c)
+
+c∗ = arg max
+c∈C
+
+= arg max
+c∈C
+
+nd(cid:89)
+
+i=1
+
+P (wi|c).
+
+(9)
+
+The traditional naive Bayes classier usually uses Laplace smoothing to deal
+with the zero probability problem. However, some previous research has shown
+that it is not as eective as the smoothing methods for language modeling [2,14].
+Therefore, we can interpolate a unigram class LM with the unigram collection
+background model by using the Jelinek-Mercer smoothing method as follows,
+
+P (wi|MC) = λP (wi|c) + (1 − λ)P (wi|MB),
+
+(10)
+
+where λ can be tuned empirically. In this paper, the method based on (10) is
+denoted as NBC-UN, and λ is set to 0.5.
+In order to discover the association between two terms wi and w, we are
+interested in Pt(wi|w), the probability that word wi will occur given that w
+
+6
+
+Meng-Sung Wu and Hsin-Min Wang
+
+occurs. The term translation probability Pt(wi|w) is dierent from the bigram
+probability P (wi|w) in that the words wi and w are not limited to occur in
+order and adjacently in the former. Then, the term association information can
+be integrated into the unigram class model as follows,
+Pt(wi|w)P (w|c),
+
+P (wi|c) =
+
+(cid:88)
+
+(11)
+
+w∈c
+
+where P (w|c) reects the distribution of words in the training documents of class
+c, which can be computed via the maximum likelihood estimate. By replacing
+P (wi|c) in (10) with the one computed by (11), we have
+
+P (wi|MC) = λ[
+
+Pt(wi|w)P (w|c)] + (1 − λ)P (wi|MB).
+
+(12)
+
+(cid:88)
+
+w∈c
+
+The model in (12) is obviously more computationally intensive than the model in
+(10). Therefore, we need to build a global term translation model for all classes
+and the word probability distribution for each class beforehand. To discover the
+associative terms in the training documents, we learn the translation LM based
+on the joint probability of the associative terms through the Bayes rule and
+based on the mutual information (MI) of the associative terms.
+
+3.2 Translation Model Estimation Using Joint Probability Model
+
+This section describes our rst way of constructing the term translation proba-
+bility Pt(wi|w). By denition, we can express the conditional probability as the
+joint probability of words wi and w over the probability of word w
+
+where the join probability of wi and w can be expressed as
+
+P (wi, w) =
+
+P (wi, w|c)P (c) =
+
+P (wi|c)P (w|c)P (c),
+
+c
+
+c
+
+(cid:88)
+
+Pt(wi|w) =
+
+P (wi, w)
+
+,
+
+P (w)
+
+(cid:88)
+
+(13)
+
+(14)
+
+if wi and w are assumed sampled independently and identically from the unigram
+class model c, and the probability of w can be expressed as
+
+P (w) =
+
+P (w|c)P (c).
+
+(15)
+
+(cid:88)
+
+c
+
+After re-normalizing P (wi, w) in (14) and P (w) in (15), and considering a uni-
+form prior P (c), we obtain
+
+Pt(wi|w) =
+
+(16)
+The method based on (12) with Pt(wi|w) computed by (16) is denoted as TATM-
+JP (the term association translation model estimated by the joint probability of
+terms).
+
+c P (w|c)
+
+.
+
+(cid:80)
+(cid:80)
+c P (wi|c)P (w|c)
+
+A Term Association Translation Model for Naive Bayes Text Classication
+
+7
+
+3.3 Translation Model Estimation based on Mutual Information
+Our second way of constructing the term translation probability Pt(wi|w) is
+based on the mutual information (MI). In information theory, the MI of two
+random variables is a quantity that measures their mutual dependence. MI is
+a good measure to assess how two words are related to each other [6,22]. We
+use the average mutual information (AMI) [22] to measure the strength of the
+association between words wi and w. The AMI between wi and w is dened as
+follows
+
+AM I(wi, w) = P (wi, w)log
+
++ P ( ¯wi, w)log
+
+P (wi, w)
+
+P (wi)P (w)
+
+P ( ¯wi, w)
+
+P ( ¯wi)P (w)
+
++ P (wi, ¯w)log
+
++ P ( ¯wi, ¯w)log
+
+P (wi, ¯w)
+
+P (wi)P ( ¯w)
+
+P ( ¯wi, ¯w)
+
+P ( ¯wi)P ( ¯w)
+
+(17)
+
+where P (wi, w) is estimated as the ratio of the number of documents that contain
+both wi and w, i.e., cd(wi, w), and the total number of documents |D| as follows
+
+P (wi, w) =
+
+cd(wi, w)
+
+|D|
+
+;
+
+P (wi, ¯w) is computed by
+
+P (wi, ¯w) =
+
+cd(wi) − cd(wi, w)
+
+|D|
+
+,
+
+(18)
+
+(19)
+
+where cd(wi) is the number of documents that contain wi; P (w) is estimated as
+the ratio of the number of documents that contain w and the total number of
+documents; P ( ¯w) is estimated as the ratio of the number of documents that do
+not contain w and the total number of documents; and the other probabilities
+are estimated in a similar way. According to [11], the term translation probabil-
+ity Pt(wi|w) can be calculated by normalizing the mutual information score as
+follows
+
+AM I(wj, w)
+
+wj
+
+.
+
+(20)
+
+Pt(wi|w) =
+
+AM I(wi, w)
+
+(cid:80)
+
+If the two words wi and w tend to associate with each other, the probability
+would be higher. The method based on (12) with Pt(wi|w) computed by (20) is
+denoted as TATM-MI (the term association translation model estimated based
+on the mutual information of terms).
+
+4 Experiments
+
+4.1 Corpora
+
+We evaluate the proposed TC methods on two standard document collections:
+Reuters-21578 (Reuters)1 and 20 Newsgroups (20NG)2. According to the ModApte
+
+1 http://kdd.ics.uci.edu/databases/reuters21578/reuters21578.html
+2 http://people.csail.mit.edu/jrennie/20Newsgroups/
+
+8
+
+Meng-Sung Wu and Hsin-Min Wang
+
+Table 1. Statistics of the Reuters collection
+
+Category Training Set Test Set
+
+earn
+acq
+
+money-fx
+
+grain
+crude
+trade
+
+interest
+wheat
+ship
+corn
+
+2877
+1650
+538
+433
+389
+369
+347
+212
+197
+182
+
+1087
+719
+179
+149
+189
+118
+131
+71
+89
+56
+
+split, the Reuters corpus is separated into 7,194 documents for training and 2,788
+documents for testing. 135 categories have been dened, but only 118 categories
+have documents assigned to them. Following Debole and Sebastiani's work in
+[8], we consider the most frequent ten categories in the experiments. The 10
+categories and the numbers of documents used for training and testing in each
+category are listed in Table 1. The 20NG dataset is a collection of 19,974 doc-
+uments collected from 20 dierent newsgroups. We consider the 20 newsgroups
+as the 20 categories. For each category, we randomly select 60% of the docu-
+ments for training and the remaining 40% for testing. Since the 20NG collection
+distributes roughly evenly across 20 newsgroups, each category has almost the
+same number of training (or testing) documents.
+
+4.2 Performance measure
+
+In the following experiments, the performance of text classication is evaluated
+in terms of the recall (R), precision (P), and F -measure (F), calculated as follows:
+
+recall =
+
+# of correct postive predictions
+
+# of postive examples
+
+,
+
+precision =
+
+# of correct postive predictions
+
+# of postive predictions
+2 × recall × precision
+recall + precision
+
+.
+
+F =
+
+,
+
+(21)
+
+(22)
+
+(23)
+
+To evaluate the average performance across classes, we use the micro-averaged
+score and macro-averaged score [20]. The micro-averaged score is calculated by
+mixing together the documents across all the classes. The macro-averaged score
+is obtained by taking the average of the recall, precision, and F -measure values
+for each category
+
+A Term Association Translation Model for Naive Bayes Text Classication
+
+9
+
+Table 2. Experimental results (in F -measure) for the Reuters collection
+
+earn
+acq
+
+money-fx
+
+grain
+crude
+trade
+
+interest
+wheat
+ship
+corn
+
+micro-averaged
+
+NBC
+
+0.814
+0.801
+0.511
+0.578
+0.577
+0.439
+0.483
+0.490
+0.571
+0.466
+
+0.709
+
+NBC-UN
+
+TATM-JP TATM-MI
+
+0.825
+0.811
+0.521
+0.583
+0.596
+0.434
+0.477
+0.506
+0.583
+0.468
+
+0.720
+
+0.819
+0.801
+0.543
+0.616
+0.610
+0.477
+0.516
+0.577
+0.624
+0.527
+
+0.727
+
+0.824
+0.802
+0.539
+0.634
+0.618
+0.465
+0.502
+0.603
+0.639
+0.491
+
+0.731
+
+Table 3. The micro/macro-averaged precision, recall, and F -measure of dierent meth-
+ods evaluated on the 20NG dataset
+
+Micro-averaged
+
+Macro-averaged
+
+P
+
+0.802
+NBC
+NBC-UN
+0.809
+TATM-JP 0.818
+TATM-MI
+0.821
+
+R
+
+0.800
+0.807
+0.815
+0.819
+
+F
+
+0.801
+0.808
+0.817
+0.820
+
+P
+
+0.817
+0.822
+0.827
+0.829
+
+R
+
+0.795
+0.802
+0.810
+0.814
+
+F
+
+0.806
+0.812
+0.818
+0.821
+
+4.3 Experimental results
+
+We compare our term association translation models (TATM-JP and TATM-
+MI) with the naive Bayes classier with Laplace smoothing (NBC) and the
+naive Bayes classier with the unigram language model (NBC-UN).
+
+Table 2 shows the results of text classication experiments evaluated on the
+Reuters collection. The measure used is the F -measure on the ten most populated
+Reuters-21578 categories and the micro-averaged F -measure (micro-F ) over all
+categories. Comparing the results of NBC and NBC-UN, it is obvious that using
+language models improves the classication eectiveness of the naive Bayes clas-
+sier. Both proposed methods consistently outperform NBC and respectively
+perform better than NBC-UN in four out of ten categories. The micro-F of
+TATM-MI is 0.731, which is better than that of TATM-JP (0.727), NBC-UN
+(0.720) and NBC (0.709). The relative improvement in micro-F by TATM-MI is
+3.1% over NBC and 1.5% over NBC-UN.
+
+Table 3 shows the experimental results for the 20NG dataset in terms of the
+micro/macro-averaged precision, recall, and F -measure. The micro-F is 0.817
+for TATM-JP and 0.82 for TATM-MI, which are better than that obtained by
+NBC (0.801) and NBC-UN (0.808). The relative improvements by TATM-JP
+over NBC and NBC-UN are 2% and 1.11%, respectively. Similarly, the relative
+improvements by TATM-MI over NBC and NBC-UN are 2.37%, and 1.49%, re-
+
+10
+
+Meng-Sung Wu and Hsin-Min Wang
+
+spectively. The improvements of TATM-JP and TATM-MI over NBC and NBC-
+UN are statistically signicant according to the t-test. In addition, learning the
+term association translation model based on the mutual information for all data
+sets is more ecient than learning the term association translation model by the
+joint probability. As expected, the performance in micro-F on the 20NG dataset
+is very similar to that in macro-F because each class has a similar number of
+training and testing documents. Again, we can see that TATM-MI performs the
+best.
+
+Several observations can be drawn from the results. First, the performance
+of text classication can be improved by incorporating language models into the
+naive Bayes classier. Second, the proposed document model with term associ-
+ation modeling leads to improvements over NBC and NBC-UN. The new model
+could be applied to other topic document models.
+
+5 Conclusion and Future Work
+
+The use of term associations for TC has attracted great interest. This paper
+has presented a new term association translation model, which models term
+associations, for TC. The proposed model can be learned based on the joint
+probability of the associative terms through the Bayes rule or based on the
+mutual information of the associative terms. The experimental results show that
+the new model learned in either way outperforms the traditional TC methods.
+For future work, we plan to investigate the eect of the feature selection method
+[17] for the selection of associative terms. In addition, we will integrate our model
+into the topic models such as probability latent semantic analysis (PLSA) [9] or
+latent Dirichlet allocation (LDA) [3] for text classication. Another interesting
+direction is to combine the term association document model with the relevance-
+based document model, and apply the combined model in TC.
+
+References
+
+1. Antonie, M.L., Zaiane, O.R.: Text Document Categorization by Term Association.
+In: Proceedings of IEEE 2002 International Conference on Data Mining (ICDM).
+pp. 1926 (2002)
+
+2. Bai, J., Nie, J.Y.: Using language models for text classication. In: Proceedings of
+
+the Asia Information Retrieval Symposium (AIRS) (2004)
+
+3. Blei, D.M., Ng, A.Y., Jordan, M.I.: Latent Dirichlet Allocation. Journal of Machine
+
+Learning Research 3(4-5), 9931022 (2003)
+
+4. Cao, G., Nie, J.Y., Bai, J.: Integrating word relationships into language models.
+In: Proceedings of the ACM SIGIR International Conference on Research and
+Development in Information Retrieval. pp. 298305 (2005)
+
+5. Chien, J.T., Wu, M.S., Peng, H.J.: Latent semantic language modeling and smooth-
+ing. International Journal of Computational Linguistics and Chinese Language
+Processing 9(2), 2944 (2004)
+
+6. Church, K.W., Hanks, P.: Word association norms, mutual information, and lexi-
+
+cography. Computational Linguistics 16(1), 2229 (1990)
+
+A Term Association Translation Model for Naive Bayes Text Classication
+
+11
+
+7. Dai, W., Xue, G.R., Yang, Q., Yu, Y.: Transferring Naive Bayes Classiers for
+Text Classication. In: Proceedings of AAAI conference on Articial intelligence.
+pp. 540545 (2007)
+
+8. Debole, F., Sebastiani, F.: An analysis of the relative diculty of Reuters-21578
+subsets. Journal of the American Society for Information Science and Technology
+56(2), 584596 (2005)
+
+9. Hofmann, T.: Probabilistic latent semantic indexing. In: Proceedings of ACM SI-
+GIR International Conference on Research and Development in Information Re-
+trieval. pp. 5057 (1999)
+
+10. Joachims, T.: Text Categorization With Support Vector Machines: Learning With
+Many Relevant Features. In: Proceedings of European Conference on Machine
+Learning (ECML). pp. 137142 (1998)
+
+11. Karimzadehgan, M., Zhai, C.: Estimation of Statistical Translation Models Based
+on Mutual Information for Ad Hoc Information Retrieval . In: Proceedings of ACM
+SIGIR International Conference on Research and Development in Information Re-
+trieval. pp. 323330 (2010)
+
+12. McCallum, A., Nigam, K.: A Comparison of Event Models for Naive Bayes Text
+Classication. In: AAAI-98 Workshop on Learning for Text Categorization. pp.
+4148 (1998)
+
+13. Nigam, K., Mccallum, A.K., Thrun, S., Mitchell, T.: Text Classication from La-
+beled and Unlabeled Documents using EM . Machine Learning 39(2/3), 103134
+(2000)
+
+14. Peng, F., Schuurmans, D.: Combining Naive Bayes and n-Gram Language Mod-
+els for Text Classication. In: Proceedings of the 25th European Conference on
+Information Retrieval Research (ECIR). pp. 335350 (1994)
+
+15. Ponte, J.M., Croft, W.B.: A language modeling approach to information retrieval.
+In: Proceedings of ACM SIGIR International Conference on Research and Devel-
+opment in Information Retrieval. pp. 275281 (1998)
+
+16. Schapire, R.E., Singer, Y.: BoosTexter: A Boosting-based System for Text Cate-
+
+gorization. Machine Learning 39(2/3), 135168 (2000)
+
+17. Schneider, K.M.: Weighted Average Pointwise Mutual Information for Feature Se-
+lection in Text Categorization. In: Proceedings of the European Conference on
+Principles and Practice of Knowledge Discovery in Databases (PKDD). pp. 252
+263 (2005)
+
+18. Wei, X., Croft, W.B.: Modeling term associations for ad-hoc retrieval performance
+within language modeling framework. In: Proceedings of the 29th European con-
+ference on IR research. pp. 5263 (2007)
+
+19. Wu, M.S., Lee, H.S., Wang, H.M.: Exploiting semantic associative information
+in topic modeling. In: Proceedings of the IEEE Workshop on Spoken Language
+Technology. pp. 384388 (2010)
+
+20. Yang, Y.: An Evaluation of Statistical Approaches to Text Categorization . Journal
+
+of Information Retrieval 1(1-2), 6788 (1999)
+
+21. Zhai, C., Laerty, J.: A study of smoothing methods for language models applied
+to Ad Hoc information retrieval. In: Proceedings of ACM SIGIR International
+Conference on Research and Development in Information Retrieval. pp. 334342
+(2001)
+
+22. Zhou, G., Lua, K.: Interpolation of n-gram and mutual-information based trig-
+ger pair language models for Mandarin speech recognition. Computer Speech and
+Language 13(2), 125141 (1999)
+
+

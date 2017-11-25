@@ -1,0 +1,942 @@
+OddBall: Spotting Anomalies in Weighted Graphs
+
+Leman Akoglu, Mary McGlohon, and Christos Faloutsos
+
+Carnegie Mellon University, School of Computer Science
+
+{lakoglu,mmcgloho,christos}@cs.cmu.edu
+
+Abstract. Given a large, weighted graph, how can we ﬁnd anomalies?
+Which rules should be violated, before we label a node as an anomaly?
+We propose the OddBall algorithm, to ﬁnd such nodes. The contribu-
+tions are the following: (a) we discover several new rules (power laws)
+in density, weights, ranks and eigenvalues that seem to govern the so-
+called “neighborhood sub-graphs” and we show how to use these rules for
+anomaly detection; (b) we carefully choose features, and design OddBall,
+so that it is scalable and it can work un-supervised (no user-deﬁned con-
+stants) and (c) we report experiments on many real graphs with up to
+1.6 million nodes, where OddBall indeed spots unusual nodes that agree
+with intuition.
+
+1 Introduction
+
+Given a real graph, with weighted edges, which nodes should we consider as
+“strange”? Applications of this setting abound: For example, in network intru-
+sion detection, we have computers sending packets to each other, and we want
+to know which nodes misbehave (e.g., spammers, port-scanners). In a who-calls-
+whom network, strange behavior may indicate defecting customers, or telemar-
+keters, or even faulty equipment dropping connections too often. In a social
+network, like FaceBook and LinkedIn, again we want to spot users whose behav-
+ior deviates from the usual behavior, such as people adding friends indiscrimi-
+nately, in “popularity contests”.
+
+The list of applications continues: Anomalous behavior could signify irregu-
+larities, like credit card fraud, calling card fraud, campaign donation irregulari-
+ties, accounting ineﬃciencies or fraud [6], extremely cross-disciplinary authors in
+an author-paper graph [29], network intrusion detection [28], electronic auction
+fraud [10], and many others.
+
+In addition to revealing suspicious, illegal and/or dangerous behavior, anomaly
+detection is useful for spotting rare events, as well as for the thankless, but ab-
+solutely vital task of data cleansing [12]. Moreover, anomaly detection is inti-
+mately related with the pattern and law discovery: unless the majority of our
+nodes closely obey a pattern (say, a power law), only then can we conﬁdently
+consider as outliers the few nodes that deviate.
+
+Most anomaly detection algorithms focus on clouds of multi-dimensional points,
+as we describe in the survey section. Our goal, on the other hand, is to spot strange
+nodes in a graph, with weighted edges. What patterns and laws do such graphs
+obey? What features should we extract from each node?
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part II, LNAI 6119, pp. 410–421, 2010.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2010
+
+OddBall: Spotting Anomalies in Weighted Graphs
+
+411
+
+We propose to focus on neighborhoods, that is, a sphere, or a ball (hence the
+name OddBall) around each node(the ego): that is, for each node, we consider
+the induced sub-graph of its neighboring nodes, which is referred to as the egonet.
+Out of the huge number of numerical features one could extract from the egonet
+of a given node, we give a carefully chosen list, with features that are eﬀective
+in revealing outliers. Thus, every node becomes a point in a low-dimensional
+feature space.
+
+Main contributions of this work are:
+
+1. Egonet patterns: We show that egonets obey some surprising patterns (like
+the Egonet Density Power Law (EDPL), EWPL, ELWPL, and ERPL), which
+gives us conﬁdence to declare as outliers the ones that deviate. We support
+our observations by showing that the ERPL yields the EWPL.
+
+2. Scalable algorithm: Based on those patterns, we propose OddBall, a scalable,
+
+un-supervised method for anomalous node detection.
+
+3. Application on real data: We apply OddBall1 to numerous real graphs (DBLP,
+political donations, and other domains) and we show that it indeed spots
+nodes that a human would agree are strange and/or extreme.
+
+Of course, there are numerous types of anomalies - we discuss several of them in
+our technical report [2], but, for brevity, we focus on only the following major
+types (see Fig.1 for examples and Section 2 for the dataset description):
+
+1. Near-cliques and stars: Those nodes whose neighbors are very well con-
+nected (near-cliques) or not connected (stars) turn out to be “strange”: in
+most social networks, friends of friends are often friends, but either extreme
+(clique/star) is suspicious.
+
+2. Heavy vicinities: If person i has contacted n distinct people in a who-calls-
+whom network, we would expect that the number of phone calls (weight)
+would be a function of n. Extreme total weight for a given number of contacts
+n would be suspicious, indicating, e.g., faulty equipment that forces redialing.
+3. Dominant heavy links: In the who-calls-whom scenario above, a very heavy
+single link in the 1-step neighborhood of person i is also suspicious, indi-
+cating, e.g., a stalker that keeps on calling only one of his/her contacts an
+excessive count of times.
+
+The upcoming sections are as follows: We describe the datasets; the proposed
+method and observed patterns; the experimental results; prior work; and ﬁnally
+the conclusions.
+
+2 Data Description
+
+We studied several unipartite/bipartite, weighted/unweighted large real-world
+graphs in a variety of domains, described in detail in Table 1. Particularly, uni-
+partite networks include the following: Postnet contains post-to-post links in a
+1 Source code of our algorithm can be found at www.cs.cmu.edu/~lakoglu/#tools
+
+412
+
+L. Akoglu, M. McGlohon, and C. Faloutsos
+
+(a) Near-star
+
+(b) Near-clique (c) Heavy vicinity (d) Dominant edge
+
+Fig. 1. Types of anomalies that OddBall detects. Top row: toy sketches of egonets (ego
+shown in larger, red circle). Bottom row: actual anomalies spotted in real datasets. (a)
+A near-star in Postnet: instapundit.com/archives/025235.php, an extremely long
+post on Hurricane Katrina relief agencies with numerous links to diverse other posts
+about donations. (b) A near-clique in Postnet: sizemore.co.uk, who often linked to
+its own posts, as well as to its own posts in other blogs. (c) A heavy vicinity in Postnet:
+blog.searchenginewatch.com/blog has abnormally high weight w.r.t. the number of
+edges in its egonet. (d) Dominant edge(s) in Com2Cand : In FEC 2004, George W. Bush
+received a huge donation from a single committee: Democratic National Committee
+(˜$87M )(!) - in fact, this amount was spent against him; next heaviest link (˜$25M ):
+from Republican National Committee.
+
+set of blogs[21], Enron contains emails at Enron collected from about 1998 to
+2002 (made public by the Federal Energy Regulatory Commission during its
+investigation), and Oregon contains AS peering information inferred from Ore-
+gon route-views BGP data. Bipartite networks include the following: Auth2Conf
+contains the publication records of authors to conferences from DBLP, and
+Don2Com and Com2Cand are from the U.S. Federal Election Commission in
+20042, a public record of donations between donors and committees and be-
+tween committees and political candidates, respectively.
+
+For Don2Com and Com2Cand, the weights on the edges are actual weights rep-
+resenting donation amounts in dollars. For the remaining weighted datasets, the
+edge weights are simply the number of occurrences of the edges. For instance, if
+post i contains k links to another post j, the weight of the edge ei,j is set to k.
+
+In our study, we speciﬁcally focused on undirected graphs, but the ideas can
+
+easily be generalized to directed graphs.
+
+3 Proposed Method
+
+Borrowing terminology from social network analysis (SNA), “ego” is an individ-
+ual node.
+2 Parsed dataset from all cycles can be found at www.cs.cmu.edu/~mmcgloho/
+fec/data/fec data.html
+
+OddBall: Spotting Anomalies in Weighted Graphs
+
+413
+
+Table 1. Datasets studied in this work
+
+N E Weights Structure Description
+Name
+Postnet
+223K 217K Yes
+Auth2Conf 421K 1M Yes
+Com2Cand 6K 125K Yes
+
+Unipartite Network of posts based on citations
+Bipartite DBLP Author/Conference associations
+2004 US FEC Committee to Candidate
+Bipartite
+donations
+2004 US FEC Donor to Committee do-
+nations
+
+Bipartite
+
+Don2Com 1,6M 2M Yes
+
+Enron
+Oregon
+
+36K 183K No
+11K 38K No
+
+Unipartite Email associations at Enron
+Unipartite AS peering connections
+
+Informally, an ego (=node) of a given network is anomalous if its neighborhood
+signiﬁcantly diﬀers from those of others. The basic research questions are: (a)
+what features should we use to characterize a neighborhood? and (b) what does
+a ‘normal’ neighborhood look like?
+
+Both questions are open-ended, but we give some answers below. First, let’s
+deﬁne terminology: the “k-step neighborhood” of node i is the collection of node
+i, all its k-step-away nodes, and all the connections among all of these nodes –
+formally, this is the “induced sub-graph”. In SNA, the 1-step neighborhood of a
+node is speciﬁcally known as its “egonet”.
+
+How should we choose the value of k steps to study neighborhoods? Given that
+real-world graphs have small diameter [3], we need to stay with small values of k,
+and speciﬁcally, we recommend k=1. We report our ﬁndings only for k=1, because
+using k > 1 does not provide any more intuitive or revealing information, while it
+has heavy computational overhead, possibly intractable for very large graphs.
+
+3.1 Feature Extraction
+
+The ﬁrst of our two inter-twined questions is which statistics/features to extract
+from a neighborhood.
+
+There is an inﬁnite set of functions/features that we could use to characterize
+a neighborhood (number of nodes, one or more eigenvalues, number of triangles,
+eﬀective radius of the central node, number of neighbors of degree 1, etc etc).
+Which of all should we use?
+
+Intuitively, we want to select features that (a) are fast-to-compute and (b)
+will lead us to patterns/laws that most nodes obey, except for a few anomalous
+nodes. We spend a lot of time experimenting with about a dozen features, trying
+to see whether the nodes of real graphs obey any patterns with respect to those
+features (see our technical report [2]). The majority of features lead to no obvious
+patterns, and thus we do not present them.
+
+The trimmed-down set of features that are very successful in spotting pat-
+
+terns, are the following:
+
+1. Ni: number of neighbors (degree) of ego i,
+2. Ei: number of edges in egonet i,
+
+414
+
+L. Akoglu, M. McGlohon, and C. Faloutsos
+
+3. Wi: total weight of egonet i,
+4. λw,i: principal eigenvalue of the weighted adjacency matrix of egonet i.
+
+The next question is how to look for outliers, in such an n-dimensional feature
+space, with one point for each node of the graph. In our case, n=4, but one
+might have more features depending on the application and types of anomalies
+one wants to detect. A quick answer to this would be to use traditional outlier
+detection methods for clouds of points using all the features.
+
+In our setting, we can do better. As we show next, we group features into
+carefully chosen pairs, where we show that there are patterns of normal behavior
+(typically, power-laws). We ﬂag those points that signiﬁcantly deviate from the
+discovered patterns as anomalous. Among the numerous pairs of features we
+studied, the successful pairs and the corresponding type of anomaly are the
+following:
+
+– E vs N: CliqueStar: detects near-cliques and stars
+– W vs E: HeavyVicinity: detects many recurrences of interactions
+– λw vs W : DominantPair: detects single dominating heavy edge (strongly
+
+connected pair)
+
+3.2 Laws and Observations
+
+The second of our research questions is what do normal neighborhoods look like.
+Thus, it is important to ﬁnd patterns (“laws”) for neighborhoods of real graphs,
+and then report the deviations, if any. In this work, we report some new, sur-
+prising patterns:
+
+For a given graph G, node i ∈ V(G), and the egonet Gi of node i;
+
+Observation 1 (EDPL: Egonet Density Power Law). The number of nodes
+Ni and the number of edges Ei of Gi follow a power law.
+
+Ei ∝ N α
+
+i , 1 ≤ α ≤ 2.
+
+In our experiments the EDPL exponent α ranged from 1.10 to 1.66. Fig. 2
+illustrates this observation, for several of our datasets. Plots show Ei versus Ni
+for every node (green points); the black circles are the median values for each
+bucket of points (separated by vertical dotted lines) after applying logarithmic
+binning on the x-axis as in [23]; the red line is the least squares(LS) ﬁt on the
+median points. The plots also show a blue line of slope 2, that corresponds to
+cliques, and a black line of slope 1, that corresponds to stars. All the plots are
+in log-log scales.
+
+Observation 2 (EWPL: Egonet Weight Power Law). The total weight Wi
+and the number of edges Ei of Gi follow a power law.
+
+Wi ∝ E
+
+β
+
+i , β ≥ 1.
+
+OddBall: Spotting Anomalies in Weighted Graphs
+
+415
+
+Fig. 3 shows the EWPL for (only a subset of) our datasets (due to space limit).
+In our experiments the EWPL exponent β ranged up to 1.29. Values of β > 1
+indicate super-linear growth in the total weight with respect to increasing total
+edge count in the egonet.
+
+Observation 3 (ELWPL: Egonet λw Power Law). The principal eigenvalue
+λw,i of the weighted adjacency matrix and the total weight Wi of Gi follow a power
+law.
+
+λw,i ∝ W
+
+γ
+
+i , 0.5 ≤ γ ≤ 1.
+
+Fig. 4 shows the ELWPL for a subset of our datasets. In our experiments the
+ELWPL exponent γ ranged from 0.53 to 0.98. γ=0.5 indicates uniform weight
+distribution whereas γ˜1 indicates a dominant heavy edge in the egonet, in which
+case the weighted eigenvalue closely follows the maximum edge weight. γ=1 if
+the egonet contains only one edge.
+
+Observation 4 (ERPL: Egonet Rank Power Law). The rank Ri,j and the
+weight Wi,j of edge j in Gi follow a power law.
+
+Wi,j ∝ Rθ
+
+i,j , θ ≤ 0.
+
+Here, Ri,j is the rank of edge j in the sorted list of edge weights. ERPL suggests
+that edge weights in the egonet have a skewed distribution. This is intuitive; for
+example in a friendship network, a person could have many not-so-close friends
+(light links), but only a few close friends (heavy links).
+Next we show that if the ERPL holds, then the EWPL also holds. Given an
+egonet Gi, the total weight Wi and the number of edges Ei of Gi, let Wi denote
+the ordered set of weights of the edges, Wi,j denote the weight of edge j, and
+Ri,j denote the rank of weight Wi,j in set Wi. Then,
+Lemma 1. ERPL implies EWPL, that is: If Wi,j ∝ Rθ
+
+i,j, θ ≤ 0, then
+
+(cid:2)
+
+Wi ∝ E
+
+β
+i
+
+β = 1, if −1 ≤ θ ≤ 0
+β > 1, if θ < −1
+
+Proof. For brevity, we give the proof for θ < −1 – other cases are similar. If
+Wi,j = cRθ
+i –the least heavy edge l with weight Wmin is
+ranked the last, i.e. Ri,l = Ei. Thus we can write Wi as
+(cid:10)
+
+i,j, then Wmin = cEθ
+
+⎛
+⎝ Ei(cid:5)
+(cid:11)
+
+j=1
+
+jθ+1
+θ + 1
+
+jθ
+
+⎞
+⎠ ≈ WminE
+(cid:12)(cid:12)(cid:12)Ei
+
+(cid:13)
+
+j=1
+
+−θ
+i
+
+(cid:8)(cid:9) Ei
+(cid:8)
+
+j=1
+
+jθdj
+
+−θ
+= WminE
+i
+
+1
+
+−θ − 1
+
+−θ
+Wi = WminE
+i
+
+−θ
+= WminE
+i
+
+(cid:10)
+
+−
+
+1
+(−θ − 1)E
+
+−θ−1
+i
+
+For suﬃciently large Ei and given θ < −1, the second term in parenthesis goes
+to 0. Therefore; Wi ≈ c
+(cid:7)(cid:8)
+
+(cid:3) = Wmin−θ−1 . Since θ < −1, β > 1.
+
+−θ
+E
+i
+
+, c
+
+(cid:3)
+
+416
+
+L. Akoglu, M. McGlohon, and C. Faloutsos
+
+3.3 Anomaly Detection
+
+We can easily use the observations given in part 3.2 in anomaly detection since
+anomalous nodes would behave away from the normal pattern. Let us deﬁne
+the y-value of a node i as yi and similarly, let xi denote the x-value of node i
+for a particular feature pair f(x, y). Given the power law equation y = Cxθ for
+f(x, y), we deﬁne the outlierness score of node i to be
+
+out-line(i) = max(yi, Cxθ
+i )
+min(yi, Cxθ
+i )
+
+∗ log(|yi − Cxθ
+
+i | + 1)
+
+Intuitively, the above measure is the “distance to ﬁtting line”. Here we penalize
+each node with both the number of times that yi deviates from its expected value
+Cxθ
+i given xi, and with the logarithm of the amount of deviation. This way, the
+minimum outlierness score becomes 0 –for which the actual value yi is equal to
+the expected value Cxθ
+i .
+
+This simple and easy-to-compute method not only helps in detecting outliers,
+but also provides a way to sort the nodes according to their outlierness scores.
+However, this method is prone to miss some outliers and therefore could yield
+false negatives for the following reason: Assume that there exist some points
+that are far away from the remaining points but that are still located close to
+the ﬁtting line. In our experiments with real data, we observe that this usually
+happens for high values of x and y. For example, in Fig. 2(a), the points marked
+with left-triangles ((cid:2)) are almost on the ﬁtting line even though they are far
+away from the rest of the points.
+
+We want to ﬂag both types of points as outliers, and thus we propose to
+combine our heuristic with a density-based outlier detection technique. We used
+LOF [7], which also assigns outlierness scores out-lof(i) to data points; but any
+other outlier detection method would do, as long as it gives such a score. To
+obtain the ﬁnal outlierness score of a data point i, one might use several methods
+such as taking a linear function of both scores and ranking the nodes according
+to the new score, or merging the two ranked lists of nodes, each sorted on a
+diﬀerent score. In our work, we simply used the sum of the two normalized(by
+dividing by the maximum) scores, that is, out-score(i) = out-line(i)+out-lof(i).
+
+4 Experimental Results
+
+CliqueStar. Here, we are interested in the communities that the neighbors of a
+node form. In particular, CliqueStar detects anomalies having to do with near-
+cliques and near-stars. Using CliqueStar, we were successful in detecting many
+anomalies over the unipartite datasets (although it is irrelevant for bipartite
+graphs since by nature the egonet forms a “star”).
+
+In social media data Postnet, we detected posts or blogs that had either all
+their neighbors connected (cliques) or mostly disconnected (stars). We show
+some illustrative examples along with descriptions from Postnet in Fig. 1. See
+Fig.2a for the detected outliers on the scatter-plot from the same dataset.
+
+OddBall: Spotting Anomalies in Weighted Graphs
+
+417
+
+104
+
+103
+
+102
+
+101
+
+s
+e
+g
+d
+e
+
+ 
+f
+
+o
+
+ 
+r
+e
+b
+m
+u
+N
+
+100
+
+100
+
+POSTNET
+
+http://www.sizemore.co.uk/
+2005/08/i−feel−some−movies
+−coming−on.html
+
+http://instapundit.com/
+archives/025235.php
+
+1.1094x + (−0.21414) = y
+1.1054x + (−0.21432) = y
+2.1054x + (−0.51535) = y
+
+101
+102
+Number of nodes
+(a) Postnet
+
+103
+
+106
+
+105
+
+104
+
+103
+
+102
+
+101
+
+s
+e
+g
+d
+e
+
+ 
+f
+
+o
+
+ 
+r
+e
+b
+m
+u
+N
+
+100
+
+100
+
+ENRON
+
+1.3581x + (0.10897) = y
+1.0438x + (−0.10446) = y
+2.0438x + (−0.40549) = y
+
+Kenneth Lay
+(CEO)
+
+Andrew Lewis (Director)
+
+105
+
+104
+
+103
+
+102
+
+101
+
+s
+e
+g
+d
+e
+
+ 
+f
+
+o
+
+ 
+r
+e
+b
+m
+u
+N
+
+103
+
+104
+
+100
+
+100
+
+101
+
+102
+
+Number of nodes
+(b) Enron
+
+OREGON
+
+Verizon
+
+Sprint
+
+AT&T
+
+1.6636x + (−0.23992) = y
+1.0737x + (−0.15151) = y
+2.0737x + (−0.45254) = y
+
+101
+
+102
+
+103
+
+104
+
+Number of nodes
+(c) Oregon
+
+Fig. 2. Illustration of the Egonet Density Power Law (EDPL), and the corresponding
+anomaly CliqueStar, with outliers marked with triangles. Edge count versus node count
+(log-log scale); red line is the LS ﬁt on the median values (black circles); dashed black
+and blue lines have slopes 1 and 2 respectively, corresponding to stars and cliques. Most
+striking outlier: Ken Lay (CEO of Enron), with a star-like neighborhood. See Section
+5.1.1 for more discussion and Fig.1 for example illustrations from Postnet.
+
+In Enron(Fig.2b), the node with the highest anomaly score turns out to be
+“Kenneth Lay”, who was the CEO and is best known for his role in the Enron
+scandal in 2001. Our method reveals that none of his over 1K contacts ever sent
+emails to each other.
+
+In Oregon (Fig.2c), the top outliers are the three large ISPs (“Verizon”,
+
+“Sprint” and “AT&T”).
+
+HeavyVicinity. In our datasets, HeavyVicinity detected “heavy egonets”, with
+considerably high total edge weight compared to the number of edges. We mark
+the anomalies in Fig.3 for several of our datasets. See [2] for results on all the
+datasets and further discussions.
+
+In Com2Cand(Fig.3a), we see that “Democratic National Committee” gave
+away a lot of money compared to the number of candidates that it donated to.
+In addition, “(John) Kerry Victory 2004” donated a large amount to a single
+candidate, whereas “Liberty Congressional Political Action Committee” donated
+a very small amount ($5), again to a single candidate. Looking at the Candidates
+plot for the same bipartite graph (Fig.3b), we also ﬂagged “Aaron Russo”, the
+lone recipient of that PAC. (In fact, Aaron Russo is the founder of the Consti-
+tution Party which never ran any candidates, and Russo shut it down after 18
+months.)
+
+In Don2Com(Fig.3c), we see that “Bush-Cheney ’04 Inc.” received a lot of
+money from a single donor. On the other hand, we notice that the “Kerry Com-
+mittee” received less money than would be expected looking at the number of
+checks it received in total. Further analysis shows that most of the edges in its
+egonet are of weight 0, showing that most of the donations to that committee
+have actually been returned.
+
+DominantPair. Here, we ﬁnd out whether there is a single dominant heavy
+edge in the egonet. In other words, this method detected “bursty” if not exclusive
+edges.
+
+418
+
+L. Akoglu, M. McGlohon, and C. Faloutsos
+
+Fig. 3. Illustration of the Egonet Weight Power Law (EWPL) and the weight-edge
+anomaly HeavyVicinity. Plots show total weight vs. total count of edges in the egonet
+for all nodes (in log-log scales). Detected outliers include Democratic National Com-
+mittee and John F. Kerry (in FEC campaign donations). See Section 5.2.1 for more
+discussions.
+
+Fig. 4. Illustration of the Egonet λw Power Law (ELWPL) and the dominant heavy
+link anomaly DominantPair. Top anomalies are marked with triangles and labeled.
+See Section 5.2.2 for detailed discussions for each dataset and Fig.1 for an illustrative
+example from Com2Cand.
+
+In Postnet(Fig.4a) nodes such as “ThinkProgress”’s post on a leak scandal3 and
+“A Freethinker’s Paradise” post4 linking several times to the “ThinkProgress” post
+were both ﬂagged. On another note, the slope of the ﬁtting line is close to 0.5,
+pointing to uniform weight distribution in egonets overall. This is expected as most
+posts link to other posts only once.
+
+In Com2Cand(Fig.4b), “Democratic National Committee” is one of the top
+outliers. We would guess that the single large amount of donation was made
+to “John F. Kerry”. Counterintuitively, however, we see that that amount was
+spent for an opposing advertisement against “George W. Bush”.
+
+DominantPair ﬂagged extremely focused authors (those publish heavily to one
+conference) in the DBLP data, shown in Fig.3c. For instance, “Toshio Fukuda”
+has 115 papers in 17 conferences (at the time of data collection), with more than
+half (87) of his papers in one particular conference (ICRA). In addition, “Averill
+
+3
+
+4
+
+www.thinkprogress.org/leak-scandal
+leados.blogs.com/blog/2005/08/overview of cia.html
+
+OddBall: Spotting Anomalies in Weighted Graphs
+
+419
+
+M. Law” has 40 papers published to the “Winter Simulation Conference” and
+nowhere else. On the other extreme, another interesting point is “Wei Li”, with
+many papers, who gets them published to as many distinct conferences, probably
+once or twice to each conference (uniform rather than ‘bursty’ distribution).
+
+See [2] for results on all the datasets and further discussions.
+
+5 Related Work
+
+5.1 Outlier Detection
+Outlier detection has attracted wide interest, being a diﬃcult problem, despite
+its apparent simplicity. Even the deﬁnition of the outlier is hard to give: For
+instance, Hawkins [16] deﬁnes an outlier as “an observation that deviates so
+much from other observations as to arouse suspicion that it was generated by a
+diﬀerent mechanism.” Similar, but not identical, deﬁnitions have been given by
+Barnett and Lewis [5], and Johnson [19].
+
+Outlier detection methods form two classes, parametric (statistical) and non-
+parametric (model-free). The former includes statistical methods that assume
+prior knowledge of the underlying data distribution [5,16]. The latter class in-
+cludes distance-based and density-based data mining methods. These methods
+typically deﬁne as an outlier the (n-D) point that is too far away from the rest,
+and thus lives in a low-density area [20]. Typical methods include LOF [7] and
+LOCI [27]. These methods not only ﬂag a point as an outlier but they also give
+outlierness scores; thus, they can sort the points according to their “strangeness”.
+Many other density-based methods especially for large high-dimensional data sets
+are proposed in [1,4,11,15]. Finally, most clustering algorithms [9,17,25] reveal
+outliers as a by-product.
+
+5.2 Anomaly Detection in Graph Data
+
+Noble and Cook [26] detect anomalous sub-graphs using variants of the Mini-
+mum Description Length (MDL) principle. Eberle and Holder [13] use MDL as
+well as other probabilistic measures to detect several types of anomalies (e.g.
+unexpected/missing nodes/edges). Frequent subgraph mining [18,30] is used to
+detect non-crashing bugs in software ﬂow graphs [22]. Chakrabarti [8] uses MDL
+to spot anomalous edges. Sun et al. [29] use proximity and random walks, to as-
+sess the normality of nodes in bipartite graphs. OutRank and LOADED [14,24]
+use similarity graphs of objects to detect outliers.
+
+In contrast to the above, we work with unlabeled graphs. We explicitly focus on
+nodes, while interactions are also considered implicitly as we study neighborhood
+sub-graphs. Finally, we consider both bipartite and unipartite graphs as well as
+edge weights.
+
+6 Conclusion
+
+This is one of the few papers that focus on anomaly detection in graph data,
+including weighted graphs. We propose to use “egonets”, that is, the induced
+
+420
+
+L. Akoglu, M. McGlohon, and C. Faloutsos
+
+sub-graph of the node of interest and its neighbors; and we give a small, carefully
+designed list of numerical features for egonets. The major contributions are the
+following:
+1. Discovery of new patterns that egonets follow, such as patterns in density
+(Obs.1: EDPL), weights (Obs.2: EWPL), principal eigenvalues (Obs.3: EL-
+WPL), and ranks (Obs.4: ERPL). Proof of Lemma 1, linking the ERPL to
+the EWPL.
+
+2. OddBall, a fast, un-supervised method to detect abnormal nodes in weighted
+graphs. Our method does not require any user-deﬁned constants. It also
+assigns an “outlierness” score to each node.
+
+3. Experiments on real graphs of over 1M nodes, where OddBall reveals nodes
+
+that indeed have strange or extreme behavior.
+
+Future work could generalize OddBall to time-evolving graphs, where the chal-
+lenge is to ﬁnd patterns that neighborhood sub-graphs follow and to extract
+features incrementally over time.
+
+Acknowledgment
+
+This material is based upon work supported by the National Science Founda-
+tion under Grants No. IIS0808661, iCAST, and under the auspices of the U.S.
+Department of Energy by UC Lawrence Livermore National Laboratory under
+contract DE-AC52-07NA27344. This work is also partially supported by an IBM
+Faculty Award, a SPRINT gift, with additional funding from Intel, and Hewlett-
+Packard. Any opinions, ﬁndings, and conclusions or recommendations expressed
+in this material are those of the author(s) and do not necessarily reﬂect the views
+of the funding parties.
+
+References
+
+1. Aggarwal, C.C., Yu, P.S.: Outlier detection for high dimensional data. In:
+
+SIGMOD, pp. 37–46 (2001)
+
+2. Akoglu, L., McGlohon, M., Faloutsos, C.: Anomaly detection in large graphs.
+
+CMU-CS-09-173 Technical Report (2009)
+
+3. Albert, R., Jeong, H., Barabasi, A.-L.: Diameter of the world wide web. Na-
+
+ture (401), 130–131 (1999)
+
+4. Arning, A., Agrawal, R., Raghavan, P.: A linear method for deviation detection in
+
+large databases. In: KDD, pp. 164–169 (1996)
+
+5. Barnett, V., Lewis, T.: Outliers in Statistical Data. John Wiley and Sons,
+
+Chichester (1994)
+
+6. Bay, S., Kumaraswamy, K., Anderle, M.G., Kumar, R., Steier, D.M.: Large scale
+
+detection of irregularities in accounting data. In: ICDM (2006)
+
+7. Breunig, M.M., Kriegel, H.-P., Ng, R.T., Sander, J.: Lof: Identifying density-based
+
+local outliers. In: SIGMOD, pp. 93–104 (2000)
+
+8. Chakrabarti, D.: AutoPart: Parameter-free graph partitioning and outlier detec-
+tion. In: Boulicaut, J.-F., Esposito, F., Giannotti, F., Pedreschi, D. (eds.) PKDD
+2004. LNCS (LNAI), vol. 3202, pp. 112–124. Springer, Heidelberg (2004)
+
+OddBall: Spotting Anomalies in Weighted Graphs
+
+421
+
+9. Chaoji, V., Hasan, M.A., Salem, S., Zaki, M.J.: Sparcl: Eﬃcient and eﬀective shape-
+
+based clustering. In: ICDM (2008)
+
+10. Chau, D.H., Pandit, S., Faloutsos, C.: Detecting fraudulent personalities in net-
+works of online auctioneers. In: F¨urnkranz, J., Scheﬀer, T., Spiliopoulou, M. (eds.)
+PKDD 2006. LNCS (LNAI), vol. 4213, pp. 103–114. Springer, Heidelberg (2006)
+
+11. Chaudhary, A., Szalay, A.S., Moore, A.W.: Very fast outlier detection in large
+
+multidimensional data sets. In: DMKD (2002)
+
+12. Dasu, T., Johnson, T.: Exploratory Data Mining and Data Cleaning. Wiley Inter-
+
+science, Hoboken (May 2003)
+
+13. Eberle, W., Holder, L.B.: Discovering structural anomalies in graph-based data.
+
+In: ICDM Workshops, pp. 393–398 (2007)
+
+14. Ghoting, A., Otey, M.E., Parthasarathy, S.: Loaded: Link-based outlier and
+
+anomaly detection in evolving data sets. In: ICDM (2004)
+
+15. Ghoting, A., Parthasarathy, S., Otey, M.E.: Fast mining of distance-based outliers
+
+in high-dimensional datasets. Data Min. Knowl. Discov. 16(3), 349–364 (2008)
+16. Hawkins, D.: Identiﬁcation of outliers. Chapman and Hall, Boca Raton (1980)
+17. Hu, T., Sung, S.Y.: Detecting pattern-based outliers. Pattern Recognition Let-
+
+ters 24(16) (2003)
+
+18. Jin, R., Wang, C., Polshakov, D., Parthasarathy, S., Agrawal, G.: Discovering fre-
+
+quent topological structures from graph datasets. In: KDD (2005)
+
+19. Johnson, R.A., Wichern, D.W.: Applied Multivariate Statistical Analysis. Prentice
+
+Hall, Englewood Cliﬀs (1998)
+
+20. Knorr, E.M., Ng, R.T.: Algorithms for mining distance-based outliers in large
+
+datasets. In: VLDB, pp. 392–403 (1998)
+
+21. Leskovec, J., McGlohon, M., Faloutsos, C., Glance, N., Hurst, M.: Cascading be-
+havior in large blog graphs: Patterns and a model. In: Society of Applied and
+Industrial Mathematics: Data Mining (2007)
+
+22. Liu, C., Yan, X., Yu, H., Han, J., Yu, P.S.: Mining behavior graphs for ”backtrace”
+
+of noncrashing bugs. In: SDM (2005)
+
+23. McGlohon, M., Akoglu, L., Faloutsos, C.: Weighted graphs and disconnected com-
+
+ponents: Patterns and a model. In: ACM SIGKDD (2008)
+
+24. Moonesinghe, H.D.K., Tan, P.-N.: Outrank: a graph-based outlier detection frame-
+work using random walk. International Journal on Artiﬁcial Intelligence Tools 17(1)
+(2008)
+
+25. Ng, R.T., Han, J.: Eﬃcient and eﬀective clustering methods for spatial data mining.
+
+In: VLDB, pp. 144–155 (1994)
+
+26. Noble, C.C., Cook, D.J.: Graph-based anomaly detection. In: KDD, pp. 631–636
+
+(2003)
+
+27. Papadimitriou, S., Kitagawa, H., Gibbons, P.B., Faloutsos, C.: Loci: Fast outlier
+
+detection using the local correlation integral. In: ICDE (2003)
+
+28. Sequeira, K., Zaki, M.J.: Admit: anomaly-based data mining for intrusions. In:
+
+KDD (2002)
+
+29. Sun, J., Qu, H., Chakrabarti, D., Faloutsos, C.: Neighborhood formation and
+
+anomaly detection in bipartite graphs. In: ICDM (2005)
+
+30. Yan, X., Han, J.: gspan: Graph-based substructure pattern mining. In: ICDM
+
+(2002)
+
+

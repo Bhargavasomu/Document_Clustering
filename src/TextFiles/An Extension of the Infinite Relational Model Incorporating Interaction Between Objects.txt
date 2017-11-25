@@ -1,0 +1,1421 @@
+An Extension of the Inﬁnite Relational Model
+
+Incorporating Interaction between Objects
+
+Iku Ohama1, Hiromi Iida1, Takuya Kida2, and Hiroki Arimura2
+
+1 Corporate R&D Division, Panasonic Corporation, Osaka 571-8501, Japan
+
+{ohama.iku,iida.hiromi}@jp.panasonic.com
+
+2 Division of Computer Science, Hokkaido University, Hokkaido 060-0814, Japan
+
+{kida,arim}@ist.hokudai.ac.jp
+
+Abstract. The Inﬁnite Relational Model (IRM) introduced by Kemp
+et al. (Proc. AAAI2006) is one of the well-known probabilistic generative
+models for the co-clustering of relational data. The IRM describes the
+relationship among objects based on a stochastic block structure with
+inﬁnitely many clusters. Although the IRM is ﬂexible enough to learn
+a hidden structure with an unknown number of clusters, it sometimes
+fails to detect the structure if there is a large amount of noise or outliers.
+To overcome this problem, in this paper we propose an extension of the
+IRM by introducing a subset mechanism that selects a part of the data
+according to the interaction among objects. We also present posterior
+probabilities for running collapsed Gibbs sampling to learn the model
+from the given data. Finally, we ran experiments on synthetic and real-
+world datasets, and we showed that the proposed model is superior to
+the IRM in an environment with noise.
+
+Keywords: relational data, co-clustering, generative model, subset se-
+lection.
+
+1
+
+Introduction
+
+A relational data among m objects and n objects is a bipartite network on a set of
+m vertices and another set of n vertices, which describes the relationships among
+objects in social, physical, and other phenomena. Equivalently, a relational data
+is represented by a matrix with m rows and n columns. For example, POS data
+is a relational data between customers and items, and a friend list of a social
+network service (SNS) such as the Facebook is a relational data among users.
+
+With the emergence of such large amounts of relational data, there has been
+an increase in the interest in methods that can eﬃciently discover hidden interac-
+tion patterns among objects from given relational data. For example, enterprises
+involved in e-commerce and SNS might want to know about the following rela-
+tionships:
+
+– Which type of items does a customer purchase using e-commerce?
+– Which other users are in a relationship with a SNS user?
+– To which user does another user re-tweet when communicating on Twitter?
+
+J. Pei et al. (Eds.): PAKDD 2013, Part II, LNAI 7819, pp. 147–159, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+148
+
+I. Ohama et al.
+
+Clustering methods are among the most eﬀective approaches to obtain answers to
+such questions, and several methods have been proposed so far [5,3,4,16]. The Inﬁ-
+nite Relational Model (IRM) [11] is a well-known and important generative model
+that represents processes for generating relational data. Co-clustering based on
+the model can produce a proper set of clusters that summarizes the relationships
+among objects. Moreover, the number of clusters is automatically estimated from
+the input data, even when the cluster structure and its size are unknown.
+
+However, the IRM might fail to detect unknown structures when the data
+has a large amount of noise or the model can describe only a part of the data.
+Owing to the use of inﬁnite clustering based on the Dirichlet Process (DP) [6],
+the IRM works to some extent, but it ﬁnds many small clusters to adapt itself
+to contradicting data. In fact, the problem of the co-clustering of real-world
+datasets is often diﬃcult, because the data are noisy or sparse. For example, a
+spam blog that leaves comments randomly on other blogs has too many links.
+Such a noisy blog makes it diﬃcult to analyze the relationship among blogs.
+Moreover, an inactive blog, which the author is not eager to write, has very few
+links. Such an insigniﬁcant blog also becomes an obstacle in ﬁnding important
+clusters. As we show later in Section 5, co-clustering with the IRM on such
+ill-formed data ﬁnds ineﬀective clusters.
+
+To handle these ill-formed data, we incorporated a subset selection mechanism
+into the IRM and proposed a new relational model. In our model, the relevance of
+each object is parameterized by an individual Bernoulli parameter. The relevance
+indicates the degree of conﬁdence with which an object forms informative relations
+coming from the latent cluster structure. For example, for POS data, an active
+customer tends to generate relevant relations with many items, as done by a well-
+known item as well. Their relevance becomes comparatively high in our model.
+Then, either a relevant relation or an irrelevant relation is generated stochastically
+for pair-wise objects according to the interaction of their relevance parameters.
+
+Our contributions in this paper are summarized as follows:
+
+– We proposed a new generative model, which is an extension of the IRM
+and incorporates a subset selection mechanism, whereby a subset of the
+relational data is determined by the interaction of the objects’ relevances.
+By estimating the relevance of each object from the data, we diminished the
+eﬀect of the irrelevant relations and performed co-clustering accurately.
+
+– We derived posterior probabilities for running the Collapsed Gibbs Sampling
+
+[12] in order to infer the parameters of the model.
+
+– We performed experiments on synthetic and real-world datasets. The experi-
+mental results for the synthetic datasets showed that our model signiﬁcantly
+improved the performance of co-clustering compared with the IRM. For the
+real-world datasets, our model could successfully ﬁnd major categories as
+clusters from the datasets. An estimated relevance of object can be viewed
+as the popularity or representativeness of the object within a cluster.
+
+Therefore, the proposed method is eﬀective in analyzing noisy relational data.
+
+An Extension of the Inﬁnite Relational Model
+
+149
+
+1.1 Related Works
+
+Hoﬀ et al. [8] discussed an ill-formed problem with clustering vector data. They
+introduced a background distribution that describes irrelevant elements within
+the vector data, so that their model can ﬁnd cluster robustly against noise based
+on a relevant subset of the data.
+
+Ishiguro et al. [10] extended the IRM with a similar idea. They introduced
+switch variables to indicate whether an object is relevant for cluster analysis, or
+is an irrelevant troublesome one. In their model, only relationships among rele-
+vant objects are analyzed. That is, their model is an object-wise subset model.
+However, in some cases, it would not be preferable to select subset of objects
+for clustering target. For example, when we utilize co-clustering results for rec-
+ommendation, we want to suggest the nearest cluster for any object. In our new
+model, the clustering target is selected in a relation-wise manner.
+
+2 Relational Data and the Inﬁnite Relational Model
+
+Let T 1 = {O1
+
+i }N 1
+i=1 and T 2 = {O2
+
+In this section, we ﬁrst deﬁne the relational data discussed in this paper. Then,
+we discuss the IRM, a generative model for co-clustering relational data.
+j}N 2
+j=1 be the sets of objects. We deﬁne the
+relational data between T 1 and T 2 as R : T 1 × T 2 → {0, 1}. If R(i, j) = 1(0), we
+say that there is a link (non-link ) between O1
+1. For a purchase dataset,
+T 1 and T 2 are the sets of customers and items, respectively. We can represent
+customer i’s purchase of item j by R(i, j) = 1, while R(i, j) = 0 indicates that
+customer i have not bought item j. The co-clustering problem on relational data
+∈ C2
+is to estimate cluster assignments z1 = {z1
+based on given data R, where C1 = {1, 2,··· , K} and C2 = {1, 2,··· , L} are
+the sets of cluster indices for T 1 and T 2, respectively.
+
+∈ C1 and z2 = {z2
+
+i }N 1
+
+i=1
+
+j}N 2
+
+j=1
+
+i and O2
+j
+
+The IRM proposed by Kemp et al. [11] is a generative model for relational
+data that can co-cluster objects based on the similarities of the relationships
+among the objects. In the IRM, the Dirichlet Process (DP) [6] is used as a prior
+distribution for the number of clusters. The DP is a nonparametric stochastic
+process that can be viewed as an inﬁnite-dimensional Dirichlet distribution, and
+can generate any-dimensional multinomial distributions. Therefore, the IRM can
+adaptively estimate the number of clusters for the observed data. The generative
+model of the IRM is described as follows:
+
+i | γ1 ∼ CRP(γ1),
+
+z1
+
+j | γ2 ∼ CRP(γ2),
+
+z2
+
+η(k, l)| β ∼ Beta(β, β),
+
+R(i, j)| η(z1
+
+j ) ∼ Bernoulli(η(z1
+
+i , z2
+
+i , z2
+
+j )),
+
+(1)
+
+(2)
+
+(3)
+
+1 We focus on a 2-type (T 1 × T 2) binary relationship in this paper, although
+several variations of relationships can be considered straightforwardly, such as
+discrete/continuous-valued relations and multi-type relations represented by a tensor.
+
+150
+
+I. Ohama et al.
+
+β
+
+γ1
+
+γ2
+
+η(k, l)
+
+∞ × ∞
+
+z1
+i
+
+N 1
+
+R(i, j)
+
+(a) IRM
+
+β1
+
+z2
+j
+
+N 2
+
+γ1
+
+z1
+i
+
+ρ1
+i
+
+N 1
+
+β
+
+η(k, l)
+
+∞ × ∞
+
+β0
+
+η0
+
+ηi,j
+
+r1
+i→j
+
+r2
+j→i
+
+R(i, j)
+
+(b) rdIRM
+
+γ2
+
+z2
+j
+
+ρ2
+j
+
+N 2
+
+β2
+
+Fig. 1. Graphical representations of the generative models. Circle nodes denote vari-
+ables, square nodes denote constants, shaded nodes denote observations, and round-
+edged squares indicate the dimensions of variables.
+
+where CRP(·) is the Chinese Restaurant Process (CRP) [2], which is one of the
+well-known constructive algorithms of DP; Beta(·,·) is the beta distribution; and
+Bernoulli(·) is the Bernoulli distribution, respectively. Figure 1a shows the IRM
+graphically.
+
+We will brieﬂy review the above process. First, the cluster assignments z1
+i
+and z2
+j are given by CRPs (Eq. (1)), where γ1 and γ2 are the concentration
+parameters of the DP that controls the number of clusters to be generated. We
+denote the cluster assignments for all objects other than object i as z1−i. When
+z1−i is given, the conditional probability P (z1
+i is assigned
+to the cluster k∗
+by CRP is given as follows:
+i = k∗ | z1−i, γ1) ∝
+
+i = k∗ | z1−i, γ1) that z1
+
+P (z1
+
+(cid:2)
+
+m1−i,k∗
+γ1
+
+(if m1−i,k∗ > 0),
+is new cluster),
+
+(if k∗
+
+(4)
+
+. As Eq. (4) shows, the assignment z1
+
+where m1−i,k∗ is the number of objects other than object i that are assigned to
+the cluster k∗
+i basically depends on the
+probability proportional to the number m1−i,k∗ of objects that belong to each
+cluster. However, new clusters are generated at the rate γ1. Assume that K × L
+clusters (C1 = {1, 2,··· , K} and C2 = {1, 2,··· , L}) have been generated for
+T 1 × T 2. Then, from Eq. (2), a Bernoulli parameter η(k, l) is given according to
+the beta prior for each pair of clusters C1 × C2. The parameter η(k, l) indicates
+the intensity of the relationship between an object in the cluster k and an object
+in the cluster l. Finally, the relation R(i, j) is generated from the corresponding
+Bernoulli trial (Eq. (3)).
+
+3 The Relevance-Dependent Inﬁnite Relational Model
+
+In this section, we present our new model, called the Relevance-Dependent Inﬁ-
+nite Relational Model (rdIRM).
+
+In real-world relationships, whether each relation is intentionally generated
+depends on the objects related to the relation. In the case of a purchase, a
+
+An Extension of the Inﬁnite Relational Model
+
+151
+
+customer who knows about a large number of items will have a certain opinion
+about whether he needs these items. As a result, this customer will generate
+very important relations that are relevant to decide his cluster assignment. In
+contrast, a customer who knows only about a few items will have vague opinions.
+Thus, relations that are generated by this customer would be irrelevant. That
+is, such an irrelevant relation should not aﬀect the co-clustering. For the items,
+it is reasonable to consider that similar properties exist in terms of popularity.
+j , we introduce rele-
+j ∈ [0, 1] that indicate the degree of conﬁdence to generate
+vance parameters ρ1
+the relevant relations. Then, we consider a generative mechanism in which each
+relation R(i, j) between objects is generated from a mixture of the distribution
+inherent in a cluster η(k, l) (foreground distribution) and the distribution com-
+mon to the entire data η0 (background distribution). We can construct such a
+mechanism as follows:
+
+To model the above situation, for each object O1
+
+i and O2
+
+i , ρ2
+
+r1
+ri,j = f (r1
+
+i→j ∼ Bernoulli(ρ1
+i ),
+ηi,j = ri,j × η(z1
+i→j , r2
+
+j→i),
+
+r2
+
+j→i ∼ Bernoulli(ρ2
+j ),
+
+j ) + (1 − ri,j ) × η0,
+
+i , z2
+
+where f (·,·) is an arbitrary Boolean function that returns 1 or 0. The above
+mechanism enables us to embed a relevance-dependent subset selection into the
+relational model: only the informative (relevant) relations are generated from the
+foreground distribution η(k, l), and the background distribution η0 describes the
+non-informative (irrelevant) part of the relational data. For example, when f is a
+i )(1−ρ2
+logical sum, it corresponds to that we make the mixture rate as 1−(1−ρ1
+j).
+When f is a logical product, the mixture rate becomes ρ1
+j . The other logical
+functions work similarly.
+
+i × ρ2
+
+To summarize, the generative process for the rdIRM is deﬁned as follows:
+
+i | γ1 ∼ CRP(γ1),
+j | γ2 ∼ CRP(γ2),
+z2
+z1
+η0 | β0 ∼ Beta(β0, β0),
+η(k, l)| β ∼ Beta(β, β),
+i | β1 ∼ Beta(β1, β1),
+j | β2 ∼ Beta(β2, β2),
+ρ2
+ρ1
+i ∼ Bernoulli(ρ1
+i→j | ρ1
+j ∼ Bernoulli(ρ2
+j→i | ρ2
+i ),
+j ),
+r2
+r1
+ηi,j = ri,j × η(z1
+j→i),
+i , z2
+i→j , r2
+ri,j = f (r1
+R(i, j)| ηi,j ∼ Bernoulli(ηi,j).
+
+j ) + (1 − ri,j) × η0,
+
+(5)
+(6)
+(7)
+(8)
+(9)
+(10)
+
+Figure. 1b graphically represents this model.
+
+Now, we will brieﬂy explain the rdIRM process. First, the cluster assignments
+z1 and z2 are given as in the original IRM, (Eq. (5)). Second, the foreground
+distribution η(k, l) and the background distribution η0 are independently given
+i and O2
+from a beta prior (Eq. (6)). Third, the relevances ρ1
+j ,
+respectively, are given from beta priors (Eq. (7)). Fourth, the two switches r1
+i→j
+and r2
+j→i are given by a Bernoulli trial with corresponding relevances (Eq. (8)).
+Fifth, either the foreground η(k, l) or the background η0 is selected by the in-
+j→i via logical function f (Eq. (9)). Finally, the relation
+teraction of r1
+R(i, j) is generated from the selected probability (Eq. (10)).
+
+i→j and r2
+
+i and ρ2
+
+j for O1
+
+152
+
+I. Ohama et al.
+
+The diﬀerence between our rdIRM and the original IRM is that we modeled a
+generative process of noisy relationships by introducing objects’ relevances and
+their interaction mechanism. That is, our rdIRM can co-cluster relational data
+based on a subset of relations that are relevant to underlying cluster structures.
+When f is a logical sum, a relevant relation can be generated when at least
+one of the related objects O1
+j has high relevance. This models situations in
+which the relevant relationship between objects can be generated by a one-sided
+request, such as sending an e-mail or following a hyperlink on the Internet. When
+f is a logical product, the relevant relation is generated only when the objects
+cooperate with each other. This models situations in which an object that wants
+to have a relevant relation with another can be constrained from doing so. Of
+course, we can employ other logical functions for other interaction models.
+
+i or O2
+
+4
+
+Inference
+
+We use the Collapsed Gibbs Sampler [12] to infer the parameters of the rdIRM2.
+Given ri,j, the relational data R are separated into a foreground part and a
+j and the link probabilities η(k, l), η0
+background part; thus, the relevances ρ1
+can be integrated out. Therefore, the inference of the rdIRM is performed by
+sampling the assignments z1, z2 and the switches r1, r2 one after the other. In
+this section, we only show the derived posteriors for running the Gibbs sampling
+below, because of the space limitation.
+
+i , ρ2
+
+4.1 Sampling Cluster Assignments z1, z2
+Because z2
+j can be sampled in the same way as z1
+i . We can
+assume that the switch variables r (r1 and r2) have already been given before
+taking a sample of z1
+i , so that the cluster assignments are inﬂuenced only by
+the foreground part of the observations. Therefore, the conditional posterior for
+i = k∗
+z1
+
+i , we concentrate on z1
+
+is derived as follows:
+
+P (z1
+
+i = k∗ | z1−i , z2 , r, R, β, γ1 ) ∝
+
+⎧
+
+⎪⎪⎪⎪⎪⎪⎨
+⎪⎪⎪⎪⎪⎪⎩
+
+m1−i,k∗ (cid:6)
+l∈C2
+B(m+i
+
+γ1
+
+(cid:6)
+l∈C2
+
+r (k∗ ,l)+β)
+r (k∗ ,l)+β,m+i
+B(m+i
+−i
+−i
+r (k∗ ,l)+β,m
+r (k∗ ,l)+β)
+
+B(m
+
+r (k∗ ,l)+β,m+i
+
+r (k∗ ,l)+β)
+
+B(β,β)
+
+(if m1−i,k∗ > 0),
+
+(11)
+
+(if m1−i,k∗ = 0),
+
+Here, we use B(·,·) to denote the beta function. Symbols mr (mr) denote the
+numbers of links (non-links) in the foreground part of the observation, and are
+computed as follows:
+(cid:2) (cid:2)
+r (k∗, l) =
+m+i
+
+((1 − R(s, j)) × ri,j ) ,
+
+(R(s, j) × ri,j) , m+i
+
+r (k∗, l) =
+
+(cid:2) (cid:2)
+
+m−i
+r (k∗, l) =
+
+(R(s, j) × ri,j) , m−i
+
+r (k∗, l) =
+
+((1 − R(s, j)) × ri,j) .
+
+s∈T 1,j∈T 2:
+s =k∗(s(cid:5)=i),
+z1
+
+z2
+j =l
+
+s∈T 1,j∈T 2:
+s =k∗(s(cid:5)=i),
+z1
+
+z2
+j =l
+
+2 Approximative approaches such as variational inference [7] are preferable for han-
+dling large scale data. However, for the sake of accuracy, we used a sampling approach
+in this paper.
+
+s∈T 1,j∈T 2:
+i :=k∗),
+s =k∗(z1
+z1
+(cid:2) (cid:2)
+z2
+j =l
+
+s∈T 1,j∈T 2:
+i :=k∗),
+s =k∗(z1
+z1
+(cid:2) (cid:2)
+z2
+j =l
+
+An Extension of the Inﬁnite Relational Model
+
+153
+
+Note that if ri,j = 1 for all (i, j), Eq. (11) is equivalent to the original IRM’s
+sampler.
+
+4.2 Sampling Switch Variables r1
+As the sampling of r2
+concentrate on r1
+Thus, the conditional posterior for r1
+
+i→j, r2
+
+j→i
+
+j→i is done in the same way as the sampling of r1
+
+i→j , we
+i→j . Given z1 and z2, we have a ﬁnite number K × L of clusters.
+
+i→j is derived as follows:
+
+i→j | z1, z2, r1−(i→j), r2, R, β, β0, β1
+
+)
+
+i→j, r1−(i→j), r2, R−(i,j), β0
+
+1−f (r1
+
+i→j ,r2
+
+j→i)
+
+)
+
+P (r1
+∝ P (R(i, j) | r1
+× P (R(i, j) | z1, z2, r1
+× P (r1
+i→(−j), β1
+
+i→j | r1
+
+i→j, r1−(i→j), r2, R−(i,j), β)
+),
+
+f (r1
+
+i→j ,r2
+
+j→i)
+
+(12)
+
+where R−(i,j) denotes the whole set of R excluding R(i, j). Similarly, r1−(i→j)
+i→j , and r1
+denotes the whole set of r1 without r1
+i→ts
+that are related to object i without r1
+i→j . The terms on the right-hand side of
+Eq. (12) are computed as follows:
+
+i→(−j) denotes a vector of r1
+
+P (R(i, j) | r1
+
+i→j , r1−(i→j)
+
+, r2 , R−(i,j) , β0 ) =
+
+P (R(i, j) | z1 , z2 , r1
+
+i→j , r1−(i→j)
+
+−(i,j)
+r
+
+(m
+
+−(i,j)
+r
+
+(m
+
++β0)R(i,j) (m
+
+m
+
++m
+
+(k,l)+β)R(i,j) (m
+
+m
+
+(k,l)+m
+
+−(i,j)
+r
+−(i,j)
+r
+−(i,j)
+r1
+i
+
++β1)
+
+−(i,j)
+r
+−(i,j)
+r
+
++β0)1−R(i,j)
++2β0
+−(i,j)
+r
+−(i,j)
+r
+i→j
+
+(k,l)+2β
+
+1−r1
+
+,
+
+(k,l)+β)1−R(i,j)
+
+,
+
+,
+
++β1)
+
+r1
+i→j (n
+N 2−1+2β1
+
+, r2 , R−(i,j) , β) =
+−(i,j)
+r1
+i
+
+, β1 ) =
+
+(n
+
+P (r1
+
+i→j | r1
+
+i→(−j)
+−(i,j)
+r
+
+−(i,j)
+r
+
+and m
+
+−(i,j)
+r
+
+denote the numbers of links and non-links, respec-
+(k, l)
+t = l
+denote the num-
+i→(−j).
+
+where m
+tively, such that rs,t = 0 for all pairs (s, t) (cid:6)= (i, j); m
+denote the numbers of links and non-links, respectively, such that z1
+and rs,t = 1 for all pairs (s, t) (cid:6)= (i, j); and n
+bers of r1
+Speciﬁcally, these counts are computed as follows:
+
+−(i,j)
+r
+s = k, z2
+i→t = 1{t (cid:6)= j} and r1
+i→t = 0{t (cid:6)= j}, respectively, within r1
+(cid:5)
+,
+(cid:4)
+R(s, t) × (1 − f (r1
+
+(k, l) and m
+−(i,j)
+r1
+i
+
+and n
+(cid:3)
+t∈T 2:t(cid:6)=j
+
+(cid:4)
+1 − r1
+i→t
+(cid:5)
+t→s))
+
+=
+−(i,j)
+r
+
+−(i,j)
+r1
+i
+
+−(i,j)
+r1
+i
+
+s→t, r2
+
+(cid:5)
+
+m
+
+n
+
+,
+
+,
+
+n
+
+=
+
+=
+
+(cid:3)
+t∈T 2:t(cid:6)=j
+(cid:3)(cid:3)
+
+−(i,j)
+r1
+i
+
+(cid:4)
+r1
+i→t
+(cid:3)(cid:3)
+(cid:4)
+(1 − R(s, t)) × (1 − f (r1
+(cid:3)(cid:3)
+
+(cid:4)
+R(s, t) × f (r1
+
+s∈T 1,t∈T 2:
+(s,t)(cid:5)=(i,j)
+(k, l) =
+
+s∈T 1,t∈T 2:
+(s,t)(cid:5)=(i,j)
+
+s→t, r2
+
+(cid:5)
+t→s))
+(cid:5)
+t→s)
+
+,
+
+,
+
+s→t, r2
+
+−(i,j)
+m
+r
+
+=
+
+−(i,j)
+r
+
+m
+
+−(i,j)
+r
+
+m
+
+(k, l) =
+
+s∈T 1,t∈T 2:
+z1
+s =k,z2
+t =l,
+(s,t)(cid:5)=(i,j)
+
+(cid:3)(cid:3)
+
+(cid:4)
+(1 − R(s, t)) × f (r1
+
+(cid:5)
+t→s)
+
+.
+
+s→t, r2
+
+s∈T 1,t∈T 2:
+z1
+s =k,z2
+t =l,
+(s,t)(cid:5)=(i,j)
+
+154
+
+I. Ohama et al.
+
+5 Experiments
+
+In this section, we present our experimental results. To clarify the eﬀectiveness
+of our subset selection mechanism, the performance of our rdIRM is compared
+with that of the original IRM. Through all the experiments, we assumed that
+the priors of all the binary variables in the generative models were uniform
+(Beta(1.0, 1.0)). In addition, we estimated the concentration parameters γ1, γ2
+for the DPs assuming Gamma priors by sampling method presented in [8].
+
+5.1 Experiments on Synthetic Datasets
+
+We prepared 12 synthetic datasets. First, in accordance with the generative
+model of our rdIRM, we created ﬁve synthetic datasets, Data1(0.0), Data1(0.2),
+Data1(0.5), Data1(0.8), and Data1(1.0), where the numbers in parentheses in-
+dicate the background link probabilities η0 for the datasets. We set the logical
+function f for the rdIRM to be a logical sum. The cluster assignments z1 and z2
+were independently generated from ﬁxed-dimensional multinomial distributions.
+The parameter values used for generating the datasets were N 1 = N 2 = 200,
+β = (0.5, 0.5), and β1 = β2 = (4.0, 3.0); the number of clusters were set as K = 4
+and L = 5, and the parameters for the multinomials were π1 = (0.4, 0.3, 0.2, 0.1)
+and π2 = (0.33, 0.27, 0.20, 0.13, 0.07) for T 1 and T 2, respectively. Next, we
+also created ﬁve synthetic datasets in a similar manner (from Data2(0.0) to
+Data2(1.0)), except that we set the logical function f to be a logical product
+and we set both β1 and β2 to be (4.0, 2.0). Finally, we created two datasets
+without background inﬂuences, (Data1(NULL) and Data2(NULL)). We applied
+the logical sum version of the rdIRM to Data1 and the logical product version
+to Data2.
+
+We used three measures to evaluate clustering performance. One was the
+Adjusted Rand Index (ARI) [9], which is widely used for computing the similarity
+between true and estimated clustering results. The ARI takes a value in the
+range 0.0 – 1.0, and takes a value of 1.0 when a clustering result is completely
+equivalent to the ground truth. Another was the number of erroneous estimated
+clusters (EC). We computed the average of these measures for the two sets T 1
+and T 2. The rest was the test data log likelihood (TDLL), which indicates the
+predictive robustness of a generative model; we hid 1.0% of the observation
+during inference (keeping it small so that the latent cluster structure did not
+change), and measured the averaged log likelihood such that a hidden entry
+would take the actual value. A larger value is better, and a smaller one means
+that the model overﬁts the data. Finally, we repeated the experiment 10 times
+for each dataset using diﬀerent random seeds to ﬁnd an overall average.
+
+Table 1 lists the computed measures. In the case of every dataset, except
+Data1(NULL) and Data2(NULL), we conﬁrmed that the rdIRM outperformed
+the IRM. In particular, the rdIRM maintained good performance for sparse (η0 ≈
+0.0) or dense (η0 ≈ 1.0) data. We also list in Table 2 the maximum a posteriori
+(MAP) estimations of the background probability ¯η0 and the estimated ratios of
+the foreground for synthetic datasets, except Data1(NULL) and Data2(NULL).
+
+An Extension of the Inﬁnite Relational Model
+
+155
+
+Table 1. ARI, EC, and TDLL on synthetic datasets
+
+ARI
+
+EC
+
+TDLL
+
+Dataset
+IRM rdIRM IRM rdIRM IRM rdIRM
+Data1(NULL) 1.000 0.999 0.000 0.030 -0.302 -0.261
+0.712 0.999 0.678 0.022 -0.410 -0.315
+Data1(0.0)
+0.806 1.000 0.480 0.010 -0.432 -0.363
+Data1(0.2)
+0.868 0.993 0.270 0.090 -0.459 -0.405
+Data1(0.5)
+0.834 0.999 0.388 0.013 -0.462 -0.385
+Data1(0.8)
+0.806 0.999 0.435 0.025 -0.425 -0.330
+Data1(1.0)
+Data2(NULL) 1.000 0.996 0.000 0.000 -0.316 -0.232
+0.629 0.980 1.053 0.020 -0.424 -0.196
+Data2(0.0)
+0.627 0.913 0.735 0.105 -0.576 -0.431
+Data2(0.2)
+0.759 0.930 0.488 0.105 -0.614 -0.526
+Data2(0.5)
+0.724 0.917 0.738 0.097 -0.558 -0.438
+Data2(0.8)
+0.644 0.981 0.910 0.083 -0.390 -0.183
+Data2(1.0)
+
+Table 2. Estimated back-
+ground probabilities (¯η0) and
+the FRs
+
+¯η0
+
+FR
+
+Dataset
+Data1(0.0) 0.0085 0.8484
+Data1(0.2) 0.1970 0.8462
+Data1(0.5) 0.4531 0.8588
+Data1(0.8) 0.7674 0.8607
+Data1(1.0) 0.9876 0.8611
+Data2(0.0) 0.0022 0.4884
+Data2(0.2) 0.2139 0.4548
+Data2(0.5) 0.5033 0.4658
+Data2(0.8) 0.7845 0.4397
+Data2(1.0) 0.9872 0.4654
+
+The ground truths of the foreground ratios (FRs) are 0.8197 for Data1 and
+0.4622 for Data2. As the table shows, the rdIRM performs well in estimating the
+ground truths.
+
+5.2 Experiments with Real-World Datasets
+
+We applied the rdIRM to two real-world datasets. One was the “MovieLens”
+dataset3, which contains a large number of user ratings of movies on a ﬁve-point
+scale. In our experiment, we created a binary relational dataset with a threshold
+that yields R(i, j) = 1 for ratings higher than 3 points and R(i, j) = 0 for all
+other ratings. That is, a relational value R(i, j) = 1 indicates that user i likes
+movie j. There are a total of 943 users and 1,682 movies in the dataset, and 3.5%
+of the relations are links. The other dataset was the “animal-feature” dataset
+[14], which includes relations between 50 animals and 85 features. Each feature
+is rated on a scale of 0–100 for each animal. We prepared the binary data with
+a threshold that yields R(i, j) = 1 for all ratings higher than the average of the
+entire set of ratings (20.79). That is, we used the relational value R(i, j) = 1
+(R(i, j) = 0) to indicate that animal i has (does not have) feature j. In this
+dataset, 36.8% of the relations are links.
+
+We used a logical sum version of the rdIRM for the MovieLens dataset and
+a logical product version for the animal-feature dataset. Our reason to use the
+former was that a user can watch any movie according to his or her preference,
+and similarly, movies are usually promoted independent of the users. Therefore,
+it seemed natural that the foreground (relevant relations) for the MovieLens
+dataset should be generated as per either the user’s relevance ρ1
+i or the movie’s
+relevance ρ2
+j . On the other hand, animal features are acquired through evolution
+based on the speciﬁc type of animal. For example, aquatic features such as
+“swims” or “water” cannot be acquired by terrestrial animals. Therefore, the
+type of animal limits the features that it can acquire, and conversely, the type
+
+3 http://movielens.umn.edu/
+
+156
+
+I. Ohama et al.
+
+(a) MovieLens (IRM), TDLL = -0.135
+
+(b) MovieLens (rdIRM), TDLL = -0.097
+
+(c) animal-feature (IRM), TDLL = -0.393 (d)animal-feature (rdIRM), TDLL = -0.213
+
+Fig. 2. Clustering results for the real-world datasets. Black and white dots indicate
+links and non-links, respectively. In the rdIRM’s results, gray dots indicate the areas
+that were estimated as background (irrelevant to cluster). Note that the objects within
+each cluster are sorted by descending order of the estimated relevances ¯ρ1
+i and ¯ρ2
+j .
+“TDLL” is the computed test data log likelihood for each dataset.
+
+of feature limits the types of animals that are related to that feature. Therefore,
+we used the logical product version of the rdIRM for the animal-feature dataset.
+Figure 2 shows the clustering results and the computed TDLL for these real-
+world datasets. Figure 3 shows color maps for the estimated foreground proba-
+bilities ¯η(k, l). The background probabilities η0 that the rdIRM estimated were
+0.0000 for the MovieLens dataset and 0.0036 for the animal-feature dataset.
+It can be seen that the original IRM organized many non-informative cluster-
+blocks, because the IRM considered that all the relations were relevant for cluster
+analysis. In contrast, the rdIRM found more vivid cluster structures owing to
+the use of our subset selection mechanism, which selects an informative subset
+of relations via the interaction of the objects’ relevances. The computed TDLLs
+show that the rdIRM predicts hidden entries more robustly than does the orig-
+inal IRM for both datasets.
+
+j , it can be seen that ¯ρ2
+
+The left side of Table 3 lists the examples of the movie clusters produced by
+the rdIRM for the MovieLens dataset. In the columns for the number of links
+and ¯ρ2
+j tends to increase with the number of links. This
+means that we can regard the relevances as an indication of the popularity of
+the movies within the cluster. On the other hand, the original IRM treats all
+the links and non-links as relevant, so that the diﬀerences of the popularity of
+movies popularity aﬀect the cluster assignment. The right side of Table 3 lists
+
+An Extension of the Inﬁnite Relational Model
+
+157
+
+Table 3. Examples of the clusters obtained by the rdIRM. The ﬁrst column lists
+the object (Title/Feature). The second column lists the number of links related to the
+object (LNKS). The third column lists the estimated relevance ( ¯ρ2
+j ). The fourth column
+lists the cluster indices that were obtained by the original IRM (ZIRM). The left side
+tables are for the MovieLens dataset. The right side tables are for the animal-feature
+dataset.
+
+Movie cluster 6 (contains 6 movies.)
+¯ρ2
+j ZIRM
+501 0.9111
+28
+9
+379 0.5534
+25
+228 0.0921
+220 0.1905
+25
+
+Title
+Star Wars
+Return of the Jedi
+Independence Day
+Star Trek
+
+LNKS
+
+Movie cluster 7 (contains 40 movies.)
+
+Title
+Silence of the Lambs
+Pulp Fiction
+Usual Suspects
+Alien
+Terminator
+Seven(Se7en)
+
+LNKS
+
+¯ρ2
+j ZIRM
+26
+344 0.9132
+26
+294 0.7598
+20
+232 0.6233
+20
+223 0.5164
+217 0.5608
+20
+15
+167 0.3376
+
+Movie Cluster 2 (contains 35 movies.)
+
+Title
+W.W. & the Chocolate F.
+Birdcage
+Truth About Cats & Dogs
+Happy Gilmore
+Kingpin
+
+LNKS
+
+¯ρ2
+j ZIRM
+189 0.7196
+27
+17
+154 0.4762
+17
+148 0.3386
+2
+74 0.0360
+73 0.1196
+2
+
+(a) MovieLens (IRM)
+
+1.0
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+0.0
+
+1.0
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+0.0
+
+Feature cluster 1 (contains 10 features.)
+ZIRM
+Feature LNKS
+swims
+2
+2
+water
+2
+coastal
+2
+arctic
+ﬂippers
+2
+
+¯ρ2
+j
+10 0.9808
+10 0.9808
+8 0.9231
+9 0.8846
+7 0.8077
+
+Feature cluster 5 (contains 15 features.)
+ZIRM
+Feature LNKS
+27
+paws
+20
+nestspot
+22
+claws
+small
+21
+
+¯ρ2
+j
+19 0.9615
+31 0.9423
+19 0.9038
+23 0.7885
+
+Feature cluster 6 (contains 8 features.)
+ZIRM
+Feature LNKS
+17
+meat
+ﬁerce
+17
+17
+hunter
+16
+stalker
+1
+scavenger
+ﬂys
+1
+
+¯ρ2
+j
+20 0.9808
+21 0.9231
+17 0.8846
+10 0.4808
+6 0.1538
+1 0.0769
+
+(b) MovieLens (rdIRM)
+
+1.0
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+0.0
+
+1.0
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+0.0
+
+(c) animal-feature (IRM)
+
+(d) animal-feature (rdIRM)
+
+Fig. 3. The estimated foreground link probabilities ¯η(k, l)
+
+158
+
+I. Ohama et al.
+
+the examples of the feature clusters obtained by the rdIRM for the animal-
+feature dataset. As with the results for the MovieLens dataset, we can see that
+the estimated ρ2
+j tends to increase with the number of links. One interesting
+result produced by the rdIRM is that representative features such as “swims,”
+“water,” “paws,” “nestspot” and “meet” were found to have high relevance in
+their clusters. From these results, we can say that the relevances estimated by
+the rdIRM indicate the popularities or representativeness of the objects. Con-
+sequently, the rdIRM ﬁnds clusters in terms of major categories by introducing
+the relevance-dependent subset selection mechanism.
+
+6 Conclusions
+
+In this paper, we proposed a new probabilistic relational model called the
+Relevance-Dependent Inﬁnite Relational Model (rdIRM), which is suitable for
+noisy relational data analysis. The rdIRM parameterizes objects’ relevances
+and incorporates a relevance-dependent subset selection mechanism, so that the
+rdIRM can estimate objects’ relevances, and can co-cluster noisy relational data
+selecting only relevant relations that are informative for co-cluster analysis.
+
+Our experiments with synthetic datasets conﬁrmed that the rdIRM can ﬁnd
+proper clusters in a noisy relational data, especially, in sparse or dense data.
+Moreover, our experiments on real-world datasets conﬁrmed that the clusters
+obtained by the rdIRM represent major categories and that the estimated rele-
+vances can be viewed as the popularity or representativeness of the objects.
+
+Our future research plans include extending the rdIRM so that it can also
+estimate the logical function f , which was given statically in this paper. We are
+also interested in applying our relevance-based subset selection mechanism to
+more advanced relational models, such as the mixed (or multiple) membership
+models [1,13], the hierarchical structure models [15], and the time-varying models
+[7].
+
+References
+
+1. Airoldi, E.M., Blei, D.M., Fienberg, S.E., Xing, E.P.: Mixed membership stochastic
+
+blockmodels. J. Mach. Learn. Res. 9, 1981–2014 (2008)
+
+2. Aldous, D.: Exchangeability and related topics. In: Ecole d’Ete de Probabilities de
+
+Saint-Flour XIII, pp. 1–198 (1985)
+
+3. Dhillon, I.S.: Co-clustering documents and words using bipartite spectral graph
+
+partitioning. In: Proc. SIGKDD, pp. 269–274 (2001)
+
+4. Dhillon, I.S., Mallela, S., Modha, D.S.: Information-theoretic co-clustering. In:
+
+Proc. SIGKDD, pp. 89–98 (2003)
+
+5. Ding, C., Li, T., Peng, W., Park, H.: Orthogonal nonnegative matrix t-
+
+factorizations for clustering. In: Proc. SIGKDD, pp. 126–135 (2006)
+
+6. Ferguson, T.S.: A bayesian analysis of some nonparametric problems. The Annals
+
+of Statistics 1(2), 209–230 (1973)
+
+7. Fu, W., Song, L., Xing, E.P.: Dynamic mixed membership blockmodel for evolving
+
+networks. In: Proc. ICML, pp. 329–336 (2009)
+
+An Extension of the Inﬁnite Relational Model
+
+159
+
+8. Hoﬀ, P.D.: Subset clustering of binary sequences, with an application to genomic
+
+abnormality data. Biometrics 61(4), 1027–1036 (2005)
+
+9. Hubert, L., Arabie, P.: Comparing partitions. J. of Classiﬁcation 2(1), 193–218
+
+(1985)
+
+10. Ishiguro, K., Ueda, N., Sawada, H.: Subset inﬁnite relational models. J. Mach.
+
+Learn. Res. - Proceedings Track 22, 547–555 (2012)
+
+11. Kemp, C., Tenenbaum, J.B., Griﬃths, T.L., Yamada, T., Ueda, N.: Learning sys-
+tems of concepts with an inﬁnite relational model. In: Proc. AAAI, vol. 1, pp.
+381–388 (2006)
+
+12. Liu, J.S.: The collapsed gibbs sampler in bayesian computations with applications
+
+to a gene regulation problem. J. Am. Stat. Assoc. 89(427), 958–966 (1994)
+
+13. Mørup, M., Schmidt, M.N., Hansen, L.K.: Inﬁnite multiple membership relational
+
+modeling for complex networks. In: Proc. MLSP, pp. 1–6 (2011)
+
+14. Osherson, D.N., Stern, J., Wilkie, O., Stob, M., Smith, E.E.: Default probability.
+
+Cognitive Science 15(2), 251–269 (1991)
+
+15. Roy, D., Kemp, C., Mansinghka, V., Tenenbaum, J.: Learning annotated hierarchies
+
+from relational data. In: Proc. NIPS, pp. 1185–1192 (2006)
+
+16. Shaﬁei, M.M., Milios, E.E.: Latent dirichlet co-clustering. In: Proc. ICDM, pp.
+
+542–551 (2006)
+
+

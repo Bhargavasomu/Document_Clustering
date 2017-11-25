@@ -1,0 +1,1584 @@
+Fast Graph Stream Classiﬁcation
+
+Using Discriminative Clique Hashing
+
+Lianhua Chi1,2, Bin Li1, and Xingquan Zhu1
+
+1 Centre for Quantum Computation & Intelligent Systems, FEIT,
+
+University of Technology, Sydney, NSW 2007, Australia
+
+2 School of Computer Science & Technology,
+
+Huazhong University of Science & Technology, Wuhan 430074, China
+
+{lianhua.chi,bin.li-1,xingquan.zhu}@uts.edu.au
+
+Abstract. As many data mining applications involve networked data
+with dynamically increasing volumes, graph stream classiﬁcation has re-
+cently extracted signiﬁcant research interest. The aim of graph stream
+classiﬁcation is to learn a discriminative model from a stream of graphs
+represented by sets of edges on a complex network. In this paper, we
+propose a fast graph stream classiﬁcation method using DIscriminative
+Clique Hashing (DICH). The main idea is to employ a fast algorithm to
+decompose a compressed graph into a number of cliques to sequentially
+extract clique-patterns over the graph stream as features. Two random
+hashing schemes are employed to compress the original edge set of the
+graph stream and map the unlimitedly increasing clique-patterns onto a
+ﬁxed-size feature space, respectively. The hashed cliques are used to up-
+date an “in-memory” ﬁxed-size pattern-class table, which will be ﬁnally
+used to construct a rule-based classiﬁer. DICH essentially speeds up the
+discriminative clique-pattern mining process and solves the unlimited
+clique-pattern expanding problem in graph stream mining. Experimen-
+tal results on two real-world graph stream data sets demonstrate that
+DICH can clearly outperform the compared state-of-the-art method in
+both classiﬁcation accuracy and training eﬃciency.
+
+Keywords: Graph classiﬁcation, graph streams, cliques, hashing.
+
+1
+
+Introduction
+
+The emergence of complex networks has led to a surge of research in graph
+data mining [1]. Graph classiﬁcation is an important graph data mining task
+that aims to learn a discriminative model from training examples to predict
+class labels of test examples, where both training and test examples are graphs.
+Many real-world applications involve graph-represented data, such as chemical
+compounds, XML documents, and program ﬂows. The essential challenge for
+graph classiﬁcation is to extract features from graphs and represent graph data
+in instance-feature format to support model training. A variety of studies on
+substructure extraction (e.g., walks [2], paths [3], and subtrees [4,5]) for describ-
+ing graphs have been proposed in the past decade. However, most of them only
+
+J. Pei et al. (Eds.): PAKDD 2013, Part I, LNAI 7818, pp. 225–236, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+226
+
+L. Chi, B. Li, and X. Zhu
+
+consider the learning problem of graph classiﬁcation in batch mode (all data are
+available for training), which limits their applicability to large-scale and stream
+scenarios.
+
+Due to the streaming nature of many real-world complex networks, such as
+social networks and sensor networks, graph stream classiﬁcation has recently
+attracted increasing research interest [6,7,8,9]. Graph stream classiﬁcation is de-
+ﬁned on a complex network which comprises a massive universe of nodes, where
+the stream of graphs are represented as sets of edges on the underlying network.
+For example, co-authorships of research works continuously form graphs on a
+coauthor network (e.g., DBLP), dynamic communities of interest continuously
+form graphs on a social network (e.g., Facebook), and traﬃc ﬂows continuously
+form graphs on a transportation network. Graph stream classiﬁcation on a com-
+plex network with massive nodes is challenging, because
+
+– Subgraph Feature Generation: Graph stream is deﬁned on a massive
+universe of nodes, enumerating subgraph-patterns from such a large node
+set as features is time consuming and memory intensive. We need fast and
+inexpensive feature generation method for graph stream classiﬁcation.
+
+– Increasing Stream Volumes: The volumes of graph data are continuously
+growing, so graph streams can usually be accessed only once. Graph stream
+classiﬁcation must be able to tackle dynamically increasing graph volumes
+and generate discriminative model with high speed.
+
+– Changing Feature Distributions: The marginal distributions of
+subgraph-patterns (features) may continuously change over the graph stream
+(i.e., the concept-drift problem [10]), a dynamic updating scheme is required
+to update the discriminative model.
+
+Few studies have investigated the graph stream classiﬁcation problem. To the
+best of our knowledge, only two works [9,11] may be applied to the considered
+problem. Both of them employ hashing techniques to sketch the graph stream for
+saving computational cost and controlling the size of the subgraph-pattern set.
+In [11], the authors proposed a hash kernel to project arbitrary graphs onto a
+compatible feature space for similarity computing, but it can only be applied to
+node-attributed graphs. Recently, Aggarwal [9] proposed a 2-D hashing scheme
+to construct an “in-memory” summary for sequentially presented graphs and
+used a simple heuristic to select a set of most discriminative frequent patterns
+to build a rule-based classiﬁer. Although [9] has exhibited promising perfor-
+mance on graph stream classiﬁcation, there are two inherent limitations: (1)
+The selected subgraph-patterns are composed with disconnected edges, which
+may have less discriminative capability than connected subgraph-patterns due
+to a lack of semantic meaning. (2) The computational cost is high because an
+additional frequent pattern mining procedure is required to perform on the sum-
+mary table which comprises massive transactions.
+
+In this paper, we propose a fast graph stream classiﬁcation method using
+DIscriminative Clique Hashing (DICH) to address the aforementioned chal-
+lenges. The main idea is to decompose a compressed graph into a number of
+cliques (fully connected subgraphs) to sequentially extract clique-patterns over
+
+Fast Graph Stream Classiﬁcation Using Discriminative Clique Hashing
+
+227
+
+the graph stream as features. Two random hashing schemes are employed to
+compress the original edge set of the graph stream and map the unlimitedly in-
+creasing clique-patterns onto a ﬁxed-size feature space, respectively. The hashed
+cliques are then used to update an “in-memory” ﬁxed-size pattern-class table,
+which will be ﬁnally used to generate a rule-based classiﬁer. Since DICH adopts
+connected subgraphs as features and needs no additional frequent pattern mining
+procedure, it can achieve very fast training speed for graph stream classiﬁcation.
+The experimental results on two real-world graph stream data sets clearly show
+that DICH outperforms the compared state-of-the-art [9] in both classiﬁcation
+accuracy and training eﬃciency.
+
+The remainder of this paper is organized as follows: Section 2 introduces the
+related work. The proposed framework for graph stream classiﬁcation will be
+described in Section 3 and the detailed method of DICH will be presented in
+Section 4. We empirically evaluate our method to show its eﬀectiveness and
+eﬃciency in Section 5 and conclude the paper in Section 6.
+
+2 Related Work
+
+The considered problem is closely related to graph classiﬁcation. Most existing
+works focus on designing eﬀective yet eﬃcient kernels for measuring graph sim-
+ilarity. A large number of graph kernels have been proposed in the last decade,
+most of which are based on the similar idea of extracting substructures from
+graphs to compare their co-occurrences. Typical substructures for describing
+graphs include walks [2,12], paths [3], subtrees [4,5,13], and subgraphs (usually
+based on a frequent subgraph mining technique, e.g., [14]). In this paper, we
+extract cliques as features for describing a graph.
+
+Our problem is also related to data stream mining. Mining high-speed data
+streams was ﬁrst studied in [15] and the idea of using ensemble learning for data
+stream classiﬁcation was proposed soon after [16]. A classical ensemble learning
+framework for addressing the concept-drift problem in data stream mining was
+proposed in [10]. In our graph stream classiﬁcation problem, we employ a rule-
+based classiﬁcation approach rather than the ensemble learning framework for
+faster processing speed and easier model updating.
+
+The most relevant work to this paper is [9], which also considers graph stream
+classiﬁcation on a complex network. It employs a 2-D hashing scheme to con-
+struct an “in-memory” summary for the sequentially presented graphs. The ﬁrst
+random-hash scheme is used to reduce the size of the edge set. The second min-
+hash scheme is used to dynamically update a number of hash-codes (i.e., corre-
+sponding to random sorting samples), which is able to summarize the frequent
+patterns of co-occurrence edges in the graph stream observed thus far. Finally,
+a simple heuristic is used to select a set of most discriminative frequent patterns
+to build a rule-based classiﬁer. In this paper, we propose a clique-based hashing
+scheme for solving the same problem with a better performance in both classi-
+ﬁcation accuracy and training eﬃciency as well as avoiding the the limitations
+of [9] discussed in Section 1.
+
+228
+
+L. Chi, B. Li, and X. Zhu
+
+3 Framework
+
+We ﬁrst introduce the problem setting for graph stream classiﬁcation. Suppose
+there is a complex network which comprises a massive universe of nodes. The
+edges connecting these nodes are denoted by the edge set E. The stream of
+graphs {G1, G2, . . . , Gi, . . .} are presented continuously as subsets of E, where
+the subscript i denotes the receiving order in the graph stream. In particular,
+the edge set of Gi are denoted by {E1, . . . , Ee} ⊂ E, where e denotes the number
+of edges in Gi. Each graph Gi has a class label Li ∈ {1, . . . , M}. We assume
+Gi is received in the form (cid:4)i, E1, . . . , Ee, Li(cid:5). In this paper, we assume that each
+
+edge has a default weight 1 for simplicity. The underlying graph stream can
+only be accessed once and our goal is to learn a discriminative model from
+
+{G1, G2, . . . , Gi, . . .} at a high eﬃciency to accurately predict the class label of
+a test graph Gtest in the future graph stream.
+
+We next give an overview of DICH for graph stream classiﬁcation. The cor-
+responding framework, illustrated in Figure 1, comprises three modules. The
+graphs in the stream are received and processed one by one. The ﬁrst module
+is for clique detection from each graph in the stream. The incoming edges of Gi
+are ﬁrst randomly hashed to a compressed edge set and then we adopt a fast
+algorithm to decompose the compressed graph into a number of cliques (fully
+connected subgraphs) as the features of Gi. Since the number of clique-patterns
+will unlimitedly increase as new graphs are fed in, the underlying feature space
+will keep expanding accordingly. Thus, in the second module, a clique hash-
+ing scheme is performed to map the unlimitedly emerged clique-patterns onto
+a ﬁxed-size clique-pattern set. In the last module, an “in-memory” ﬁxed-size
+pattern-class table is updated using the clique-pattern and class label informa-
+tion of Gi; and a rule-based classiﬁer is constructed based on the pattern-class
+table by identifying frequent and discriminative clique-patterns associated to
+each class. To test a graph Gtest in the future graph stream, Gtest is processed
+in the ﬁrst two modules and the obtained hashed clique-patterns are input to
+the rule-based classiﬁer for class label prediction. The detailed approaches to the
+three modules are described in the following section.
+
+4 Graph Stream Classiﬁcation
+
+4.1 Graph Clique Detection
+
+As shown in Figure 1, instead of relying on expensive frequent subgraph mining
+to discover graph features, we propose to use frequent and discriminative clique-
+patterns for clique-based classiﬁer construction. So our ﬁrst step is to detect all
+the cliques from each graph in the graph stream. Since the edge set of the graph
+stream on the complex network can be extremely large, it is necessary to sketch
+the graph stream as a preprocessing step. In particular, we use a random hash
+function to map the original edge set E onto a signiﬁcantly compressed edge set ¯E
+of size N . That is to say, the edges in the compressed graph of Gi will be indexed
+by {1, . . . , N}. If multiple edges in Gi are hashed onto the same index, the weight
+
+Fast Graph Stream Classiﬁcation Using Discriminative Clique Hashing
+
+229
+
+Gtest
+
+.
+.
+.
+.
+.
+.
+
+Gi+1
+
+Gi
+
+Gi-1
+
+.
+.
+.
+
+Graph 
+Stream
+
+Edge 
+Hashing
+
+Clique
+
+Detection
+
+Clique
+Hashing
+
+Label
+
+Prediction
+
+Edge 
+Hashing
+
+Clique
+
+Detection
+
+Edge 
+Hashing
+
+Clique
+
+Detection
+
+Edge 
+Hashing
+
+Clique
+
+Detection
+
+Clique
+Hasing
+
+Clique
+Hasing
+
+Clique
+Hasing
+
+Pattern-
+Class 
+Table
+
+Updating
+
+Frequent 
+
+Discriminative 
+
+Clique
+Mining
+
+Clique
+Mining
+
+Rule-
+based 
+Classiﬁer
+
+Graph Clique Detection
+
+Graph Clique 
+
+Hashing
+
+Clique-based Classiﬁer
+
+Fig. 1. The framework of DICH for graph stream classiﬁcation
+
+Algorithm 1. Clique Detection
+Clique-Detect(): Detect the clique set Ci from graph Gi.
+begin
+
+¯Gi := Edge-Hash(Gi, N );
+Ci := ∅;
+for t := max( ¯Gi) to min( ¯Gi) step 1 do
+
+:= 1( ¯Gi ≥ t);
+:= Bron-Kerbosch( ¯G(t)
+
+i );
+
+(cid:2)
+
+i
+
+¯G(t)
+C (t)
+Ci := Ci
+
+i
+
+C (t)
+
+i
+
+;
+
+od
+
+end
+
+of the compressed edge is set to the number of the edges that get the same index.
+After hashing all the edges in Gi, we obtain a compressed graph ¯Gi for clique
+detection. We deﬁne this edge hashing scheme using ¯Gi := Edge-Hash(Gi, N ).
+The leftmost two columns in Figure 2 illustrates this procedure.
+
+Next we will employ a fast algorithm to detect cliques in each compressed
+graph. We adapt the graphlet basis estimation algorithm used in [17] to this end.
+The ﬁrst step for clique detection is to threshold the compressed graph ¯Gi at a
+number of weight levels in descending order, say t = {max( ¯Gi), . . . , min( ¯Gi)},
+where max( ¯Gi) and min( ¯Gi) denote the largest and the smallest edge weights
+:= 1( ¯Gi ≥ t), where 1(·)
+in ¯Gi, respectively. We deﬁne this operation using ¯G(t)
+denotes the indicator function and the resulting graph is denoted by ¯G(t)
+. We
+use the Bron-Kerbosch algorithm [18] to identify all the cliques from ¯G(t)
+i at each
+threshold. The union set of the cliques found in { ¯G(t)
+t=min( ¯Gi) is represented
+as the clique set for Gi. This procedure is detailed in Algorithm 1.
+
+i }max( ¯Gi)
+
+i
+
+i
+
+230
+
+L. Chi, B. Li, and X. Zhu
+
+1
+
+1
+
+1
+
+1 1
+
+1
+
+Edge 
+Hashing
+
+1 1
+1
+
+1
+1 1
+
+1
+
+1
+
+1
+
+Gi
+
+4
+
+2
+
+2
+
+1
+
+1
+2 1
+
+2
+
+Compressed 
+Graph of Gi
+
+thres=4
+
+thres=2
+
+thres=1
+
+Setting 
+
+Thresholds
+
+Clique Detection
+
+Clique Set Ci of Gi
+
+Fig. 2. Clique detection in a compressed graph
+
+An example of clique detection is illustrated in Figure 2. After edge hashing,
+we obtain the compressed graph of Gi (2nd column). Then, four weight thresh-
+olds {4, 3, 2, 1} are set to generate three graphs { ¯G(1)
+i } (3rd column).
+Note that ¯G(3)
+is an empty graph which is not shown. The Bron-Kerbosch algo-
+rithm is applied to the three graphs and detect a set of cliques from each graph
+(4th column). Finally, the cliques detected at all weight thresholds are merged
+to form the clique set Ci for Gi as its feature representation (5th column).
+
+, ¯G(2)
+
+, ¯G(4)
+
+i
+
+i
+
+i
+
+4.2 Graph Clique Hashing
+
+The cliques extracted from each graph are used to represent its features. To
+learn a classiﬁer from the graph stream, it is required to make the features of
+all graphs be in the same feature space. In other words, we should count the
+occurrences of the same set of clique-patterns in all graphs in the stream. Since
+the number of clique-patterns will increase as new graphs are continuously fed
+in, the induced feature space will keep expanding accordingly. To address this
+problem, we adopt a feature hashing scheme used in [11] to randomly map the
+unlimitedly emerged clique-patterns onto a ﬁxed-size set. In particular, we use an
+“in-memory” P × M pattern-class table Δ, which can be dynamically updated,
+to count clique-pattern and class label information from the graph stream. In
+Δ, P rows correspond to the indices of hashed clique-patterns while M columns
+correspond to all the classes of the graphs.
+
+Given Gi in the graph stream, we ﬁrst use Algorithm 1 to collect the clique
+set Ci. Then, for each clique in Ci, say Ci,j , we apply a random hash function
+(·) to the string of ordered edges in Ci,j to generate an index Hi,j ∈ {1, . . . , P}.
+If a clique with class label Li is hashed to an index Hi,j, we add 1 to the entry
+Δ[Hi,j, Li], which means clique-pattern Ci,j has a contribution to class Li. This
+ﬁxed-size pattern-class table is continuously updated as new cliques are detected
+over the graph stream. This procedure is detailed in Algorithm 2.
+
+Fast Graph Stream Classiﬁcation Using Discriminative Clique Hashing
+
+231
+
+Algorithm 2. Clique Hashing
+Clique-Hash(): Hash the cliques in Gi and update the pattern-class table.
+begin
+
+for j := 1 to size(Ci) step 1 do
+
+Hi,j := (Ci,j );
+Δ[Hi,j , Li] := Δ[Hi,j , Li] + 1;
+
+od
+
+end
+
+4.3 Clique-Based Classiﬁer
+
+Given the “in-memory” pattern-class table Δ, we can construct a rule-based
+classiﬁer by identifying frequent yet discriminative clique-patterns from Δ. To
+identify frequent clique-patterns, we ﬁrst sum up the counts in each row of Δ
+and divide them by the number of graphs received thus far. The result for each
+row indicates the occurrence frequency of a set of cliques with the same hash
+value in the graph stream. Then we sort them in a descending order and set
+a threshold parameter α to select the clique-patterns whose frequencies ≥ α.
+These selected cliques are frequent clique-patterns which are also the candidates
+for the subsequent discriminative clique-pattern selection.
+
+Next we can determine whether a frequent clique-pattern is also a discrimi-
+native one by comparing its occurrence ratios on the M classes (corresponding
+to the M columns in Δ). For a candidate clique-pattern, the ratio in column j
+represents the probability that the clique-pattern belongs to class j. A higher
+probability on a certain class indicates a better discriminative capability. Sim-
+ilarly, we can set a threshold parameter θ to select the clique-patterns whose
+maximum ratios ≥ θ. Figure 3 gives a toy example for selecting the frequent and
+discriminative clique-patterns from a pattern-class table Δ.
+
+Finally, based on the selected clique-patterns, we can classify a test graph
+using majority voting based on the detected cliques in the test graph. In par-
+ticular, given a test graph Gtest, we detect its cliques Ctest using Algorithm 1
+and hash its cliques {Htest,j}size(Ctest)
+to index its clique-patterns. Each clique
+corresponding to a discriminative clique-pattern will contributes a class label
+Ltest,j := Find-Rule(Δ, Htest,j ). The class label of the test graph Ltest is de-
+termined by the majority of class labels {Ltest,j}size(Ctest)
+. This procedure is
+detailed in Algorithm 3.
+
+j=1
+
+j=1
+
+5 Experimental Results
+
+In this section, we will test the proposed DICH method for graph stream classiﬁ-
+cation on two real-world data sets. In particular, we will evaluate the eﬀectiveness
+and eﬃciency of DICH by comparing it with the 2-D hash compressed stream
+classiﬁer [9], which is the only state-of-the-art method applicable to graph stream
+classiﬁcation. We use the following data sets in our experiments.
+
+232
+
+L. Chi, B. Li, and X. Zhu
+
+sum 
+row 
+
+ 
+p1 
+p2 
+p3 
+p4 
+p5 
+p6 
+p7 
+p8 
+p9 
+p10 
+
+row 
+sum 
+1 
+0 
+3 
+4 
+6 
+3 
+6 
+4 
+4 
+5 
+(b) 
+
+freq 
+0.1 
+0.0 
+0.3 
+0.4 
+0.6 
+0.3 
+0.6 
+0.4 
+0.4 
+0.5 
+
+ 
+m1  m2  m3 
+0 
+p1 
+0 
+1 
+0 
+p2 
+0 
+0 
+2 
+p3 
+1 
+0 
+0 
+p4 
+3 
+1 
+3 
+p5 
+0 
+3 
+1 
+p6 
+1 
+1 
+4 
+p7 
+2 
+0 
+1 
+p8 
+1 
+2 
+1 
+p9 
+2 
+1 
+2    
+3 
+p10 
+0 
+Pattern-class Table  
+(a) 
+
+                  
+
+(cid:573)(cid:3)(cid:945)(cid:882)(cid:484)(cid:886) 
+
+freq 
+ 
+0.4 
+p4 
+0.6 
+p5 
+0.6 
+p7 
+0.4 
+p8 
+0.4 
+p9 
+0.5 
+p10 
+Frequent Cliques 
+(c) 
+
+ 
+p4 
+p5 
+p7 
+p8 
+p9 
+p10 
+
+m1 
+0.75 
+0.00 
+0.33 
+0.25 
+0.50 
+0.60 
+(d) 
+
+m2 
+0.00 
+0.50 
+0.67 
+0.25 
+0.25 
+0.00 
+
+m3 
+0.25 
+0.50 
+0.00 
+0.50 
+0.25 
+0.40 
+
+ 
+(cid:581)(cid:945)(cid:882)(cid:484)(cid:888) 
+p4 
+ 
+p7 
+p10 
+Cliques 
+(e) 
+
+Discriminative 
+
+max 
+ratio 
+0.75 
+0.67 
+0.60  
+
+Label 
+m1 
+m2 
+m1 
+
+               
+
+Fig. 3. A toy example of frequent and discriminative clique-pattern mining. (a) A
+pattern-class table with 10 clique-patterns {p1, . . . , p10} and 3 classes {m1, m2, m3}.
+(b) The sums of individual clique-patterns in rows and the corresponding occurrence
+frequencies (i.e., the sums divided by the number of graphs, say 10 here). (c) The
+selected frequent clique-patterns whose frequencies are larger than the frequent pattern
+threshold α = 0.4. (d) The occurrence ratios of the selected clique-patterns on the
+M classes. (e) The selected discriminative clique-patterns whose maximum ratios are
+larger than the discriminative pattern threshold θ = 0.6.
+
+Algorithm 3. Graph Classiﬁcation
+Graph-Classify(): Predict the class label of a test graph Gtest in the stream.
+begin
+
+Ctest = Clique-Detect(Gtest);
+for j := 1 to size(Ctest) step 1 do
+
+Htest,j := (Ctest,j);
+Ltest,j := Find-Rule(Δ, Htest,j);
+
+od
+Ltest := Majority-Vote({Ltest,j}size(Ctest)
+
+j=1
+
+);
+
+end
+
+– DBLP Data Set1: In this data set, authors are nodes and co-authorship
+forms edges, and a graph is constituted by the co-authors of a paper. There
+are three classes in the data set: 1) Database related conferences, 2) Data
+mining related conferences, and 3) All remaining conferences. Our goal is
+to classify a test paper into one of three classes. The ﬁnal data set contains
+over 5× 105 authors, 9.75× 105 edges, and 3.55× 105 diﬀerent graphs as the
+training data. We divide the data set into ﬁve splits and choose four splits
+as the training data and the remaining split as the test data.
+
+– IBM Sensor Data Set2: This data set records the information from local
+traﬃc constituted by each graph on a sensor network. The IP-addresses
+are nodes and local traﬃc ﬂows are edges. Each graph is associated with
+a particular intrusion type and there are over 300 diﬀerent intrusion types
+(classes) in the data set. Our goal is to classify a traﬃc ﬂow pattern into one
+
+1
+
+2
+
+http://www.charuaggarwal.net/dblpcl/
+http://www.charuaggarwal.net/sens1/gstream.txt
+
+Fast Graph Stream Classiﬁcation Using Discriminative Clique Hashing
+
+233
+
+100
+
+90
+
+80
+
+70
+
+60
+
+50
+
+40
+
+2−D hash compressed stream classifier
+DICH classifier
+
+)
+
+%
+(
+y
+c
+a
+r
+u
+c
+c
+A
+n
+o
+
+ 
+
+i
+t
+
+a
+c
+i
+f
+i
+s
+s
+a
+C
+
+l
+
+ 
+
+)
+
+%
+(
+y
+c
+a
+r
+u
+c
+c
+A
+n
+o
+
+ 
+
+i
+t
+
+a
+c
+i
+f
+i
+s
+s
+a
+C
+
+l
+
+ 
+
+2−D hash compressed stream classifier
+DICH classifier
+
+45
+
+40
+
+35
+
+30
+
+25
+
+20
+
+30
+ 
+0
+
+0.05
+
+0.1
+
+0.15
+
+0.2
+
+Frequent Pattern Threshold (α)
+
+0.25
+
+0.3
+
+0.35
+
+15
+ 
+0
+
+0.05
+
+0.1
+
+0.15
+
+0.2
+
+Frequent Pattern Threshold (α)
+
+0.25
+
+0.3
+
+0.35
+
+Fig. 4. Eﬀectiveness evaluation w.r.t. α on the DBLP data set (left) and the IBM
+sensor data set (right), N = 5000 and θ = 0.4
+
+of intrusion types. Because the number of classes is extremely large (> 300),
+we expect the overall accuracy to be relatively low. The data set contains
+more than 1.57× 106 edges. We choose 90% of the data as the training data
+and the remaining 10% as the test data.
+
+5.1 Eﬀectiveness Evaluation
+
+In this experiment, we evaluate the eﬀectiveness of DICH by comparing it with
+the 2-D hash compressed stream classiﬁer proposed in [9]. We will investigate
+the classiﬁcation performance and sensitivity of the two methods by varying 1)
+the frequent pattern threshold α, 2) the discriminative pattern threshold θ, and
+3) the size of the compressed edge set N .
+
+First, we adjust the frequent pattern threshold3 α for performance evaluation
+and ﬁx the other two parameters by setting N = 5000 and θ = 0.4. Figure 4
+plots the classiﬁcation accuracy curves (y-axis) w.r.t. α (x-axis) on the two data
+sets. We can see that the classiﬁcation performance of DICH is much higher than
+the 2-D hash compressed stream classiﬁer on both data sets and in all values
+of α. The performance of both classiﬁers trends to decline as α becomes larger
+since more graph features will be eliminated and such information loss will aﬀect
+classiﬁcation performance. By comparing the curve slopes of two classiﬁers, the
+2-D hash compressed stream classiﬁer is more sensitive to α. In the case of
+α = 0.3, the classiﬁcation accuracy of the 2-D hash compressed stream classiﬁer
+is much lower. From this experiment, we can validate the eﬀectiveness of DICH,
+which can clearly outperform the 2-D hash compressed stream classiﬁer and is
+more insensitive to the frequent pattern threshold.
+
+Second, we adjust the discriminative pattern threshold θ for performance eval-
+uation and ﬁx the other two parameters by setting N = 5000 and α = 0.05.
+Figure 5 plots the classiﬁcation accuracy curves (y-axis) w.r.t. θ (x-axis) on the
+two data sets. On the DBLP data set, DICH was signiﬁcantly superior to the
+2-D hash compressed classiﬁer in classiﬁcation accuracy. The classiﬁcation per-
+formance of both methods was insensitive to θ, which may be due to the fact
+
+3 In [9], the frequent pattern threshold α is used to screen out subgraph patterns.
+
+234
+
+L. Chi, B. Li, and X. Zhu
+
+)
+
+%
+(
+y
+c
+a
+r
+u
+c
+c
+A
+n
+o
+
+ 
+
+i
+t
+
+a
+c
+i
+f
+i
+s
+s
+a
+C
+
+l
+
+100
+
+95
+
+90
+
+85
+
+80
+
+75
+
+70
+ 
+0
+
+0.05
+
+0.1
+
+2−D hash compressed stream classifier
+DICH classifier
+
+ 
+
+)
+
+%
+(
+y
+c
+a
+r
+u
+c
+c
+A
+n
+o
+
+ 
+
+i
+t
+
+a
+c
+i
+f
+i
+s
+s
+a
+C
+
+l
+
+ 
+
+2−D hash compressed stream classifier
+DICH classifier
+
+55
+
+50
+
+45
+
+40
+
+35
+
+30
+
+0.15
+
+0.2
+
+0.25
+
+Discriminative Pattern Threshold (θ)
+
+0.3
+
+0.35
+
+0.4
+
+25
+ 
+0
+
+0.05
+
+0.1
+
+0.15
+
+0.2
+
+0.25
+
+Discriminative Pattern Threshold (θ)
+
+0.3
+
+0.35
+
+0.4
+
+Fig. 5. Eﬀectiveness evaluation w.r.t. θ on the DBLP data set (left) and the IBM
+sensor data set (right), N = 5000 and α = 0.05
+
+ 
+
+2−D hash compressed stream classifier
+DICH classifier
+
+90
+
+85
+
+80
+
+75
+
+70
+
+)
+
+%
+(
+y
+c
+a
+r
+u
+c
+c
+A
+ 
+n
+o
+i
+t
+a
+c
+i
+f
+i
+s
+s
+a
+C
+
+l
+
+ 
+
+2−D hash compressed stream classifier
+DICH classifier
+
+55
+
+50
+
+45
+
+40
+
+35
+
+30
+
+25
+
+)
+
+%
+(
+y
+c
+a
+r
+u
+c
+c
+A
+ 
+n
+o
+i
+t
+a
+c
+i
+f
+i
+s
+s
+a
+C
+
+l
+
+65
+ 
+2000
+
+4000
+
+6000
+
+8000
+
+10000
+
+12000
+
+14000
+
+16000
+
+Size of the Compressed Edge Set (n)
+
+20
+ 
+2000
+
+4000
+
+6000
+
+8000
+
+10000
+
+12000
+
+14000
+
+16000
+
+Size of the Compressed Edge Set (n)
+
+Fig. 6. Eﬀectiveness evaluation w.r.t. the edges compression size N on the DBLP data
+set (left) and the IBM sensor data set (right), α = 0.06 and θ = 0.3
+
+that the two classes (Database related conferences and Data mining related con-
+ferences) in DBLP data are extremely rare, the identiﬁed frequent patterns have
+already had relatively high discriminative capability. On the IBM sensor data
+set, although DICH is somewhat more sensitive to θ than the 2-D hash com-
+pressed classiﬁer, it has much higher classiﬁcation accuracy in all cases. This
+experiment further demonstrates that DICH has higher eﬀectiveness than the
+2-D hash compressed classiﬁer in terms of the discriminative pattern threshold.
+Third, we adjust the size of the compressed edge set N for performance eval-
+uation and ﬁx the other two parameters by setting α = 0.06 and θ = 0.3.
+Intuitively, the classiﬁcation performance of both classiﬁers will increase at the
+expense of more space. Figure 6 plots the classiﬁcation accuracy curves (y-axis)
+w.r.t. N (x-axis) on the two data sets. We can see that the 2-D hash compressed
+classiﬁer is very sensitive to N , especially on the DBLP data set; while DICH is
+more steady on the DBLP data set but no clear performance improvement can
+be observed as N becomes larger. On the IBM sensor data set, the performance
+of both classiﬁers is improved as N becomes larger. Again, DICH outperforms
+the 2-D hash compressed classiﬁer in all cases.
+
+Fast Graph Stream Classiﬁcation Using Discriminative Clique Hashing
+
+235
+
+i
+
+)
+d
+n
+o
+c
+e
+s
+(
+ 
+e
+m
+T
+ 
+n
+o
+i
+t
+a
+c
+i
+f
+i
+s
+s
+a
+C
+
+l
+
+3500
+
+3000
+
+2500
+
+2000
+
+1500
+
+1000
+
+500
+
+0
+ 
+0
+
+0.05
+
+0.1
+
+ 
+
+2−D hash compressed stream classifier
+DICH classifier
+
+ 
+
+2−D hash compressed stream classifier
+DICH classifier
+
+3500
+
+3000
+
+2500
+
+2000
+
+1500
+
+1000
+
+7000
+
+6000
+
+5000
+
+4000
+
+3000
+
+2000
+
+1000
+
+ 
+
+2−D hash compressed stream classifier
+DICH classifier
+
+i
+
+)
+d
+n
+o
+c
+e
+s
+(
+ 
+e
+m
+T
+ 
+n
+o
+i
+t
+a
+c
+i
+f
+i
+s
+s
+a
+C
+
+l
+
+i
+
+)
+d
+n
+o
+c
+e
+s
+(
+ 
+e
+m
+T
+ 
+n
+o
+i
+t
+a
+c
+i
+f
+i
+s
+s
+a
+C
+
+l
+
+0.15
+
+0.2
+
+Frequent Pattern Threshold (α)
+
+0.25
+
+0.3
+
+0.35
+
+500
+ 
+0
+
+0.05
+
+0.1
+
+0.15
+
+0.2
+
+0.25
+
+Discriminative Pattern Threshold (θ)
+
+0.3
+
+0.35
+
+0.4
+
+0
+ 
+2000
+
+4000
+
+6000
+
+8000
+
+10000
+
+12000
+
+14000
+
+16000
+
+Size of the Compressed Edge Set (n)
+
+Fig. 7. Eﬃciency evaluation (1) w.r.t. α, N = 5000 and θ = 0.4 (left); (2) w.r.t. θ,
+N = 5000 and α = 0.05 (middle); and (3) w.r.t. N , α = 0.06, θ = 0.3 (right), on the
+DBLP data set
+
+5.2 Eﬃciency Evaluation
+
+In this experiment, we evaluate the eﬃciency of the two compared methods on
+the DBLP data set by adjusting the frequent pattern threshold α, the discrim-
+inative pattern threshold θ, and the size of the compressed edge set N . The
+settings of these parameters are the same as those in the above eﬀectiveness
+evaluation. All the experiments are conducted on a Linux Cluster which com-
+prises 24 nodes with 3.33GHz Intel Xeon CPU (64bit). Both DICH and the 2-D
+hash compressed stream classiﬁer are implemented using R studio.
+
+Figure 7 plots the training time curves of the two compared methods w.r.t.
+α, θ, and N on the DBLP data set. We can see that the training time of DICH
+is signiﬁcantly less than the compressed hash-based classiﬁer in all cases. The
+computational cost of the 2-D hash compressed classiﬁer is much higher be-
+cause it requires an additional frequent pattern mining procedure to perform
+on the edge co-occurrence table which comprises massive transactions. In con-
+trast, DICH employs a fast clique detection algorithm, which can directly ﬁnd
+cliques (connected subgraphs) from the graph stream as features for classiﬁer
+construction, such that no additional frequent pattern mining procedure is re-
+quired to ﬁnd connected subgraph patterns. This experiment shows that DICH
+clearly outperforms the 2-D hash compressed classiﬁer in not only classiﬁcation
+accuracy but also training eﬃciency.
+
+6 Conclusion
+
+In this paper, we propose a fast graph stream classiﬁcation method using DIs-
+criminative Clique Hashing (DICH). The main idea is to employ a fast algorithm
+to decompose a compressed graph into a number of cliques to sequentially ex-
+tract clique-patterns over the graph stream as features. Two random hashing
+schemes are employed to speed up the discriminative clique-pattern mining pro-
+cess and address the unlimitedly clique-pattern expanding problem. The hashed
+cliques are used to update an “in-memory” ﬁxed-size pattern-class table, which
+is ﬁnally used to construct a rule-based classiﬁer. We test DICH on two real-
+world graph stream data sets. Because DICH directly extracts cliques (connected
+
+236
+
+L. Chi, B. Li, and X. Zhu
+
+subgraphs) from the graph stream as features for classiﬁer training, rather than
+mining unconnected co-occurrence edge sets as that in the compared state-of-
+the-art method [9], DICH can signiﬁcantly outperform [9] in both classiﬁcation
+accuracy and learning eﬃciency.
+
+Acknowledgements. This work was supported in part by Australian Re-
+search Council (ARC) Discovery Project DP1093762, Australian Research Coun-
+cil (ARC) Future Fellowship FT100100971, and a UTS Early Career Researcher
+Grant.
+
+References
+
+1. Aggarwal, C.C., Wang, H.: Managing and Mining Graph Data. Springer, New York
+
+(2010)
+
+2. Kashima, H., Tsuda, K., Inokuchi, A.: Marginalized kernels between labeled
+
+graphs. In: ICML, pp. 321–328 (2003)
+
+3. Borgwardt, K.M., Kriegel, H.P.: Shortest-path kernels on graphs. In: ICDM, pp.
+
+74–81 (2005)
+
+4. Mah´e, P., Vert, J.P.: Graph kernels based on tree patterns for molecules. Machine
+
+Learning 75(1), 3–35 (2009)
+
+5. Shervashidze, N., Borgwardt, K.: Fast subtree kernels on graphs. In: NIPS, pp.
+
+1660–1668 (2009)
+
+6. Feigenbaum, J., Kannan, S., McGregor, A., Suri, S., Zhang, J.: Graph distances in
+
+the data-stream model. SIAM Journal on Computing 38(5), 1709–1727 (2008)
+
+7. Aggarwal, C.C., Zhao, Y., Yu, P.S.: On clustering graph streams. In: SDM, pp.
+
+478–489 (2010)
+
+8. Aggarwal, C.C., Li, Y., Yu, P.S., Jin, R.: On dense pattern mining in graph streams.
+
+In: PVLDB, pp. 975–984 (2010)
+
+9. Aggarwal, C.C.: On classiﬁcation of graph streams. In: SDM, pp. 652–663 (2011)
+10. Wang, H., Fan, W., Yu, P.S., Han, J.: Mining concept-drifting data streams using
+
+ensemble classiﬁers. In: KDD, pp. 226–235 (2003)
+
+11. Li, B., Zhu, X., Chi, L., Zhang, C.: Nested subtree hash kernels for large-scale
+
+graph classiﬁcation over streams. In: ICDM, pp. 399–408 (2012)
+
+12. Vishwanathan, S., Schraudolph, N.N., Kondor, R., Borgwardt, K.M.: Graph ker-
+
+nels. Journal of Machine Learning Research 11, 1201–1242 (2010)
+
+13. Hido, S., Kashima, H.: A linear-time graph kernel. In: ICDM, pp. 179–188 (2009)
+14. Yan, X., Han, J.: gSpan: Graph-based substructure pattern mining. In: ICDM, pp.
+
+721–724 (2002)
+
+15. Domingos, P., Hulten, G.: Mining high speed data streams. In: KDD, pp. 71–80
+
+(2000)
+
+16. Street, W.N., Kim, Y.: A streaming ensemble algorithm (SEA) for large-scale clas-
+
+siﬁcation. In: KDD, pp. 377–382 (2001)
+
+17. Souﬁani, H.A., Airoldi, E.: Graphlet decomposition of a weighted network. Journal
+
+of Machine Learning Research – Proceedings Track 22, 54–63 (2012)
+
+18. Bron, C., Kerbosch, J.: Algorithm 457: Finding all cliques of an undirected graph.
+
+Communications of the ACM 16(9), 575–577 (1973)
+
+

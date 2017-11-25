@@ -1,0 +1,1584 @@
+Ensemble-Based Wrapper Methods for Feature
+
+Selection and Class Imbalance Learning
+
+Pengyi Yang1,3, Wei Liu2, Bing B. Zhou1,
+Sanjay Chawla1, and Albert Y. Zomaya1
+
+1 School of Information Technologies, University of Sydney, NSW 2006, Australia
+2 Dept of Computing and Information Systems, University of Melbourne, Australia
+
+3 Garvan Institute of Medical Research, Darlinghurst, NSW 2010, Australia
+
+yangpy@it.usyd.edu.au, wei.liu@unimelb.edu.au
+
+Abstract. The wrapper feature selection approach is useful in identi-
+fying informative feature subsets from high-dimensional datasets. Typ-
+ically, an inductive algorithm “wrapped” in a search algorithm is used
+to evaluate the merit of the selected features. However, signiﬁcant bias
+may be introduced when dealing with highly imbalanced dataset. That
+is, the selected features may favour one class while being less useful to
+the adverse class. In this paper, we propose an ensemble-based wrapper
+approach for feature selection from data with highly imbalanced class
+distribution. The key idea is to create multiple balanced datasets from
+the original imbalanced dataset via sampling, and subsequently evaluate
+feature subsets using an ensemble of base classiﬁers each trained on a
+balanced dataset. The proposed approach provides a uniﬁed framework
+that incorporates ensemble feature selection and multiple sampling in a
+mutually beneﬁcial way. The experimental results indicate that, overall,
+features selected by the ensemble-based wrapper are signiﬁcantly bet-
+ter than those selected by wrappers with a single inductive algorithm in
+imbalanced data classiﬁcation.
+
+1
+
+Introduction
+
+Feature selection is a critical procedure for high-dimensional data classiﬁcation.
+The beneﬁts of feature selection are several-fold and dependent on the applica-
+tions. For creating classiﬁcation models, feature selection can often improve pre-
+dictive accuracy and comprehensibility [1]. For many bioinformatics applications,
+feature selection is a critical procedure for identifying important biomarkers [2].
+The techniques for feature selection are commonly classiﬁed as ﬁlter approach,
+wrapper approach, and embedded approach. Filter approach and embedded ap-
+proach are relatively computationally eﬃcient and are commonly applied as a
+fast feature ranking procedure [3]. In contrast, wrapper approach evaluates fea-
+tures by performing internal classiﬁcation with a given inductive algorithm [4].
+Therefore, they are much more computation intensive. Nevertheless, wrapper ap-
+proach remains attractive for two reasons. Firstly, wrapper approach evaluates
+features iteratively with respect to an inductive algorithm. Therefore, features
+
+J. Pei et al. (Eds.): PAKDD 2013, Part I, LNAI 7818, pp. 544–555, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+Ensemble-Based Wrapper Methods
+
+545
+
+selected by wrapper approach are more likely to suit the inductive algorithm,
+and therefore, yield high classiﬁcation accuracy [4]. Secondly, wrapper approach
+evaluates features jointly and are eﬀective in capturing intrinsic relationships
+such as interactions among multiple features [5].
+
+Learning from imbalanced data is an important problem in many data mining
+applications. Such a case arises when samples from one class signiﬁcantly out-
+number those from the other class. Imbalanced data are common in text mining
+[6] and bioinformatics where the minority class often represents the rare cases. It
+is well known that many classiﬁcation algorithms are sensitive to the imbalanced
+class distribution [7]. Therefore, many strategies have been proposed to deal with
+class imbalance learning. Generally, they fall into two categories: cost-sensitive
+learning and data sampling [8]. With cost-sensitive learning, a given algorithm
+will receive a higher penalty when a mistake is made on the minority class than
+on the majority class. The advantage of cost-sensitive learning is that it does
+not modify the class distribution. However, an accurate cost-metric needs to be
+speciﬁed beforehand. As for data sampling, the learning instances in the major-
+ity class and minority class are manipulated in certain way so as to balance the
+class distribution. The downside is that sampling strategies may introduce noise
+or remove useful information while modifying class distribution.
+
+The challenges of feature selection and imbalanced data classiﬁcation meet
+when the dataset to be analysed is of both high-dimensionality and highly im-
+balanced class distribution [9]. In such a scenario, if wrapper approach is adopted
+for feature selection, the inductive algorithm may introduce signiﬁcant bias be-
+cause the merit of the feature subset is evaluated based on the performance of
+the inductive algorithm. Therefore, if the inductive algorithm favours a single
+class, the features selected will also bias to this class while being less useful to
+the adverse class.
+
+In this study, we propose an ensemble-based wrapper approach for feature
+selection from highly imbalanced datasets. The proposed algorithm retains the
+advantages of wrapper feature selection while also maximises data usage and
+reduce feature selection bias simultaneously by training multiple base classiﬁers
+with balanced sample subsets. A hybrid multiple sampling procedure is employed
+to create balanced sample subsets. Together we introduce a uniﬁed framework
+that incorporates ensemble feature selection and multiple sampling in a mutually
+beneﬁcial manner.
+
+The paper is organised as follows. In Section 2, we outline the proposed frame-
+work and describe each component in details. Section 3 describes the experimen-
+tal procedure. Results are presented in Section 4 and Section 5 concludes the
+paper.
+
+2 Ensemble-Based Wrapper Approach
+
+Wrapper algorithms, in general, consist of three main components [10]: (1) a
+search algorithm, (2) a ﬁtness function, and (3) an inductive algorithm. The
+
+546
+
+P. Yang et al.
+
+proposed system adheres to this structure. In this section, we outline the system
+and describe each component.
+
+2.1 System Overview
+
+A schematic representation of the proposed ensemble-based wrapper approach is
+shown in Figure 1. The imbalanced training dataset is balanced by a hybrid sam-
+pling approach (which will be explained in Section 2.3). Such a hybrid sampling
+procedure is applied multiple times producing multiple sets of balanced training
+data each of which is used to train a base classiﬁer. The base classiﬁers trained
+on the balanced datasets are subsequently applied to classify an imbalanced test
+dataset. The classiﬁcation distributions of each sample in the test dataset are
+normalised and combined, and the area under ROC curve (AUC) is calculated
+as the ﬁtness indices for feature selection. The wrapper procedure terminates
+when it reaches a predeﬁned number of iteration or a desired number of features
+is selected (i.e. greedy search), and the ﬁnal feature subsets are used for further
+validation.
+
+Imbalanced 
+Train Data 
+
+ 
+
+ 
+
+Selected 
+
+Feature Subset 
+
+Hybrid Sampling 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+Balanced 
+Train Data 
+a
+
+Balanced 
+Train Data 
+
+Balanced 
+Train Data 
+T
+
+Classifier 
+
+Classifier 
+
+Classifier 
+
+Search 
+
+Algorithm 
+
+Final  
+
+Feature Subset 
+
+Imbalanced 
+Test Data 
+
+ 
+
+ 
+
+Combine Normalized 
+
+Classification Distribution 
+
+Calculate AUC Value 
+
+Fig. 1. A schematic representation of the ensemble-based wrapper approach
+
+2.2 Search Algorithm
+
+There are several popular search strategies, including hill climbing algorithms
+best exempliﬁed by forward selection and backward elimination [11,12] and evo-
+lutionary algorithms such as genetic algorithm [13] and particle swarm optimi-
+sation [14].
+
+In this study, we apply two search algorithms. The ﬁrst one is a hill climb-
+ing algorithm that starts with an empty set and greedily selects a feature at a
+
+Ensemble-Based Wrapper Methods
+
+547
+
+time that maximises the given ﬁtness function. This is a typical greedy forward
+selection approach and at each step the best feature f∗
+f itness(S ∪ {f})
+
+is determined by:
+
+f∗
+
+= arg max
+f(cid:4)∈S
+
+where S is the set that contains the features selected so far and f is a feature
+under evaluation according to a ﬁtness function.
+
+The second search algorithm is a simple elitism genetic algorithm. The feature
+size is pre-speciﬁed and the algorithm selects the best feature set that maximises
+the given ﬁtness function through genetic operations such as crossover and mu-
+tation. Here each feature in the best set S
+
+is determined simultaneously:
+
+∗
+
+∗
+
+S
+
+= arg max
+i=1...p
+
+f itness(Si)
+
+where p is the population size of the genetic algorithm.
+
+The above two typical yet simple wrapper procedures oﬀer a transparent way
+
+to compare diﬀerent inductive components.
+
+2.3 Hybrid Sampling from Imbalanced Data
+
+Sampling is a popular approach to balance the dataset with imbalanced class
+distribution. The simplest methods are random under-sampling and random
+over-sampling [15]. The random under-sampling method balances the dataset
+by randomly removing samples in the majority class. On the contrary, the ran-
+dom over-sampling method balances the dataset by sampling from the minority
+class with/without replacement and reattaching them to the dataset. A more
+sophisticated approach is to synthesise “new” samples from the minority class
+(known as SMOTE) [16]. Several studies also found that better results can be
+achieved by increasing minority samples and decreasing majority samples simul-
+taneously [17,18].
+
+Here we apply our own hybrid approach in which the dataset (denoted as D)
+is balanced by increasing minority class with SMOTE and decreasing majority
+class with random under-sampling as follows:
+
+IR = Random(Imaj, (Nmaj − 3/2 × Nmin))
+IS = SM OT E(Imin, 1/2 × Nmin)
+∗
+D
+
+= (Imin ∪ IS) ∪ (Imaj\IR)
+
+where Imaj , Imin, Nmaj and Nmin are the majority samples, minority samples,
+and their sample sizes, respectively. Random(.) randomly selects from Imaj a
+subset of samples IR and SM OT E(.) creates synthetic samples IS using Imin.
+∗
+The balanced dataset D
+retains the original minority samples and introduces
+1/2 × Nmin synthetic minority samples. The majority samples IR are reduced
+∗
+to match the new set of minority samples in D
+and result in a class ratio of 1.
+
+548
+
+P. Yang et al.
+
+2.4 Ensemble Learning
+
+The classic idea of ensemble is to generate multiple datasets using a sampling
+method such as bootstrap, and train a set of homogeneous learning algorithms
+which classify new instances in a consensus manner [19]. This idea has been
+extended both to imbalanced data classiﬁcation [20] and feature ﬁltering [21].
+However, no work has been done to unify them as a single procedure which may
+be mutually beneﬁcial.
+
+Here, we extend the idea of ensemble to feature selection in a wrapper manner
+and provide a uniﬁed framework that incorporates ensemble feature selection as
+well as multiple sampling. Speciﬁcally, given a training dataset constrained by
+a set of features S, suppose we apply the above hybrid sampling procedure L
+∗S
+(i = 1...L), and
+times, each time producing a balanced sampling dataset D
+i
+each sampling dataset is used to train a base classiﬁer denoted as hi. Then,
+the ensemble classiﬁcation distribution y of each test sample x is computed as
+follows:
+
+pE(y|x, S) =
+
+1
+L
+
+L(cid:2)
+
+i=1
+
+P rob(hi(x), D
+
+∗S
+i )
+
+∗S
+where P rob(hi(x), D
+i ) is a probability vector computed by using an ensemble
+∗S
+of L base classiﬁers (hi), each is trained on a balanced sampling set D
+selected
+i
+by the feature set S. Therefore, both feature set information and data sampling
+information are incorporated in an ensemble framework.
+
+2.5 Fitness Function
+
+An inductive algorithm (classiﬁer) is commonly used to generate ﬁtness indices
+in wrapper algorithms. It is well known that the overall accuracy as a metric
+is biased when the class distribution is imbalanced in the data. A more reliable
+way to compute the ﬁtness of a feature set in such a case is to use the area
+under the ROC curve (AUC). AUC is a numeric value summarising the trade-oﬀ
+between the true positive rate and the false positive rate across the entire sample
+classiﬁcation distribution of a dataset.
+
+When using a single inductive algorithm, the AUC value is directly calculated
+by sorting the classiﬁcation probability of each sample, calculating trade-oﬀ value
+of the true positive rate and false positive rate at each classiﬁcation threshold,
+and calculating the area under the trade-oﬀ values. As to the ensemble classi-
+ﬁer, classiﬁcation distribution of each sample is combined and normalised across
+all base classiﬁers. Then, the same procedure as those for a single inductive
+algorithm is applied to calculate the AUC value.
+
+Accordingly, we deﬁne the ﬁtness of a feature subset as follows:
+
+f itness(S) = AU C(p(y|x1, S)...p(y|xm, S))
+
+where x1 is the ﬁrst sample in the test dataset and m is the total sample size.
+Function AU C(.) calculates the AUC value.
+
+Ensemble-Based Wrapper Methods
+
+549
+
+2.6 Main Algorithm of Ensemble-Based Wrapper Approach
+
+Algorithm 1 represents the core of the ensemble-based wrapper approach in
+pseudo-code:
+
+T = constrainDataDimension(DT , S);
+
+// Sampling to create a balanced dataset using training set:
+
+Algorithm 1. Ensemble Component
+Input: A feature subset S; Imbalanced training set DT and test set Dt
+Output: Fitness of S
+1: F it = 0;
+2: // constrain the data dimension using the input feature subset:
+3: DS
+4: E = ∅;
+5: for i = 1 to L do
+6:
+7: D
+8:
+9:
+10:
+11:
+12: end for
+13: DS
+14: // Apply the ensemble of classiﬁers to the test set:
+15: F it = calculateAUC(E, DS
+16: return F it;
+
+// Train a base classiﬁer using balanced dataset:
+hi = trainClassiﬁer(D
+// Add the base classiﬁer to the ensemble:
+E = E ∪ hi;
+
+∗S
+i = hybridSampling(DS
+
+T );
+
+t = constrainDataDimension(Dt, S);
+
+∗S
+i );
+
+t );
+
+The ensemble component is independent from the search algorithm. It is ﬂex-
+
+ible and can be reused in diﬀerent wrapper algorithms.
+
+3 Experimental Procedure
+
+In this section, we summarise the datasets used for evaluation and detail the
+algorithms and parameter settings. Following that, the performance evaluation
+is described.
+
+3.1 Datasets and Data Partitioning
+
+We used 5 datasets with high-dimensionality and highly imbalanced class distri-
+bution. Table 1 summarises the datasets.
+
+Speciﬁcally, fbis, re0, and oh5 are text mining datasets extracted by Han
+and Karypis [22]. The ALL (acute lymphoblastic leukemia) dataset is from a
+leukemia study [23], and the oil dataset is from study [24].
+
+For datasets with multiple classes, we reserved the class with the small-
+est number of samples as the minority class and combined the other classes
+as the majority class. To make the problem computationally less demanding,
+
+550
+
+P. Yang et al.
+
+Table 1. Summary of datasets
+
+Name # Sample # Feature Minority class ratio
+
+fbis
+re0
+oh5
+ALL
+oil
+
+1250
+1504
+918
+248
+937
+
+2000
+2886
+3012
+12626
+
+50
+
+0.0304
+0.0073
+0.0643
+0.0605
+0.0438
+
+for datasets with very high dimensions, we applied a χ2 ﬁltering to reduce the
+feature size to 500.
+
+The datasets are partitioned using the double-level cross-validation strategy.
+That is for each dataset, we partitioned it using a 2-fold stratiﬁed cross-validation
+to obtain the training and evaluation sets. For the training set, it is further par-
+titioned using a 5-fold stratiﬁed cross-validation to obtain the internal training
+and internal testing sets for feature selection. The evaluation set is reserved from
+the feature selection procedure and is only used for evaluating the usefulness of
+the selected features after the feature selection procedure.
+
+3.2 Algorithms and Parameter Settings
+
+For the greedy forward feature selection algorithm, we speciﬁed it to search 20
+steps in which 1 to 20 features are selected one after an other. As for the genetic
+algorithm, we set both the population size and the termination generation to
+20. The crossover probability and the mutation probability are 0.7 and 0.1,
+respectively. The “chromosome” is coded as a string of feature indexes, and the
+chromosome size of 1 to 20 are tested which corresponds to the feature subset size
+of 1 to 20. Diﬀerent from the greedy forward feature selection algorithm which
+builds the feature subset on previously selected features, the genetic algorithm
+tests diﬀerent size of feature subsets separately.
+
+The decision tree algorithm (J48) is used for induction in our wrapper al-
+gorithms. In ensemble learning, the decision tree algorithm is prevailingly used
+as the base classiﬁer because it is relatively fast to train and unstable to small
+changes in the data [25]. These are the important merits to our wrapper algo-
+rithms since we need to evaluate features using multiple classiﬁers in an eﬃcient
+manner. Yet, it is widely known that the decision tree algorithm is sensitive to
+the imbalance of the data class distribution [26]. Hence, it is of both theoretical
+and practical interests to use decision tree in our experimental settings. For the
+ensemble wrapper, we used the ensemble size of 20. That is 20 diﬀerent sampling
+dataset are produced in each iteration and 20 decision tree classiﬁers are trained
+on these sampling dataset and then used for feature selection.
+
+To evaluate the selected features, we used 6 diﬀerent classiﬁcation algorithms,
+including random forest (RF), nearest neighbour with k=3 (3-NN), nearest
+neighbour with k=7 (7-NN), logistic regression (LogReg), multiple layer percep-
+tron (MLP), and alternating decision tree (ADTree). The rationale is that if the
+wrapper algorithm is able to select useful features, the selected features should
+
+Ensemble-Based Wrapper Methods
+
+551
+
+be able to improve the classiﬁcation result regardless what type of classiﬁcation
+algorithm is used. Therefore, evaluating a wide range of diﬀerent classiﬁers can
+better reﬂect the genuine usefulness of the selected features.
+
+3.3 Performance Evaluation
+
+In this study, we focus on comparing wrapper algorithms with ensemble-based
+imbalanced sampling and classiﬁcation component to wrapper algorithms with
+a single inductive algorithm. We refer to the ﬁrst approach as the ensemble ap-
+proach and the latter as the single approach. To summarise the performance
+results, the AUC values obtained from each classiﬁer using features selected
+by ensemble approach and single approach are compared. If the ensemble ap-
+proach yields a higher AUC value compared to the single approach, we label it
+as “ensemble win”. Similarly, if the ensemble approach yields a lower AUC value
+compared to the single approach, we label it as “single win”. When the AUC
+values from these two approaches are equal, we obtain a “tie”. The comparison
+is conducted from feature size 1 to 20.
+
+In addition, the Friedman test [27] is applied to evaluate the performance of
+each classiﬁer. The conﬁdence of 95% is used under the null hypothesis that the
+performance of each classiﬁer is not signiﬁcantly diﬀerent by using the features
+selected by the ensemble approach and the single approach. The null hypothesis
+is rejected if there are signiﬁcant performance diﬀerence when using features
+selected by ensemble approach as to single approach.
+
+4 Results
+
+AUC comparison of ensemble wrapper and single wrapper using greedy forward
+feature selection with fbis and re0 dataset are plotted in Figure 2 and Figure 3,
+respectively. As can be seen, the ensemble wrapper approach exhibited a better
+performance compared to the single wrapper approach. We summarise results
+in Figures 2 and 3 and the rest of the comparison across using feature sets with
+size from 1 to 20 in Table 2 and Table 3 (see 3.3 for details of the summarisation
+method). Speciﬁcally, Table 2 shows the comparison of the ensemble approach
+and the single approach using greedy forward selection algorithm, and Table 3
+shows the comparison using genetic algorithm. It is clear that across all datasets
+most classiﬁers achieves better classiﬁcations using features selected by ensemble
+approach than those selected by single approach. This implies that the ensemble
+approach is more robust to high-dimensionality and highly imbalanced class
+distribution. Hence, the features selected by the ensemble approach are likely to
+be more useful to both the majority class and the minority class.
+
+The greedy forward selection appears to be more sensitive to ensemble com-
+ponent. In most cases, the improvements are signiﬁcant. In comparison, genetic
+algorithm based selection is less sensitive to the ensemble component, and most
+improvements are moderate. This may attributed to their diﬀerent feature se-
+lection styles. That is, greedy forward selection builds the feature subset on
+
+552
+
+P. Yang et al.
+
+Table 2. Comparison of ensemble and single approaches using greedy forward selection
+
+fbis dataset
+
+3-NN
+
+7-NN
+
+LogReg
+
+MLP
+
+ADTree
+
+Ensemble Win
+14
+Single Win
+6
+Friedman Test 0.0017 (cid:2) 0.0017 (cid:2) 7.74e-6 (cid:2) 0.073
+Re0 dataset
+
+20
+0
+
+17
+3
+
+13
+7
+
+0.1797
+
+15
+5
+
+0.0253 (cid:2)
+
+3-NN
+
+7-NN
+
+LogReg
+
+MLP
+
+ADTree
+
+Ensemble Win
+Single Win
+Friedman Test 7.74e-6 (cid:2) 7.74e-6 (cid:2) 7.74e-6 (cid:2) 7.74e-6 (cid:2) 7.74e-6 (cid:2) 7.74e-6 (cid:2)
+
+20
+0
+
+20
+0
+
+20
+0
+
+20
+0
+
+20
+0
+
+RF
+17
+3
+
+RF
+20
+0
+
+RF
+15
+5
+
+RF
+19
+1
+
+Ensemble Win
+
+Single Win
+
+Tie
+
+RF
+12
+7
+1
+
+Friedman Test
+
+0.251
+
+Oh5 dataset
+
+3-NN
+
+7-NN
+
+LogReg
+
+MLP
+
+ADTree
+
+16
+3
+1
+
+6
+13
+1
+0.0029 (cid:2) 0.108
+
+15
+4
+1
+
+0.011 (cid:2)
+
+13
+6
+1
+
+0.108
+
+17
+2
+1
+
+5.79e-4 (cid:2)
+
+3-NN
+
+ALL dataset
+7-NN
+
+LogReg
+
+MLP
+
+ADTree
+
+Ensemble Win
+Single Win
+Friedman Test 0.025 (cid:2) 0.025 (cid:2) 0.025 (cid:2) 0.0017 (cid:2) 0.025 (cid:2)
+
+15
+5
+
+15
+5
+
+17
+3
+
+15
+5
+
+6
+14
+
+0.073
+
+Oil dataset
+
+3-NN
+
+7-NN
+
+LogReg
+
+MLP
+
+ADTree
+
+Ensemble Win
+7
+13
+Single Win
+Friedman Test 5.69e-5 (cid:2) 0.179
+
+10
+10
+1
+
+15
+5
+
+18
+2
+
+0.025 (cid:2) 3.46e-4 (cid:2) 5.69e-5 (cid:2)
+
+19
+1
+
+(cid:2) Results with signiﬁcant diﬀerences (p-value lower than 0.05) using Friedman test
+
+C
+U
+A
+
+C
+U
+A
+
+0.9
+
+0.85
+
+0.8
+
+0.75
+
+0.7
+
+0.65
+
+0.6
+
+0.55
+
+0.5
+
+0.45
+
+ 
+0
+
+0.9
+
+0.85
+
+0.8
+
+0.75
+
+0.7
+
+0.65
+
+0.6
+
+0.55
+
+0.5
+
+ 
+0
+
+Random Forest
+
+Single
+Ensemble
+
+5
+
+10
+
+15
+
+Number of Features
+
+7−Nearest Neighbours
+
+ 
+
+20
+
+ 
+
+Single
+Ensemble
+
+5
+
+10
+
+15
+
+20
+
+Number of Features
+
+C
+U
+A
+
+C
+U
+A
+
+0.9
+
+0.85
+
+0.8
+
+0.75
+
+0.7
+
+0.65
+
+0.6
+
+0.55
+
+0.5
+
+0.45
+
+ 
+0
+
+0.9
+
+0.85
+
+0.8
+
+0.75
+
+0.7
+
+0.65
+
+ 
+0
+
+3−Nearest Neighbours
+
+Single
+Ensemble
+
+5
+
+10
+
+15
+
+Number of Features
+
+Multiple Layer Perceptron
+
+ 
+
+20
+
+ 
+
+Single
+Ensemble
+
+5
+
+10
+
+15
+
+20
+
+Number of Feature
+
+C
+U
+A
+
+C
+U
+A
+
+0.9
+
+0.85
+
+0.8
+
+0.75
+
+0.7
+
+0.65
+
+0.6
+
+0.55
+
+0.5
+
+ 
+0
+
+0.9
+
+0.85
+
+0.8
+
+0.75
+
+0.7
+
+0.65
+
+0.6
+
+0.55
+
+0.5
+
+0.45
+
+ 
+0
+
+Logistic Regression
+
+ 
+
+Single
+Ensemble
+
+5
+
+10
+
+15
+
+Number of Features
+
+Alternating Decision Tree
+
+20
+
+ 
+
+Single
+Ensemble
+
+5
+
+10
+
+15
+
+20
+
+Number of Features
+
+Fig. 2. AUC comparison of ensemble wrapper and single wrapper using greedy forward
+selection and fbis dataset. The feature size from 1 to 20 selected by ensemble and single
+wrappers are evaluated by 6 diﬀerent classiﬁcation algorithms.
+
+RF
+16
+4
+
+RF
+13
+7
+
+RF
+12
+8
+
+ADTree
+
+17
+3
+
+0.0017 (cid:2)
+
+ADTree
+
+15
+5
+
+0.025 (cid:2)
+
+ADTree
+
+11
+9
+
+0.654
+
+ADTree
+
+Ensemble-Based Wrapper Methods
+
+553
+
+Table 3. Comparison of ensemble and single approaches using genetic algorithm
+
+Ensemble Win
+Single Win
+Friedman Test 0.0073 (cid:2) 0.3711
+
+12
+8
+
+3-NN
+
+fbis dataset
+7-NN LogReg MLP
+
+11
+9
+
+16
+4
+
+13
+7
+
+0.0073 (cid:2) 0.1797
+Re0 dataset
+7-NN LogReg MLP
+
+0.654
+
+3-NN
+
+Ensemble Win
+11
+9
+Single Win
+Friedman Test 0.1797 0.0073 (cid:2) 3.46e-4 (cid:2) 0.025 (cid:2) 0.654
+
+18
+2
+
+15
+5
+
+16
+4
+
+Ensemble Win
+
+Single Win
+
+RF
+11
+9
+
+3-NN
+
+12
+8
+
+Friedman Test
+
+0.654
+
+0.3711
+
+Oh5 dataset
+7-NN LogReg MLP
+
+12
+8
+
+14
+6
+
+12
+8
+
+0.1797
+
+0.3711
+ALL dataset
+7-NN LogReg MLP
+
+0.3711
+
+3-NN
+
+Ensemble Win
+Single Win
+Friedman Test 0.3711 0.0073 (cid:2) 0.0073 (cid:2) 0.1797 0.0017 (cid:2) 0.0073 (cid:2)
+
+16
+4
+
+13
+7
+
+16
+4
+
+16
+4
+
+17
+3
+
+Ensemble Win
+
+Single Win
+
+RF
+12
+8
+
+Friedman Test 0.3711
+
+Oil dataset
+
+3-NN
+
+7-NN LogReg MLP
+
+ADTree
+
+15
+5
+
+12
+8
+
+0.025 (cid:2) 0.3711
+
+13
+7
+0.179 5.69e-5 (cid:2) 0.025 (cid:2)
+
+19
+1
+
+15
+5
+
+(cid:2) Results with signiﬁcant diﬀerences (p-value lower than 0.05) using Friedman test.
+
+1
+
+0.9
+
+0.8
+
+0.7
+
+0.6
+
+0.5
+
+0.4
+
+C
+U
+A
+
+ 
+0
+
+1
+
+0.95
+
+0.9
+
+0.85
+
+0.8
+
+0.75
+
+0.7
+
+0.65
+
+0.6
+
+0.55
+
+ 
+0
+
+C
+U
+A
+
+Random Forest
+
+Single
+Ensemble
+
+5
+
+10
+
+15
+
+Number of Features
+
+7−Nearest Neighbour
+
+ 
+
+20
+
+ 
+
+Single
+Ensemble
+
+5
+
+10
+
+15
+
+20
+
+Number of Features
+
+1
+
+0.9
+
+0.8
+
+C
+U
+A
+
+0.7
+
+0.6
+
+0.5
+
+0.4
+
+ 
+0
+
+1
+
+0.95
+
+0.9
+
+C
+U
+A
+
+0.85
+
+0.8
+
+0.75
+
+0.7
+
+ 
+0
+
+3−Nearest Neighbours
+
+Single
+Ensemble
+
+5
+
+10
+
+15
+
+Number of Features
+
+Multiple Layer Perceptron
+
+ 
+
+20
+
+ 
+
+Single
+Ensemble
+
+5
+
+10
+
+15
+
+20
+
+Number of Features
+
+1
+
+0.9
+
+0.8
+
+C
+U
+A
+
+0.7
+
+0.6
+
+0.5
+
+0.4
+
+ 
+0
+
+1
+
+0.9
+
+0.8
+
+0.7
+
+0.6
+
+0.5
+
+ 
+0
+
+C
+U
+A
+
+Logistic Regression
+
+Single
+Ensemble
+
+5
+
+10
+
+15
+
+Number of Features
+
+Alternating Decision Tree
+
+ 
+
+20
+
+ 
+
+Single
+Ensemble
+
+5
+
+10
+
+15
+
+20
+
+Number of Features
+
+Fig. 3. AUC comparison of ensemble wrapper and single wrapper using greedy forward
+selection and re0 dataset. The feature size from 1 to 20 selected by ensemble and single
+wrappers are evaluated by 6 diﬀerent classiﬁcation algorithms.
+
+previously selected features. Therefore, if a good feature is selected, it will con-
+tinually be used in later iterations. Whereas, the genetic algorithm tries diﬀerent
+size of feature subsets separately, and for each run the initiation, crossover, and
+mutation operations introduces randomness to the selection procedure. It follows
+
+554
+
+P. Yang et al.
+
+that the greedy forward selection approach is likely to aggregate the eﬀect of the
+ensemble through iterations, while the genetic algorithm approach may reduce
+the eﬀect of the ensemble due to its stochastic behaviour.
+
+It is interesting to see that diﬀerent classiﬁcation algorithms performed dif-
+ferently even with the same set of features. For the extreme case, in Table 2
+the classiﬁcation results of 7-NN on oh5 dataset and 3-NN and 7-NN on oil
+dataset contradict to the rest of the classiﬁers. Even for classiﬁers with similar
+comparison results, each of them may still behave diﬀerently throughout the
+feature subset size of 1 to 20. For example, in Figure 2, RF shows an increasing
+trend when more features are added. However, LogReg and ADTree indicate a
+decreasing trend when more features are included, whereas the performance of
+MLP increases ﬁrst and then decreases. Note that the same sets of features and
+the same evaluation dataset are used for each classiﬁcation algorithm. There-
+fore, it is clear that using a single classiﬁcation algorithm for results evaluation
+is insuﬃcient. Instead, multiple classiﬁcation algorithms should be evaluated in
+order to reﬂect the general usefulness of the selected features.
+
+5 Conclusion
+
+In this study, we proposed an ensemble approach that incorporate feature selec-
+tion and imbalanced data sampling in a wrapper framework. Using two search
+algorithms and several high-dimensional and highly imbalanced datasets, we
+demonstrated that features selected by the ensemble-based wrapper approach
+are more useful than the traditional approach (i.e. using single inductive algo-
+rithm) in terms of feature selection and imbalance learning. This implies that
+the traditional approach that uses a single inductive algorithm for feature evalu-
+ation may perform suboptimally when the dataset is of both high-dimensionality
+and highly imbalanced class distribution. By designing a multiple sampling and
+an ensemble feature evaluation components, we can correct the undesirable bias
+and identify more useful features and/or feature subsets.
+
+References
+
+1. Liu, H., Yu, L.: Toward integrating feature selection algorithms for classiﬁcation and
+clustering. IEEE Transactions on Knowledge and Data Engineering, 491–502 (2005)
+2. Saeys, Y., Inza, I., Larra˜naga, P.: A review of feature selection techniques in bioin-
+
+formatics. Bioinformatics 23(19), 2507–2517 (2007)
+
+3. Blum, A., Langley, P.: Selection of relevant features and examples in machine
+
+learning. Artiﬁcial Intelligence 97(1-2), 245–271 (1997)
+
+4. Kohavi, R., John, G.: Wrappers for feature subset selection. Artiﬁcial Intelli-
+
+gence 97(1-2), 273–324 (1997)
+
+5. Freitas, A.: Understanding the crucial role of attribute interaction in data mining.
+
+Artiﬁcial Intelligence Review 16(3), 177–199 (2001)
+
+6. Tang, L., Liu, H.: Bias analysis in text classiﬁcation for highly skewed data. In: Pro-
+ceedings of the Fifth IEEE International Conference on Data Mining, pp. 784–787
+(2005)
+
+Ensemble-Based Wrapper Methods
+
+555
+
+7. He, H., Garcia, E.: Learning from imbalanced data. IEEE Transactions on Knowl-
+
+edge and Data Engineering, 1263–1284 (2008)
+
+8. Batista, G., Prati, R., Monard, M.: A study of the behavior of several methods for
+balancing machine learning training data. ACM SIGKDD Explorations Newslet-
+ter 6(1), 20–29 (2004)
+
+9. Mladenic, D., Grobelnik, M.: Feature selection for unbalanced class distribution
+and naive bayes. In: Proceedings of the Sixteenth International Conference on
+Machine Learning, pp. 258–267 (1999)
+
+10. Guyon, I., Elisseeﬀ, A.: An introduction to variable and feature selection. The
+
+Journal of Machine Learning Research 3, 1157–1182 (2003)
+
+11. Caruana, R., Freitag, D.: Greedy attribute selection. In: Proceedings of the
+
+Eleventh International Conference on Machine Learning, pp. 28–36 (1994)
+
+12. Kudo, M., Sklansky, J.: Comparison of algorithms that select features for pattern
+
+classiﬁers. Pattern Recognition 33(1), 25–41 (2000)
+
+13. Oh, I., Lee, J., Moon, B.: Hybrid genetic algorithms for feature selection. IEEE
+
+Transactions on Pattern Analysis and Machine Intelligence, 1424–1437 (2004)
+
+14. Wang, X., Yang, J., Teng, X., Xia, W., Jensen, R.: Feature selection based on rough
+sets and particle swarm optimization. Pattern Recognition Letters 28(4), 459–471
+(2007)
+
+15. Japkowicz, N., Stephen, S.: The class imbalance problem: A systematic study.
+
+Intelligent Data Analysis 6(5), 429–449 (2002)
+
+16. Chawla, N., Bowyer, K., Hall, L., Kegelmeyer, W.: SMOTE: synthetic minority over-
+sampling technique. Journal of Artiﬁcial Intelligence Research 16(1), 321–357 (2002)
+17. Estabrooks, A., Jo, T., Japkowicz, N.: A multiple resampling method for learning
+
+from imbalanced data sets. Computational Intelligence 20(1), 18–36 (2004)
+
+18. Khoshgoftaar, T., Seiﬀert, C., Van Hulse, J.: Hybrid Sampling for Imbalanced
+
+Data. In: Proceedings of IRI, pp. 202–207 (2008)
+
+19. Breiman, L.: Bagging predictors. Machine Learning 24(2), 123–140 (1996)
+20. Li, C.: Classifying imbalanced data using a bagging ensemble variation (BEV). In:
+Proceedings of the 45th Annual Southeast Regional Conference, pp. 203–208 (2007)
+21. Saeys, Y., Abeel, T., Van de Peer, Y.: Robust feature selection using ensemble
+feature selection techniques. In: Daelemans, W., Goethals, B., Morik, K. (eds.)
+ECML PKDD 2008, Part II. LNCS (LNAI), vol. 5212, pp. 313–325. Springer,
+Heidelberg (2008)
+
+22. Han, E.-H(S.), Karypis, G.: Centroid-Based Document Classiﬁcation: Analysis
+and Experimental Results. In: Zighed, D.A., Komorowski, J., ˙Zytkow, J.M. (eds.)
+PKDD 2000. LNCS (LNAI), vol. 1910, pp. 424–431. Springer, Heidelberg (2000)
+
+23. Yeoh, E., Ross, M., Shurtleﬀ, S., Williams, W., Patel, D., Mahfouz, R., Behm, F.,
+Raimondi, S., Relling, M., Patel, A., et al.: Classiﬁcation, subtype discovery, and
+prediction of outcome in pediatric acute lymphoblastic leukemia by gene expression
+proﬁling. Cancer Cell 1(2), 133–143 (2002)
+
+24. Kubat, M., Holte, R., Matwin, S.: Machine learning for the detection of oil spills
+
+in satellite radar images. Machine Learning 30(2), 195–215 (1998)
+
+25. Dietterich, T.: An experimental comparison of three methods for constructing en-
+sembles of decision trees: Bagging, boosting, and randomization. Machine Learn-
+ing 40(2), 139–157 (2000)
+
+26. Liu, W., Chawla, S., Cieslak, D., Chawla, N.: A robust decision tree algorithms
+for imbalanced data sets. In: Proceedings SIAM International Conference on Data
+Mining, pp. 766–777 (2010)
+
+27. Demˇsar, J.: Statistical comparisons of classiﬁers over multiple data sets. The Jour-
+
+nal of Machine Learning Research 7, 1–30 (2006)
+
+

@@ -1,0 +1,904 @@
+Modeling Social Information Learning
+
+among Taxi Drivers
+
+Siyuan Liu1, Ramayya Krishnan1, Emma Brunskill1, and Lionel M. Ni2
+
+1 Carnegie Mellon University
+
+2 Hong Kong University of Science and Technology
+
+Abstract. When a taxi driver of an unoccupied taxi is seeking passengers on a
+road unknown to him or her in a large city, what should the driver do? Alternatives
+include cruising around the road or waiting for a time period at the roadside in
+the hopes of ﬁnding a passenger or just leaving for another road enroute to a
+destination he knows (e.g., hotel taxi rank)? This is an interesting problem that
+arises everyday in many cities worldwide. There could be different answers to
+the question poised above, but one fundamental problem is how the driver learns
+about the likelihood of ﬁnding passengers on a road that is new to him (as in
+he has not picked up or dropped off passengers there before). Our observation
+from large scale taxi drivers behavior data is that a driver not only learns from his
+own experience but through interactions with other drivers. In this paper, we ﬁrst
+formally deﬁne this problem as Socialized Information Learning (SIL), second
+we propose a framework including a series of models to study how a taxi driver
+gathers and learns information in an uncertain environment through the use of his
+social network. Finally, the large scale real life data and empirical experiments
+conﬁrm that our models are much more effective, efﬁcient and scalable that prior
+work on this problem.
+
+1 Introduction
+
+The study of how a person gathers information and makes decisions has a long and
+varied literature. In the previous research, collective intelligence [13, 19, 23, 27], intel-
+ligent agent [7, 10, 12, 21, 22], transfer learning [6, 25, 26] and evidence-based reason-
+ing [4, 8, 14] and other methods are proposed to investigate an agent’s learning theory.
+But due to the new challenges raised in dynamic uncertain environment [11, 17, 18],
+prior work on this topic is either inefﬁcient or inaccurate. Now consider the following
+problem.
+
+In our application context, there are 3,187 taxi drivers, and among them there are
+25.2% new drivers (less than one year driving experience), 47.1% normal drivers (one
+to two years driving experience) and 27.7% experienced drivers (greater than two years
+driving experience). When a driver comes to road to pick up passengers, there are two
+actions (action set) to choose: waiting at the current location or cruising to other lo-
+cations. The knowledge of the taxi driver can be described as the histogram of the
+waiting time before picking up a passenger, the number of picking-ups, and the rev-
+enue (income) at the given time and location. Given a situation that the drivers come
+to an unknown road, in a survey of 1,000 taxi drivers, we study how the drivers fol-
+low their own experienced knowledge and the socialized knowledge (the knowledge
+
+J. Pei et al. (Eds.): PAKDD 2013, Part II, LNAI 7819, pp. 73–84, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+74
+
+S. Liu et al.
+
+obtained from other drivers) to accordingly make actions. We ﬁnd that different drivers
+have very different learning preferences. The new drivers prefer to follow the socialized
+knowledge, but the experienced drivers prefer to follow their experienced knowledge.
+The standard deviation is larger in new drivers than the experienced drivers. Hence,
+different drivers would take various knowledge sources.
+
+In our dataset, we also have the communication records to indicate the socialization
+of taxi drivers. When a new driver was assigned to different group compositions, we
+studied the income changes (one week). We take 70% as the threshold to deﬁne a group
+composition, e.g., New means more than 70% of the drivers in the group are new drivers.
+We also tested other thresholds larger than 50%, and the results are very similar. It is
+very interesting that even the new driver has less social closeness to the Experienced
+group than the New group, but not only individual income but also total income in the
+Experienced group have the greater increases than the New group. Hence the more so-
+cializations may not give the more accurate knowledge and better income. For example,
+the experienced drivers could give the new driver more accurate knowledge than other
+drivers.
+
+In a word, the problem is that how the drivers socialize with each other to construct
+the accurate knowledge in an uncertain environment, which we deﬁne as Socialized
+Information Learning. To tackle the problem, we have two steps to be accomplished,
+1) how to retrieve an accurate knowledge set for an individual driver in an uncertain
+environment; 2) how to utilize a social network to learn the information. In this paper,
+we ﬁrst propose an Individual Information Model to describe taxi drivers’ information
+collection, considering the features of the required places and the similarity between the
+required places and the experienced places. Second, we introduce the social network
+structure with a probability weighting function into the model to describe the non-linear
+socialized information learning, called Socialized Information Model.
+
+To summarize the contributions of our work, ﬁrst, we are the ﬁrst to discover the
+Socialized Information Learning problem in taxi drivers, and we deﬁne it as a new
+uncertain information learning problem; second, we propose a framework including a
+series of novel models to solve the socialized information learning problem (not only
+model taxi drivers’ behaviors by themselves, but also their social behaviors via the
+group information) and investigate it in the dynamic ﬁeld; third, we employ large scale
+real life datasets to test our models, and the empirical results show that our models
+outperform the state-of-the-art in terms of effectiveness, efﬁciency and scalability.
+
+The paper is structured as follows.In Section 2, we formally deﬁne the socialized
+information learning problem. We propose a series of models to solve the new socialized
+information learning problem in Section 3, and the empirical experiment results are
+illustrated and analyzed in Section 4. The related work to our study is surveyed in
+Section 5. Finally, we conclude our work and give directions to the future work.
+
+2 Problem Deﬁnition
+
+2.1 Deﬁnitions
+
+Deﬁnition 1. (Agent) Agent is deﬁned as an entity that is capable of perceiving knowl-
+edge and accordingly do action.
+
+Modeling Social Information Learning among Taxi Drivers
+
+75
+
+In our work, an agent is a taxi driver.
+Deﬁnition 2. (Agent group) Agent group is deﬁned as a set of agents that are capable
+of perceiving knowledge from each other and accordingly do action.
+In our work, an agent group is a predeﬁned group of taxi drivers by a taxi company.
+We deﬁne the knowledge of a taxi driver as experienced knowledge and socialized
+knowledge as below.
+Deﬁnition 3. (Experienced knowledge) The experienced knowledge (EK) is deﬁned
+as a set of information collected from the agent’s own experience, that is, historical
+records.
+In our work, the experienced knowledge is a set of the CDFs of waiting-time, picking-
+up and revenue distributions at given locations and times, from a given taxis historical
+GPS logs and business records. For the road without a given taxi driver’s experienced
+knowledge is called an unknown road.
+Deﬁnition 4. (Socialized knowledge) The socialized knowledge (SK) is deﬁned as a
+set of information collected from other agents’ information in the same group, that is,
+other agents’ historical records.
+In our work, the socialized knowledge is a set of CDFs of waiting-time, picking-up and
+income distributions at given locations and times, from a given taxis group members
+GPS logs and business records at the same given locations and times.
+Deﬁnition 5. (Action) Action of an agent is deﬁned as a selection of a mutual exclusion
+set.
+Action of a taxi driver is deﬁned as cruising or waiting for a passenger. At a given
+location and time, a taxi driver can select an action (make a decision) of cruising to
+other locations until picking up a passenger or waiting for a time period at the given
+location until picking up a passenger.
+Deﬁnition 6. (Socialization) Socialization of an agent is deﬁned as a communication
+between two agents.
+Socialization of a taxi driver is a call between two taxi drivers in the same group. Each
+socialization is recorded a vector: (i, j, ts, te, ιs, ιe), where i is the caller taxi ID, j is
+the callee taxi ID, ts is the call start time, te is the call end time, ιs is the calling start
+location (longitude and latitude) and ιs is the calling end location.
+Deﬁnition 7. (Socialization closeness) Socialization closeness between two agent is
+deﬁned as a function of communications between the two agents.
+The socialization closeness between two taxi drivers is deﬁned as:
+Deﬁnition 8. (Socialization closeness of taxi drivers) Given two taxi driver i and j in
+a group, a time interval t, i has the communication attribute set St
+, ...,
+}, where 1 ≤ f ≤ m and m is the number of attributes. The socialization closeness
+st,m
+i
+within the time interval t, γt
+
+i = {st,1
+
+i,j is
+
+, ..., st,f
+
+i
+
+i
+
+γt
+i,j =
+
+1
+m
+
+m(cid:2)
+
+f =1
+
+wf st,f
+i,j
+
+(1)
+
+76
+
+S. Liu et al.
+
+where wt
+ness set is Γ t = {..., γt
+taxi drivers in a given group.
+
+f is the weight of an attribute f in the time interval t. The socialization close-
+i,j, ...}, where i, j ∈ N, i, j = 1, 2, ..., n, and n is the number of
+
+In our study, we take the mean of three attributes (m=2), the number of calls and the
+call duration as socialization closeness values. Our solution can be extended to other
+cases where m > 2 and other functions. The default time interval is set as a minute,
+which is set by the communication service company. In this work, we equally take the
+weights in 8, which is predeﬁned by users.
+
+For the input communication data, we can construct a social network, G = (V, E),
+where V is a set of nodes (taxi drivers), and E is a set of edges (socialization with
+socialization closeness as the weight on the edge).
+
+Deﬁnition 9. (Decision knowledge) The decision knowledge (DK) is deﬁned as the
+information taken by an agent to make an action.
+
+For a taxi driver, the decision knowledge is based on a set of CDFs of waiting-time,
+picking-up and income distributions at given locations and times to make a certain
+action.
+
+2.2 Socialized Information Learning
+
+The formal deﬁnition of Socialized Information Learning (SIL) is as below.
+
+Given: a set of agents Q, a set of experienced knowledge E, a set of socialized
+
+knowledge S, and a social network G with socialization closeness Γ .
+
+Goal: a set of decision knowledge D.
+Speciﬁcally, given a taxi driver with experienced knowledge and socialized knowl-
+edge, under a social network, to make a good action to pick up a passenger in an un-
+known road, what is decision knowledge to support the given taxi driver’s action?
+
+In our work, the decision knowledge utilized by a taxi driver to decide the next move
+
+is calculated by a decision function as below.
+Deﬁnition 10. (Decision function of a Taxi Driver) P [vt(ι)|nt(ι) ≥  ] ≥ ω, where
+ι is a location index, t is a time index, vt(ι) is the revenue, nt(ι) is the number of
+passengers,  and ω are thresholds.
+
+The above function means if given a probability of a certain number of passenger is
+greater than a given threshold (), the conditional probability of revenue is greater than
+ω, the driver is going to wait for passengers at the given location, otherwise, cruise to
+other locations.
+
+3 Socialized Information Learning Framework
+
+3.1 Individual Information Model
+
+The basic idea of Individual Information Model is as follows. First, based on the util-
+ities of the road and buildings, we label each grid and cluster the grids into different
+
+Modeling Social Information Learning among Taxi Drivers
+
+77
+
+clusters. Second, given a location, we evaluate the similarity between the given location
+and the taxi’s experienced locations. Third, we weight the similar experienced knowl-
+edge and the socialized knowledge at the given location and time, and ﬁnally get the
+decision knowledge. To make the following expression clear, we take the revenue as a
+knowledge example to illustrate the model.
+
+Deﬁnition 11. Given a physical location ι =(x,y) and the report set Φ, the revenue
+spectrum V (t)
+Φ (ι) is the set of all the reported revenues (of the given taxi) at time t in
+location ι in Φ, i.e.,
+
+Φ (ι) = {v|∃φ(t)
+V (t)
+
+m ∈ Φ, (x(t)
+
+m , y(t)
+
+m , v(t)
+
+m ) = (x, y, v)}
+
+The revenue spectrum at all time instances is also written as VΦ(ι) = ∪t∈[0,+∞] V (t)
+Φ (ι).
+Since the time is discrete, Φ contains a ﬁnite number of reports and thus the revenue
+spectrum is ﬁnite as well.
+Deﬁnition 12. The location revenue v(t)
+spectrum in location ι at t,
+
+Φ (ι) is deﬁned as the average of the revenue
+
+(cid:3)
+
+v(t)
+Φ (ι) =
+
+1
+|V (t)
+Φ (ι)|
+
+vm∈V (t)
+
+Φ (ι)
+
+vm
+
+(2)
+
+In the real data, the revue spectrum is very sparse and lossy, hence we employ a moving
+average technique to reconstruct a sufﬁcient spectrum as below.
+
+Deﬁnition 13. The experienced revenue knowledge H(t)(ι) of a given location ι =
+(x, y) is deﬁned as an exponential moving average of the complementary cumulative
+distribution function (CCDF) of the instant revenue over the revenue spectrum, i.e.,
+
+H(t)(ι) = αι · H(t−τl)(ι) + (1 − αι) · (1 − P(v ≤ v(t)
+
+(3)
+where P(v ≤ v(t)(ι)), v ∈ VΦ(ι) represents the probability that the revenue at ι is less
+than or equal to the location instant revenue v(t)
+Φ (ι). αι and τι are two parameters to
+capture the dynamism of ι.
+
+Φ (ι)))
+
+The parameter αι is a smoothing factor of exponential moving average in H. It is
+used to capture the degree of dynamism of the location dynamics. In general, a smaller
+αι indicates a higher dynamism and vice versa. The parameter τι is the interval between
+two moving averages. It reﬂects the periodic property of the location dynamics.
+
+Different locations will present distinctive dynamic behaviors, resulting in various
+settings. In order to systematically study the speed distribution, we apply Fourier Trans-
+formation (FT). FT can transform the function from time domain to frequency domain,
+revealing inherent periodic property of original function as well as the amplitude of the
+corresponding frequency. Speciﬁcally, given the revenue distribution function over time
+v(t)(ι) at a location ι, its FT can be calculated by,
+
+ˆf (ξ) =
+
+where t is the variable.
+
+(cid:4) +∞
+−∞
+
+v(t)(l)e−2πitξdt,
+
+(4)
+
+78
+
+S. Liu et al.
+
+To calculate the H(t)(ι), we maintain the location history information for six months.
+As the computation is carried out at a data center in a centralized manner, the computa-
+tional and storage cost is acceptable.
+
+Deﬁnition 14. The similarity between the given location and the taxi’s experienced
+locations is deﬁned by the linear correlation coefﬁcient.
+Given the similar experienced revenue knowledge H(t)(ι) and the socialized revenue
+(cid:2)(t)(ι) from other drivers, we have the decision revenue knowledge as
+knowledge H
+below.
+
+ˆH(t)(ι) = βH(t)(ι) + (1 − β)H
+
+(cid:2)(t)(ι),
+
+(5)
+where β is a parameter capturing the weight of a taxi driver following the own expe-
+rienced revenue knowledge, which is determined by users (taxi drivers). In our work,
+we learned this parameter from the real life data, which is elaborated in Section 4. The
+(cid:2)(t)(ι) is proposed in the next
+method to retrieve the socialized revenue knowledge H
+section.
+
+3.2 Socialized Information Model
+
+Given a taxi driver, there exists knowledge limitation (hard to possess the knowledge of
+the whole city), hence the taxi driver may consult other taxi drivers via a social network
+G. In this subsection, we propose a Socialized Information Model to learn knowledge
+from other drivers in a social network.
+
+Deﬁnition 15. (Socialization probability) The probability pi,j of a given taxi driver i
+socializing with a taxi driver j is the percentage of socialization closeness between the
+two drivers over the total socialization closeness among other drivers being socialized
+by the driver in a given time period.
+
+Hence the socialized knowledge for a given taxi driver can be described by a probability-
+based weighting function over a set of knowledge. Under the expected utility theory, a
+taxi driver weights probabilities of learning information linearly. However, the evidence
+suggests that the taxi drivers weight probabilities in a non-linear manner. An example
+is given as following.
+
+(cid:2)(t)
+H
+i
+
+(ι) = (
+
+1
+n
+
+· n(cid:2)
+
+k=1
+
+[pi,kH(t)
+
+k (ι)]
+
+m
+
+) 1
+m ,
+
+(6)
+
+where m is a parameter in generalized mean, determining the appropriate mean (in our
+work, we select as 2). pi,kH(t)
+k (ι) in Eq. 6 means the socialized knowledge of driver
+i from driver j, under the probability of driver i being able to access the experienced
+knowledge of driver k.
+
+Unfortunately, this method does not work well under the following two cases: 1)
+overweight small probabilities and underweight large ones (S1); 2) do not choose
+stochastically dominated options when such dominance is obvious (S2). Hence we uti-
+lize a probability weighting function to conduct a non-linear weighting of socialized
+knowledge.
+
+Modeling Social Information Learning among Taxi Drivers
+
+79
+
+The particular probability weighting function is
+
+w(p) =
+
+pλ
+
+[pλ + (1 − p)λ]
+
+1
+λ
+
+,
+
+(7)
+
+where 0.5 < λ ≤ 1, w(p) is a weighted probability and p is pi,j in Eq. 6.
+
+After weighting pi,j, we utilize Eq. 6 to compute the socialized knowledge.
+
+4 Empirical Experiments
+
+4.1 Experiment Setup
+
+Datasets Description: We collected one year taxi operation data records, including taxi
+tracking records, taximeter records and communication records, in a large city in China.
+The scale of the whole dataset is almost 1 Terabytes. Taxi tracking records provide
+taxis’ group information and traces, including location and time information; taxime-
+ter records provide taxis’ revenue, waiting time and picking-up with location-time logs;
+communication records provide taxis’ social information, e.g., social closeness. We em-
+ploy six months data as training data and the other six months data as test data. We also
+collected one month trafﬁc surveillance video data in the city. The trafﬁc data can pro-
+vide us the trafﬁc ﬂow, trafﬁc lights, taxis’ picking-up and dropping-off information,
+which we employ as the ground truth of taxis’ behaviors in the city.
+
+Experiment Environment: A server with four Intel Core Quad CPUs (Q9550 2.83
+GHz) and 32 GB main memory.
+
+Baseline Methods: We compare our method with two baseline methods: one is the
+classic method in collective intelligence, called CMM [13], which is popular and gen-
+erate many latest approaches; the other is the representative method in agent modeling
+in intelligent agent and social system, called ABM [21]. The parameter settings of the
+above two methods in our work follow their parameters in their papers [13, 21].
+
+Evaluation Metrics: In our experiments, we employ time cost, scalability to evaluate
+efﬁciency, and precision, recall, and F1 to evaluate effectiveness.
+
+4.2 Parameter Learning
+
+Given a taxi driver, we learn the parameters β in Eq. 5 from the driver’s historical
+behaviors as follows. When the driver comes to an unknown road, if the driver makes no
+call to other drivers to consult the given road’s information, we assume the driver follow
+the own experienced knowledge; else if the driver makes calls to other drivers who have
+the experienced knowledge of the given road, and the given driver accordingly makes
+an action, we assume the driver follow the socialized knowledge. Based on the records
+in the historical data, we can have the percentage of a given driver’s follow behavior.
+In our study, we take the percentage of following the own experienced knowledge as β.
+For different drivers, β is different and updating along the new records coming to the
+dataset. The parameter updating is intuitive which is not elaborated in the paper. In the
+following experiments, we utilize the percentage number as the parameter.
+
+80
+
+S. Liu et al.
+
+0.8
+
+0.7
+
+0.6
+
+0.5
+
+0.4
+
+n
+o
+i
+s
+i
+c
+e
+r
+P
+
+ 
+
+0.3
+2000
+
+n
+o
+i
+s
+i
+c
+e
+r
+P
+
+0.8
+
+0.7
+
+0.6
+
+0.5
+
+0.4
+
+0.3
+
+ 
+30
+
+ 
+
+Our Method
+CMM
+ABM
+
+5000
+
+ 
+
+Our Method
+CMM
+ABM
+
+3000
+
+4000
+
+Number of Drivers
+
+(a) Different Drivers
+
+50
+
+70
+
+Number of Driver Groups
+
+90
+
+(b) Different Groups
+
+Fig. 1. Precision in Different Drivers and Groups
+
+4.3 Effectiveness Evaluation
+
+We evaluate effectiveness by precision, recall, and F1. Precision is the fraction of re-
+trieved results that are relevant to the search, that is, the number of waiting/ cruising
+actions resulting from our model over the number of all waiting/ cruising actions made
+by taxis resulting from our model. Recall is the fraction of retrieved results that are rele-
+vant to the query that are successfully retrieved, that is, the number of waiting/ cruising
+actions resulting from our model over the number of all waiting cruising actions made
+by taxis.
+
+Table 1. Our Method’s Effectiveness in Different Driver Categories
+
+DC
+
+N
+
+P
+
+R
+
+F
+
+1260 67.8% 57.8% 62.3%
+New
+Normal
+2355 71.7% 67.3% 69.4%
+Experienced 1385 80.2% 78.7% 79.4%
+
+Modeling Social Information Learning among Taxi Drivers
+
+81
+
+ABM
+Our Method
+CMM
+
+600
+
+500
+
+400
+
+300
+
+200
+
+)
+e
+t
+u
+n
+M
+
+i
+
+(
+ 
+e
+m
+T
+
+i
+
+100
+
+ 
+
+2000
+
+600
+
+500
+
+400
+
+300
+
+200
+
+)
+e
+t
+u
+n
+i
+M
+
+(
+ 
+e
+m
+T
+
+i
+
+100
+
+ 
+30
+
+3000
+
+4000
+
+Number of Drivers
+
+(a) Different Drivers
+
+ABM
+Our Method
+CMM
+
+50
+
+70
+
+Number of Driver Group
+
+ 
+
+5000
+
+ 
+
+90
+
+(b) Different Groups
+
+Fig. 2. Efﬁciency in Different Drivers and Groups
+
+Table 2. Baseline Method’s Effectiveness in Different Driver Categories
+
+DC
+
+N
+
+P
+
+R
+
+F
+
+1260 31.2% 17.8% 22.7%
+New
+Normal
+2355 39.7% 27.3% 32.3%
+Experienced 1385 45.9% 36.5% 40.8%
+
+To evaluate the effectiveness of our method, we design two categories of experi-
+
+ments.
+
+Category 1: effectiveness in different driver categories. The results of our method are
+listed in Table 1. DC is the driver category, N is the number of drivers in the category,
+P is Precision, R is recall, and F is F1. The results of ABM are listed in Table 2. In our
+experiment, CMM returns much worse results than ABM.
+
+Category 2: effectiveness in different drivers, groups and time series. We conducted
+precision, recall, and F1 tests in different drivers, groups and time series. Due to page
+limitation, we only show the precision results. In Figure 1 (a) and (b), we test the accu-
+racy in one month data. The results show that our method returns much more accurate
+results than the baseline methods, not only in different drivers scenario, but also in
+
+82
+
+S. Liu et al.
+
+different groups. In a conclusion, our method’s accuracy is much better than baseline
+methods, and the accuracy also shows great scalability.
+
+4.4 Efﬁciency Evaluation
+
+We conducted efﬁciency tests in different drivers, groups and time series. The efﬁciency
+is measured by the time cost in a knowledge learning process. In Figure 2 (a) and (b),
+we test the efﬁciency in one month data. The results show that our method costs much
+less time than the baseline methods, not only in different drivers scenario, but also in
+different groups. In a conclusion, our method’s efﬁciency is much more better than
+baseline methods, and the efﬁciency also shows great scalability.
+
+5 Related Work
+
+In [9], they proposed an approach to the problem of driving an autonomous vehicle
+in normal trafﬁc. In [1], they discussed the spatial dispersion problem. But the work
+in this category either does not consider the social structure to retrieve the accurate
+information, or does not consider the dynamics in the learning process. In organized
+learning theory, this category work assumes that the sum of individual knowledge does
+not equate to organizational knowledge [2, 3, 5, 15, 16, 24]. In [4], they studied the
+distinction between individual knowledge and organizational knowledge, and prove the
+assumption. In [21], Ronald et al. demonstrated the design and implementation of an
+agent-based model of social activity generation. Szuba et al. [23] attempted to for-
+mally analyze the problem of individual existence of a being versus its existence in a
+social structure through the evaluation of collective intelligence efﬁciency. Heylighen
+et al.[13] argued that the obstacles created by individual cognitive limits and the dif-
+ﬁculty of coordination could be overcome by using a collective mental map (CMM).
+Deng et al. [7] explored the use of active learning techniques to design more efﬁcient
+trials. Rettinger et al.[20] studied the learning of trust and distrust in social interaction
+among autonomous, mentally-opaque agents. Wang et al.[25] presented an algorithm
+for ﬁnding the structural similarity between two domains, to enable transfer learning at
+a structured knowledge level. Cao et al.[6] proposed an adaptive transfer learning algo-
+rithm to adapt the transfer learning schemes by automatically estimating the similarity
+between a source and a target task. Zhu et al.[27] turned the co-training algorithm into
+a human collaboration policy. Unfortunately current work can not work well in our so-
+cialized information learning because of the challenges from dynamic updating along
+the time and large scale socializations.
+
+6 Conclusion and Future Work
+
+In this paper, we model the social information learning among taxi drivers and employ
+large scale real life data and empirical experiments to conﬁrm our models in terms
+of much better effectiveness, efﬁciency and scalability than the state-of-the-art. Our
+models could be relevant to other domains, e.g., studying animal behavior, or where
+
+Modeling Social Information Learning among Taxi Drivers
+
+83
+
+people go to sell things. We leave taxi driver decision model as the future work. How
+to model taxi driver’s decision based on their collected information is a very interesting
+but challenging topic. Our current work can make such future work on the accurate and
+updated information.
+
+Acknowledgment. This research is supported by the Singapore National Research
+Foundation under its International Research Centre @ Singapore Funding Initiative and
+administered by the IDM Programme Ofﬁce, and Huawei Corp. grant YBCB2009041-
+27, and University Transportation Center grant (DTRT12-G-UTC11) from the US De-
+partment of Transportation.
+
+References
+
+1. Alpern, S., Reyniers, D.: Spatial dispersion as a dynamic coordination problem. Theory and
+
+Decision 53(1) (2002)
+
+2. Argote, L., Miron-Spektor, E.: Organizational learning: From experience to knowledge. Or-
+
+ganization Science 22 (2011)
+
+3. Argyris, C., Schn, D.: Organizational learning: A theory of action perspective. Addison-
+
+Wesley (1978)
+
+4. Bhatt, G.: Information dynamics, learning and knowledge creation in organizations. The
+
+Learning Organization 7(2) (2000)
+
+5. Bontis, N., Coss, V.M.: Managing an organizational learning system by aligning stocks and
+
+ﬂows. Journal of Management Studies 39 (2002)
+
+6. Cao, B., Pan, J., Zhang, Y., Yeung, D., Yang, Q.: Adaptive transfer learning. In: Proc. of
+
+AAAI (2010)
+
+7. Deng, K., Pineau, J., Murphy, S.: Active learning for developing personalized treatment. In:
+
+Proc. of UAI (2011)
+
+8. Devlin, K.: A framework for modeling evidence-based, context-inﬂuenced reasoning. In:
+
+Proc. of CONTEXT (2003)
+
+9. Forbes, J., Huang, T., Kanazawa, K., Russell, S.: The batmobile: Towards a bayesian auto-
+
+mated taxi. In: Proc. of IJCAI (1995)
+
+10. Fu, W., Song, L., Xing, E.P.: Dynamic mixed membership blockmodel for evolving net-
+
+works. In: Proc. of ICML (2009)
+
+11. Ge, Y., Xiong, H., Liu, C., Zhou, Z.-H.: A taxi driving fraud detection system. In: Proc. of
+
+ICDM (2011)
+
+12. Glaubius, R., Tidwell, T., Gill, C., Smart, W.: Real-time scheduling via reinforcement learn-
+
+ing. In: Proc. of UAI (2010)
+
+13. Heylighen, F.: Collective intelligence and its implementation on the web: Algorithms to de-
+
+velop a collective mental map. Comput. Math. Organ. Theory 5(3), 253–280 (1999)
+
+14. Kay, J., Niu, W.T., Carmichael, D.J.: Oncor: ontology- and evidence-based context reasoner.
+
+In: Proc. of IUI (2007)
+
+15. Lee, S.J., Popovi´c, Z.: Learning behavior styles with inverse reinforcement learning. ACM
+
+Trans. Graph. 29 (July 2010)
+
+16. Li, P., Yu, J.X., Liu, H., He, J., Du, X.: Ranking individuals and groups by inﬂuence propa-
+gation. In: Huang, J.Z., Cao, L., Srivastava, J. (eds.) PAKDD 2011, Part II. LNCS, vol. 6635,
+pp. 407–419. Springer, Heidelberg (2011)
+
+17. Liu, S., Liu, C., Luo, Q., Ni, L., Krishnan, R.: Calibrating large scale vehicle trajectory data.
+
+In: Proc. of IEEE MDM (2012)
+
+84
+
+S. Liu et al.
+
+18. Liu, S., Liu, Y., Ni, L.M., Fan, J., Li, M.: Towards mobility-based clustering. In: Proc. of
+
+ACM SIGKDD (2010)
+
+19. Nickel, M., Tresp, V., Kriegel, H.-P.: A three-way model for collective learning on multi-
+
+relational data. In: Proc. of ICML (2011)
+
+20. Rettinger, A., Nickles, M., Tresp, V.: Statistical relational
+
+learning of trust. Mach.
+
+Learn. 82(2) (2011)
+
+21. Ronald, N., Dignum, V., Jonker, C., Arentze, T., Timmermans, H.: On the engineering of
+agent-based simulations of social activities with social networks. Inf. Softw. Technol. 54(6)
+(2012)
+
+22. Russell, S.: Learning agents for uncertain environments (extended abstract). In: Proc. of
+
+COLT (1998)
+
+23. Szuba, T., Pola´nski, P., Schab, P., Wielicki, P.: On Efﬁciency of Collective Intelligence Phe-
+nomena. In: Nguyen, N.T., Kowalczyk, R. (eds.) Transactions on CCI III. LNCS, vol. 6560,
+pp. 50–73. Springer, Heidelberg (2011)
+
+24. Templeton, G.F., Lewis, B.R., Snyder, C.A.: Development of a measure for the organizational
+
+learning construct. J. Manage. Inf. Syst. 19(2) (2002)
+
+25. Wang, H., Yang, Q.: Transfer learning by structural analogy. In: Proc. of AAAI (2011)
+26. Xiao, L., Zhou, D., Wu, M.: Hierarchical classiﬁcation via orthogonal transfer. In: Proc. of
+
+ICML (2011)
+
+27. Zhu, X., Gibson, B., Rogers, T.: Co-training as a human collaboration policy. In: Proc. of
+
+AAAI (2011)
+
+

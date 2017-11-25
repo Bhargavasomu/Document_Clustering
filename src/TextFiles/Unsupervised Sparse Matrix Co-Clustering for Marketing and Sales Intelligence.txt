@@ -1,0 +1,892 @@
+Unsupervised Sparse Matrix Co-clustering
+
+for Marketing and Sales Intelligence
+
+Anastasios Zouzias1, Michail Vlachos2, and Nikolaos M. Freris2
+
+1 Department of Computer Science,
+
+University of Toronto, Canada
+
+2 IBM Z¨urich Research Laboratory, Switzerland
+
+Abstract. Business intelligence focuses on the discovery of useful re-
+tail patterns by combining both historical and prognostic data. Ultimate
+goal is the orchestration of more targeted sales and marketing eﬀorts. A
+frequent analytic task includes the discovery of associations between cus-
+tomers and products. Matrix co-clustering techniques represent a com-
+mon abstraction for solving this problem. We identify shortcomings of
+previous approaches, such as the explicit input for the number of co-
+clusters and the common assumption for existence of a block-diagonal
+matrix form. We address both of these issues and present techniques for
+automated matrix co-clustering. We formulate the problem as a recur-
+sive bisection on Fiedler vectors in conjunction with an eigengap-driven
+termination criterion. Our technique does not assume perfect block-
+diagonal matrix structure after reordering. We explore and identify oﬀ-
+diagonal cluster structures by devising a Gaussian-based density estima-
+tor. Finally, we show how to explicitly couple co-clustering with product
+recommendations, using real-world business intelligence data. The ﬁnal
+outcome is a robust co-clustering algorithm that can discover in an au-
+tomatic manner both disjoint and overlapping cluster structures, even in
+the preserve of noisy observations.
+
+1
+
+Introduction
+
+Graph structures constitute a prevalent representation form for modeling con-
+nections between diﬀerent entities. In particular, analysis of bi-partite graphs is
+the focus on a wide spectrum of studies that span from social-network to busi-
+ness analytics and decision making. In business intelligence, bi-partite graphs
+may capture the connection between sets of customers and sets of products.
+Analysis of such data holds great importance for companies that collect large
+amounts of customer interaction data in their data warehouses.
+
+One common analytic process for business intelligence is the identiﬁcation of
+groups of customers that buy (or do not buy) a subset of products. The avail-
+ability of such information is advantageous to both sales and marketing teams,
+as follows: sales people can use these insights for oﬀering more accurate person-
+alized product suggestions to customers by examining what ‘similar’ customers
+buy. In a similar manner, identiﬁcation of buying/not-buying preferences can
+
+P.-N. Tan et al. (Eds.): PAKDD 2012, Part I, LNAI 7301, pp. 591–603, 2012.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2012
+
+592
+
+A. Zouzias, M. Vlachos, and N.M. Freris
+
+assist marketing people to determine groups of customers interested in a set of
+package products. This can help organize more focused marketing campaigns,
+hence leading to a more appropriate allocation of the company’s marketing funds.
+The described problem can be mapped to a co-clustering instance [1,4,11]. A
+similar task is ‘matrix reordering’ which discovers a permutation of matrix rows
+and columns such that the resulting matrix is as ‘compact’ as possible. We view
+co-clustering as a matrix reordering with a subsequent clustering step for dense
+area identiﬁcation. For this work we provide examples from a particular setting,
+where the rows represent customers and the columns identify the products that a
+customer has bought; but our approach is applicable in diﬀerent settings, too. An
+example of a matrix reorganization is shown in Figure 1 a) and b). Existence of
+a ‘one’ (black dot) signiﬁes that a customer has bought a product, otherwise the
+value is ‘zero’ (white dot). It is evident that the reordered matrix view provides
+strong evidence on the existence of patterns in the data.
+
+Fig. 1. Overview of our approach. a) Original matrix of customers-products, b) Ma-
+trix is reorganized, c) ‘White spots’ within clusters are extracted and combined with
+ﬁrmographic information, d) Product recommendations are constructed.
+
+Existing co-clustering methods can face several practical issues which limit
+both their eﬃciency and the interpretability of the results. For example, the
+majority of co-clustering algorithms explicitly require as input the number of
+clusters in the data. In most business scenarios, such an assumption is unrealis-
+tic. We cannot assume prior knowledge on the data, but we require a technique
+that allows data exploration. There exist some methodologies that attempt to
+perform automatic co-clustering [3], i.e., determine the number of co-clusters.
+They address the problem by evaluating diﬀerent number of conﬁgurations and
+retaining the solution that provides the best value of the given objective func-
+tion (e.g., entropy minimization). Such a trial-based approach can signiﬁcantly
+aﬀect the performance of the algorithm. Therefore, these techniques are bet-
+ter suited for oﬀ-line data processing, rather than for interactive data analysis,
+which constitutes a key requirement for our setting.
+
+Another shortcoming of many spectral-based approaches is that they typically
+assume a perfect block-diagonal form for the reordered matrix; “oﬀ-diagonal”
+clusters are usually not detected. This is something that we accommodate in
+
+Unsupervised Sparse Matrix Co-clustering
+
+593
+
+our solution, where existence of possible “oﬀ-diagonal” dense clusters is resolved
+through a Gaussian-based density estimator algorithm. Because we are interested
+in ﬁnding rectangular clusters, the algorithm discovers the parameters of those
+rectangles (center, width, height) that best cover the highest density of “oﬀ-
+diagonal” areas. Note, that using such an approach we can also support discovery
+of overlapping co-clusters with no extra eﬀort.
+
+We use the discovered co-clusters for providing product recommendations to
+customers. The customers in our setting are not individuals but large companies,
+for whom we have extensive information such as company turnover, number of
+employees, etc. We use this information to prioritize recommendations. Recall
+that a co-cluster corresponds to a set of customers with similar buying patterns.
+To this end, existence of ‘white spots’ within a discovered co-cluster represents
+potential product recommendations. However, not all white areas within a cluster
+are equally important. These recommendations need to be ranked. We rank the
+quality and importance of each recommendation based on:
+
+– The quality of the discovered co-cluster. For example, a single white spot in
+a very dense and large co-cluster is more important than a white spot in a
+smaller and sparse co-cluster.
+
+– Firmographic and ﬁnancial characteristics of the customer; recommendations
+for customers that have bought more products in the past should be ranked
+higher, because they have exhibited a higher buying propensity.
+
+With the combination of the above two characteristics, the recommendations
+exploit both global patterns as discovered by the co-clustering, and personalized
+metrics.
+
+In summary, our main contribution is providing a robust, unsupervised and
+fast solution for co-clustering which can be used for interactive business intel-
+ligence scenarios. We also demonstrate how to use our solution for providing
+product recommendations. We perform a comprehensive empirical study using
+real and synthetic data-sets to validate our solutions. To the best of our knowl-
+edge, this is one of the few works that evaluate the performance of co-clustering
+algorithms on real-world, business intelligence data.
+
+2 Related Work
+
+The principle of co-clustering was introduced ﬁrst by Hartigan with the goal of
+‘clustering cases and variables simultaneously’ [11]. Initial applications were for
+the analysis of voting data. Hartigan’s method is heuristic in nature and may fail
+to ﬁnd existing dense co-clusters under certain cases. In [4] the authors present
+an iterative algorithm that convergences to a local minimum of the same objec-
+tive function as in [11]. [1] describes an algorithm which provides constant factor
+approximations to the optimum co-clustering solution using the same objective
+function. A spectral co-clustering method based on the Fiedler vector appeared
+in [6]. Our approach uses a similar analytical toolbox as [6], but in addition is
+automatic (number of clusters need not be given), and does not assume perfect
+
+594
+
+A. Zouzias, M. Vlachos, and N.M. Freris
+
+block-diagonal form for the matrix. A diﬀerent approach, views the input matrix
+as an empirical joint probability distribution of two discrete random variables
+and poses the co-clustering problem as an optimization problem from an infor-
+mation theoretic perspective [7]. So, the optimal co-clustering maximizes the
+mutual information between the clustered random variables. A method employ-
+ing a similar metric as the one of [7] appeared in [20]; the latter approach also
+returns the co-clusters in a hierarchical format. Finally, [16] provides a parallel
+implementation of the method of [20] using the map-reduce framework. More
+detailed reviews on the topic can be found in [14] and [21].
+
+Our approach is equally rigorous with the above approaches; more impor-
+tantly, it lifts important shortcomings of the spectral-based approaches and in
+addition focuses on the recommendation aspect of co-clustering, something that
+previous eﬀorts do not consider.
+
+3 Overview of Our Approach
+
+3.1 Preliminaries
+
+We denote by I, 0, 1 the identity matrix, all-zero, and all-one vector, respec-
+tively, and the dimensions will become clear from the context. We deﬁne [m] :=
+{1, 2, . . . , m}. Let C be an m × n matrix. For a subset of its rows R and a sub-
+set of its columns T we denote by CR,T the sub-matrix formed by rows R and
+columns T .
+Given an undirected graph G = (V, E) on n vertices with adjacency matrix
+A, its Laplacian matrix is deﬁned L := D − A, where D is a diagonal matrix
+j Aij. Moreover, the normalized Laplacian matrix of G is
+of size n with Dii =
+deﬁned, when Dii > 0 for all i, as (cid:3)L := I− D−1/2AD−1/2. The eigenvector of (cid:3)L
+that corresponds to the second smallest eigenvalue of (cid:3)L is known as the Fiedler
+vector [8]. Let (S, ¯S) be a bipartition of the vertex set of G. Denote by cut(S, ¯S)
+the sum of weights of the edges between the sets S and ¯S.
+
+(cid:2)
+
+3.2 Graph Partitioning
+
+Partitioning a graph into two balanced vertex sets (i.e., two sets such that nei-
+ther is much larger than the other one) while minimizing the number of edges
+between them is a fundamental combinatorial problem with various applica-
+tions [19]. Choosing a particular balancing condition gives rise to diﬀerent related
+measures of the quality of the cut including conductance, expansion, normalized
+and sparsest cut. The two most commonly used balancing objective functions
+are the ratio cut [10] and the normalized cut [17]. In ratio cut, the size of a
+subset S ⊂ V of a graph is measured by its number of vertices |S|, where in
+normalized cut the size is measured by the total weights of its edges, denoted by
+vol(S). Here we will use the normalized cut objective function
+
+Ncut(S, ¯S) :=
+
+cut(S, ¯S)
+vol(S)
+
++
+
+cut(S, ¯S)
+vol( ¯S)
+
+.
+
+Unsupervised Sparse Matrix Co-clustering
+
+595
+
+Note that the above objective function typically takes a small value if the bi-
+partition (S, ¯S) is not balanced, hence it favors balanced partitions. The goal of
+graph partitioning is to solve the optimization problem
+
+NCut(S, ¯S).
+
+min
+S⊂V
+
+(1)
+
+This problem is NP-hard. Many approximation algorithms for this problem have
+been developed over the last years [2,12], however they turn out not to be per-
+forming well in practice. In our approach, we employ a heuristic that is based
+on spectral techniques and works well in practice [13,9]. Following the notation
+of [13], for any S ⊂ V , deﬁne the vector q ∈ R
+
+n as
+η2/η1, i ∈ S;
+η1/η2, i ∈ ¯S,
+
+qi =
+
+(cid:4)
+
+(cid:5)
++
+−(cid:5)
+
+(2)
+
+where η1 = vol(S) and η2 = vol( ¯S). The objective function in (1) can be written
+(see [6] for details) as follows
+
+q(cid:4)Lq
+q(cid:4)Dq
+
+,
+
+min
+
+subject to q as in (2) and q(cid:4)D1 = 0,
+
+where the extra constraint q(cid:4)D1 = 0 excludes the trivial solution where S = V
+or S = ∅. Even though the above problem is also NP-hard, we adopt a spectral
+2-clustering heuristic: ﬁrst, we drop the constraint that q is as in Eqn. (2); this
+relaxation is equivalent to ﬁnding the second largest eigenvalue and eigenvector
+of the generalized eigensystem Lz = λDz. Then, we round the resulting eigen-
+vector z (a.k.a. Fiedler vector ) to obtain a bipartition of G. The rounding is
+performed by applying 2-means clustering separately on the coordinates of z,
+which can be solved exactly and eﬃciently.
+
+4 The Algorithm
+
+The proposed algorithm consists of two steps: in the ﬁrst step, we compute a per-
+mutation of the row set and column set using a recursive spectral bi-partitioning
+algorithm; in the second step we use the permuted input matrix to identify any
+remaining clusters by means of a Gaussian-based density estimator.
+
+4.1 Recursive Spectral Bi-partitioning
+
+In this section, we recall a graph theoretic approach to the co-clustering prob-
+lem [6]. The input is an m × n matrix C. For illustration purposes, we assume
+that C is a binary matrix, i.e., its elements are in {0, 1}, but our approach
+is applicable in general. Given C, we can uniquely deﬁne a bipartite graph
+G = (L ∪ R, E),
+|R| = n as follows: Each element of the left set of
+vertices, L, corresponds to a row of C and each element of the right vertices
+R to a column of C. We connect an edge between i ∈ L and j ∈ R if and
+only if Cij = 1. Now given the bipartite graph G corresponding to C, we ﬁnd a
+balanced cut in G with few edges crossing the cut.
+
+|L| = m,
+
+596
+
+A. Zouzias, M. Vlachos, and N.M. Freris
+
+Algorithm 1. Recursive Spectral Bipartition
+1: procedure RecBipart(C) (cid:2) C: an m × n binary matrix, EigenGap : a stopping
+
+2:
+3:
+4:
+5:
+6:
+7:
+
+parameter
+
+{(R1, R2), (T1, T2)} = SplitCluster(C).
+if there is a split (R1, R2) and (T1, T2) then
+
+Run RecBipart(CR1,T1 )
+Run RecBipart(CR2,T2 )
+
+end if
+Output: A partition of the row and column set of C, i.e., ∪Ri = [m] and
+∪Ti = [n].
+
+8: end procedure
+
+9: procedure SplitCluster(C)
+10:
+
+(cid:2) C: binary matrix
+Let (cid:2)L be the normalized Laplacian of the bipartite graph that corresponds to
+
+C
+
+11:
+12:
+13:
+
+14:
+15:
+
+Let λ2 and z be the second smallest eigenvalue and eigenvector of (cid:2)L
+if λ2 > EigenGap then
+
+Bipartition the coordinates of z s.t. the sum of its intra-variances is mini-
+
+mized.
+
+end if
+Output: A bipartition of the row set and the column set into (R1, R2) and
+
+(T1, T2), respectively.
+
+16: end procedure
+
+4.2 Eigengap-Based Termination
+
+A basic fact in spectral graph theory is that the number of connected components
+in an undirected graph equals to the multiplicity of the zero eigenvalue of its
+normalized Laplacian matrix. Cheeger’s inequality provides an “approximate”
+version of the latter fact [5]. That is, a graph has a sparse (normalized) cut if
+and only if there are at least two eigenvalues that are close to zero. Let the
+conductance of a graph G = (V, E) deﬁned as follows
+
+S⊆V,vol(S)≤ |E|
+
+2
+
+cut(S, ¯S)
+vol(S)
+
+.
+
+c(G) :=
+
+min
+
+Cheeger’s inequality [5] tells us that 2c(G) ≥ λ2 ≥ c(G)2/2, where λ2 is the sec-
+ond smallest eigenvalue of the normalized Laplacian of G. The ﬁrst inequality of
+the above equation implies that if λ2 is large, then G does not have suﬃciently
+small conductance. The latter implication supports our choice of the termination
+criterion of the recursion of Algorithm 1 (see Step 11 of the SplitCluster proce-
+dure). Roughly speaking, we want to stop the recursion when the matrix can not
+be reduced (after permutation of rows and columns) to an approximately block
+diagonal matrix, equivalently when the bipartite graph associated to the cur-
+rent matrix does not contain any sparse cut. Using Cheeger’s inequality, we can
+eﬃciently check if the bipartite graph has a suﬃciently good cut or not. An illus-
+tration of the algorithm’s recursion is explored in Fig.2. Our approach has many
+similarities with Newman’s modularity partitioning but it is not identical [15].
+
+Unsupervised Sparse Matrix Co-clustering
+
+597
+
+Ground Truth
+
+Randomly Permuted
+
+Step 1
+
+Step 2
+
+20
+
+40
+
+60
+
+80
+
+100
+
+120
+
+140
+
+160
+
+180
+
+200
+
+220
+
+20
+
+40
+
+60
+
+80
+
+100
+
+120
+
+140
+
+160
+
+180
+
+200
+
+220
+
+50
+
+100
+
+150
+
+200
+
+50
+
+100
+
+150
+
+200
+
+250
+
+200
+
+150
+
+100
+
+50
+
+0
+
+0
+
+50
+
+100
+
+150
+
+200
+
+250
+
+250
+
+200
+
+150
+
+100
+
+50
+
+0
+
+0
+
+50
+
+100
+
+150
+
+200
+
+250
+
+Fig. 2. Running example of Algorithm 1
+
+4.3 Discovering Oﬀ-Diagonal Clusters
+
+After termination of Algorithm 1, we expect to have produced a fairly good
+reordering of the rows and columns of the input matrix C and moreover to have
+discovered a set of co-clusters that have disjoint row and column sets. However,
+in almost all instances of practical interest, we cannot expect the set of co-
+clusters to have disjoint row and column sets; several “oﬀ-diagonal” co-clusters
+may have appeared after the course of our reordering algorithm. In order not to
+discard this potentially useful information, we apply as a post-processing step
+a Gaussian-based density estimator on the matrix after removing the set of co-
+clusters already discovered by Algorithm 1. This process is depicted in Figure 3.
+In the ﬁrst step, we remove all the clusters that have been already extracted by
+Algorithm 1. In the second step we apply a density estimator to discover any
+(possibly) remaining co-clusters. That is, we convolute a Gaussian mask over all
+positions of the binary matrix to detect the most dense areas. Initially, we set a
+suﬃciently large size on the Gaussian mask1. We then progressively reduce the
+size of the mask by a ﬁxed constant. At each step, we record all suﬃciently dense
+areas (those for which the convolution exceeds some threshold) and remove the
+co-cluster from further consideration.
+
+Complexity: We brieﬂy discuss the time complexity of Algorithm 1. For ease of
+presentation, assume that the input is a square matrix of size n and let T (n) be
+the time complexity. Moreover, we may assume2 that in every recursion step the
+partitioning is balanced. Since the input matrix is sparse, the following recursion
+holds T (n) ≈ 2T (n/2) + O(n log n), where the extra additive factor is due to
+sorting (Lanczos method is used for computing the eigenvector). Solving the
+recursion we get that T (n) = O(n log2 n) which implies that our method is only
+more expensive than a single bi-partitioning by a poly-logarithmic factor.
+
+1 We can over-estimate the size of the largest dense rectangle by the number of non-
+
+zero entries of the input matrix.
+
+2 We are allowed to do so, since a constant number of successive unbalanced cuts
+
+indicate that the recursion should terminate.
+
+598
+
+A. Zouzias, M. Vlachos, and N.M. Freris
+
+Step 1
+
+Step 2
+
+Final Outcome
+
+Fig. 3. Discovering Oﬀ-diagonal Clusters
+
+4.4 Recommendations
+
+Algorithm 1 together with the density estimation step output a list of co-clusters.
+In the business scenarios that we consider co-clusters will represent strongly
+correlated customer and products subsets. We illustrate how this information
+can be used to drive meaningful product recommendations.
+
+Many discovered co-clusters are expected to contain “white-spots”. These
+represent customers that exhibit similar buying pattern with a number of other
+customers, they still have not bought a product within the co-cluster. These
+are products that constitute good recommendations. Essentially, we exploit the
+existence of globally-observable patterns for making individual recommendations.
+Not all “white-spots” are equally important. We rank them by considering
+ﬁrmographic and ﬁnancial characteristics of the customers. The intuition is that
+‘wealthy’ customers/companies that have bought many products in the past are
+better-suited candidates. They are at ﬁnancial position to buy a product and
+they have already established a buying relationship. In our formula we consider
+three factors:
+
+– Turnover T is the revenue of the company as provided in its ﬁnancial
+
+statements.
+
+– Past Revenue R is the revenue amount that our company made in its
+
+interactions with the customer during the past 3 years.
+
+– Industry Growth IG represents that predicted growth for the industry in
+which the customer belongs for the upcoming year. This data is furnished
+from marketing databases and is estimated from diverse global ﬁnancial in-
+dicators.
+
+Therefore the rank r of a given white-spot that captures a customer-product
+recommendation is given by:
+
+r = w1T + w2R + w3IG,
+
+(cid:6)
+
+i
+
+wi = 1,
+
+In our scenario, the weights w1,w2,w3 are assumed to be equal but in general
+they can be tuned appropriately.
+
+Unsupervised Sparse Matrix Co-clustering
+
+599
+
+We have described how to rank the “white-spots” within a particular co-
+cluster. In order to give a total ordering on the set of the recommendations, we
+should normalize these ranking value with the importance of each co-cluster. We
+deﬁne the importance of each co-cluster as the product of its area and density
+normalized by the sum of the importance of all co-clusters. Hence, we normalize
+all recommendations by the importance of the corresponding co-cluster.
+
+5 Experiments
+
+5.1 Comparison with other Techniques
+
+We compare the proposed approach with two other techniques. The ﬁrst one
+(SPECTRAL) is described in [6] and is similar with the proposed approach.
+The main diﬀerence is that the approach of [6] performs k-partition of the in-
+put matrix using the eigenvectors that correspond to the smallest eigenvalues.
+Moreover, in order to compute the clustering it utilizes k-means clustering which
+makes the approach randomized, compared to our approach which is determinis-
+tic. The second one (DOUBLE-KMEANS) is described in [1]. First, it performs
+k-means clustering using as input vectors the columns of the input matrix and
+then permutes the columns by grouping together columns that belong in the
+same cluster. In the second step, it performs the same procedure on the rows
+of the input matrix using a possible diﬀerent number of clusters, say l. This
+approach outputs k · l clusters. Typical values for k and l that we use, are be-
+tween 3 and 5. We run all the above algorithms on synthetic data which we
+produced by creating several block-diagonal and oﬀ-diagonal clusters. We intro-
+duced “salt-and-pepper” noise in the produced matrix, in an eﬀort to examine
+the accuracy of the compared algorithms even in when diluting the strength of
+the original patterns. The results are summarized in Figure 4. We observe that
+our algorithm can detect with high eﬃciency the original patterns, whereas the
+original spectral and k-Means algorithms present results of lower quality.
+
+5.2 Compression-Based Evaluation
+
+It is common to judge the eﬀectiveness of a particular algorithm based on the
+value of an objective function. However, it is not clear how to evaluate the
+eﬀectiveness of various co-clustering algorithms that are designed to optimize
+diﬀerent objective functions. It is even harder to fairly compare the quality of
+two algorithms that output a diﬀerent number of co-clusters. Therefore, we make
+a comparison using compressibility metrics: we measure how many bytes the re-
+ordered array will require when stored using Run-Length-Encoding (RLE) [18].
+Recall that RLE replaces long blocks of repetitive values with just two numbers:
+the value and the length of the “run”. For example, RLE encodes the sequence
+0, 0, 0, 0, 0, 0, 0, 0, 0 as a tuple (9, 0). This simple metric allows to quantify how
+appropriately each algorithm packed together zeros and ones. Understandably,
+larger number of bytes for the reordered matrix under RLE compression, indi-
+cates worse performance in placing zeros and ones in adjacent positions.
+
+600
+
+A. Zouzias, M. Vlachos, and N.M. Freris
+
+Optimal Outcome
+
+Algorithm 1
+
+SPECTRAL
+
+DOUBLE-KMEANS
+
+RLE = 20382
+
+RLE = 20438
+
+RLE = 20416
+
+(a) Diagonal with noise
+
+RLE = 6278
+
+RLE = 6572
+
+RLE = 6394
+
+(b) Diagonal with outliers
+
+Fig. 4. The ﬁrst column contains the ground truth and the remaining columns contains
+the output of the three algorithms described in Section 5.1. All algorithms take as input
+a randomly permuted (independently in rows and columns) version of the ground truth
+instance.
+
+The results using are depicted in Table 1. For this we extract matrices that rep-
+resent buying patterns within our company for various industries of customers,
+because diﬀerent industries exhibit diﬀerent patterns. We notice that the pro-
+posed recursive algorithm results in compressed matrix sizes signiﬁcantly smaller
+than the competitive approaches, suggesting a more eﬀective co-clustering pro-
+cess.
+
+Table 1. We compare the eﬃcacy of the various co-clustering algorithms by report-
+ing the number of bytes when the reordered matrix is compressed using Run-Length-
+Encoding (RLE). We present results for buying patterns extracted from various cus-
+tomer industries. Our approach results in reordered matrices that can be better com-
+pressed.
+
+Industry’s name
+
+Computer Services
+
+Professional Services
+
+Banks
+
+Provincial Government
+
+Other Productions Ind.
+
+Retail
+
+Travel & Transport
+
+Wholesale distribution services
+
+Original Our Approach SPECTRAL DOUBLE-KMEANS
+2004
+1136
+2810
+954
+1458
+5232
+1158
+638
+
+544
+658
+1348
+352
+720
+2148
+582
+394
+
+108
+212
+372
+128
+288
+360
+204
+212
+
+306
+484
+1012
+236
+648
+888
+534
+408
+
+Unsupervised Sparse Matrix Co-clustering
+
+601
+
+5.3 Business Intelligence on Real Datasets
+
+For this example we use real-world data provided by our sales department re-
+lating to approximately 30,000 Swiss customers. The dataset contains all ﬁrmo-
+graphic information pertaining to the customers, such as: industry categorization
+(electronic, automotive, etc), expected industry growth, customer’s turnover for
+last, past revenue. We perform co-clustering on the customer-product matrix..
+We apply our algorithm on each industry separately, because sales people only
+have access to their industry of specialization. Figure 5 shows the outcome of
+the algorithm and the detected diagonal and oﬀ-diagonal clusters. The highest
+ranked recommendations are detected within the blue cluster, and they suggest
+that ‘white-spot’ customers within this cluster can be approached with an oﬀer
+for the product ‘System-I’. These customers were ranked higher based on their
+ﬁnancial characteristics.
+
+Highest ranked recommendations.
+For the detected white spots
+offer product 'System I' to the respective customers.
+
+Fig. 5. Example of our co-clustering algorithm when applied on customers of a partic-
+ular industry (Life Sciences). We see that the algorithm can easily discern oﬀ-diagonal
+clusters. For the illustrated “white-spot” customers within the blue cluster, there is a
+product recommendation for ‘System I’.
+
+6 Conclusion
+
+Focus of this work was to explicitly show how co-clustering techniques can be
+coupled with recommender systems for business intelligence applications. Con-
+tributions of our approach include:
+
+– An unsupervised spectral-based technique for detection of large ‘diagonal’ co-
+clusters. We present a robust termination criterion and we depict its accuracy
+on a variety of synthetic data where we compare with ground-truth.
+
+602
+
+A. Zouzias, M. Vlachos, and N.M. Freris
+
+– A Gaussian-based density estimator for identiﬁcation of smaller ‘oﬀ-diagonal’
+
+co-clusters.
+
+– A comprehensive comparison of our approach with prevalent co-clustering
+
+approaches using a compression-based metric.
+
+– A direct application of our methodology in business recommender systems.
+
+References
+
+1. Anagnostopoulos, A., Dasgupta, A., Kumar, R.: Approximation Algorithms for co-
+Clustering. In: Proceedings of ACM Symposium on Principles of Database Systems
+(PODS), pp. 201–210 (2008)
+
+2. Arora, S., Rao, S., Vazirani, U.: Expander Flows, Geometric Embeddings and
+
+Graph Partitioning. J. ACM 56, 5:1–5:37 (2009)
+
+3. Chakrabarti, D., Papadimitriou, S., Modha, D.S., Faloutsos, C.: Fully Automatic
+Cross-associations. In: Proc. of International Conference on Knowledge Discovery
+and Data Mining (KDD), pp. 79–88 (2004)
+
+4. Cho, H., Dhillon, I.S., Guan, Y., Sra, S.: Minimum Sum-Squared Residue co-
+Clustering of Gene Expression Data. In: Proc. of SIAM Conference on Data Mining,
+SDM (2004)
+
+5. Chung, F.R.K.: Spectral Graph Theory. American Mathematical Society (1994)
+6. Dhillon, I.S.: Co-Clustering Documents and Words using Bipartite Spectral Graph
+Partitioning. In: Proc. of International Conference on Knowledge Discovery and
+Data Mining (KDD), pp. 269–274 (2001)
+
+7. Dhillon, I.S., Mallela, S., Modha, D.S.: Information-theoretic co-Clustering. In:
+Proc. of International Conference on Knowledge Discovery and Data Mining
+(KDD), pp. 89–98 (2003)
+
+8. Fiedler, M.: Algebraic Connectivity of Graphs. Czechoslovak Mathematical Jour-
+
+nal 23(98), 298–305 (1973)
+
+9. Guattery, S., Miller, G.L.: On the Performance of Spectral Graph Partitioning
+Methods. In: Proc. of ACM-SIAM Symposium on Discrete Algorithms (SODA),
+pp. 233–242 (1995)
+
+10. Hagen, L., Kahng, A.: New Spectral Methods for Ratio Cut Partitioning and Clus-
+tering. IEEE Transactions on Computer-Aided Design of Integrated Circuits and
+Systems 11(9), 1074–1085 (1992)
+
+11. Hartigan, J.A.: Direct Clustering of a Data Matrix. Journal of the American Sta-
+
+tistical Association 67(337), 123–129 (1972)
+
+12. Leighton, T., Rao, S.: Multicommodity Max-ﬂow Min-cut Theorems and their Use
+
+in Designing Approximation Algorithms. J. ACM 46, 787–832 (1999)
+
+13. Luxburg, U.: A Tutorial on Spectral Clustering. Statistics and Computing 17, 395–
+
+416 (2007)
+
+14. Madeira, S., Oliveira, A.L.: Biclustering Algorithms for Biological Data Analysis:
+
+a survey. Trans. on Comp. Biology and Bioinformatics 1(1), 24–45 (2004)
+
+15. Newman, M.E.J.: Fast Algorithm for Detecting Community Structure in Networks.
+
+Phys. Rev. E 69, 066133 (2004)
+
+16. Papadimitriou, S., Sun, J.: DisCo: Distributed Co-clustering with Map-Reduce: A
+Case Study towards Petabyte-Scale End-to-End Mining. In: Proc. of International
+Conference on Data Mining (ICDM), pp. 512–521 (2008)
+
+Unsupervised Sparse Matrix Co-clustering
+
+603
+
+17. Shi, J., Malik, J.: Normalized Cuts and Image Segmentation. IEEE Transactions
+
+on Pattern Analysis and Machine Intelligence 22(8), 888–905 (2000)
+
+18. Salomon, D.: Data Compression: The Complete Reference, 2nd edn. Springer-
+
+Verlag New York, Inc. (2000)
+
+19. Shmoys, D.B.: Cut Problems and their Application to Divide-and-conquer, pp.
+
+192–235. PWS Publishing Co. (1997)
+
+20. Sun, J., Faloutsos, C., Papadimitriou, S., Yu, P.S.: GraphScope: Parameter-free
+
+Mining of Large Time-evolving Graphs. In: Proc. of KDD, pp. 687–696 (2007)
+
+21. Tanay, A., Sharan, R., Shamir, R.: Biclustering Algorithms: a survey. Handbook
+
+of Computational Molecular Biology (2004)
+
+

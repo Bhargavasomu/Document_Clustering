@@ -1,0 +1,568 @@
+Visual Analysis of Uncertainty in Trajectories
+
+Lu Lu1, Nan Cao2, Siyuan Liu3, Lionel Ni1, Xiaoru Yuan4, and Huamin Qu1
+
+1 Hong Kong University of Science and Technology
+
+{llu,huamin}@ust.hk
+
+2 IBM Thomas J Watson Research Center
+
+3 Heinz College, Carnegie Mellon University
+
+4 Peking University
+
+Abstract. Mining trajectory datasets has many important applications. Real tra-
+jectory data often involve uncertainty due to inadequate sampling rates and mea-
+surement errors. For some trajectories, their precise positions cannot be recovered
+and the exact routes that vehicles traveled cannot be accurately reconstructed. In
+this paper, we investigate the uncertainty problem in trajectory data and present
+a visual analytics system to reveal, analyze, and solve the uncertainties associ-
+ated with trajectory samples. We ﬁrst propose two novel visual encoding schemes
+called the road map analyzer and the uncertainty lens for discovering road map
+errors and visually analyzing the uncertainty in trajectory data respectively. Then,
+we conduct three case studies to discover the map errors, to address the ambiguity
+problem in map-matching, and to reconstruct the trajectories with historical data.
+These case studies demonstrate the capability and effectiveness of our system.
+
+Keywords: Uncertainty, trajectory, visual analysis.
+
+1 Introduction
+
+In recent years, there has been a dramatic increase in GPS-embedded devices used for
+navigation and tracking, which enables the collection of large volumes of GPS trajecto-
+ries [8]. Trajectory data play important roles in urban planning, route recommendation,
+trafﬁc analysis, and transportation management. Usually, trajectories are presented in
+two styles: curves (parameterized by time) in a 2D plane or trajectory samples that are
+discrete spatial-temporal points. The latter style is widely adopted in trajectory datasets
+since the cost of capturing and maintaining data is relatively low. However, the tra-
+jectories represented by samples often involve uncertainty which might appear as data
+imprecision due to sampling/measurement errors or fuzziness caused by pre-processing
+for preserving anonymity. Uncertainty in trajectories poses challenges for enhancing,
+reconstructing, and mining trajectories.
+
+Uncertainty that appears as measurement errors has been studied for enhancing his-
+torical trajectories [9]. Limited by the technology used, the trajectory data are not pre-
+cise due to measurement and sampling errors. Therefore, the recorded GPS positions
+often need to be matched with the given road network (referred to as road map). This
+process is called map-matching. Map-matching is integrated in many trajectory-based
+applications as a pre-processing module, which aligns trajectory samples with the given
+road networks. Quddus et al. [14] summarized the existing map-matching approaches
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part I, LNAI 8443, pp. 509–520, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+510
+
+L. Lu et al.
+
+and compared their performances. They addressed the measurement error problem and
+focused on the sampling errors. While map-matching methods are effective in solving
+the problem of sampling errors, few of them address the issues of inaccurate road maps
+and ambiguous selections of roads for trajectory samples.
+
+Road maps, considered as the vital input to map-matching, are not always reliable
+due to two reasons. First, the update of road maps is not as frequent as the collection
+of trajectory data. Usually, a city digital map is only updated monthly or even less
+frequently, but the actual road changes happen everyday or even every hour in large
+cities. Thus, some road changes might not be incorporated in the road maps used for
+map-matching. Second, although the semi-automatic or fully-automatic methods used
+for road-map extraction are often effective, they might still fail to obtain correct road
+positions for various reasons, such as the low resolution of images, and the overlapping
+of roads. Therefore, road maps should be checked for errors before they are used for
+map-matching. Since road maps are complex and large, an effective visual analysis tool
+for revealing and ﬁxing road map errors is needed.
+
+Another kind of uncertainty is the ambiguity in the selection of roads to match sam-
+ples. An essential step of map-matching methods is selecting an appropriate road for an
+off-road sample to align with. For that, the map-matching algorithms ﬁrst select several
+road candidates with loose conditions, and then score the road candidates with speciﬁc
+cost functions, and ﬁnally choose the road with the highest score as the target. How-
+ever, when the scores of the road candidates are similar, e.g., the sample positions fall in
+the middle of multiple roads, all map-matchin algorithms will encounter the ambiguity
+problem as it is no longer clear which road should be chosen.
+
+Uncertainty involving low sampling rates is also a serious issue for reconstructing
+trajectories. Some applications may need to reconstruct a vehicle’s continuous route
+from its discrete trajectory samples. Due to low sampling rates, the collected trajectory
+samples can be very sparse. Between two consecutive sparse samples, there may exist
+several routes. Thus, additional information is needed to help choose routes to complete
+the reconstruction. Historical data could be very helpful. For example, we can investi-
+gate the historical data and check whether there are other relevant trajectories with
+denser sampling rates in the region of interest. With the help of relevant trajectories, we
+may have a better chance to ﬁnd out the correct routes. In addition, by investigating the
+uncertainty patterns in the data, we may ﬁnd ways to reduce the uncertainty and improve
+the data quality. For example, for areas dense with poor trajectory samples, we can add
+some road-side-units to improve the position accuracy and increase the sampling rates.
+To solve the uncertainty problem, it is vital to keep humans in the loop and present all
+the relevant information to the users in an intuitive manner, especially for some fuzzy
+patterns and tricky cases. In this paper, we present our visual analytics solutions to the
+uncertainty problem in the trajectory data. Speciﬁcally, we propose two novel visual
+designs, i.e., a road map analyzer for discovering potential errors in road maps, and an
+uncertainty lens for resolving the uncertainty in trajectory data. We demonstrate how to
+visually reveal the road map errors, resolve the ambiguities in map-matching, and re-
+construct trajectories from sparse consecutive samples. We further test the effectiveness
+and usefulness of our approach with three case studies on real trajectory data.
+
+Visual Analysis of Uncertainty in Trajectories
+
+511
+
+The major contributions of our work are as follows:
+
+– A visual design called road map analyzer to reveal errors in road maps based on
+observed trajectory samples. Our visual design is able to discover map errors such
+as road shifting and road missing.
+
+– A visual design called uncertainty lens to reveal and resolve the uncertainty in the
+trajectory data. Our method integrates multiple factors (e.g., speed, time, sparse-
+ness, direction) related to uncertainty into a coherent analytical framework.
+
+– Case studies with real trajectories and digital maps to demonstrate the effectiveness
+
+and usefulness of the approach.
+
+2 Related Work
+
+Uncertainty Modeling. Kraak [7] proposed an interactive system to explore and vi-
+sualize space-time data under a space time cube. Pfoser and Jensen[12] described the
+notion of the uncertainty in sampling error and the error across time. Later, a cylindrical
+model was presented by Trajcevski [16] to represent and capture the uncertainty for ef-
+ﬁcient querying. Most of the works solve the uncertainty problem in trajectory datasets,
+but few of them address the uncertainty in the context of speciﬁc trajectory-based appli-
+cations. In our work, we deal with the uncertainty issue in the context of map-matching
+approaches, and address not only the uncertainty problem in trajectory datasets but also
+the uncertainty issue in map-matching approaches.
+
+Uncertainty Visualization. Visualization techniques have also been developed for
+uncertainty, e.g., glyphs, error bars, scale modulation, and ambulation. Pang et al. [11]
+proposed an uncertainty classiﬁcation, studied its representation, and presented various
+approaches for its visualization. Fisher [3] surveyed the literature on uncertainty visu-
+alizations for bounded errors. Color and texture were considered to be the best choices
+for visualizing uncertainty [2][5]. The traditional representations of uncertainty usually
+consider uncertainty as a one-dimensional variable, but the uncertainty we want to ad-
+dress is more complicated. Traditional methods are inadequate for solving our problem.
+Map-Matching. To deal with the errors in trajectory datasets, various map-matching
+approaches have been proposed and they can be categorized into three groups:
+geometric-based methods[15], topological-based methods [4][10], and statistical meth-
+ods [6]. Geometric-based methods are effective in ﬁnding local matches, but sensitive
+to map errors. Extended from geometric-based methods, topological methods aim at
+matching the entire trajectory to road maps by using the topologies of road networks.
+Although topological methods are more robust than geometric-based methods, they still
+suffer from various errors associated with navigation sensors and road maps. Statistical
+models are employed in map-matching include Kalman Filter [6], and Bayesian clas-
+siﬁer [13]. All map-matching approaches will encounter the ambiguity problem when
+the trajectory samples fall into the middle of multiple roads. Besides, few of the ex-
+isting works take the map errors into consideration, which has a big impact on the
+map-matching results. In this paper, we present a novel visualization method to identify
+and ﬁx the map errors and propose a visual-guided approach to resolve the ambiguities.
+
+512
+
+L. Lu et al.
+
+3 Visualization Design
+
+3.1 Design Principles
+
+We identify a few key principles to follow during the development of our designs: (1)
+To address the uncertainty in trajectories, maps should be used to facilitate the analysis
+but their errors should be identiﬁed and ﬁxed ﬁrst. The visualization schemes should
+help reveal and differentiate different map errors.
+
+(2) To resolve the uncertainty in samples, multiple factors (the maps, other trajecto-
+ries, and the trafﬁc) should be taken into account and these factors should be put into a
+coherent analytical framework.
+
+(3) The visualization mantra, “overview ﬁrst, zoom and ﬁlter, then details-on-
+
+demand”, will be followed.
+
+3.2 Road Map Analyzer
+
+As road maps are the critical reference for map-matching, road maps should be as ac-
+curate as possible and the errors in road maps need to be identiﬁed and corrected. After
+studying the map error problem and checking with domain experts, we focus on two
+speciﬁc cases are commonly seen in applications: (a) Road Shifting. In this case, the
+distribution of the samples forms a road shape, but the samples are not symmetric with
+respect to the road. (b) Road Missing. In this case, samples are roughly separated into
+multiple sets (usually two). The distribution of the samples forms two road shapes, and
+one of them is different from the observed road. It is likely that the road near the ob-
+served road is missing. Since the trajectory samples are sparse, we try to establish the
+relations among the samples. Given the set of the samples, we ﬁrst establish the rela-
+tions by building a tree considering the samples as the nodes and the distances between
+samples as the weights of the edges. The goal is to obtain a set of edges that minimize
+the sum of the weights. After establishing the relations, we get a set of edges that link
+the samples, called virtual edge. The virtual edges assign each pixel (on the display)
+they covered a density value by weights. Then, we generate a density map with the
+samples and their virtual edges. Finally we bound the density map by the bubble sets
+algorithm [1]. Fig. 1 is an example of the visualization of the boundary, called bubble
+view. Using the bubble view, we can easily detect the road error cases. For road shift-
+ing case, the bubble doesn’t cover the observed road. For road missing case, the bubble
+not only covers the observed road, but also forms a trace linking with other roads. We
+also provide a statistical view that review statistical information of trajectory samples
+on road. In this view, we encode the distribution of the samples by plotting the samples
+into a tranform space. Each line represents a sample. It starts from a dot where indicates
+the average distance of the samples to the road, passes through its relative position to
+the road (left side or right side, by clockwise on the map), and ends on its projection on
+the road. Fig. 6 gives an example of the statistical view.
+
+3.3 Uncertainty Lens
+
+Identifying and resolving the uncertainty in trajectory data are our major goals. To
+achieve these goals, we design a novel visualization scheme, uncertainty lens, which
+
+Visual Analysis of Uncertainty in Trajectories
+
+513
+
+Fig. 1. Bubble view. The bubble view helps the users to identify the map errors, and it is generated
+from the trajectory samples around the observed road and the virtual edges linking the trajectory
+samples.
+
+Fig. 2. Uncertainty lens. The uncertainty lens magniﬁes relative roads and sorts relative trajectory
+samples by their information (speed, error or sparseness). Based on the ordered information, the
+uncertainty lens provides suggestions for resolving ambiguities.
+
+integrates multiple visualizations into one display to present all the important informa-
+tion that may help users resolve the uncertainty.
+
+Fig.2 shows the design of the uncertainty lens which consists of relevant magniﬁed
+roads with the trajectory samples, and a set of system suggestions. The uncertainty lens
+is overlaid on the geographical map. One straightforward way to observe the trajectory
+samples is plotting the samples on the geographical map. In this way, users can quickly
+ﬁnd out the geographical information for the trajectory data and whether the samples
+fall on roads. However, as the number of trajectory samples is usually very large, the
+visualization becomes very cluttered. Therefore, we magnify the roads and re-order
+the trajectory samples in a certain way to get a better view. Additionally, users often
+need to consider other information besides maps to perform the analytical tasks, so
+this information should also be presented. After discussing with domain experts, we
+identify three features that are most important for analysis, including speed, error and
+sparseness.
+
+The uncertainty lens magniﬁes relevant roads and displays trajectory samples on the
+relevant roads. For better analysis, the uncertainty lens encodes the speed, error, and
+sparseness by users’ preferences. The encoding scheme is as follows.
+
+– Position: We sort the trajectory sample by speed, error, or sparseness along the
+relevant road direction. At the same time, we keep the distances of the samples to
+
+514
+
+L. Lu et al.
+
+Fig. 3. System overview. Our system consists of two primary components. The input of the sys-
+tem is a set of trajectory samples and a digital map. The digital map is ﬁrstly processed by the
+module road map analyzer. The road map analyzer reﬁnes the digital map with the bubble views.
+Then a map-matching process is applied on the trajectory data with the reﬁned map. The uncer-
+tainty analysis module analyzes the uncertainty of the trajectory data, resolves ambiguity, and
+reconstructs continuous trajectories.
+
+the center of the road. In this way, we encode the error information implicitly. But
+users still can show the error information in an explicit way. The system uses speed
+to sort by default.
+
+– Color: Users can set color saturation to encode one measurement that is different
+
+from the one used in the position visual channel.
+
+4 System Overview and Workﬂow
+
+Fig. 3 shows the overview of our system which consists of two primary components for
+three major tasks (i.e., analyzing map errors, resolving ambiguities, and reconstructing
+trajectories). The input to the system is a set of trajectory samples and a digital map.
+The digital map is ﬁrst processed by the module road map analyzer. The road map
+analyzer reﬁnes the digital map with the help of the bubble views. With the reﬁned
+map, the map-matching process adjusts the observed positions of the trajectory sam-
+ples, which partially solves the uncertainty problem in the data. After summarizing the
+results of the map-matching, the uncertainty analysis module identiﬁes the ambiguous
+samples, analyzes the uncertainty of the ambiguous samples by using the uncertainty
+lens, and resolves the ambiguities. Then, to reconstruct trajectories, the system extracts
+the sparse consecutive samples with multiple route candidates. For selecting the best
+candidate route as a partial trajectory, the uncertainty lens provides historical trajectory
+information as hints for users to make decision.
+
+Analyze Map Errors. Since the road network is large and complex, it is infeasible
+to review every road segment or display the visualizations of the roads in a size-limited
+screen. Therefore, our system computes the uncertainties of the roads and provides a
+list of the uncertainties. The list is shown in Fig. 4(b). The texts and the colors of the
+list cells refer to the identiﬁcations of the roads and their uncertainties respectively.
+The light color indicates the high uncertainty while the dark color indicates the low
+uncertainty (usually dark color suggests the correct road). The users can double click
+the list to select the roads. Once a road is selected to observe, the main viewer (Fig. 4(c))
+automatically zooms to ﬁt the display to the road and shows the bubble view of the
+
+Visual Analysis of Uncertainty in Trajectories
+
+515
+
+observed road. If the users ﬁnd any road errors, they can reﬁne the roads by drawing the
+estimated roads manually.
+
+Resolve Ambiguities. In our system, we leverage a map-matching approach [15] to
+adjust the observed position of the trajectory samples with the reﬁned map. The core
+step in map-matching is to select an appropriate road for an off-road sample to align
+with by utilizing a speciﬁc cost function. In some cases, the selections are quite certain
+since the samples are close to a road. When the samples are reported in the middle of
+multiple roads, the selections become ambiguous (the samples in this case are called
+ambiguous samples). To resolve the ambiguities, we extract the ambiguous samples
+from the map-matching results. To locate the ambiguous samples, our system provides
+different levels of the map views. In low-level views, the system generates heatmaps
+that describe the distribution of the ambiguous samples. In high-level views, the system
+shows the ambiguous samples directly (using rectangles by default).
+
+Once a set of ambiguous samples is focused, the uncertainty lens ﬁrst auto-detects
+the relevant roads according to the directions of the ambiguous samples. Then, the un-
+certainty lens magniﬁes the relevant roads and displays the trajectory samples on the
+relevant roads. The users can sort the samples by their preferences. For example, they
+can sort the samples by speed and set the color of the samples by sparseness. After
+that, the system sorts the ambiguous samples accordingly and shows the suggestions
+for resolving the ambiguities. The users can resolve the ambiguities by clicking the am-
+biguous samples to follow the system suggestions or dragging the ambiguous samples
+to the roads depending on their own decisions.
+
+Reconstruct Trajectories. Once the users load a trajectory, the system reconstructs
+the trajectory from the most sparse sample pair. To ﬁnd out the routes between a sample
+pair, the system employs the time-space prism model [12]. By using this model, the
+possible movement region (of the trajectory) between two neighboring samples can be
+found. The moving object (such as vehicles) can only move within this region under
+a given speed. Therefore, the possible routes are conﬁned within this region. For any
+sample pair, the system detects the possible routes. If there exists only one route, it con-
+tinues to the next pair. If there exist multiple routes, the system shows the uncertainty
+lens for choosing a route as a partial trajectory. In the uncertainty lens, every possi-
+ble route refers to a relevant route. Similar to resolving ambiguities, the users can sort
+the trajectory samples on the relevant routes. The system treats the trajectory between
+the neighboring samples as an ambiguous sample with information from this pair of
+samples. For example, the trajectory speed can be considered as the average speed of
+its adjacent samples. In this way, the system can make the suggestion for the users to
+choose a route.
+
+5 Experiment and Discussion
+
+The entire system was developed using Java, DaVinci and JOSM. We tested our system
+on a 1.8 GHz Intel Core i7 laptop with 4 GB DDR3. Raw map data were collected
+from OpenStreetMap.org. Trajectory data were collected from 4,000 taxis in a big city
+over an eight-month period. Each GPS record contains longitude, latitude, timestamp,
+and logs of other activities. The preprocessing of the data includes removing erroneous
+
+516
+
+L. Lu et al.
+
+trajectories with impossible speeds and storing the valid trajectories in binary ﬁles to
+reduce the storage space and processing time.
+
+Fig. 4 shows the system user interface. The system user interface consists of three
+components, including a tool bar that enables users to perform operations such as select-
+ing and zooming, a road list that uses color to show the uncertainties of the roads, and
+a main viewer that provides the views of the geographical map, the road map analyzer,
+and the uncertainty lens.
+
+Fig. 4. System user interface. The system user interface consists of three components, including
+(a) a tool bar that enables users to perform operations such as selecting and zooming, (b) a road
+list that uses color to show the uncertainties of the roads, and (c) a main viewer that provides the
+views of the geographical map, the road map analyzer, and the uncertainty lens. In the road list,
+the light color indicates the roads with high uncertainty while the dark color suggests the roads
+with low uncertainty.
+
+5.1 Experiment
+
+To show the system usability, two transportation system researchers were invited to
+use our system to investigate the uncertainty in trajectory data. We have consulted the
+researchers when we design our system, so they are familiar with our design. We ﬁrst
+gave a tutorial for about 15 minutes, then the researchers played with our system and
+did a test run to get familiar with the system user interface. After that, they were asked
+to perform three tasks: (1) analyzing map errors, (2) resolving ambiguities, and (3)
+reconstructing trajectories. The process for each researcher was about 40 minutes.
+
+Analyzing Map Errors. In this task, the participants were asked to identify errors on
+the map. They ﬁrst investigated some roads by clicking the road list. Fig. 5 shows three
+of the roads that the participant checked. The roads with different uncertainty showed
+different patterns in the bubble views. For example, the uncertainty of the road in Fig. 5
+(b) was very low. The bubble aligned this road very well. Therefore, the participants
+considered this road was correct. For the case a participant found in Fig. 5 (c), it was
+with high uncertainty. He observed the bubble view (a zoom view shown in Fig. 6
+
+Visual Analysis of Uncertainty in Trajectories
+
+517
+
+Fig. 5. Roads with different uncertainties. (a) Road uncertainty=0.534, the road is probably with
+errors. (b) Road uncertainty=0.001, the road is correct. (c) Road uncertainty=0.998, the road is
+with errors.
+
+Fig. 6. Map error cases. (a) (b) Road shifting case. Most of the trajectory samples are reported
+slightly away from the observed road (red dashed lines). The actual road position (blue lines) is
+estimated using the bubble generated from the trajectory samples. (c) (d) Road missing case. The
+bubble forms a trace from the observed road to another road, which means that a road is absent
+from the map.
+
+(a)) and recognized the road as a road shifting case. Because most of the trajectory
+samples were not falling on the road and the bubble didn’t cover the road. He estimated
+the road position according to the bubble (Fig. 6 (a)). For an interesting error another
+participant found on Fig. 5 (a), the uncertainty of this road was medium. The uncertainty
+of this road was medium. The bubble covered the observed road, which conﬁrmed the
+observed road is correct. However, the bubble formed a trace (without covering any
+road) connecting to another road. He considered that a road was absent from the map.
+Then he manually added the road on the map (Fig. 6(c)). The bubble view is effective
+at revealing road missing and estimating the actual positions of road with errors.
+
+Resolving Ambiguities. To resolve the ambiguities, a participant located the am-
+biguous samples by using multiple level map views. He ﬁrst selected a set of ambiguous
+samples in the region in Fig. 7(a). Then he opened the uncertainty lens. The uncertainty
+lens suggested two relevant roads (shown in Fig. 7(b)) and magniﬁed them with the tra-
+jectory samples (see Fig. 7(c)). After that, he chose to sort the samples by speed and use
+the color to encode error. Following the setting by the participant, the system provided
+the suggestions for the ambiguous samples. Fig. 7(d) shows the system suggestions
+on the ambiguous samples by arrows. The arrows pointed to the road that the system
+recommended for the ambiguous samples. The participant resolved the ambiguities by
+clicking on the ambiguous samples (shown in Fig. 7(e)). Finally the ambiguous samples
+moved to the road (see Fig. 7(f)). From the task, the system’s capability of resolving the
+ambiguities in map-matching was conﬁrmed.
+
+518
+
+L. Lu et al.
+
+Fig. 7. Resolving ambiguities. (a) User selects a region to resolve ambiguous samples. (b) System
+suggests two candidate roads according to the directions of the ambiguous samples. (c) The sys-
+tem magniﬁes the candidate roads and shows the trajectory samples positioning on the roads. (d)
+Trajectory samples and ambiguous samples are sorted according to their speeds. And the system
+provides suggestions for the ambiguous samples. (e) User makes the decision according to the
+system suggestions. (f) Ambiguous samples are resolved and placed on the roads.
+
+Reconstructing Trajectories. A participant started the task with loading a sparse
+trajectory. The system focused on the most sparse sample pair at the beginning. He
+reconstructed the trajectory pair by pair. Fig.8 shows a process of the participant re-
+constructing one trajectory between a pair of samples. The system focused on a partial
+trajectory that needed to be reconstructed. In Fig. 8 (a), this trajectory didn’t pass any
+roads. The system computed the possible movement region for the sample pair and
+found out two possible routes (Route 1 and Route 2). Then, the participant opened the
+uncertainty lens. The uncertainty lens combined the roads in the routes and magniﬁed
+the routes (Fig.8 (b)). After that, the participant sorted the trajectory samples on the
+routes, and obtained system suggestion (Fig.8 (c)). The system suggested the trajectory
+should pass Route 1. Finally, he reconstructed the trajectory by accepting system sug-
+gestion. Fig. 8 (d) depicts reconstruction result. From the task, the usefulness of our
+system for reconstructing the continuous trajectories was conﬁrmed.
+
+5.2 User Feedback
+
+We consulted two experts who have expertise in intelligent transportation system re-
+search for comments after internally testing our system. They both have worked with
+trajectory data and are familiar with map-matching.
+
+The well-designed visual encoding schemes to resolve uncertainty in trajectory data
+and the highly supported interactions with users are greatly appreciated by the experts.
+Especially the powerful encoding scheme to reveal errors in road maps as well as the
+method to reveal the uncertainty in the trajectory data received very positive comments.
+
+Visual Analysis of Uncertainty in Trajectories
+
+519
+
+Fig. 8. Reconstructing a trajectory. (a) A sparse trajectory doesn’t pass any roads. System com-
+putes the possible movement region for its adjacent samples. Within the possible movement re-
+gion, the system ﬁnds out two possible routes. (b) Uncertainty lens combines the roads on the
+routes and magniﬁes the routes. It shows the trajectory samples on the routes at the same time.
+(c) Uncertainty lens re-orders the trajectory samples and the system provides a suggestion ac-
+cordingly. (d) Reconstruction result.
+
+These features largely improved the user experiences in trafﬁc data exploration. Com-
+pared with their current map-matching analysis tools, which only plots the trajectory
+samples on the map to reconstruct the trajectory, our system makes the whole explo-
+ration process much more accurate and free of map errors. According to the feedback,
+our system is also good for demonstration. The visualization provides intuitive inter-
+face for understanding the trajectory data with many unique attributes. Utilizing the
+uncertainty lenses, users can gain insight into the speed, time, and direction attributes
+of the data which are very useful to detect the anomaly of the trafﬁc, study drivers’
+driving patterns, and investigate the passengers’ distribution. Our visual analytics cases
+are very convincing for domain experts. The analysis of the trafﬁc patterns and trajec-
+tory reconstruction is considered very valuable to guide the road trafﬁc capacity design
+and driving pattern study. The discovery of the map errors in Fig. 6 greatly attracts the
+experts’ attention. The detected map errors are later conﬁrmed by their manual inspec-
+tion on and comparison of different versions of the maps. The experts also feel excited
+that the ambiguity analysis and demonstration of our system shows a data exploration
+process that is more promising than traditional methods to retrieve driving patterns.
+
+6 Conclusion
+
+In this paper we have presented a comprehensive visual analytics system for revealing
+and resolving the uncertainty in trajectory data. Two novel encoding schemes are de-
+signed. The experiments with real data, three case studies, and the feedback from the
+domain experts, have demonstrated the effectiveness of our system.
+
+Acknowledgments. This project is partially supported by HKUST grant SRFI11EG15
+and FSGRF12EG40. Siyuan Liu’s research is supported by the Singapore National Re-
+search Foundation under its International Research Centre @ Singapore Funding Ini-
+tiative and administered by the IDM Programme Ofﬁce, Media Development Authority
+(MDA) and the Pinnacle Lab at Singapore Management University.
+
+520
+
+L. Lu et al.
+
+References
+
+1. Collins, C., Penn, G., Carpendale, S.: Bubble sets: Revealing set relations with isocon-
+tours over existing visualizations. IEEE Transactions on Visualization and Computer Graph-
+ics 15(6), 1009–1015 (2009)
+
+2. Davis, T.J., Keller, C.P.: Modelling and visualizing multiple spatial uncertainties. Computers
+
+and Geosciences 23(4), 397–408 (1997)
+
+3. Fisher, D.: Incremental, approximate database queries and uncertainty for exploratory visu-
+alization. In: IEEE Symposium on Large Data Analysis and Visualization, pp. 73–80 (2011)
+4. Greenfeld, J., Joshua, S.: Matching gps observations to locations on a digital map. Environ-
+
+mental Engineering 1(3), 1–13 (2002)
+
+5. Hengl, T., Toomanian, N.: Maps are not what they seem: representing uncertainty in soil-
+property maps. In: International Symposium on Spatial Accuracy Assessment in Natural
+Resources and Environmental Sciences, pp. 805–813 (2006)
+
+6. Hummel, B., Tischler, K.: Robust, gps-only map matching: exploiting vehicle position his-
+tory, driving restriction information and road network topology in a statistical framework. In:
+The GIS Research UK Conference, pp. 68–77 (2005)
+
+7. Kraak, M.J.: The space-time cube revisited from a geovisualization perspective. In: Interna-
+
+tional Cartographic Conference, pp. 1988–1995 (2003)
+
+8. Liu, S., Liu, Y., Ni, L.M., Fan, J., Li, M.: Towards mobility-based clustering. In: ACM
+
+SIGKDD Conference on Knowledge Discovery and Data Mining, pp. 919–928 (2010)
+
+9. Liu, S., Pu, J., Luo, Q., Qu, H., Ni, L.M., Krishnan, R.: Vait: A visual analytics system for
+
+metropolitan transportation, pp. 1586–1596 (2013)
+
+10. Lou, Y., Zhang, C., Zheng, Y., Xie, X., Wang, W., Huang, Y.: Map-matching for low-
+
+sampling-rate gps trajectories. In: Geographic Information Systems, pp. 352–361 (2009)
+
+11. Pang, A.T., Wittenbrink, C.M., Lodha, S.K.: Approaches to uncertainty visualization. The
+
+Visual Computer 13(8), 370–390 (1997)
+
+12. Pfoser, D., Jensen, C.S.: Capturing the uncertainty of moving-object representations. In:
+G¨uting, R.H., Papadias, D., Lochovsky, F.H. (eds.) SSD 1999. LNCS, vol. 1651, pp. 111–131.
+Springer, Heidelberg (1999)
+
+13. Pink, O., Hummel, B.: A statistical approach to map matching using road network geometry,
+topology and vehicular motion constraints. In: Intelligent Transportation Systems, pp. 862–
+867 (2008)
+
+14. Quddus, M.A., Ochieng, W.Y., Noland, R.B.: Current map-matching algorithms for transport
+applications: state-of-the art and future research directions. Transportation Research 15(5),
+312–328 (2007)
+
+15. Taylor, G., Brunsdon, C., Li, J., Olden, A., Steup, D., Winter, M.: Gps accuracy estimation
+using map matching techniques: Applied to vehicle positioning and odometer calibration.
+Computers, Environment and Urban Systems 30(6), 757–772 (2006)
+
+16. Trajcevski, G., Wolfson, O., Hinrichs, K., Chamberlain, S.: Managing uncertainty in moving
+
+objects databases. ACM Transaction Database System 29(3), 463–507 (2004)
+
+

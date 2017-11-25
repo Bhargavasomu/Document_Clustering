@@ -1,0 +1,1054 @@
+Intervention-Driven Predictive Framework for
+
+Modeling Healthcare Data
+
+Santu Rana(cid:2), Sunil Kumar Gupta(cid:2), Dinh Phung, Svetha Venkatesh
+
+Center for Pattern Recognition and Data Analytics
+
+Deakin University, Australia 3216
+
+{santu.rana,sunil.gupta,dinh.phung,svetha.venkatesh}@deakin.edu.au
+
+Abstract. Assessing prognostic risk is crucial to clinical care, and crit-
+ically dependent on both diagnosis and medical interventions. Current
+methods use this augmented information to build a single prediction
+rule. But this may not be expressive enough to capture diﬀerential ef-
+fects of interventions on prognosis. To this end, we propose a supervised,
+Bayesian nonparametric framework that simultaneously discovers the la-
+tent intervention groups and builds a separate prediction rule for each
+intervention group. The prediction rule is learnt using diagnosis data
+through a Bayesian logistic regression. For inference, we develop an ef-
+ﬁcient collapsed Gibbs sampler. We demonstrate that our method out-
+performs baselines in predicting 30-day hospital readmission using two
+patient cohorts - Acute Myocardial Infarction and Pneumonia. The sig-
+niﬁcance of this model is that it can be applied widely across a broad
+range of medical prognosis tasks.
+
+1
+
+Introduction
+
+Medical interventions cure us, and keep us alive. They form the cornerstone
+of modern medical practice. Doctors carefully study the clinical observations
+related to our illness, and perform interventions. To formulate the most eﬀective
+post-discharge care plan, they assess the prognosis. For example, what is the
+risk of readmission? How long will this person live? Answering these questions
+requires risk prediction models.
+
+A patient’s condition captures usual risk factors that can then be used in
+prognostic models. But medical interventions performed on patients are con-
+founding, changing the outcome and thus prediction rules. For example, diﬀerent
+cancer treatments (such as radiotherapy, chemotherapy or their combinations)
+have diﬀerent prognosis proﬁles for the same tumor type [1]. Similarly, prognosis
+of cardiac patients for diﬀerent procedures are diﬀerent [2]. Thus interventions
+should be taken into account when developing prediction models.
+
+Traditionally, in the healthcare community both the patient conditions and
+interventions are augmented together and a single prediction rule is learnt [3]. A
+single rule, however, may not be expressive enough to capture diﬀerential rules
+
+(cid:2) Contributed equally
+
+due to diﬀerent interventions. Current predictive methods, such as logistic re-
+gression (LR), Support vector machine (SVM), Naïve Bayes (NB), and Random
+Forest (RF) require amalgamation of interventions with the patient condition
+variables, and suﬀer from the same limitation. At the other extreme, learning
+prediction rules for each intervention separately is not useful either - out of hun-
+dreds of unique interventions, all are not equally important and many of them
+are performed together (as groups of interventions) - for a variety of reasons
+including current treatment polices, hospital capacity and cost. This opens up
+the need to learn a set of intervention groups and group-speciﬁc risk prediction
+models.
+
+Following this, we propose a nonparametric, supervised framework that uses
+a mixture distribution over interventions, learning a prediction model for each
+mixture component. A Dirichlet Process (DP) prior over interventions mixture
+is used allowing extraction of latent intervention groups, for which the number
+of groups is not known a priori. The outcome is then modeled as conditional
+on this latent grouping and patient condition data through a Bayesian logistic
+regression (B-LR). The use of DP also allows formation of new intervention
+groups when necessary, thus coping with changes in medical practice. In addition,
+the intervention based clustering inferred by the model is made predictive. This
+encourages formation of intervention groups that lead to a low prediction error.
+We refer to this model as DPM-LR. Eﬃcient inference is derived for this model.
+To evaluate our model, prediction of 30-day readmission on two retrospective
+cohorts of patients from an Australian hospital is considered: 2652 admissions
+related to Acute Myocardial Infarction (AMI) between 2007-2011 and 1497 ad-
+missions related to Pneumonia between 2009-2011. On both the cohorts, DPM-
+LR outperforms several baselines - dpMNL [4], Bayesian Logistic Regression,
+SVM, Naïve Bayes and Random Forest. We show that the intervention groups
+discovered using DPM-LR are clinically meaningful. We also illustrate that the
+highest risk factors identiﬁed by DPM-LR for diﬀerent intervention groups are
+diﬀerent, validating the necessity of intervention-driven predictive modeling.
+
+In summary, our main contributions are:
+
+– A nonparametric Bayesian, supervised prediction framework (DPM-LR) that
+explicitly models interventions and extracts latent groups by imposing a
+Dirichlet Process Mixture over interventions. The prognosis is modeled as
+conditional on this latent grouping and patient condition data through a
+Bayesian logistic regression (B-LR).
+
+– Eﬃcient inference for DPM-LR is derived and implemented.
+– Validation on both synthetic and two real-world patient cohorts, demon-
+
+strating better performance by model over state-of-the-art baselines.
+
+2 Background
+
+Hospital readmissions are common and costly. The 30-day readmission rate
+among the Medicare beneﬁciaries in the USA is estimated at 18%, costing $17
+billion [5]. Some hospital readmissions are considered avoidable and thus 30-
+day readmission rates are used for benchmarking across hospitals, with ﬁnancial
+
+penalties for hospitals with high risk-adjusted rates [5]. Avoidable readmissions
+can be avoided by appropriately planning post-discharge care [6]. This requires
+accurate risk prediction.
+
+Few models exist in the healthcare community to predict 30-day readmis-
+sion risk in general medical patients [7,8,3]. All these methods employ Logistic
+Regression to derive a score based system for risk stratiﬁcation using retrospec-
+tive clinical and administrative data collected mainly from Electronic Health
+Records. Readmission prediction using other machine learning techniques such
+as SVM, Naïve Bayes and Random Forest have been studied respectively for
+heart-failure patients in [9] and for ten diﬀerent diseases [10]. In all the meth-
+ods, both the patients condition and interventions are augmented together to
+learn a single prediction rule.
+
+A single rule, however, may not be suﬃcient to model the eﬀect of diﬀerent
+interventions. On the contrary, learning prediction rules for each intervention is
+not necessary - out of all the unique interventions, many of them are performed
+together and only a few latent groups exist. This gives rise to the need to learn the
+set of intervention groups and group-speciﬁc prediction models. The intervention
+grouping can be learnt using a mixture distribution with a Dirichlet Process prior
+to account for the unknown number of groups.
+
+The use of Dirichlet process (DP) has been previously studied for modeling
+a set of classiﬁers under mixture model settings. In an attempt to develop a
+nonlinear classiﬁer, Shahbaba and Neal [4] use DP as a prior for dividing data in
+clusters learning a separate linear classiﬁer for each cluster. This model (dpMNL)
+learns nonlinear boundaries through a piecewise linear approximation. The idea
+from this model can be adapted for dividing patients for diﬀerent intervention
+groups. Instead of using a single feature for both clustering and classiﬁcation, we
+can use interventions to cluster the patients, and learn separate classiﬁers using
+patient condition features for each of the intervention groups.
+
+3 Framework
+
+We describe a prediction framework that learns a set of latent, predictive in-
+tervention groups and builds a prediction rule for each intervention group. In
+developing such a framework, our intention is to develop a predictive model that
+is ﬂexible in modeling the eﬀect of medical interventions on patient condition
+variables and outcome.
+
+Typically, healthcare data has the following form: for each patient, we have a
+list of patient conditions (denoted by x), a list of medical interventions (denoted
+by i) and an outcome variable (denoted by y). We denote the data as D =
+{(xn, in, yn) | n = 1, . . . , N} where xn ∈ R
+
+Mx×1, in ∈ R
+
+Mi×1.
+
+To model the eﬀect of interventions, we cluster the interventions into a set
+of predictive groups. A Dirichlet process mixture (DPM) over interventions is
+used to extract a set of latent intervention groups. The use of DPM allows us
+to form new intervention groups when necessary and thus copes with changes
+in hospital practices and policies. Further, the intervention-based clustering is
+
+made predictive so that it encourages formation of intervention groups that lead
+to a low predictive error. Given such clustering, we learn a separate classiﬁer for
+each intervention group. We refer to this model as DPM-LR.
+
+The generative process of DPM-LR can be described as follows: A random
+probability measure G is drawn from a Dirichlet process DP (α, H) where α is
+a positive concentration parameter and H is a ﬁxed base measure. Since we are
+using a DP prior, the random measure G is discrete with probability one [11].
+In stochastic process notation, we can write:
+
+G ∼ DP (α, H) , ψn ∼ G, {xn, in, yn} ∼ ψn
+
+(1)
+
+Stick-breaking construction of Dirichlet process [12] often provides more intuitive
+and clearer understanding of DP-based models. Using stick-breaking notation,
+the above generative process can be written as:
+
+∞(cid:2)
+
+k=1
+
+G =
+
+πkδθk
+
+(2)
+
+(cid:3)
+
+where θk are independent random variables (also called “atoms”) distributed
+according to H. Further, δθk denotes an atomic measure at θk and πk are the
+k πk = 1. For our model, the variable θk
+“stick-breaking weights” such that
+takes values in a product space of two independent variables φk and wk. Thus,
+we can explicitly write θk ≡ {φk, wk}. For DPM-LR model, the φk can be inter-
+parameter λ and wk ∼ N (cid:4)
+preted as k-th “intervention topic” while the wk is the classiﬁer weight vector for
+k-th intervention topic. We model φk ∼ Dir (λ), i.e. a Dirichlet distribution with
+, i.e. a multivariate normal distribution with
+zero mean and single standard deviation parameter σw. The two representations
+(the stochastic and the stick-breaking) can be tied by introducing an indicator
+variable zn such that ψn ≡ θzn. We summarize the generative process as:
+(cid:5)
+
+0, σ2
+
+wI
+
+(cid:5)
+
+iid∼ H (λ, σw) , H (λ, σw) = Dir (λ) × N (cid:4)
+(cid:4)
+
+m=1Discrete (φzn
+
+(cid:4)
+
+)
+
+(cid:5)(cid:5)
+zn ∼ Discrete (π) , in | zn, φ ∼ Π Mi
+yn | xn, zn, w ∼ Ber
+
+xn
+
+wT
+zn
+
+f
+
+π ∼ GEM (α) , (φk, wk)
+For n = 1, . . . , N
+
+0, σ2
+
+wI
+
+(3)
+
+(4)
+(5)
+
+where GEM distribution is named after the ﬁrst letters of Griﬃths, Engen and
+McCloskey [13]. Ber (.) and Dir (.) denote the Bernoulli and Dirichlet distribu-
+tions, respectively and f (.) denotes the logistic function. Graphical representa-
+tions of DPM-LR is shown in Figure 1.
+
+4
+
+Inference
+
+The inference of parameters in a fully Bayesian model is performed by sampling
+them from their joint posterior distribution, conditioned on the observations. For
+DPM-LR model, this distribution does not take a closed form. A popular way to
+
+H((cid:644), (cid:653)w) 
+
+(cid:626) 
+
+G 
+
+(cid:663)n 
+
+in 
+
+xn 
+
+n=1,…,N 
+
+yn 
+
+(a)
+
+ (cid:626) 
+
+(cid:651) 
+
+ zn 
+
+yn 
+
+xn 
+
+n=1,….,N 
+
+(cid:644) 
+
+(cid:660)k 
+
+ in 
+
+(cid:653)w 
+
+wk 
+K(cid:198)(cid:1100) 
+
+(b)
+
+Fig. 1: Graphical representation of the DPM-LR (a) the stochastic process view
+(b) the stick-breaking view.
+
+circumvent this problem is to approximate this distribution using Markov chain
+Monte Carlo (MCMC) sampling. Asymptotically, the samples obtained using
+MCMC are guaranteed to come from the true posterior distribution [14]. We
+use Gibbs sampling (a MCMC variant) - an algorithm that iteratively samples
+a set of variables conditioned upon the remaining set of variables and the obser-
+vations. The MCMC parameter state space consists of the variables {π, z, φ, w}
+and the hyperparameters λ, α and σw. To improve the sampler mixing, we inte-
+grate out π, φ and only sample variables {z, w} and the hyperparameter α. The
+hyperparameters λ and σw are ﬁxed to one. After the sampler convergence, we
+ﬁnally estimate φ as it provides useful insights into diﬀerent intervention groups.
+Since our model uses a Dirichlet process (DP) prior, Gibbs sampling of vari-
+able φ conditioned on other variables remains identical to the standard DP
+mixture model. However, due to the changes in the generative process caused
+by altering the model into a supervised setting, the Gibbs sampling updates for
+the variables z and w need to be derived.
+4.1 Sampling z
+We sample the variable zn from Gibbs conditional posterior integrating out π
+and φ from the model. For the assignment of zn, there are two possibilities: (1)
+the intervention in is assigned to an existing intervention cluster, i.e. given K
+clusters, zn takes a value between 1 and K (2) the intervention in is assigned to
+a new intervention cluster, i.e. zn is set to K + 1. For the former case, the Gibbs
+sampling updates can be obtained from the following posterior distribution:
+
+For k = 1, . . . , K
+
+(cid:4)
+
+(cid:4)
+
+p (zn = k | . . .) = p
+(cid:6)
+(cid:7)(cid:8)
+∝ p
+
+in | zn = k, z−n, i−n
+
+(cid:4)
+zn = k | z−n, i−n, in, yn, xn, w
+(cid:6)
+(cid:9)
+(cid:6)
+p (yn | zn = k, xn, w)
+p
+
+(cid:7)(cid:8)
+
+(cid:5)
+(cid:9)
+
+intervention likelihood
+
+class likelihood
+
+(cid:5)
+zn = k | z−n
+
+(cid:7)(cid:8)
+
+predictive prior
+
+(6)
+
+(cid:5)
+(cid:9)
+
+In the above posterior, three terms interact: intervention likelihood (how likely
+is the cluster k for intervention in given other interventions), class likelihood (if
+in is assigned to cluster k, how small would be the classiﬁcation error for the
+k-th cluster) and the predictive prior (the prior probability of an intervention
+being assigned to the cluster k given other assignments). For the case when zn
+is assigned to a new cluster, the Gibbs sampling updates can be obtained from
+the following posterior distribution:
+
+p (zn = K + 1 | . . .)
+(cid:6)
+(cid:9)
+∝ p (in | zn = K + 1)
+
+(cid:7)(cid:8)
+
+intervention likelihood
+
+(cid:6)
+(cid:9)
+p (yn | zn = K + 1, xn)
+
+(cid:7)(cid:8)
+
+(cid:6)
+(cid:9)
+p (zn = K + 1 | α)
+
+(cid:7)(cid:8)
+
+class likelihood
+
+predictive prior
+
+(7)
+
+The class likelihood term in the above expression requires integrating out a
+Bernoulli likelihood with respect to wK+1. We approximate this integral numer-
+ically using Monte Carlo samples of wK+1.
+
+4.2 Sampling wk
+Using the generative process of (3-5), the Gibbs conditional posterior of wk can
+be written as:
+
+(cid:4)
+(cid:10)
+p (wk | ...) = p
+(cid:5)yk
+∝
+
+(cid:4)
+
+Π nk
+i=1
+
+sk
+i
+
+i
+
+(cid:5)
+yk | wk, Xk
+(cid:4)
+(cid:5)1−yk
+1 − sk
+
+i
+
+(cid:11)
+p (wk | σw)
+e−wT
+kwk/2σ2
+
+i
+
+w
+
+(cid:5)
+
+(cid:4)
+
+(8)
+where we deﬁne Xk (cid:2) {xn | zn = k}, which contains the patient condition data
+from the k-th intervention group and xk
+i is the i-th data column of Xk. Further,
+we have N k (cid:2) #{n | zn = k} and sk
+i (cid:2) f
+. The direct sampling from the
+above posterior is not possible as this does not reduce to any standard distri-
+bution. However, we can approximate the density using Laplace approximation
+[15,16]. The idea is to ﬁnd the mode of the posterior distribution through an op-
+timization procedure and then ﬁtting a Gaussian with its mean at the computed
+mode. Instead of optimizing the posterior directly, we optimize the logarithm of
+the posterior (results are unaltered due to monotonicity of logarithm), for which
+it is possible to compute the ﬁrst and the second derivatives in closed form. The
+ﬁrst and the second derivatives of the log posterior are given as:
+
+k xk
+i
+
+wT
+
+∇wklnp (wk | ...) =
+
+i − sk
+yk
+
+i
+
+wklnp (wk | ...) = −XkDs (wk)
+∇2
+(cid:4)
+
+(cid:4)(cid:12)
+
+(cid:4)
+
+(cid:5)
+
+1 − sk
+
+nk(cid:2)
+
+(cid:4)
+
+i=1
+
+(cid:5)
+
+(cid:4)
+
+wk
+
+i − 1
+xk
+(cid:5)T − I
+σ2
+w
+(cid:5)(cid:13)(cid:5)
+
+Xk
+
+σ2
+w
+
+(9)
+
+(10)
+
+where Ds (wk) (cid:2) diag
+is a diagonal matrix
+with entries between 0 and 1. For the above optimization, we use quasi-Newton
+
+, . . . , sk
+
+sk
+1
+
+N k
+
+N k
+
+1
+
+1 − sk
+
+(cid:18)
+
+p
+
+l=1. Given a new observation
+(cid:19)
+˜y | ˜x,˜i
+(cid:18)
+
+L(cid:2)
+(cid:19)
+
+≈ 1
+L
+˜z | ˜i, z(l), α
+
+˜y | ˜z, ˜x, w(l)
+
+K(cid:2)
+
+(cid:18)
+
+˜z=1
+
+l=1
+
+p
+
+(cid:19)
+
+(cid:18)
+
+˜z | ˜i, z(l), α
+
+p
+
+(cid:19)
+
+(11)
+
+(L-BFGS) method as it converges faster compared to steepest-descent given good
+initializations. The optimization solution (denoted as w∗
+k) is used as mean of the
+approximating Gaussian. The covariance matrix of the Gaussian is computed
+(in closed form) by taking the negative of the inverse of the Hessian of the log
+posterior, i.e. Σ∗
+wk, the posterior
+
+(cid:13)−1. Given w∗
+(cid:5)
+
+= −(cid:12)∇2
+
+samples of wk are drawn from N (cid:4)
+
+wklnp (wk | ...)
+k, Σ∗
+w∗
+
+k and Σ∗
+
+wk
+
+.
+
+wk
+
+4.3 Sampling φk, α
+Sampling φk is not necessary for the prediction. However, since it provides useful
+insights into diﬀerent intervention groups, we ﬁnally estimate (after the sampler
+convergence) it as ˆφm,k =
+m=1(nm,k+λ) where nm,k is the number of occurrences
+(cid:2)Mi
+of the m-th intervention in the k-th group. Sampling of the hyperparameter α
+remains same as in standard DPM model. Further details can be found in [17].
+
+nm,k+λ
+
+(cid:14)
+
+4.4 Prediction for new observations
+After training the model with data D = {(xn, in, yn) | n = 1, . . . , N}, we have
+samples
+, its outcome ˜y can be
+sampled from the following distribution:
+
+w(l), z(l)
+
+(cid:15)L
+
+˜x,˜i
+
+(cid:16)
+
+(cid:17)
+
+The posterior p
+terms in (6) as the model is not updated during the test phase.
+
+can be computed similar to the corresponding
+
+5 Experiments
+
+We perform experiments with a synthetic dataset and two hospital datasets.
+Baseline methods used for comparison are ﬁrst presented followed by results on
+synthetic data. Finally, evaluation is performed on two patient cohorts.
+
+5.1 Baselines
+We compare the predictive performance of DPM-LR with the following methods:
+(a) Standard DP-Multinomial Logit model, with Gaussian observation model
+(dpMNL)[4]. The method learns a nonlinear classiﬁer with data constructed by
+augmenting patients condition and intervention features (b) An adaptation of
+dpMNL with Multinomial observation model (referred to as dpMNL(MM)) (c)
+Bayesian Logistic Regression (B-LR) (d) SVM with linear kernel (Linear-SVM)
+(e) SVM with 3rd order polynomial kernel (Poly3-SVM) (f) Naïve Bayes (g)
+Random Forest. Weka implementation [18] is used for the SVM, Naive Bayes
+and the Random Forest. For all the baselines, the feature vector is created by
+merging the patient condition and intervention features.
+
+5.2 Experiments with Synthetic Data
+The synthetic dataset spans 5 years with 100 unique patients per year. Nine
+diﬀerent interventions are considered. Six intervention topics are created from
+horizontal and vertical bar patterns of a 3x3 matrix (Fig 2a). Per patient “inter-
+vention” feature is synthesized by sampling an intervention topic from a uniform
+mixture distribution and then sampling 4 interventions from the selected inter-
+vention topic. Each intervention topic is considered as an intervention group.
+The classiﬁcation weight vector of each group is sampled from a 50-variate Nor-
+mal distribution. The “patient condition” feature is randomly sampled from a
+set of 10 distinct random binary vectors. The label (or outcome) is computed by
+combining the group-speciﬁc classiﬁer with patient data following (5). The pre-
+diction task is to predict labels for the patients in the 5th year. Default settings
+from Weka is used for SVM, Naïve Bayes and the Random Forest.
+
+DPM-LR outperforms all the baselines (Table 1) in terms of AUC (Area un-
+der the ROC curve). DPM-LR outperforms (AUC 0.942) the closest contender,
+Random Forest (AUC 0.873). The performance of standard dpMNL (AUC 0.630)
+with Gaussian observation model was poor, however, the adapted version with
+multinomial observation model did reasonably well (AUC 0.836). All the other
+methods performed poorly (AUC<0.750). Figure 2b shows the number of inter-
+vention topics sampled over 1000 Gibbs iterations (including 500 burnins). It can
+be seen that the convergence to the true number of topics is achieved quickly
+(i.e. the mode of the number of groups (Km) remains unchanged after about 50
+iterations), implying stable estimate of the posterior. Intervention topics inferred
+by the DPM-LR closely match true intervention topics (Figures 2a).
+
+s
+p
+u
+o
+r
+g
+
+ 
+f
+
+o
+
+ 
+.
+
+o
+N
+
+10
+9
+8
+7
+6
+5
+
+Ground truth topics
+
+Inferred topics
+(a)
+
+K
+Km
+
+0
+
+100
+
+200
+
+300
+
+400
+
+500
+
+Iteration
+(b)
+
+600
+
+700
+
+800
+
+900
+
+1000
+
+Fig. 2: Experiments on synthetic data (a) 6 intervention topics - True (top) and
+inferred (below) (b) Number of intervention topics (K) over Gibbs iterations
+and its running mode (Km).
+
+5.3 Experiments with Hospital Data
+The data is collected from a large public hospital1 in Australia. The hospi-
+tal patient database provides a single point of access for information on patient
+hospitalizations, emergency department visits, in-hospital medications and treat-
+ments. Detailed records of these patient interactions with the hospital system are
+available through the EMR. This includes International Classiﬁcation of Disease
+1 Ethics approval obtained through University and the hospital – Number 12/83
+
+(MM) B-LR Linear-
+LR dpMNL dpMNL
+Methods DPM-
+SVM
+0.942
+0.836
+0.568
+
+Random
+Forest
+0.873
+Table 1: AUC for prediction on the synthetic dataset. Training is performed with
+400 patients and testing with the remainder 100 patients.
+
+AUC
+
+Poly3-
+SVM
+0.735
+
+Naive
+Bayes
+0.686
+
+0.630
+
+0.719
+
+10 (ICD-10) codes2, Diagnosis-related Group (DRG) codes of each admission,
+ICD-10 codes for each emergency visit, details of procedures, and departments
+that have been involved in the patient’s care. Other information includes demo-
+graphic data (age, gender, and occupation) and details of the patient’s access to
+primary care facilities.
+
+Cohort 1: Acute Myocardial Infarction (AMI) The patient cohort consists
+of 2652 consecutive admissions with conﬁrmed diagnosis of Acute Myocardial
+Infarction (AMI) admitted between 1st January 2007 and 31st December 2011.
+For each patient, we have a sequence of interactions with the hospital system.
+Of these, the discharge corresponding to an admission with primary reason for
+admission as AMI is treated as assessment points (APs) from which prediction
+is made. Patient records prior to an AP are used to construct features. The
+“patient condition” feature contains demographic (age, gender and occupation)
+and disease information (ICD-10 codes) for each admission, accumulated at four
+diﬀerent time scales - past 1 month, past 3 months, past 6 months and past
+1 year. The “intervention” feature consists of procedure codes associated with
+only the current admission. The label is set to one if there are any readmissions
+in 30-day period following an AP with a cardiac related diagnosis. Readmission
+rate in this cohort varied from 11.7% (2007) to 4.8% (2011).
+
+Experimental Results Patient data from 2007-2010 are used for training and
+patient data from 2011 for testing. The comparative results with the baselines
+(Table 2) shows that DPM-LR outperforms all other methods.
+
+DPM-LR is better (AUC 0.677) than the the closest contender dpMNL(MM)
+(AUC 0.641) by a signiﬁcant margin. This is followed by dpMNL (AUC 0.635)
+and B-LR (AUC 0.607). All other methods have AUC less than 0.6. Surprisingly,
+more complex models such as SVM with polynomial kernel and the Random
+Forest perform the worst.
+
+Table 3 lists the 5 strongest risk factors for the three intervention groups.
+These risk factors are the patient condition features that correspond to the
+largest positive weights in the linear regression model. We can see from the table
+that the strongest risk factors for diﬀerent intervention groups are diﬀerent. This
+vindicates the need of modeling intervention-speciﬁc prediction rules.
+
+2 http://www.who.int/classifications/icd10/
+
+Cohort 2 - Pneumonia This cohort consists of 1497 admissions with con-
+ﬁrmed diagnosis of Pneumonia, admitted between 1st January 2009 and 31st
+December 2011. Similar to AMI, the discharges corresponding to an admission
+with primary reason for admission as Pneumonia is treated as the assessment
+points (APs) from which prediction is made. Patient records prior to an AP are
+used to construct the features, in a similar fashion as in the AMI cohort described
+in the previous section. The label is set to one if there are any readmissions in
+30-day period following an AP with respiratory related diagnosis. Readmission
+rate in this cohort varied between 5-6% over the study years (2009-2011).
+
+Experimental Results The model is trained using patient data from 2009-
+2010 and then tested on patient data from 2011. The comparative results with
+the baselines are presented in Table 4. Once again, DPM-LR outperforms (AUC
+0.667) the closest contender dpMNL(MM) (AUC 0.664).
+
+DPM-LR learns two intervention groups. The risk factors corresponding to
+these two intervention groups are diﬀerent (Table 5) - a point that was also
+observed for AMI cohort.
+(MM) B-LR Linear-
+LR dpMNL dpMNL
+Methods DPM-
+SVM
+0.677
+0.641
+0.576
+
+Random
+Forest
+0.566
+Table 2: AUC for 30-day readmission prediction for the AMI cohort. Patient
+data from 2007-2010 is used for training. Test year is 2011.
+
+AUC
+
+Poly3-
+SVM
+0.516
+
+Naive
+Bayes
+0.577
+
+0.635
+
+0.607
+
+6 Conclusion
+
+We present a novel predictive framework for modeling healthcare data in the
+presence of medical interventions. This framework automatically discovers the
+latent intervention groups and builds group-speciﬁc prediction rules. A Dirichlet
+process mixture used over the intervention groups ensures that new groups are
+created when a new intervention is introduced. The prediction rule is learnt
+using patients condition data through a Bayesian logistic regression. Eﬃcient
+inference is derived for this model. Experiments demonstrate that this method
+outperforms state-of-the-art baselines in predicting 30-day hospital readmission
+on two cohorts - Acute Myocardial Infarction and Pneumonia. As a future work,
+it would be interesting to explore the performance improvement through sharing
+across various intervention groups using Bayesian shared subspace learning [19].
+
+References
+
+1. M. Al-Sarraf, M. LeBlanc, P. Giri, K. K. Fu, J. Cooper, T. Vuong, A. A. Forastiere,
+G. Adams, W. A. Sakr, D. E. Schuller, and J. F. Ensley, “Chemoradiotherapy
+versus radiotherapy in patients with advanced nasopharyngeal cancer: phase iii
+randomized intergroup study,” Journal of Clinical Oncology, vol. 16, no. 4, pp.
+1310–1317, 1998.
+
+Intervention group
+
+Coronary angioplasty with
+
+stenting, Coronary
+
+angiography, Examination
+procedures on ventricle,
+Generalised allied health
+
+interventions
+
+Coronary artery bypass,
+Coronary angiography,
+
+Examination procedures on
+ventricle, Generalised allied
+
+health interventions
+
+No intervention
+
+Top 5 strongest risk factors for readmission
+Hypertension in the past 1 month
+Retired and pensioner
+Congestive heart failure in the past 1 month
+Obesity in the past 1 month
+Fluid and electrolyte disorders in the past 1 month
+
+Metastatic cancer in the past 1 month
+Depression in the past 1 month
+Diabetes, complicated in the past 1 month
+Congestive heart failure in the past 3 month
+Peripheral vascular disease in the past 1 month
+Obesity in the past 1 month
+Metastatic cancer in the past 1 year
+Solid tumor without metastasis in the past 3 month
+Fluid and electrolyte disorders in the past 3 month
+Age above 90 years
+
+Table 3: Strongest risk factors associated with a 30-day readmission risk in the
+AMI cohort for three main intervention groups - Coronary angioplasty with stent-
+ing, Coronary artery bypass, and No intervention.
+
+Methods DPM-
+LR dpMNL dpMNL
+(MM) B-LR Linear-
+SVM
+0.667
+0.523
+0.664
+
+AUC
+
+0.590
+
+0.640
+
+Poly3-
+SVM
+0.511
+
+Naive
+Bayes
+0.635
+
+Random
+Forest
+0.561
+
+Table 4: AUC for 30-day readmission prediction (pneumonia). Training is with
+patient data from 2007-2010. Test is with patient data from 2011.
+
+Intervention group
+Generalized allied health
+
+intervention, Administration
+of blood and blood products,
+
+Administration of
+pharmacotherapy.
+No intervention
+
+Top 5 strongest risk factors for readmission
+Iron deﬁciency anaemia in the past 1 month
+Lower respiratory infection in the past 1 month
+Angina pectoris in the past 1 month
+Acute kidney failure in the past 1 month
+Fluid and electrolyte disorders in the past 1 month
+Intestinal disorders in the past 1 month
+Congestive heart failure in the past 1 month
+Age between 70-80 years
+Acute myocardial infarction in the past 1 month
+Acute kidney failure in the past 1 month
+
+Table 5: Strongest risk factors associated with a 30-day readmission risk in the
+pneumonia cohort for two main intervention groups.
+
+2. E. L. Hannan, M. J. Racz, G. Walford, R. H. Jones, T. J. Ryan, E. Bennett,
+A. T. Culliford, O. W. Isom, J. P. Gold, and E. A. Rose, “Long-term outcomes of
+coronary-artery bypass grafting versus stent implantation,” New England Journal
+of Medicine, vol. 352, no. 21, pp. 2174–2183, 2005.
+
+3. J. Donzé, D. Aujesky, D. Williams, and J. L. Schnipper, “Potentially avoidable
+30-day hospital readmissions in medical patientsderivation and validation of a pre-
+diction modelpotentially avoidable 30-day hospital readmissions,” JAMA internal
+medicine, vol. 173, no. 8, pp. 632–638, 2013.
+
+4. B. Shahbaba and R. Neal, “Nonlinear models using dirichlet process mixtures,”
+
+The Journal of Machine Learning Research, vol. 10, pp. 1829–1850, 2009.
+
+5. S. F. Jencks, M. V. Williams, and E. A. Coleman, “Rehospitalizations among pa-
+tients in the medicare fee-for-service program,” New England Journal of Medicine,
+vol. 360, no. 14, pp. 1418–1428, 2009.
+
+6. E. H. Bradley, L. Curry, L. I. Horwitz, H. Sipsma, Y. Wang, M. N. Walsh, D. Gold-
+mann, N. White, I. L. Piña, and H. M. Krumholz, “Hospital strategies associated
+with 30-day readmission rates for patients with heart failure,” Circulation: Cardio-
+vascular Quality and Outcomes, vol. 6, no. 4, pp. 444–450, 2013.
+
+7. M. Omar Hasan MBBS, D. O. Meltzer, S. A. Shaykevich, C. M. Bell, P. J. Kaboli,
+A. D. Auerbach, T. B. Wetterneck, V. M. Arora, and J. L. Schnipper, “Hospital
+readmission in general medicine patients: a prediction model,” Journal of general
+internal medicine, vol. 25, no. 3, pp. 211–219, 2010.
+
+8. C. van Walraven, I. A. Dhalla, C. Bell, E. Etchells, I. G. Stiell, K. Zarnke, P. C.
+Austin, and A. J. Forster, “Derivation and validation of an index to predict early
+death or unplanned readmission after discharge from hospital to the community,”
+Canadian Medical Association Journal, vol. 182, no. 6, pp. 551–557, 2010.
+
+9. N. Meadem, N. Verbiest, K. Zolfaghar, J. Agarwal, S.-C. Chin, and S. B. Roy, “Ex-
+ploring preprocessing techniques for prediction of risk of readmission for congestive
+heart failure patients,” 2013.
+
+10. S. Cholleti, A. Post, J. Gao, X. Lin, W. Bornstein, D. Cantrell, and J. Saltz,
+“Leveraging derived data elements in data analytic models for understanding and
+predicting hospital readmissions,” vol. 2012, p. 103, 2012.
+
+11. T. S. Ferguson, “A bayesian analysis of some nonparametric problems,” The annals
+
+of statistics, pp. 209–230, 1973.
+
+12. J. Sethuraman, “A constructive deﬁnition of dirichlet priors,” DTIC Document,
+
+Tech. Rep., 1991.
+
+tice, pp. 75–88, 1996.
+
+13. J. Pitman, Combinatorial stochastic processes. Springer-Verlag, 2006, vol. 1875.
+14. W. R. Gilks, “Full conditional distributions,” Markov chain Monte Carlo in prac-
+
+15. N. E. Breslow and D. G. Clayton, “Approximate inference in generalized linear
+mixed models,” Journal of the American Statistical Association, vol. 88, no. 421,
+pp. 9–25, 1993.
+
+16. C. M. Bishop and N. M. Nasrabadi, Pattern recognition and machine learning.
+
+springer New York, 2006, vol. 1.
+
+17. M. Escobar and M. West, “Bayesian density estimation and inference using mix-
+tures,” Journal of the American Statistical Association, vol. 90, no. 430, pp. 577–
+588, 1995.
+
+18. M. Hall, E. Frank, G. Holmes, B. Pfahringer, P. Reutemann, and I. H. Witten, “The
+
+weka data mining software: An update,” SIGKDD Explorations, vol. 11, 2009.
+
+19. S. Gupta, D. Phung, and S. Venkatesh, “A Bayesian nonparametric joint factor
+model for learning shared and individual subspaces from multiple data sources,”
+in Proc. of SIAM Int. Conference on Data Mining (SDM), 2012, pp. 200–211.
+
+

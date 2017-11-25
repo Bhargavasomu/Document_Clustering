@@ -1,0 +1,1449 @@
+Inducing Controlled Error over Variable Length
+
+Ranked Lists
+
+Laurence A.F. Park and Glenn Stone
+
+School of Computing, Engineering and Mathematics,
+
+University of Western Sydney, Australia
+
+{l.park,g.stone}@uws.edu.au
+
+http://www.scem.uws.edu.au/~lapark
+
+Abstract. When examining the robustness of systems that take ranked
+lists as input, we can induce noise, measured in terms of Kendall’s tau
+rank correlation, by applying a set number of random adjacent trans-
+positions. The set number of random transpositions ensures that any
+ranked lists, induced with this noise, has a speciﬁc expected Kendall’s
+tau. However, if we have ranked lists of varying length, it is not clear how
+many random transpositions we must apply to each list to ensure that we
+obtain a consistent expected Kendall’s tau across the collection. In this
+article we investigate how to compute the number of random adjacent
+transpositions required to obtain an expected Kendall’s tau for a given
+list length, and ﬁnd that it is infeasible to compute for lists of length
+more than 9. We also investigate an alternate and more eﬃcient method
+of inducing noise in ranked lists called Gaussian Perturbation. We show
+that using this method, we can compute the parameters required to in-
+duce a consistent level of noise for lists of length 107 in just over six
+minutes. We also provide an approximate solution to provide results in
+less than 10
+
+−5 seconds.
+
+1
+
+Introduction
+
+The robustness of a modeling or prediction system is deﬁned as the system’s
+ability to handle noise or error applied to its input, and operate within certain
+limits. For example, if we have a classiﬁcation system that predicts a state, given
+a set of observations, we can measure its accuracy by examining how many of
+its predictions are correct. We can then measure the robustness of the system by
+applying a speciﬁed level of random noise to the observations, and then examine
+its change in accuracy. Of course, if we increased the level of the added noise, we
+would expect the accuracy of the system to decrease, but a more robust system
+would provide a slower decrease.
+
+To determine the robustness level of a system, we must often perform a sim-
+ulation experiment, where we can control the noise. Noise is usually randomly
+sampled from a predeﬁned distribution with carefully chosen parameters to en-
+sure the noise is consistent for the experiment. For example, if our observations
+are elements of the real number set, we may generate noise using a Normal dis-
+tribution with zero mean and variance of one. If our observations are frequency
+values, we may generate noise using a Poisson distribution with mean 1. Fur-
+ther experiments can then be performed by adjusting the variance of the noise
+distribution and measuring the change in accuracy.
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part II, LNAI 8444, pp. 259–270, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+260
+
+L.A.F. Park and G. Stone
+
+Many systems, such as collaborative ﬁltering systems, meta search engines,
+query expansion systems, and rank aggregation systems require a set of ranked
+items as input.
+
+Therefore, to measure the robustness of such systems, we can randomly per-
+mute the lists to obtain a given expected Kendall’s τ between the permuted
+and unpermuted lists. We can achieve this by performing a set number of ran-
+domly chosen adjacent transpositions, as long as all of the list lengths are the
+same. If the lists lengths are not the same, it is not clear how many adjacent
+transpositions we should apply to obtain a given expected Kendall’s τ across all
+lists.
+
+In this article, we investigate how to compute the number of random adjacent
+transposition required to obtain a given expected τ for a given list length. We ﬁnd
+that this is a very computationally expensive task. We also propose an alternate
+method of inducing error in ranked lists called Gaussian Perturbation. We show
+that its parameter is a function of the rank correlation reduction caused by the
+error, and therefore can be used to induce controlled noise in ranked lists. We
+provide the following contributions:
+
+– An analysis of the relationship between the expected Kendall’s τ , the number
+
+of random adjacent transpositions and the list length (Section 3.1),
+
+– A novel ranked list noise induction method called Gaussian Perturbation
+
+that can be computed for larger lists in reasonable time, (Section 3.2),
+
+– An approximate version of Gaussian Perturbation to compute the required
+
+parameters in minimum time (Section 3.3).
+
+The article will proceed as follows: Section 2 reviews how we measure the ro-
+bustness of a system, and examines the form of Kendall’s τ . Section 3 examines
+the noise induced using random adjacent transpositions, introduces and anal-
+yses Gaussian Perturbation, and provides a faster approximation to Gaussian
+Perturbation.
+
+2 Robustness Using Ranked Lists
+
+To assess the robustness of a prediction system using simulation, we must deﬁne
+a method of inducing controlled noise into the observation space. In this section,
+we will examine how to measure robustness, given a noise distribution. We will
+then examine how to use Kendall’s τ rank correlation to measure the induced
+noise.
+
+2.1 Measuring System Robustness
+
+A robust system is one that can function within a set of predeﬁned limits in a
+noisy (error prone) environment. Therefore a robust classiﬁcation system would
+be able to provide a certain level of accuracy, when making predictions based on
+observations, with a given level of noise. For example, if our observation space
+is the one dimensional real line R, we might deﬁne an unknown true value as
+a ∈ R, and an observation with added noise as ˆa = a +  where  ∼ N (0, σ), a
+sample from a Normal distribution, with mean 0 and standard deviation σ.
+
+Inducing Controlled Error over Variable Length Ranked Lists
+
+261
+
+In this situation the level of noise is controlled by the parameter σ. As the dif-
+ference between the noisy and noise free observations increase, we would expect
+the system prediction accuracy to change, but we would expect a more robust
+system’s behaviour to change less.
+
+Analysis of robust system behaviour has provided us with strategies that
+allow prediction models to provide good accuracy using a wide range of observa-
+tion input data. Some well known general strategies are to use cross validation
+when training a model [12] and including a regularisation term in the optimisa-
+tion function (used in SVMs [13] and Lasso/Ridge regression [7]). Such systems
+introduce bias into the optimisation, in order to reduce the variance of the clas-
+siﬁcation, and hence increase the robustness.
+
+Similar methods can be used in clustering and dimension reduction. Com-
+pressive sampling has been used in image analysis [2], clustering [11] and outlier
+detection [1]. Each of these methods use l1 regularisation to obtain sparse so-
+lutions to the dimension reduction, clustering, and outlier detection problems.
+These methods have also been applied to Principal Component Analysis [3], to
+obtain biased, but more robust principal components.
+
+Now consider the observation space as the set of all ranked lists of multiple
+lengths. There are many systems that have an observation space of ranked lists,
+therefore it is important that we provide a method of measuring the robustness
+of this space. Systems using Collaborative ﬁltering [9] use an observation space
+of ranked lists. These systems obtain ranked responses from the user community
+and aggregate them to assist in the decision making process. Query expansion [4]
+also requires ranked lists, where ranked documents are used to extract potential
+query terms. Meta search over multiple databases [8,6] obtain ranked results from
+various databases (e.g. airline travel prices, book prices, Web search results) and
+combines them to form a single result. Also, Rank aggregation systems [5,10] are
+used to combine multiple ranked lists into a single ranked list (e.g. results from
+tennis competitions to form an overall player ranking).
+
+To test the robustness of methods applied in such systems, we need a method
+to induce noise into ranked lists. Furthermore, we must be able to control the
+amount of noise induced. Ranked lists contain ordinal numbers, therefore the
+error term  would be the application of a random permutation of the list ele-
+ments (clearly, simply adding an error variate to the true ranking will not be
+appropriate for ordinal numbers).
+
+2.2 Measuring Error in Ranked Lists
+
+The ranking of n items can be identiﬁed with an ordering of the integers 1, . . . , n.
+Thus the sample space for ranked lists can be considered Sn, the set of permu-
+tations of the integers 1 to n. We will talk about elements x = (x1, . . . , xn) of
+Sn, where xi is the rank of item i. Note that we cannot induce error on lists of
+length n = 1, therefore, we will only consider n > 1 in this article.
+Given two rankings x and y ∈ Sn, one way to measure the similarity of the
+
+two rankings is using Kendall’s τ rank correlation. Kendall’s τ is deﬁned as:
+
+τ (x, y) =
+
+(cid:2)
+
+1≤i<j≤n cij − dij
+n(n − 1)/2
+
+262
+
+L.A.F. Park and G. Stone
+
+where the sum is over the set of all possible pairs of items being ranked, and
+
+(cid:3)
+
+1,
+0,
+
+cij =
+
+if ((xi < xj) and (yi < yj)) or ((xi > xj) and (yi > yj))
+otherwise
+
+and dij = 1 − cij . A pair of items are concordant (cij = 1) if their ordering
+in each of the two lists matches, otherwise they are discordant (dij = 1). We
+can see that τ = 1 if and only if x = y (all items are concordant), implying
+perfect correlation. Also τ = −1 if and only if x = reverse(y) (all items are
+discordant), implying perfect anti-correlation. The result of τ = 0 implies no
+correlation between x and y. Therefore, Kendall’s τ can be simpliﬁed to:
+
+τ (x, y) =
+
+2
+
+(cid:2)
+1≤i<j≤n cij
+n(n − 1)/2
+
+− 1
+
+(cid:2)
+
+1≤i<j≤n cij + dij = n(n − 1)/2.
+
+since
+We can use Kendall’s τ to measure the noise induced in a ranked list. Given
+ranked lists x, y ∈ Sn, the level of noise between x and y is measured using
+τ (x, y). The greater the value of τ , the lower the amount of noise.
+
+Since Kendall’s τ is a measure of correlation, it is comparable across lists of
+diﬀerent lengths. This means that if we induce noise on a list of length n1 and on
+another of length n2, where the measure of noise using Kendall’s τ is the same
+for both, then we have induced the same level of noise for both lists.
+
+3
+
+Inducing Controlled Noise in Ranked Lists
+
+To examine the robustness of a system, we must examine how it performs when
+noise is introduced. If the system takes a set of ranked lists as input, we must
+induce controlled noise in the ranked lists. We showed that error in ranked
+lists can be measured using Kendall’s τ , which is a function of the permutation
+required to remove error from the erroneous ranked list. Therefore, to induce
+controlled noise, we must perform controlled permutations.
+Ideally, supposing the truth to be x ∈ Sn, we would weight all elements y ∈ Sn
+such that the expected τ is as desired. We can then sample from the set Sn with
+probability proportional to the assigned weights. However, there are n! elements
+in Sn and enumeration rapidly becomes impractical.
+
+In this section, we examine two methods of sampling from Sn to obtain an
+expected τ ; one controlled by the number of transpositions t, the other controlled
+by the standard deviation σ.
+
+3.1 Using Adjacent Transpositions to Induce Controlled Noise
+
+When measuring error using Kendall’s τ , an obvious choice of inducing error
+is to perform adjacent transpositions. The set of adjacent transpositions is a
+generating set for the symmetric group, therefore we can obtain every possible
+ranking of n items using a ﬁnite sequence of adjacent transpositions.
+
+Inducing Controlled Error over Variable Length Ranked Lists
+
+263
+
+To induce error in a ranked list x of length n, we randomly select xi, where
+i ∈ {1, 2, . . . , n− 1} and transpose it with the adjacent item xi+1. By performing
+t random adjacent transpositions, we obtain a permuted list y, which when com-
+pared to the original list x, gives a value of τ . If we repeat this random process
+many times, we ﬁnd that we obtain a distribution over τ , that is dependent on
+n and t.
+
+To compute the expected Kendall’s τ after t random adjacent transpositions,
+we ﬁrst construct the probability transition matrix containing the probability
+of moving from one state to another in one adjacent transposition. The state of
+the list is the order of the items in the list. Therefore, if there are n items in
+the list, there are n! possible states. The probability transition matrix will be
+of size n! × n!, but each column will contain only n − 1 nonzero elements (since
+for any list of n items, we can only move to n − 1 other states using a single
+adjacent transposition). This gives us a probability transition matrix containing
+n! × (n − 1) nonzero elements.
+
+For example, if n = 3, we have the n! = 6 possible states x1 = (1, 2, 3),
+x2 = (1, 3, 2), x3 = (3, 1, 2), x4 = (3, 2, 1), x5 = (2, 3, 1) and x6 = (2, 1, 3)
+giving a probability transition matrix T with n!(n − 1) = 12 nonzero values:
+
+⎡
+
+⎢
+⎢
+⎢
+⎢
+⎢
+⎣
+
+0 0.5
+0 0.5 0
+0
+0.5 0 0.5 0
+0
+0
+0 0.5 0 0.5 0
+0
+0 0.5 0 0.5 0
+0
+0 0.5 0 0.5
+0
+0
+0.5 0
+0 0.5 0
+0
+
+⎤
+
+⎥
+⎥
+⎥
+⎥
+⎥
+⎦
+
+T =
+
+(1)
+
+where ti,j, the elements of T , contain the probability of moving from state j to
+state i. If we begin in state 1: x1 = (1, 2, 3), our initial state probability vector is
+(cid:4)
+p0 = [ 1 0 0 0 0 0 ]
+. By taking a random walk of length 1, we compute our new
+(cid:4)
+state probability as p1 = T p0 = [ 0 0.5 0 0 0 0.5 ]
+. A random walk of length 2
+is computed as p1 = T p1 = T 2p0 = [ 0.5 0 0.25 0 0.25 0 ]
+. A random walk of
+length n gives us the state distribution T np0. Once we have the probability of
+each state after t random adjacent transpositions, we can compute the expected
+Kendall’s τ using:
+
+(cid:4)
+
+E[τ ] =
+
+n!(cid:10)
+
+i=1
+
+pt,iτ (xi, x1)
+
+(2)
+
+where pt,i is the ith element of pt. If we perform two random transpositions (a
+random walk of length 2), on a list of length n = 3, we can obtain a Kendall’s τ
+of 0 or −1/3, but the expected Kendall’s τ is:
+
+E[τ ] = 0.5 × 1 + 0 × 1/3 + 0.25 × (−1/3)
+
++ 0 × (−1) + 0.25 × (−1/3) + 0 × 1/3 = 1/3
+
+By representing the problem as a random walk on an undirected graph, we ob-
+tain additional information about its stationary distribution, being proportional
+to the degree of each vertex over an undirected graph. The degree of each vertex
+
+264
+
+L.A.F. Park and G. Stone
+
+Table 1. The number of nonzero elements (Nonzero) in the adjacent transposition ad-
+jacency matrix and the computation time required (Time) to compute the 50 expected
+values
+
+List length
+
+Nonzero
+Time (sec)
+
+2
+
+2
+
+3
+
+12
+
+4
+
+72
+
+0.055
+
+0.099
+
+0.311
+
+5
+
+480
+1.322
+
+6
+
+7
+
+8
+
+9
+
+3600
+7.628
+
+30240
+282240 2903040
+56.034 9.78 min 10.38 hr
+
+over the set of permutations is equal (n − 1), therefore the stationary distribu-
+tion is the Uniform. This implies that as the number of adjacent transpositions
+approaches inﬁnity, each state is equally likely. Kendall’s τ is symmetric about
+0 over all permutation states, therefore the expected Kendall’s τ approaches 0
+as t approaches inﬁnity for all lists of length n > 1.
+
+Given the task of randomly sampling ranked lists of length n with a given
+expected τ error, it is not obvious how we should choose t. In fact there is no
+way to directly compute t, other than trial and error (set t and n and examine
+the associated expected τ ). To achieve this task, we have provided Table 2 con-
+taining the computed expected τ values of lists of length 2 to 9, using 1 to 50
+random adjacent transpositions. So given E[τ ] = 0.5952, the table shows that
+we are required to perform 13 random adjacent transpositions for n = 8. If we
+induce error in lists of length 7 and 9, we ﬁnd that 9 and 18 random adjacent
+transpositions will provide the wanted E[τ ] respectively.
+
+We have also provided the computation time for each of the lists in Table 1.
+It is interesting to note how fast the number of nonzero elements and computa-
+tion time grows as n increases. Based on the trend, we found that the time is
+increasing double exponentially, meaning that the expected τ for n = 10 would
+take approximately 100 days to compute. Clearly, it is not feasible to compute
+the expected τ using this method for lists of length 10 or more.
+
+3.2 Using Gaussian Perturbation to Induce Controlled Noise
+
+Rather than performing adjacent transpositions, controlled noise can be induced
+in ranked lists by perturbing the rank of the elements. Perturbation requires
+the introduction of a latent value for each item i as a sample from a Normal
+distribution Xi ∼ N (μ = xi, σ), with mean equal to its rank xi and constant
+standard deviation σ.
+
+Once we have sampled a value for each item, we generate the new rank, by
+ordering the latent values. An example of this process is shown in Figure 1. We
+can see in this example four items (1, 2, 3, 4), each having a Normal distribution
+with equal standard deviation, centred on its rank. A sample from these four
+distributions gives (1.2, 3.1, 2.7, 4.4), providing us with the noise induced ranked
+list (1, 3, 2, 4). Using this method of noise induction, it is more likely that each
+item moves a smaller number of ranks than one item move a large number, which
+is the typical form of error seen in ranked lists.
+
+Inducing Controlled Error over Variable Length Ranked Lists
+
+265
+
+Table 2. The expected Kendall’s τ after t transpositions over lists is length 2 to 9
+
+t
+
+List length
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+
+8
+
+9
+
+-1.0000
+1
+1.0000
+2
+-1.0000
+3
+1.0000
+4
+-1.0000
+5
+1.0000
+6
+-1.0000
+7
+1.0000
+8
+-1.0000
+9
+10
+1.0000
+11 -1.0000
+12
+1.0000
+13 -1.0000
+14
+1.0000
+15 -1.0000
+16
+1.0000
+17 -1.0000
+18
+1.0000
+19 -1.0000
+20
+1.0000
+21 -1.0000
+22
+1.0000
+23 -1.0000
+24
+1.0000
+25 -1.0000
+26
+1.0000
+27 -1.0000
+28
+1.0000
+29 -1.0000
+30
+1.0000
+31 -1.0000
+32
+1.0000
+33 -1.0000
+34
+1.0000
+35 -1.0000
+36
+1.0000
+37 -1.0000
+38
+1.0000
+39 -1.0000
+40
+1.0000
+41 -1.0000
+42
+1.0000
+43 -1.0000
+44
+1.0000
+45 -1.0000
+46
+1.0000
+47 -1.0000
+48
+1.0000
+49 -1.0000
+1.0000
+50
+
+0.3333
+0.3333
+0.0000
+0.1667
+-0.0833
+0.1250
+-0.1042
+0.1146
+-0.1094
+0.1120
+-0.1107
+0.1113
+-0.1110
+0.1112
+-0.1111
+0.1111
+-0.1111
+0.1111
+-0.1111
+0.1111
+-0.1111
+0.1111
+-0.1111
+0.1111
+-0.1111
+0.1111
+-0.1111
+0.1111
+-0.1111
+0.1111
+-0.1111
+0.1111
+-0.1111
+0.1111
+-0.1111
+0.1111
+-0.1111
+0.1111
+-0.1111
+0.1111
+-0.1111
+0.1111
+-0.1111
+0.1111
+-0.1111
+0.1111
+-0.1111
+0.1111
+-0.1111
+0.1111
+
+0.6667
+0.5556
+0.4198
+0.3580
+0.2716
+0.2318
+0.1759
+0.1501
+0.1139
+0.0972
+0.0738
+0.0630
+0.0478
+0.0408
+0.0309
+0.0264
+0.0200
+0.0171
+0.0130
+0.0111
+0.0084
+0.0072
+0.0054
+0.0046
+0.0035
+0.0030
+0.0023
+0.0019
+0.0015
+0.0013
+0.0010
+0.0008
+0.0006
+0.0005
+0.0004
+0.0003
+0.0003
+0.0002
+0.0002
+0.0001
+0.0001
+0.0001
+0.0001
+0.0001
+0.0000
+0.0000
+0.0000
+0.0000
+0.0000
+0.0000
+
+0.8000
+0.7000
+0.6125
+0.5469
+0.4883
+0.4395
+0.3955
+0.3571
+0.3223
+0.2913
+0.2633
+0.2381
+0.2153
+0.1947
+0.1761
+0.1593
+0.1441
+0.1303
+0.1179
+0.1066
+0.0964
+0.0872
+0.0789
+0.0714
+0.0645
+0.0584
+0.0528
+0.0478
+0.0432
+0.0391
+0.0353
+0.0320
+0.0289
+0.0262
+0.0237
+0.0214
+0.0194
+0.0175
+0.0158
+0.0143
+0.0130
+0.0117
+0.0106
+0.0096
+0.0087
+0.0078
+0.0071
+0.0064
+0.0058
+0.0053
+
+0.8667
+0.7867
+0.7216
+0.6681
+0.6216
+0.5807
+0.5440
+0.5107
+0.4803
+0.4523
+0.4264
+0.4023
+0.3798
+0.3587
+0.3390
+0.3205
+0.3030
+0.2865
+0.2710
+0.2564
+0.2426
+0.2295
+0.2171
+0.2055
+0.1944
+0.1840
+0.1741
+0.1648
+0.1559
+0.1476
+0.1397
+0.1322
+0.1251
+0.1184
+0.1120
+0.1060
+0.1003
+0.0950
+0.0899
+0.0851
+0.0805
+0.0762
+0.0721
+0.0682
+0.0646
+0.0611
+0.0578
+0.0547
+0.0518
+0.0490
+
+0.9048
+0.8413
+0.7901
+0.7469
+0.7091
+0.6754
+0.6449
+0.6170
+0.5911
+0.5672
+0.5447
+0.5237
+0.5038
+0.4850
+0.4672
+0.4503
+0.4342
+0.4188
+0.4041
+0.3900
+0.3765
+0.3636
+0.3511
+0.3391
+0.3276
+0.3166
+0.3059
+0.2956
+0.2857
+0.2761
+0.2669
+0.2580
+0.2494
+0.2411
+0.2331
+0.2254
+0.2179
+0.2106
+0.2037
+0.1969
+0.1904
+0.1841
+0.1780
+0.1721
+0.1664
+0.1609
+0.1556
+0.1505
+0.1455
+0.1407
+
+0.9286
+0.8776
+0.8361
+0.8007
+0.7695
+0.7414
+0.7158
+0.6922
+0.6703
+0.6498
+0.6306
+0.6124
+0.5952
+0.5789
+0.5633
+0.5483
+0.5341
+0.5204
+0.5072
+0.4945
+0.4823
+0.4705
+0.4591
+0.4481
+0.4374
+0.4271
+0.4171
+0.4074
+0.3979
+0.3887
+0.3798
+0.3711
+0.3627
+0.3545
+0.3465
+0.3387
+0.3311
+0.3236
+0.3164
+0.3094
+0.3025
+0.2958
+0.2892
+0.2828
+0.2766
+0.2705
+0.2645
+0.2587
+0.2530
+0.2474
+
+0.9444
+0.9028
+0.8685
+0.8389
+0.8127
+0.7890
+0.7673
+0.7472
+0.7285
+0.7109
+0.6943
+0.6786
+0.6637
+0.6494
+0.6358
+0.6227
+0.6102
+0.5981
+0.5864
+0.5752
+0.5643
+0.5538
+0.5436
+0.5337
+0.5241
+0.5148
+0.5057
+0.4968
+0.4882
+0.4798
+0.4716
+0.4636
+0.4558
+0.4482
+0.4407
+0.4335
+0.4263
+0.4193
+0.4125
+0.4058
+0.3993
+0.3928
+0.3865
+0.3804
+0.3743
+0.3684
+0.3626
+0.3568
+0.3512
+0.3457
+
+266
+
+L.A.F. Park and G. Stone
+
+x
+
+1
+
+2
+
+3
+
+4
+
+˜y
+
+1.2
+
+2.7
+3.1
+
+4.4
+
+y
+
+1
+
+3
+
+2
+
+4
+
+Fig. 1. Inducing error in ranked list x containing four items, using Gaussian Pertur-
+bation. Each item is treated as a Normal distribution with mean equal to its rank
+and constant standard deviation (in this case, σ = 1). A ranked list with error y is
+obtained by sampling from the Normal distributions (to obtain the latent values ˜y),
+then ordering by the sample value. We can see that a value of 3.1 was sampled from
+the Normal distribution with mean 2, and 2.7 was sampled from the distribution with
+mean 3, pushing item 3 to the 2nd rank and item 2 to the 3rd rank.
+
+Using Gaussian Perturbation, we can compute the expected τ as a function
+
+of n and σ. The expected value of τ is given as:
+(cid:2)
+1≤i<j≤n cij
+n(n − 1)/2
+1≤i<j≤n E [cij]
+n(n − 1)/2
+
+E[τ ] = E
+
+(cid:2)
+
+(cid:11)
+
+2
+
+2
+
+=
+
+(cid:12)
+
+− 1
+
+− 1
+
+(3)
+
+showing that it is dependent on the expected concordance of each pair of items.
+Let us consider x the ranked list of length n, and the permuted list y, based
+on latent values ˜y, which are realisations of Normal random variables ˜Y . Given
+two items i and j, where xi < xj in ranked list x, then the pair is concordant if
+yi < yj which happens if and only if ˜yi < ˜yj. Now;
+
+E [cij ] = 1 × P (cij = 1) + 0 × P (cij = 0)
+
+= P (˜yi < ˜yj)
+= P (˜yi − ˜yj < 0)
+
+and ˜yi is a sample from a distribution N (μ = xi, σ). Therefore, ˜yi− ˜yj is a sample
+√
+from a Normal distribution with mean μ = xi− xj, and standard deviation
+2σ.
+After standardising, we obtain:
+
+E [cij ] = P
+
+Z <
+
+(4)
+
+(cid:13)
+
+(cid:14)
+
+xj − xi√
+2σ
+
+Inducing Controlled Error over Variable Length Ranked Lists
+
+267
+
+Table 3. The computation time to compute σ when given E[τ ] and n for Gaussian
+Perturbation for lists of length 101 to 106
+
+List Length
+
+101
+
+102
+
+103
+
+104
+
+105
+
+106
+
+Computation Time (sec) 0.002
+
+0.020
+
+0.254
+
+3.083
+
+34.259 379.931
+
+where Z ∼ N (0, 1) is the standard Normal distribution. Substituting equation 4
+back into 3 gives:
+
+E[τ ] =
+
+(cid:10)
+
+1≤i<j≤n
+
+(cid:13)
+
+P
+
+Z <
+
+(cid:14)
+
+xj − xi√
+2σ
+
+4
+
+n(n − 1)
+
+− 1
+
+By noticing that xj − xi is an integer from 1 to n − 1, and the sum involves
+several copies of each such integer, we can simplify the equation further:
+
+E[τ|n, σ] =
+
+n−1(cid:10)
+
+k=1
+
+(cid:13)
+
+P
+
+Z <
+
+(cid:14)
+
+4(n − k)
+n(n − 1)
+
+k√
+2σ
+
+− 1
+
+(5)
+
+Since σ > 0 and n > 1, each term of the sum in equation 5 is non-negative,
+showing that E[τ|n, σ] ≥ 0. E[τ|n, σ] can only be zero when all terms of the sum
+are zero, implying that E[τ|n, σ] → 0 if and only if σ → ∞.
+
+Using equation 5, we can compute the value of σ for a given E[τ ] and n using a
+one-dimensional optimisation function. For example, if we want to induce noise
+so that E[τ ] = 0.6, we ﬁnd that we must assign σ = 22.46, 44.48 and 110.54 for
+n = 100, 200 and 500 respectively.
+
+Table 3 provides us with the computation time to perform the one-dimensional
+optimisation to compute σ. The table shows us that the time to compute σ
+increases linearly with n. When comparing this to Table 1, we see that Gaussian
+Perturbation has beneﬁt over the Adjacent Transposition sampling method in
+terms of the parameter computation time.
+
+3.3 Estimating σ for Gaussian Perturbation
+
+In the previous section, we derived the equation for E[τ ], dependant on n and σ,
+and stated that we had to run a one dimensional optimisation over the function
+to compute σ when given E[τ ] and n. The computation of σ would be faster if we
+had a formula that gives the appropriate σ in terms of n and E[τ ]. Unfortunately,
+σ is embedded in the Normal cumulative density function (CDF) and summed
+n − 1 times.
+
+To allow inversion of equation 5 we have made use of the Shah piece-wise
+
+approximation [14] to the Standard Normal CDF:
+
+P (Z < x) =
+
+⎧
+⎨
+
+⎩
+
+x(4.4 − x)/10 + 1/2
+0.99
+1
+
+if x ≤ 2.2
+if 2.2 < x < 2.6
+if x ≥ 2.6
+
+(6)
+
+268
+
+L.A.F. Park and G. Stone
+
+)
+z
+ 
+<
+Z
+(
+P
+
+ 
+
+0
+
+.
+
+1
+
+9
+
+.
+
+0
+
+8
+
+.
+
+0
+
+7
+
+.
+
+0
+
+6
+
+.
+
+0
+
+5
+
+.
+
+0
+
+Cumulative Standard Normal
+Shah approximation
+
+0.0
+
+0.5
+
+1.0
+
+1.5
+
+2.0
+
+2.5
+
+3.0
+
+z
+
+Fig. 2. The Cumulative Standard Normal function and the Shah piece-wise approxi-
+mation
+
+for x ≥ 0. The similarity of the Shah approximation to the Standard Normal
+√
+CDF is shown in Figure 2.
+If we assume that (n − 1)/(
+2σ) ≤ 2.2, we can substitute P (Z < x) with
+the ﬁrst piece of the Shah approximation x(4.4 − x)/10 + 1/2. By making this
+substitution into equation 5 and simplifying, we obtain the expected τ approxi-
+mation:
+
+E[τ|n, σ] ≈ 4.4
+
+√
+2(n + 1)
+30σ
+
+− (n + 1)n
+
+60σ2
+
+which is a quadratic equation in terms of 1/σ. By solving for σ, we obtain:
+
+σ ≈
+
+4.4
+
+√
+2 ± (cid:18)
+
+n
+
+2 × 4.42 − 60E[τ ]n
+
+n+1
+
+(7)
+
+providing a solution under the condition E[τ ] < 4.42 n+1
+n /30, meaning that we
+can compute an approximate σ for all values of n when 0 < E[τ ] < 0.6453, and
+greater values of E[τ ] as n decreases. Also note that σ → ∞ as E[τ ] → 0, as
+shown in equation 5.
+
+Of the two solutions, the negative form provides accurate estimates for most of
+the τ, n combinations, but the positive form provides poor estimates. To examine
+the estimate’s accuracy, we chose a desired value of E[τ ], used equation 7 to
+compute the approximate σ, then used equation 5 to compute the obtained E[τ ].
+
+Inducing Controlled Error over Variable Length Ranked Lists
+
+269
+
+u
+a
+
+t
+ 
+s
+
+'
+l
+l
+
+a
+d
+n
+e
+K
+d
+e
+
+ 
+
+t
+c
+e
+p
+x
+e
+
+ 
+
+d
+e
+r
+i
+s
+e
+D
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+NA
+
+0.030
+
+0.025
+
+0.020
+
+0.015
+
+0.010
+
+0.005
+
+0.000
+
+2
+
+5
+
+10
+
+20
+
+50
+
+100
+
+Number of items
+
+Fig. 3. The absolute diﬀerence when comparing the desired expected Kendall’s τ , to
+the obtained expected Kendall’s τ , when using the approximate σ computed from
+equation 7. The diﬀerence is computed for varying number if items (n) and desired
+expected Kendall’s τ (E[τ ]).
+
+Figure 3 shows the absolute diﬀerence in desired E[τ ] compared to the obtained
+E[τ ], when using an approximate σ. We can see that that the σ estimate is a
+good estimate since most of the error is smaller than 0.01.
+−5
+
+When using equation 7 to compute σ the computation time is less that 10
+
+seconds for all n.
+
+4 Conclusion
+
+To examine the robustness of systems that take ranked lists as input, we can
+induce noise by applying a set number of random adjacent transpositions, where
+the error is measured using Kendall’s τ rank correlation. For a ﬁxed list length
+n, we can ensure a ﬁxed expected τ by keeping the number a random adjacent
+transpositions constant, allowing a consistent level of noise to be applied to
+all lists. If the lists are of varying length, it is not clear how many adjacent
+transposition should be applied to each list to obtain a consistent expected τ
+over all lists.
+
+In this article, we examined the relationship between the expected τ , the list
+length n and the number of random adjacent transpositions t. We found that it
+is possible to compute the expected τ , given n and t, but the computation time
+rapidly increases with n, making the computation infeasible for n > 9.
+
+270
+
+L.A.F. Park and G. Stone
+
+We also proposed a new method of inducing noise in ranked lists called Gaus-
+sian Perturbation, which allows us to derive an equation for the expected τ when
+given n and its parameter σ. The parameter σ can be computed in reasonable
+time for large lists (just over six minutes for lists of length 106), allowing us to
+compute σ for various list lengths while keeping the expected τ constant over
+all lists.
+−5
+
+We also provided an approximate solution for σ that requires less that 10
+
+seconds of computation time for all n.
+
+References
+
+1. Aouf, M., Park, L.A.F.: Approximate document outlier detection using random
+spectral projection. In: Thielscher, M., Zhang, D. (eds.) AI 2012. LNCS, vol. 7691,
+pp. 579–590. Springer, Heidelberg (2012)
+
+2. Cand`es, E.J., Wakin, M.B.: An introduction to compressive sampling. IEEE Signal
+
+Processing Magazine 25(2), 21–30 (2008)
+
+3. Cand`es, E.J., Li, X., Ma, Y., Wright, J.: Robust principal component analysis? J.
+
+ACM 58(3), 11:1–11:37 (2011)
+
+4. Carpineto, C., Romano, G.: A survey of automatic query expansion in information
+
+retrieval. ACM Computing Surveys (CSUR) 44(1), 1 (2012)
+
+5. Dwork, C., Kumar, R., Naor, M., Sivakumar, D.: Rank aggregation methods for
+the web. In: Proceedings of the 10th International Conference on World Wide Web,
+pp. 613–622. ACM (2001)
+
+6. Farah, M., Vanderpooten, D.: An outranking approach for rank aggregation in
+information retrieval. In: Proceedings of the 30th Annual International ACM SIGIR
+Conference on Research and Development in Information Retrieval, SIGIR 2007,
+pp. 591–598. ACM, New York (2007)
+
+7. Friedman, J., Hastie, T., Tibshirani, R.: The elements of statistical
+
+learning.
+
+Springer Series in Statistics, vol. 1 (2001)
+
+8. Kr¨upl, B., Holzinger, W., Darmaputra, Y., Baumgartner, R.: A ﬂight meta-search
+engine with metamorph. In: Proceedings of the 18th International Conference on
+World Wide Web, pp. 1069–1070. ACM (2009)
+
+9. Linden, G., Smith, B., York, J.: Amazon. com recommendations: Item-to-item
+
+collaborative ﬁltering. IEEE Internet Computing 7(1), 76–80 (2003)
+
+10. Liu, Y.T., Liu, T.Y., Qin, T., Ma, Z.M., Li, H.: Supervised rank aggregation. In:
+Proceedings of the 16th international Conference on World Wide Web, pp. 481–490.
+ACM (2007)
+
+11. Park, L.A.F.: Fast approximate text document clustering using compressive sam-
+pling. In: Gunopulos, D., Hofmann, T., Malerba, D., Vazirgiannis, M. (eds.) ECML
+PKDD 2011, Part II. LNCS, vol. 6912, pp. 565–580. Springer, Heidelberg (2011)
+
+12. Ronchetti, E., Field, C., Blanchard, W.: Robust linear model selection by cross-
+validation. Journal of the American Statistical Association 92(439), 1017–1023
+(1997)
+
+13. Sch¨olkopf, B., Smola, A.J.: Learning with kernels: Support vector machines, regu-
+
+larization, optimization, and beyond. MIT press (2001)
+
+14. Shah, A.K.: A simpler approximation for areas under the standard normal curve.
+
+The American Statistician 39(1), 80–80 (1985)
+
+

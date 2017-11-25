@@ -1,0 +1,1695 @@
+Semantic-Distance Based Clustering for XML
+
+Keyword Search
+
+Weidong Yang and Hao Zhu
+
+School of Computer Science, Fudan University,
+
+Handan Road 220, Shanghai, China
+
+Abstract. XML Keyword Search is a user-friendly information discov-
+ery technique, which is well-suited to schema-free XML documents. We
+propose a novel scheme for XML keyword search called XKLUSTER,
+in which a novel semantic-distance model is proposed to specify the set
+of nodes contained in a result. Based on this model, we use clustering
+approaches to generate all meaningful results in XML keyword search.
+A ranking mechanism is also presented to sort the results.
+
+Keywords: XML, Keyword Search, Clustering.
+
+1 Introduction
+
+Keyword search in database is gaining a lot of attentions [1-11]. Many exist-
+ing methods about XML keyword search are based on LCA (lowest common
+ancestor) model. A typical one of them is the SLCA (smallest LCA) method
+[2, 3, 5], which returns a group of smallest answer subtrees of an XML tree. A
+smallest answer subtree is deﬁned as: a subtree which includes all the keywords
+and any subtree of it doesn’t contain all the keywords. The root of a smallest
+answer subtree is called a SLCA. However, SLCA method probably omits some
+meaningful results. Example 1.1 shown in Fig. 1 illustrates a tree structure of
+an XML document, in which every node is denoted as its label and the number
+below it is the Dewey number.
+
+Article
+
+0.0
+
+DBLP
+
+0
+
+Article
+
+0.1
+
+Title
+0.0.0
+
+Authors
+
+0.0.1
+
+HTML1
+0.0.0.0
+
+x1
+Michael
+0.0.1.0
+
+x2
+David
+0.0.1.1
+
+Title
+0.1.0
+
+x3
+XML1
+0.1.0.0
+
+Authors
+
+0.1.1
+
+Title
+0.2.0
+
+x4
+Michael
+0.1.1.0
+
+John
+0.1.1.1
+
+x5
+XML2
+0.2.0.0
+
+x6
+Michael
+0.2.1.0
+
+Article
+
+0.2
+
+Authors
+
+0.2.1
+
+x7
+Michael
+0.2.1.1
+
+cite
+0.2.2
+
+x8
+David
+0.2.1.2
+
+Article
+0.2.2.0
+
+Title
+0.2.2.0.0
+
+Authors
+0.2.2.0.1
+
+x9
+XML3
+
+0.2.2.0.0.0
+
+x10
+Michael
+0.2.2.0.1.0
+
+x11
+David
+
+0.2.2.0.1.1
+
+Fig. 1. Tree Structure of an XML document (Example 1.1)
+
+Suppose that keywords are “XML”, “Michael” and “David” are submitted
+to search in the document, and the nodes containing keywords are marked in
+red. If SLCA method is applied, the result would be a subtree rooted at node
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part II, LNAI 6119, pp. 398–409, 2010.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2010
+
+Semantic-Distance Based Clustering for XML Keyword Search
+
+399
+
+Article (0.2.2.0). The searching semantics is most likely to be “which papers
+about XML have been written by Michael and David”, and obviously it ﬁnds
+the paper “XML3” while omitting the paper “XML2”. Moreover, users may
+have other reasonable searching intentions, like “which papers are written by
+Michael and David” and “which papers about XML are written by Michael
+OR David”. For these two requests, paper “HTML1” and “XML1” are both
+contented results but also omitted. If we regard any node set which contains
+all the keywords as a candidate results, actually what SLCA method does is
+picking out some “optimal” ones from all the candidate results, and it considers
+a candidate result to be “optimal” when its LCA is relatively lowest, so those
+candidate results with higher LCAs are discarded, this is the essential reason for
+SLCA method losing some meaningful results. Besides, SLCA method still has
+some other drawbacks: (1) all the results are isolated, which means any node only
+can exist in one result, and apparently it is inappropriate in some situations; (2)
+each result is demanded to contain all the keywords, means that SLCA methods
+only support “AND” logic between all keywords.
+
+This paper presents a novel approach based on clustering techniques for XML
+keyword search, which can solve all above problems. Main contributions include:
+We propose a novel semantic distance model for XML keyword search in section
+2; three clustering algorithms are designed in section 3, which are graph-based
+(GC), core-driven (CC) and loosened core-driven (LCC) algorithms; a ranking
+mechanism is proposed to sort all the searching results in section 4.
+
+2 Search Semantics and Results
+
+We deﬁne the keywords submitted by users as a set containing t keywords L =
+{ki|i = 1, . . . , t},and the XML document as an XML document tree.
+Deﬁnition 2.1 (Search Semantics and Results). An XML document tree
+is a tree coded by Dewey numbers, and denoted as:d = (V, E, X, label(id),
+(cid:3))), in which: (1)V is the set of all the
+pl(id1, id2), depth(id), dwcode(id), lca(V
+nodes, in which each node corresponds to an element or an attribute or a value
+in the document and has a unique identiﬁer as well as a Dewey number; (2)
+E ⊆ V × V , is the set of edges in the tree; (3) label(id), is a function which can
+get the label of the node whose identiﬁer is id;(4)X ⊆ V , is the set of keyword
+nodes in the tree, and a keyword node is a node whose label contains any key-
+word; (5)pl(id1, id2), is a function to obtain the path length between two nodes,
+in which id1 and id2 must have an ancestor-descendant relation, and the func-
+tion returns the number of edges between them; (6) depth(id) is a function to
+get the depth of the node whose identiﬁer is id (the depth of the root is 1); (7)
+dwcode(id), is a function to get the Dewey number of the node whose identiﬁer
+(cid:3) ⊆ V .
+is id; (8) lca(V
+Deﬁnition 2.2 (Shortest Path). The shortest path between two nodes The
+shortest path between two nodes xi and xj is the sum of the path between
+xi and lca(xi, xj) and the path between xj and lca(xi, xj). Meanwhile, the
+
+(cid:3)), is a function to get the LCA of all nodes in V
+
+(cid:3), and V
+
+400
+
+W. Yang and H. Zhu
+
+spl(xi,xj)
+
+function spl(xi, xj) is used to obtain the length of the shortest path. Apparently,
+spl(xi, xj) = pl(lca(xi, xj), xi) + pl(lca(xi, xj), xj).
+Deﬁnition 2.3 (Semantic Distance). The semantic distance between any
+two keyword nodes xi and xj is deﬁned as a function dis(xi, xj): dis(xi, xj) =
+depth(lca(xi,xj)).
+
+In the rest, semantic distance is called distance for short. In the formula of the
+distance function, the numerator and the denominator are the length of shortest
+path and the depth of LCA respectively. Obviously, the semantic distance of
+two keyword nodes is smaller when their shortest path is shorter or the depth of
+their LCA is lower. Assume the height (maximum depth) of the tree is h, then
+the range of spl(xi, xj) is [0, 2h] and the range of depth(lca(xi, xj)) is [1, h], so
+the range of dis(xi, xj) is [0, 2h]. In Example 1.1, evaluating all the distances
+between any two keyword nodes can get a semantic distance matrix (Fig. 2).
+
+x1
+0
+
+0.67
+6.00
+6.00
+6.00
+6.00
+6.00
+6.00
+8.00
+8.00
+8.00
+
+x1
+x2
+x3
+x4
+x5
+x6
+x7
+x8
+x9
+x10
+x11
+
+x2
+
+0
+
+6.00
+6.00
+6.00
+6.00
+6.00
+6.00
+8.00
+8.00
+8.00
+
+x3
+
+x4
+
+x5
+
+x6
+
+x7
+
+x8
+
+x9
+
+x10
+
+x11
+
+0
+
+2.00
+6.00
+6.00
+6.00
+6.00
+8.00
+8.00
+8.00
+
+0
+
+6.00
+6.00
+6.00
+6.00
+8.00
+8.00
+8.00
+
+0
+
+2.00
+2.00
+2.00
+3.00
+3.00
+3.00
+
+0
+
+0.67
+0.67
+3.00
+3.00
+3.00
+
+0
+
+0.67
+3.00
+3.00
+3.00
+
+0
+
+3.00
+3.00
+3.00
+
+0
+
+1.00
+1.00
+
+0
+
+0.40
+
+0
+
+Fig. 2. Semantic Distance Matrix (Example 1.1)
+
+From Fig. 2, it can be found that the few smallest distances (0.40 and 0.67) are
+between two authors of a paper, and any largest distances (8.00) is between titles
+or authors of diﬀerent papers which have no citation relation. The values of the
+distances match the practical meanings. Strictly speaking, the searching intentions
+of users can never be conﬁrmed accurately; so diﬀerent than existing researches,
+we suggest that all keyword nodes are useful more or less and should be included in
+results. Based on the semantic distance model, we divide the set of keyword nodes
+X into a group of smaller sets, and each of them is called a “cluster”.
+Deﬁnition 2.4 (Cluster). A cluster Ci is a set of keyword nodes, which means
+Ci ⊆ X; and if C = {Ci|i = 1, . . . , m} is the set of all clusters generated, then
+(cid:2)m
+i=1 Ci = X.
+We set a distance threshold to conﬁne the size of clusters that the distance of
+any two keyword nodes in a cluster must be less equal to ω. It actually means,
+two keyword nodes are regarded semantically related if their semantic distance is
+less than to ω. Besides, there isn’t any restriction for which keywords can exist in
+one cluster, which means both of the “AND” and “OR” logic between keywords
+can be supported. Nevertheless, given a distance threshold, there will be massive
+clusters satisfying the request, and many of them have inclusion relations with
+each other, so a concept of “optimal cluster” is proposed.
+
+Semantic-Distance Based Clustering for XML Keyword Search
+
+401
+
+Deﬁnition 2.5 (Optimal Cluster). Given a distance threshold ω, a set of
+keyword nodes Ci ⊆ X is called an optimal cluster iﬀ: (1) ∀xi, xj ∈ Ci, s.t.
+dis(xi, xj) ≤ ω; (2) ∀xa, (xa ∈ X)and(xa /∈ Ci),∃xb ∈ Ci s.t. dis(xa, xb) > ω.
+Example 2.1: Assume the value of distance threshold is 2.0, then there are only
+part of the distances can be retained in the table shown in Fig. 2 (marked in blue),
+four optimal clusters is easily to be obtained: C1 = x1, x2, C2 = x3, x4, C3 =
+x5, x6, x7, x8andC4 = x9, x10, x11, which actually correspond to the contents of
+four papers respectively in Fig. 1.
+
+Finding the optimal clusters is deﬁnitely not the last step. Actually a cluster
+is only a set of keyword nodes, how to generate enough useful information from
+clusters is another point. A simple approach is: for each cluster Ci, return the
+whole subtree rooted at lca(Ci) to users. However many these subtrees will have
+inclusion relations (for example the subtree rooted at lca(C3) and the subtree
+rooted at lca(C4) in Example 2.1), especially when the depth of some lca(Ci)
+is high, this kind of problems become serious. Moreover, it would cause some
+results being too large to be returned and for users to obtain useful information.
+So, for each (optimal) cluster, we generate and return a “minimum building tree”
+of it.
+Deﬁnition 2.6 (Minimum Building Tree). A minimum building tree (MBT)
+of any cluster Ci is a tree whose root is lca(Ci) and leaves are all the nodes
+in descendants(Ci). The function descendants(Ci) returns all the nodes in Ci
+which doesn’t have any descendant node in Ci.
+
+Two extra operations are provided to expand the MBTs: (1) the “expansion”
+of any node, which would add the subtree rooted at the node into the MBT.
+For example for the MBT of C2 in Example 2.1, users can expand the node
+Authors(0.1.1) to get another author of the paper John (0.1.1.1); (2) the “ele-
+vation” of the root, which will ﬁnd the parent node of the MBT root and add it
+into the MBT, for example for the MBT of C1 in Example 2.1, users can elevate
+the root Authors(0.0.1) and get its parent node Article(0.0). Thus, users can
+expand each MBT optionally according to their needs until satisfactory infor-
+mation is found.
+Deﬁnition 2.7 (XML Keyword Search). XML keyword search is a process
+that: for a set of keywords L submitted by users and a distance threshold ω
+set in advance, a set of MBTs are obtained by searching an XML document d;
+moreover, each MBT could be expanded according to the demands of users.
+
+3 Clustering Algorithms
+
+Since our goal is to divide a set of keyword nodes into groups according to the
+distances between keyword nodes, if each keyword node is regarded as an object,
+it is very natural to achieve our goal through clustering techniques, so we develop
+three clustering algorithms for XML keyword search: GC, CC, and LCC.
+Lemma 3.1. For an XML document tree d, any number of nodes which have
+the same depth are picked out, and sorted in preorder to form a list I. For any
+
+402
+
+W. Yang and H. Zhu
+
+(cid:3) is deﬁned. Assume that the depth of the nodes in I
+
+node xi in I, traverse leftwards (rightwards) from it, then the distance between
+xi and the node each time met is non-decreasing.
+Lemma 3.2. The list I is deﬁned as the same as in Lemma 3.1, also a similar
+(cid:3) is higher (lower)
+list I
+(cid:3)
+than that of the nodes in I, xi is an arbitrary node in I, and x
+i is the ancestor
+(cid:3) or even in the tree, we
+(cid:3)
+(cid:3) (x
+(descendant) node of xi in I
+i doesn’t have to exist in I
+(cid:3) if it’s inexistent). When traverse
+can add one in the corresponding position of I
+(cid:3), the distance between xi and the node each
+(cid:3)
+leftwards (rightwards) from x
+i in I
+time met is non-decreasing.
+(cid:3)
+(cid:3)
+(cid:3)
+(cid:3), equals to spl(x
+Proof: For any node xj in I
+i)(spl(x
+i, xj) plus spl(xi, x
+i, xj) mi-
+(cid:3)
+(cid:3)
+i)), and since spl(xi, x
+i) is invariable, spl(xi, xi) will become greater
+nus spl(xi, x
+along with spl(xi’, xj) (spl(xi’, xj) is non-decreasing). Otherwise, it is obvious
+that depth(lca(xi, xj)) is non-increasing, according to the formula of semantic
+distance, is non-decreasing.
+
+After the ω is set and the keywords are submitted, we traverse the XML tree
+in preorder, ﬁnd all the keyword nodes and put them into a hierarchical data
+structure.
+Deﬁnition 3.1 (Hierarchical Data Structure). Assume the height of the
+XML document tree is h; the hierarchical data structure H is a data structure
+which contains h ordered lists of keyword nodes, and the depth of any node in
+the ith list is i.
+
+When we traverse the XML tree in preorder, each node met would be added
+into the end of corresponding list in H if its label contains some keyword. Con-
+sequently, after the traversal is ﬁnished, H will contain all keyword nodes, and
+because in any list of it all nodes are added in preorder, Lemma 3.1 and Lemma
+3.2 hold true in H.
+
+3.1 GC: Graph-Based Clustering Algorithm for XML Keyword
+
+Search
+
+In algorithm GC, ﬁrstly we traverse H and connect any two nodes between which
+the distance is less equal to the distance threshold ω with a link. After that a
+weighted undirected graph whose vertices are all the keyword nodes is obtained.
+Afterwards, a graph-partition algorithm is used to ﬁnd all the maximal complete
+subgraphs (cliques); apparently the vertex set of each clique is an optimal cluster.
+H is accessed from top to bottom, and for each list, nodes are traversed from left
+to right. Assume xi is the node currently being accessed, we check the distances
+between xi and some neighbors which are right of or below xi, and because of
+the accessing order, the nodes left of or above xi needn’t be considered. Assume
+xj is a node right of xi in the same list, according to Lemma 3.1, dis(xi, xj)
+is non-decreasing when the position of xj moves rightwards, so if dis(xi, xj) is
+greater than ω, all nodes right of xj in the same list needn’t be regarded.
+
+For the nodes in lower lists, ﬁrstly it should be conﬁrm that how many lists should
+≤ ω,
+
+be taken into account. For any node xj below xi, dis(xi,xj)=
+
+spl(xi,xj)
+
+depth(lca((xi,xj )))
+
+Semantic-Distance Based Clustering for XML Keyword Search
+
+403
+
+≤
+
+spl(xi,xj )
+
+depth(lca((xi,xj)))
+
+also because that depth(xi) ≥ depth(lca((xi, xj))) , then we can easily get that
+≤ ω, which indicates that spl(xi, xj) ≤ depth(xi)×ω,
+spl(xi,xj)
+depth(xi)
+so only lists below xi need to be taken into account. Obviously, even there exists
+a descendant of xi in the (f loor(depth(xi) × ω) + 1)th lower list, the distance
+overﬂows.
+For each of these (f loor(depth(xi) × ω) lists, ﬁrst we ﬁnd the position of the
+descendant node of xi in it (the descendant node of xi doesn’t have to exist), then
+traverse leftwards (rightwards) from the position until the distance overﬂows, and
+according to Lemma 3.2, all other nodes in the list needn’t be considered.
+
+Each time the distance between two nodes is found to be less equal to ω, these
+two nodes are linked (by adding cursors point to each other) to build an edge,
+and the value of distance is recorded as the edge’s weight. A weighted undirected
+graph is obtained, and then a simple graph-partition algorithm is used to get
+all the cliques. The pseudocode of GC is given in Fig. 3. The graph-partition
+algorithm is not given here for the sake of space of this paper. We can show that
+the total cost of ﬁnding descendant’s position is h2 · O(log n) + h · O(n).
+
+It is easy to ﬁnd that the time complexity of GC not only depends on the total
+number of keyword nodes, but also strongly relies on the distance threshold. The
+disadvantage of GC is the uncontrollable eﬃciency, especially when the distance
+threshold is large. So, we propose two other algorithms: CC and LCC.
+
+H
+
+C
+
+l H
+xi
+
+l
+
+dis xi xj
+
+link xi xj
+
+(cid:550)
+
+xj
+
+p
+
+findDescPosition xi, l'
+
+xj
+
+l'
+
+floor depth xi ·(cid:550)
+
+findDescPosition xi, l'
+
+xi'
+xi
+
+xj
+
+l'(cid:30)
+
+xi
+
+l
+p
+
+p
+
+l
+
+C
+
+l-1
+
+l
+
+r
+
+r+1
+
+(cid:258)
+
+(cid:258)
+
+(cid:258)
+
+xi
+
+l'
+
+(cid:258)
+
+l
+
+r
+
+(cid:258)
+
+(cid:258)
+
+(cid:258)
+
+position
+
+xj
+
+l'(cid:30)
+
+l' cursor
+p
+
+p
+
+l' cursor
+
+p
+
+xj(cid:30)
+
+(cid:258)
+
+(cid:258)(cid:258)
+
+(cid:258)
+
+(cid:258)
+
+(cid:258)
+
+(cid:258)
+
+l
+
+r
+
+l
+
+r
+
+Fig. 3. Algorithm GC
+
+Fig. 4. Illustration of Cores
+
+3.2 CC: Core-Driven Clustering Algorithm for XML Keyword
+
+Search
+
+GC is node-driven, which gathers some keyword nodes close enough to each other
+together. While the idea of algorithm CC is “divide-and-conquer”: ﬁnds some
+keyword node sets which are called “cores” in the ﬁrst place, all the nodes in a
+
+404
+
+W. Yang and H. Zhu
+
+core can deﬁnitely be clustered together; afterwards, each of which aﬃrmatively
+contains at least one optimal cluster; ﬁnally optimal clusters are obtained from
+these core sets.
+Deﬁnition 3.2 (Core). Given a distance threshold ω, a keyword node set
+R ⊆ X is called a core iﬀ the distance between any two nodes in R is less equals
+to ω.
+
+An optimal cluster is a core, but a core is not necessarily an optimal cluster.
+Lemma 3.3. Assume xl and xr are any two nodes in the same list of H, and xl
+is left of xr. Given a distance threshold ω and dis(xl, xr) ≤ ω, then the set of
+nodes from xl to xr (including them) is a core.
+Proof: Take any two nodes xa and xb from the (r − l + 1) nodes from xl to xr,
+and let xa be left of xb. According to Lemma 3.1, dis(xa, xb) ≤ dis(xa, xr) ≤
+dis(xl, xr) ≤ ω, so the distance between any two nodes isn’t greater than ω. At
+the beginning of algorithm CC, we traverse H and divide all keyword nodes in
+H into a number of cores, each of which is called a “core origin”.
+Deﬁnition 3.3 (Core Origin). Oi is a set of certain keyword nodes in H ; it
+is called a core origin iﬀ: (1) Oi is a core; (2) all the nodes in Oi are in the same
+(cid:3)
+list I of H ; (3) there doesn’t exist a core O
+i and all the
+nodes in O
+
+i which satisﬁes Oi ⊂ O
+(cid:3)
+
+(cid:3)
+i are in I.
+
+A core origin is actually an optimal cluster in one list. As illustrated in Fig.
+4 (a): assume I is a list in H, xl−1, xl, xr and xr+1 are four nodes in I and their
+positions are just as the same as illustrated in the ﬁgure, also dis(xl, xr) ≤ ω,
+dis(xl−1, xl) ≥ ω, and dis(xr, xr+1) ≥ ω. According to Lemma 3.3, xl, . . . , xr is
+a core, and easily ﬁnd: for any node xa in it, dis(xl−1, xa) > dis(xl−1, xl) > ω,
+and dis(xa, xr+1) > dis(xr, xr+1) > ω. On account of Lemma 3.1, the distance
+between xa and any node left of xl−1 or right of xr+1 is greater than ω, conse-
+quently xl, . . . , xr is a core origin. It denotes that the positions of a core origin’s
+nodes are continuous in the list.
+
+After getting all the cores origin from H, some cores around each core origin
+Oi are considered for the purpose of ﬁnding optimal clusters which contain all the
+nodes in Oi. As illustrated in Fig.4 (b), xl, . . . , xr is a core origin, and according to
+previous discussions, all other nodes in the same list needn’t be regarded. Assume
+(cid:3) whose distances to xl are all less
+(cid:3)
+(cid:3) is a lower list, x
+l, . . . , xl” is a set of nodes in I
+I
+(cid:3) of nodes whose distances to xr are all less
+(cid:3)
+equal to ω, and x
+r, . . . , xr” is a set in I
+(cid:3)(cid:3)
+(cid:3)
+(cid:3)
+(cid:3)(cid:3)
+equal to ω. If the intersection of x
+l and x
+r is null, aﬃrmatively there
+r, . . . , x
+l, . . . , x
+(cid:3) could be added into x
+(cid:3)
+(cid:3)(cid:3)
+r to form a core; if the intersection
+isn’t any node in I
+r, . . . , x
+(cid:3)
+(cid:3)
+(cid:3)(cid:3)
+(cid:3)
+isn’t null, it must be x
+l can’t be right of x
+l (it is easy to prove that x
+r and
+r, . . . , x
+(cid:3)(cid:3)
+(cid:3)(cid:3)
+r can’t be left of x
+l ), therefore we can get a lemma as follows.
+x
+(cid:3)
+(cid:3)(cid:3)
+Lemma 3.4. If x
+r, . . . , x
+l
+(cid:3)(cid:3)
+(cid:3)
+l is a core; (2) any node in I
+r, . . . , x
+x
+be added into xl, . . . , xr to build a core.
+(cid:3)(cid:3)
+(cid:3)
+Proof: For the ﬁrst thesis, xl, . . . , xr and x
+l are both cores, so the only
+r, . . . , x
+thing needs to be proved is the distance between any two nodes from diﬀerent
+
+is a core, then: (1) the union of xl, . . . , xr and
+(cid:3)
+(cid:3) other than the nodes of x
+(cid:3)(cid:3)
+l cannot
+r, . . . , x
+
+Semantic-Distance Based Clustering for XML Keyword Search
+
+405
+
+(cid:3)
+a is an
+sets is less equal to ω. Assume xa is an arbitrary node in xl, . . . , xr, x
+(cid:3)
+(cid:3)(cid:3), and dis(xa, x
+(cid:3)
+arbitrary node in x
+a) > ω, then according to Lemma 3.2:
+r, . . . , xl
+(cid:3)) ≤ ω, the position of x
+a) ≤
+(cid:3)
+(cid:3)
+a’s ancestor in I is left of xa; if dis(xr, x
+if dis(xl, xa
+(cid:3)
+(cid:3)
+a’s ancestor in I is right of xa. However, dis(xl, x
+a) and
+ω, the position of x
+(cid:3)
+(cid:3)
+a’s ancestor node in I
+dis(xr, x
+a) are both less equal to ω, the position of x
+a) ≤ ω. For the second thesis, apparently, the distance
+(cid:3)
+conﬂicts, so dis(xa, x
+(cid:3)
+between xr and any node left of x
+r and the distance between xl and any node
+(cid:3)(cid:3)
+left of x
+l all exceed ω.
+(cid:3) is an upper list Lemma 3.4 still
+(cid:3)
+(cid:3)(cid:3)
+holds. Otherwise, when x
+is not a core, we can divide it into several
+r, . . . , x
+l
+(cid:3)
+(cid:3)(cid:3)
+cores, and for each core Lemma 3.4 holds. The similar cores as x
+l are
+r, . . . , x
+called “related cores” of xl, . . . , xr. After all the related cores of xl, . . . , xr being
+found, we choose one core from each list except I, along with the core origin
+xl, . . . , xr a core set is obtained, and obviously some optimal clusters containing
+all the nodes of xl, . . . , xr can be found from it. The pseudocode of algorithm
+(cid:3)
+(cid:3)(cid:3)
+CC is given in Fig. 5, and for simplicity it only considers the case that x
+r, . . . , x
+l
+is a core.
+
+In the same way, we can prove that, when I
+
+Line 1-11 of Algorithm 2 costs O(n); line 6-9 in function ﬁndRelatedCores
+costs O(log n), and line 11 costs O(n), so the total cost of ﬁndRelatedCores is
+O(log n) + O(n). For the function ﬁndOptimalClusters at line 14 of Algorithm
+2, its purpose is to ﬁnd all optimal clusters which contain all nodes in a cluster
+origin O. Detailed code is omitted here. It is similar to searching cliques in a
+graph, but the diﬀerence is that we consider cores instead of nodes. The core
+set S contains a number of cores and each of which comes from a distinct list;
+assume there are t cores in S, then they have 2t possible combinations at most;
+for each of the combination a function similar to ﬁndRelatedCores needs to be
+invoked for at most t2 times; because t is always a small number (less than
+h), we can see that the complexity of function ﬁndOptimalClusters is same as
+ﬁndRelatedCores.
+
+Also we propose two extreme cases here: (1) when ω is really large, then m is
+a small number, and the complexity will be O(n); (2) when ω is very small, m
+tends to n, however line 11 in ﬁndRelatedCores will cost O(1), so the complexity
+will be O(n · log n). Moreover, in the worst case the complexity is O(n2).
+
+3.3 LCC: Loosened Core-Driven Clustering Algorithm for XML
+
+Keyword Search
+
+In most cases users don’t have accurate requests for the returned results; we
+can loosen the restrictions of results for the purpose of improving eﬃciency. At
+the beginning of algorithm LCC, H is also traversed to get all the cores origin.
+Afterwards for each list I in H, two additional lists are built: a head node list
+HNL and a tail node list TNL. HNL and TNL orderly store the ﬁrst nodes and
+the last nodes of cores origin in I respectively. Thereafter, for each core origin O,
+we ﬁnd some cores origins close enough, and then instead of looking for optimal
+clusters out of them, we easily add all nodes of them into O to form a result.
+The pseudocode of LCC is in Fig. 6. Line 1 of Algorithm 3 is to ﬁnd all the cores
+
+l
+
+l
+(cid:550)
+
+xi
+
+O
+
+H
+
+C
+
+S
+
+ findRelatedCoresOrigin O
+
+O
+
+S
+
+R
+
+O  O  R
+C
+
+O
+
+findRelatedCoresOrigin O
+
+l
+
+S
+
+xl
+xr
+pl
+pr
+
+O
+
+O
+O
+
+pl
+
+pr
+
+ findADPositionInHNL xl, l
+ findADPositionInTNL xr, l
+
+xl"
+HNL
+xr'
+HNL
+
+xl xl" (cid:550)
+
+xr xr' (cid:550)
+
+xr'
+
+xl"
+
+S
+
+406
+
+W. Yang and H. Zhu
+
+H
+
+C
+
+l H
+
+xf xi
+xi
+
+Co
+
+ xi
+
+O
+xf
+O
+
+O
+
+ findRelatedCores O
+ findOptimalClusters S
+
+Ci
+
+findRelatedCores O
+
+S
+
+l
+
+O
+xf
+
+S
+Ci
+
+R
+xl
+xr
+pl
+pr
+
+C
+
+O
+
+O
+O
+
+xl"
+xr'
+
+ findAnceOrDescPosition xl, l
+ findAnceOrDescPosition xr, l
+
+xr'
+
+xl"
+
+R
+
+S
+
+xl"
+
+xr'
+
+xl"
+
+R
+
+xr'
+
+xl"
+
+xl"
+
+Fig. 5. Algorithm CC
+
+Fig. 6. Algorithm LCC
+
+origin, the processing is the same which in Algorithm 2. For line 4-8 in function
+ﬁndRelatedCoresOrigin, the time complexity of each step is O(log n); and for
+line 10, the related cores origin only need to be recorded with identiﬁers rather
+than be traversed. Assume the number of cores origin is m, then apparently the
+time complexity of algorithm LCC is O(n)+ O(m·log n); the worst case happens
+when m tends to n, then it comes to O(n · logn); otherwise, when m is a small
+number, it is O(n).
+
+4 Ranking of Results
+
+The whole process of ranking mechanism is: ﬁrstly sort all the clusters gener-
+ated by clustering algorithms using the scoring function, and then transform
+them into MBTs orderly, ﬁnally return top-k or all ordered MBTs to users. The
+ﬁrst criterion of the scoring function is the number of keywords, obviously con-
+taining more keywords indicates a better cluster, and the best clusters are those
+which contain all the keywords. On the other hand we consider the occurrence
+frequencies of keywords having no inﬂuence on ranking. For those clusters con-
+tain the same number of keywords, the criterion of comparison is the average
+distances of clusters.
+Deﬁnition 4.1 (Average Distance). The average distance of a cluster Ci is
+the average value of all the distances between any two nodes in Ci. Assume Ci
+
+Semantic-Distance Based Clustering for XML Keyword Search
+
+407
+
+dis(xi,xj)
+
+, m > 1
+
+2C2
+m
+
+contains m nodes, and function dismean(Ci) is used to get the average distance
+of Ci, then, dismean(Ci) =
+
+xi,xj∈Ci;xi(cid:3)=xj
+
+(cid:3)
+
+Assume h is the tree height, then the range of dismean(Ci) is [1/h, 2h]. Ap-
+parently for a cluster Ci, a smaller dismean(Ci) indicates that all nodes of Ci are
+more compact in the tree. Otherwise, if Ci only contains one node, the average
+distance cannot be deﬁned on it, however we can see that the MBT of it also
+contains a single node and means almost nothing to users, so this kind of clusters
+are worst for users. We deﬁne function keywordN um(Ci) to get the number of
+keywords, and score(Ci) as the scoring function of clusters, moreover our ﬁnal
+scoring function is as follows:
+
+score(Ci) =
+
+(cid:4)
+
+h · keywordN um(Ci) +
+0
+
+1
+
+dismean(Ci)
+
+m > 1
+m = 1
+
+Example 4.1: For the four optimal clusters obtained in Example 2.1, their scores
+are: score(C1) = 13.50, score(C2) = 12.50, score(C3) = 18.75 and score(C4) =
+19.25 respectively. So, the order of clusters is: C4, C3, C1, C2.
+
+5 Experiments
+
+The environment of our experiments is a PC with a 2.8GHZ CPU and 2G RAM;
+and the software includes: Windows XP, JDK 1.6, and the parser “Xerces”. The
+data sets used to compare three clustering algorithms are DBLP (size 127M,
+6332225 nodes) and Treebank (size 82M, 3829511) [12]. We build a vocabulary for
+each data set, which stores some terms existing in the document; the occurrence
+frequency of each term is between 5,000 and 15,000. We randomly choose several
+ones from vocabularies as keywords to search in the documents. The process is
+repeated for forty times and afterwards the average values are evaluated as the
+ﬁnal results.
+
+From Fig. 7 it’s easy to ﬁnd that: (1) given certain keywords and distance
+threshold, the time costs of three algorithms is ranked as “GC, CC, LCC” (from
+big to small) except when the distance threshold is very small; (2) with the
+increasing of the distance threshold, time cost of GC always increases, while
+time costs of CC and LCC both ﬁrst increase and then decrease. In Fig. 8 (a),
+when the distance threshold equals to 0.0, the returned results are those nodes
+whose labels contain multiple keywords, because each of them is considered as
+some diﬀerent nodes; when the distance threshold equals to 6.0, almost all the
+keyword nodes gather into a few large clusters; also with the threshold increasing,
+the amount of clusters except single-node ones ﬁrstly increases and then reduces
+to 1. Similar situations happen in other subﬁgures in Fig 8. We have evaluated
+the average distances of returned clusters: the results of GC and CC are the
+same, and LCC’s only very litter larger than them (at 4 decimal places). So, the
+results of GC and CC are the same (all the optimal clusters), and the results
+of LCC are less and bigger but not quite worse than them. we can see that in
+any case DBLP has more average keyword nodes, however, Fig. 7 indicates that
+
+408
+
+W. Yang and H. Zhu
+
+)
+s
+
+m
+
+(
+ 
+e
+m
+T
+
+i
+
+GC
+CC
+LCC
+
+)
+s
+
+m
+
+(
+ 
+e
+m
+T
+
+i
+
+GC
+CC
+LCC
+
+500
+
+400
+
+300
+
+200
+
+100
+
+)
+s
+
+m
+
+(
+ 
+e
+m
+T
+
+i
+
+50000
+
+10000
+
+1000
+
+500
+
+100
+
+)
+s
+
+m
+
+(
+ 
+e
+m
+T
+
+i
+
+500
+
+400
+
+300
+
+200
+
+100
+
+0.0
+
+2.0
+
+4.0
+
+6.0
+
+0.0
+
+2.0
+
+4.0
+
+8.0
+
+16.0
+
+32.0
+
+64.0
+
+0.0
+
+2.0
+
+4.0
+
+6.0
+
+Distance Threshold
+
+#Keywords = 2
+
+(b) #keyword = 2 (Treebank)
+
+Distance Threshold
+
+#Keywords = 2
+
+(a) #keyword = 2 (DBLP)
+
+50000
+
+10000
+
+1000
+
+500
+
+100
+
+GC
+CC
+LCC
+
+)
+s
+
+m
+
+(
+ 
+e
+m
+T
+
+i
+
+500
+
+400
+
+300
+
+200
+
+100
+
+Distance Threshold
+
+#Keywords = 3
+
+(c) #keyword = 3 (DBLP)
+
+GC
+CC
+LCC
+
+)
+s
+
+m
+
+(
+ 
+e
+m
+T
+
+i
+
+50000
+
+10000
+
+1000
+
+500
+
+100
+
+0.0
+
+2.0
+
+4.0
+
+8.0
+
+16.0
+
+32.0
+
+64.0
+
+0.0
+
+2.0
+
+4.0
+
+6.0
+
+0.0
+
+2.0
+
+4.0
+
+8.0
+
+16.0
+
+32.0
+
+64.0
+
+Distance Threshold
+
+#Keywords = 3
+
+GC
+CC
+LCC
+
+Distance Threshold
+
+#Keywords = 5
+
+GC
+CC
+LCC
+
+Distance Threshold
+
+#Keywords = 5
+
+(d) #keyword = 3 (Treebank)
+
+(e) #keyword = 5 (DBLP)
+
+(f) #keyword = 5 (Treebank)
+
+Fig. 7. Eﬃciencies of Clustering Algorithms
+
+s
+r
+e
+t
+s
+u
+l
+C
+
+4000
+
+3000
+
+2000
+
+1000
+
+500
+
+s
+r
+e
+t
+s
+u
+l
+C
+
+2000
+
+1000
+
+300
+
+200
+
+100
+
+s
+r
+e
+t
+s
+u
+l
+C
+
+4000
+
+3000
+
+2000
+
+100
+0
+
+500
+
+0.0
+
+2.0
+
+4.0
+
+6.0
+
+0.0
+
+2.0
+
+4.0
+
+8.0
+
+16.0 32.0
+
+64.0
+
+0.0
+
+2.0
+
+4.0
+
+6.0
+
+GC
+CC
+LCC
+
+s
+r
+e
+t
+s
+u
+l
+C
+
+Distance Threshold
+
+#Keywords = 2
+
+(a) #keyword= 2(DBLP)
+
+2000
+
+1000
+
+300
+
+200
+
+100
+
+GC
+CC
+LCC
+
+s
+r
+e
+t
+s
+u
+l
+C
+
+Distance Threshold
+
+#Keywords = 2
+
+(b) #keyword = 2 (Treebank)
+
+4000
+
+3000
+
+2000
+
+1000
+
+500
+
+GC
+CC
+LCC
+
+s
+r
+e
+t
+s
+u
+l
+C
+
+3000
+
+2000
+
+1000
+
+300
+
+200
+
+100
+
+Distance Threshold
+
+#Keywords = 3
+
+(c) #keyword = 3 (DBLP)
+
+0.0
+
+2.0
+
+4.0
+
+8.0
+
+16.0
+
+32.0
+
+64.0
+
+0.0
+
+2.0
+
+4.0
+
+6.0
+
+GC
+CC
+LCC
+
+Distance Threshold
+
+#Keywords = 3
+
+GC
+CC
+LCC
+
+Distance Threshold
+
+#Keywords = 5
+
+GC
+CC
+LCC
+
+0.0
+
+2.0
+
+4.0
+
+8.0
+
+16.0
+
+32.
+0
+
+64.0
+
+Distance Threshold
+
+#Keywords = 5
+
+(d) #keyword = 3 (Treebank)
+
+(e) #keyword = 5 (DBLP)
+
+(f) #keyword = 5 (Treebank)
+
+Fig. 8. Result Quantities of Clustering Algorithms
+
+any of the three algorithms costs more time in Treebank than in DBLP with the
+same conditions, which means the topology of the XML document tree deﬁnitely
+aﬀect the eﬃciency strongly. The eﬃciencies become lower when the height is
+larger and the topology is more complicated.
+
+6 Conclusion
+
+In this paper, to obtain all fragments of the XML document meaningful to
+users, we propose a novel approach called XKLUSTER, which include a novel
+semantic distance model, three clustering algorithms (GC, CC, LCC); a ranking
+mechanism.
+
+Acknowledgments. This research is supported in part by the National Nat-
+ural Science Foundation of China under grant 60773076, the Key Fundamental
+Research of Shanghai under Grant 08JC1402500, Xiao-34-1.
+
+Semantic-Distance Based Clustering for XML Keyword Search
+
+409
+
+References
+
+1. Hristidis, V., Papakonstantinou, Y., Balmin, A.: Keyword proximity search on
+XML graphs. In: Proceedings of the 19th International Conference on Data Engi-
+neering, pp. 367–378. IEEE Computer Society Press, Bangalore (2003)
+
+2. Xu, Y., Papakonstantinou, Y.: Eﬃcient Keyword Search for Smallest LCAs in
+XML Databases. In: Proceedings of the ACM SIGMOD International Conference
+on Management of Data, pp. 537–538. ACM, Baltimore (2005)
+
+3. Li, Y., Yu, C., Jagadish, H.V.: Schema-Free XQuery. In: Proceedings of the
+Thirtieth International Conference on Very Large Data Bases, pp. 72–83.
+Morgan Kaufmann, Toronto (2004)
+
+4. Hristidis, V., Koudas, N., Papakonstantinou, Y., Srivastava, D.: Keyword Proxim-
+ity Search in XML Trees. IEEE Transactions on Knowledge and Data Engineer-
+ing 18(4), 525–539 (2006)
+
+5. Cohen, S., Mamou, J., Kanza, Y., Sagiv, Y.: XSEarch: A Semantic Search Engine
+for XML. In: Proceedings of 29th International Conference on Very Large Data
+Bases, Berlin, Germany, pp. 45–46 (2003)
+
+6. Guo, L., Shao, F., Botev, C., Shanmugasundaram, J.: XRANK: Ranked Keyword
+Search over XML Documents. In: Proceedings of the 2003 ACM SIGMOD Interna-
+tional Conference on Management of Data, San Diego, California, USA, pp. 16–27
+(2003)
+
+7. Liu, Z., Chen, Y.: Identifying meaningful return information for XML keyword
+search. In: Proceedings of the 2007 ACM SIGMOD International Conference on
+Management of Data, pp. 329–340. ACM, Beijing (2007)
+
+8. Kong, L., Gilleron, R., Lemay, A.: Retrieving meaningful relaxed tightest fragments
+for XML keyword search. In: 12th International Conference on Extending Database
+Technology, pp. 815–826. ACM, Saint Petersburg (2009)
+
+9. Bao, Z., Ling, T.W., Chen, B., Lu, J.: Eﬀective XML Keyword Search with Rele-
+vance Oriented Ranking. In: Proceedings of the 25th International Conference on
+Data Engineering, pp. 517–528. IEEE, Shanghai (2009)
+
+10. Agrawal, S., Chaudhuri, S., Das, G.: DBXplorer.: A System for Keyword-Based
+Search over Relational Databases. In: Proceedings of the 18th International Con-
+ference on Data Engineering, pp. 5–16. IEEE Computer Society, San Jose (2002)
+11. He, H., Wang, H., Yang, J., Yu, P.S.: BLINKS: ranked keyword searches on graphs.
+In: Proceedings of the 2007 ACM SIGMOD International Conference on Manage-
+ment of Data, pp. 305–316. ACM, Beijing (2007)
+
+12. XML Data Repository, http://www.cs.washington.edu/research/xmldatasets/
+
+www/repository.html
+
+

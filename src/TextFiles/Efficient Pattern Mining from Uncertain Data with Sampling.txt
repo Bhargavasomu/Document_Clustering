@@ -1,0 +1,1008 @@
+Eﬃcient Pattern Mining of Uncertain Data
+
+with Sampling
+
+Toon Calders1, Calin Garboni2, and Bart Goethals2
+
+1 TU Eindhoven, The Netherlands
+2 University of Antwerp, Belgium
+
+Abstract. Mining frequent itemsets from transactional datasets is a
+well known problem with good algorithmic solutions. In the case of un-
+certain data, however, several new techniques have been proposed. Un-
+fortunately, these proposals often suﬀer when a lot of items occur with
+many diﬀerent probabilities. Here we propose an approach based on sam-
+pling by instantiating “possible worlds” of the uncertain data, on which
+we subsequently run optimized frequent itemset mining algorithms. As
+such we gain eﬃciency at a surprisingly low loss in accuracy. These is
+conﬁrmed by a statistical and an empirical evaluation on real and syn-
+thetic data.
+
+1 Introduction
+
+In frequent itemset mining, the transaction dataset is typically represented as
+a binary matrix where each line represents a transaction and every column cor-
+responds to an item. An element Mij represents the presence or the absence of
+the item j in transaction i by the value 1 or 0 respectively. For this the basic
+traditional model, where an item is either present or absent in a transaction
+many algorithms have been proposed for mining frequent itemsets; i.e., sets of
+columns of M that have all ones in at least a given number of transactions (see
+e.g. [Goe05] for an overview on frequent itemset mining).
+
+In many applications, however, an item is not present or absent in a trans-
+action, but rather an existence probability of being in the transaction is given.
+This is the case, for example, for data collected from experimental measurements
+or from noisy sensors. Mining frequent patterns from this kind of data is more
+diﬃcult than mining from traditional transaction datasets. After all, computing
+the support of an itemset now has to rely on the existence probabilities of the
+items, which leads to an expected support as introduced by Chui et al. [CKH07].
+If the binary matrix is transformed into a probabilistic matrix, where each
+element takes values in the interval [0, 1], we have the so called uncertain data
+model. Under the assumption of statistical independence of the items in all
+transactions in the dataset, the support of an itemset in this model, as deﬁned
+by Chui et al. [CKH07], is based on the possible world interpretation of uncertain
+data. Basically, for every item x and every transaction t there exist two sets of
+possible worlds, one with the worlds in which x is present in t and one with
+
+2
+
+Toon Calders, Calin Garboni, and Bart Goethals
+
+the worlds where x is not present in t. The probability of the ﬁrst set of worlds
+is given by the existence probability of x in t (P (x, t)) and the probability of
+the second set of worlds by 1 − P (x, t). The probability of a single world is then
+obtained by multiplying the probabilities for all its individual items; i.e., P (W ) =
+
+Pt∈W Qx∈t P (x, t)Qx6∈t(1 − P (x, t)). The expected support of an itemset can
+
+be obtained by summing the support of that itemset over all possible worlds,
+while taking into consideration the probability of each world. There exist 2|D|×|I|
+worlds, where |D| is the total number of transactions in the probabilistic dataset
+and |I| is the total number of items. This rather complicated formula can be
+reduced to:
+
+expSup(X) = Xt∈D Yx∈X
+
+P (x, t)
+
+Every transaction thus supports an itemset with the probability given by the
+product of existence probabilities of all items in the itemset and in that trans-
+action. The expected support of an itemset over the entire dataset is the sum of
+the existence probabilities of that itemset in every transaction of the dataset.
+
+In the reminder of this paper we revisit the related work, then we present
+our proposed method based on sampling, followed by theoretical and empirical
+analysis of the quality of the results.
+
+2 Related Work
+
+The eﬃcient data structures and techniques used in frequent itemset mining
+such as TID-lists [AS94], FP-tree, which adopts a preﬁx tree structure as used
+in FP-growth [HPYM04], and the hyper-linked array based structure as used
+in H-mine [PHL+01] can no longer be used as such directly on the uncertain
+data. Therefore, recent work on frequent itemset mining in uncertain data that
+inherits the breadth-ﬁrst and depth-ﬁrst approaches from traditional frequent
+itemset mining adapts the data structures to the probabilistic model.
+
+U-Apriori [CKH07] is based on a level wise algorithm and represents a base-
+line algorithm for mining frequent itemsets from uncertain datasets. Because of
+the generate and test strategy, level by level, the method does not scale well.
+
+UCP-Apriori [CK08] is based on the decremental pruning technique which
+consists in maintaining an upper bound of the support and decrementing it while
+scanning the dataset. The itemset is pruned as soon as its most optimistic value
+falls below the threshold. This approach represents the state of the art for mining
+frequent patterns from uncertain data with a generate-and-prune strategy.
+
+UF-growth [LMB08] extends the FP-Growth algorithm [HPYM04]. It is based
+on a UF-tree data structure (similar to FP-tree). The diﬀerence with the con-
+struction of an FP-tree is that a transaction is merged with a child only if the
+same item and the same expected support exist in the transaction and in the
+child node, leading to a far lower compression ratio as in the original FP-tree. The
+improvements consist in discretization of the expected support to avoid the huge
+number of diﬀerent values and in adapting the idea of co-occurrence frequent
+itemset tree (COFI-tree). The UF-trees are built only for the ﬁrst two levels. It
+
+Eﬃcient Pattern Mining of Uncertain Data with Sampling
+
+3
+
+then enumerates the frequent patterns by traversing the tree and decreasing the
+occurrence counts.
+
+Aggarwal et al. [ALWW09] extended several existing classical frequent item-
+set mining algorithms for deterministic data sets, and compared their relative
+performance in terms of eﬃciency and memory usage. The UH-mine algorithm,
+proposed in their paper, provides the best trade-oﬀs. The algorithm is based on
+the pattern growth paradigm. The main diﬀerence with UF-growth is the data
+structure used which is an hyperlinked array.
+
+The limitations of these existing methods are the ones inherited from the
+original methods. The size of the data for the level-wise generate-and-test tech-
+niques aﬀects their scalability and the pattern-growth techniques require a lot
+of memory for accommodating the dataset in the data structures, such as the
+FP-tree, especially when the transactions do not share many items. In the case
+of uncertain data, not only the items have to be shared for a better compression
+but also the existence probabilities, which is often not the case.
+
+3 Sampling the Uncertain Dataset
+
+The ﬁrst method, called Concatenating the Samples, takes the uncertain dataset
+and samples according to the given existential probabilities. For every transac-
+tion t and every item i in transaction t we generate an independent random
+number 0 ≤ r ≤ 1 (coint ﬂip) and we compare it with the probability p associ-
+ated with the item i. If p ≥ r then item i will appear in the currently sampled
+transaction. For every transaction in the uncertain dataset we repeat the step
+above n times, for a given n. The result is a dataset which can be mined with any
+traditional frequent itemset mining algorithm. To obtain the estimated support
+of an itemset in the uncertain dataset, its support in the sampled dataset still
+needs to be divided by n.
+
+The diﬃculty of this method resides in the fact that we physically instantiate
+and store the sampled “certain” dataset which can be up to n times larger than
+the original uncertain dataset. Fortunately, for most eﬃcient itemset mining
+algorithms, we do not actually have to materialize this samples database. After
+all, most eﬃcient techniques read the database from disk only once, after which
+their advanced data structures contain the database in main memory. Therefore,
+the sample can be generated immediately in memory when the database is being
+read from disk for the ﬁrst time. We call this method is called Inline Sampling.
+To this end, we made minor modiﬁcations of the frequent itemset mining
+algorithms. We will brieﬂy describe U-Eclat and UFP-growth, the modiﬁed
+versions of the ECLAT and FP-growth algorithms.
+
+U-Eclat is an adaptation of the ECLAT algorithm [ZPOL97] with an improve-
+ment based on diﬀsets as described in [ZG03]. In only one scan of the dataset
+the relevant items are stored into memory together with the list of transactions
+where the items appear, called tid-list. The candidates are then generated using
+a depth-ﬁrst search strategy and their support is computed by intersecting the
+
+4
+
+Toon Calders, Calin Garboni, and Bart Goethals
+
+tid-list of the subsets. The only adaptation for U-Eclat consists in reading the
+uncertain transactions and instantiating them as described above. More speciﬁ-
+cally, given the number of iterations n, for every transaction t and every item i
+in transaction t we generate n independent random numbers r1, . . . , rn betweeen
+0 and 1 and we compare them with the probability p associated with the item i.
+If p ≥ rj , for 1 ≤ j ≤ n, then n · t + j will appear in the tid-list of item i. From
+there on, the standard Eclat algorithm is being executed.
+
+UFP-growth extends the initial FP-growth algorithm [HPYM04]. The FP-
+tree construction needs two scans of the dataset. The ﬁrst scan collects the
+frequent items and their support and in the second scan, every transaction is ac-
+commodated in the FP-tree structure. The frequent itemsets are then generated
+recursively from the FP-tree. In order to adapt this algorithm to our method, the
+ﬁrst scan computes the expected support of every itemset exactly by computing
+their support as the sum of existential probabilities in every transaction where
+it occurs. In the second scan, every transaction is instantiated n times, accord-
+ing to the existential probability of the items in the transaction and then it is
+inserted in FP-tree structure. The algorithm then extracts the frequent itemsets
+in the same way as in the FP-growth algorithm.
+
+4 Statistical Bounds on the Quality of the Approximation
+
+As before, D denotes the set of transactions, and I the set of items. P (x, t)
+denotes the probability assigned to item x by transaction t. We extend this
+
+notation to itemsets X; i.e., P (X, t) will denoteQx∈X P (x, t). Our whole analysis
+
+will be based on the numbers P (X, t) only and hence, will not depend on the
+assumption of independence between the items. Notice that this implies that our
+sampling-based method, in contrast to the other existing proposals, could also
+be applied when a more involved probabilistic model is assumed. We ﬁrst start
+our analysis for a single itemset X and will extend it later on for the complete
+collection of itemsets.
+
+t = 1 if X ⊆ ti, and X i
+
+Suppose that, for every transaction t ∈ D, we sample n deterministic versions
+of this tuple, t1, . . . , tn. Let X i
+t be the stochastic variable denoting if X ⊆ ti; i.e.,
+X i
+t are statis-
+tically independent as they are sampled using independent coin ﬂips. X i
+t follows
+a Bernoulli distribution with mean P (X, t). It is easy to see that the stochastic
+t follows a binomial distribution with mean nP (X, t) and
+The
+
+t = 0 otherwise. Notice that the variables X i
+
+variance nP (X, t)(1 − P (X, t)). Consider now the sum: S(X) :=
+expected value and variance of this sum are as follows:
+
+variable Xt =Pn
+
+i=1 X i
+
+Pt∈D Xt
+
+n
+
+E[S] = expSup(X)
+
+V [S] = V (cid:20)Pt∈D Xt
+
+n
+
+(cid:21) = Pt∈D V [Xt]
+
+n2
+
+= Pt∈D nP (X, t)(1 − P (X, t))
+
+n2
+
+≤
+
+|D|
+4n
+
+.
+
+Eﬃcient Pattern Mining of Uncertain Data with Sampling
+
+5
+
+Hence, not surprisingly, the sum S we use to approximate the expected support
+is an unbiased estimator with a variance that decreases linearly with n. For the
+relative version, rS = S
+
+|D|2 ≤ 1
+
+4n|D| .
+
+|D| , we get V [rS] = V h S
+
+|D|i = V [S]
+
+We now apply Hoeﬀding’s inequality. This inequality is as follows: given
+independent (but not necessarily identically distributed) stochastic variables
+X1, . . . , Xm such that for all i = 1 . . . n, P (ai ≤ Xi − E[Xi] ≤ bi) = 1, then
+
+Xi − E"Xi
+
+Xi#(cid:12)(cid:12) ≥ mǫ# ≤ 2 exp(cid:18)−
+
+2m2ǫ2
+
+i=1(bi − ai)2(cid:19) .
+Pn
+
+In our case, for all X i
+
+t , X i
+
+t − E(X i
+
+t ) is in the interval [−1, 1], and hence we get:
+
+p"(cid:12)(cid:12)Xi
+p"(cid:12)(cid:12)(cid:12)Xt∈D
+
+Xi=1
+
+n
+
+X i
+
+t − E"Xt∈D
+
+n
+
+Xi=1
+
+X i
+
+t#(cid:12)(cid:12)(cid:12)
+
+≥ n|D|ǫ# ≤ 2 exp −
+= 2 exp(cid:18)−
+
+2(n|D|)2ǫ2
+
+i=1 22 !
+Pn|D|
+2 (cid:19) .
+
+n|D|ǫ2
+
+If we now rewrite in function of rS(X) and rsupp(X) := expSup(X)
+
+|D|
+
+, we get:
+
+p[|rS(X) − rsupp(X)| ≥ ǫ] ≤ 2 exp(cid:18)−
+
+n|D|ǫ2
+
+2 (cid:19) .
+2 (cid:17), i.e., n ≥ − 2 ln(δ/2)
+
+|D|ǫ2
+
+,
+
+Hence, for given ǫ, δ > 0, we have: If δ ≥ 2 exp(cid:16)− n|D|ǫ2
+
+then p[|rS(X) − rsupp(X)| ≤ ǫ] ≥ 1 − δ .
+
+The signiﬁcance of this result can best be illustrated by an example. Suppose
+D contains 100 000 probabilistic transactions and X is an itemset. In order to
+guarantee that the support of X is approximated with 99% probability with
+less than 1% error, we need to have n ≥ − 2 ln(0.01/2)
+100 000(0.01)2 ≈ 1. Hence, we need
+approximately 1 sample per transaction in D to achieve this result. Furthermore,
+suppose that we have a collection of 1 000 000 frequent itemsets. In order to
+guarantee that all these itemsets have less than 1% error with 99% probability,
+we need to have (using the union rule) n ≥ − 2 ln(1/200 000 000)
+100 000(0.01)2 ≈ 3.8; i.e., less
+than 4 samples per transaction.
+
+As a side note, even tighter bounds can be gotten by approximating the
+distribution of rS with a normal distribution, using a weaker form of the Cen-
+tral Limit Theorem, called Lyapunov’s central limit theorem. That is, S−supp(X)
+converges in probability to N (0, 1).
+
+nV [S]
+
+5 Experiments
+
+The experiments were conducted on a GNU/Linux machine with a 2.1GHz CPU
+with 2 Gb of main memory. We used the datasets and the executables for com-
+parison from [ALWW09]. Kosarak contains anonymized click-stream data. It is
+
+6
+
+Toon Calders, Calin Garboni, and Bart Goethals
+
+a very sparse dataset, with a density of less than 0.02%, about 1 million trans-
+actions, 42170 distinct items and an average of 8 item per transaction. The
+dataset T40I10D100K was generated using the IBM synthetic data generator,
+having 100K transactions, 942 distinct items and a density of 4.2%. The orig-
+inal datasets were transformed by Aggarwal et al. [ALWW09] into uncertain
+datasets by assigning to every item in every transaction existential probabilities
+according to the normal distribution N (µ, σ2), where µ and σ were randomly
+and independently generated with values between [0.87, 0.99] and [1/21, 1/12]
+respectively.
+
+)
+s
+(
+ 
+e
+m
+
+i
+t
+ 
+n
+o
+i
+t
+u
+c
+e
+x
+e
+
+)
+
+ 
+
+%
+n
+i
+(
+ 
+
+i
+
+i
+
+n
+o
+s
+c
+e
+r
+p
+
+10000
+
+1000
+
+100
+
+10
+
+1
+
+0
+
+UCP-Apriori
+UH-mine
+U-Eclat (1 iteration)
+U-Eclat (2 iterations)
+U-Eclat (5 iterations)
+U-Eclat (10 iterations)
+U-Eclat (20 iterations)
+U-Eclat (50 iterations)
+
+(1 iteration)
+(2 iterations)
+(5 iterations)
+(10 iterations)
+(20 iterations)
+(30 iterations)
+(40 iterations)
+(50 iterations)
+
+0.007
+
+0.006
+
+0.005
+
+0.004
+
+0.003
+
+0.002
+
+0.001
+
+)
+
+%
+ 
+n
+i
+(
+ 
+r
+o
+r
+r
+e
+
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+0.6
+
+0.7
+
+0.8
+
+minsup (in %)
+
+0
+0.1
+
+0.2
+
+0.3
+
+0.4
+0.5
+minsup (in %)
+
+0.6
+
+0.7
+
+0.8
+
+(a) Execution Time
+
+(b) Error in Support
+
+100
+
+99.5
+
+99
+
+98.5
+
+98
+
+97.5
+
+0.1
+
+0.2
+
+0.3
+
+100
+
+99.5
+
+)
+
+ 
+
+%
+n
+i
+(
+ 
+l
+l
+
+a
+c
+e
+r
+
+99
+
+98.5
+
+98
+
+97.5
+
+0.1
+
+0.2
+
+0.3
+
+(1 iteration)
+(2 iterations)
+(5 iterations)
+(10 iterations)
+(20 iterations)
+(30 iterations)
+(40 iterations)
+(50 iterations)
+
+0.4
+0.5
+minsup (in %)
+
+0.6
+
+0.7
+
+0.8
+
+(1 iteration)
+(2 iterations)
+(5 iterations)
+(10 iterations)
+(20 iterations)
+(30 iterations)
+(40 iterations)
+(50 iterations)
+
+0.4
+0.5
+minsup (in %)
+
+0.6
+
+0.7
+
+0.8
+
+(c) Precision
+
+(d) Recall
+
+Fig. 1. kosarak Dataset
+
+For diﬀerent values of the minimum support, we ran our implementations of
+U-Eclat and UFP-growth. The number of times we instantiate the uncertain
+dataset varies between 1 and 50. The higher the number of instantiations, the
+better the accuracy of the results becomes, at the cost of an increase in exe-
+cution time. We also experimented with the original ECLAT and FP-growth
+algorithms after materializing the sampled datasets. Obviously the size of these
+datasets become very large for multiple iterations, and thus, those experiments
+always resulted in a decrease in performance as compared to their inline versions.
+Experimentally we show that for relatively low number of instantiations we reach
+highly accurate results. The gain in time motivates the use of our method which
+outperforms in execution time the existing state of the art methods mentioned
+in [ALWW09]. For every dataset, we plot the execution times we obtained for
+diﬀerent values of the minimum support and for some diﬀerent numbers of iter-
+ations. It turns out that U-Eclat always outperformed UFP-growth. In many
+cases, the FP-tree simply became too large to handle [Goe05]. In the experi-
+ments, for clarity, we thus only show the results for U-Eclat. For a fair compar-
+ison we also only show the best performing implementations of the algorithms
+
+)
+s
+(
+ 
+e
+m
+
+i
+t
+ 
+n
+o
+i
+t
+u
+c
+e
+x
+e
+
+)
+
+%
+ 
+n
+i
+(
+ 
+n
+o
+s
+c
+e
+r
+p
+
+i
+
+i
+
+Eﬃcient Pattern Mining of Uncertain Data with Sampling
+
+7
+
+10000
+
+1000
+
+100
+
+10
+
+1
+
+0.1
+
+100
+
+99
+
+98
+
+97
+
+96
+
+95
+
+94
+
+93
+
+92
+
+0.1
+
+(1 iteration)
+(2 iterations)
+(5 iterations)
+(10 iterations)
+(20 iterations)
+(30 iterations)
+(40 iterations)
+(50 iterations)
+
+0.018
+
+0.016
+
+0.014
+
+0.012
+
+0.01
+
+0.008
+
+0.006
+
+0.004
+
+0.002
+
+)
+
+%
+ 
+n
+i
+(
+ 
+r
+o
+r
+r
+e
+
+0
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+0.6
+
+0.7
+
+0.8
+
+0.9
+
+1
+
+UCP-Apriori
+UH-mine
+U-Eclat (1 iteration)
+U-Eclat (2 iterations)
+U-Eclat (5 iterations)
+U-Eclat (10 iterations)
+U-Eclat (20 iterations)
+U-Eclat (50 iterations)
+
+0
+
+0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09
+
+0.1
+
+minsup (in %)
+
+minsup (in %)
+
+(a) Execution Time
+
+(b) Error in Support
+
+100
+
+99
+
+98
+
+97
+
+96
+
+95
+
+94
+
+)
+
+%
+ 
+n
+i
+(
+ 
+l
+l
+
+a
+c
+e
+r
+
+93
+
+0.1
+
+(1 iteration)
+(2 iterations)
+(5 iterations)
+(10 iterations)
+(20 iterations)
+(30 iterations)
+(40 iterations)
+(50 iterations)
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+0.6
+
+0.7
+
+0.8
+
+0.9
+
+1
+
+minsup (in %)
+
+(d) Recall
+
+(1 iteration)
+(2 iterations)
+(5 iterations)
+(10 iterations)
+(20 iterations)
+(30 iterations)
+(40 iterations)
+(50 iterations)
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+0.6
+
+0.7
+
+0.8
+
+0.9
+
+1
+
+minsup (in %)
+
+(c) Precision
+
+Fig. 2. t40 Dataset
+
+mentioned in [ALWW09], being UCP-Apriori and UH-mine. The execution times
+are depicted in Figures 1(a) and 2(a).
+
+For low support threshold, our U-Eclat outperforms UCP-Aprori and UH-
+mine for up to 5 sampling iterations of the dataset. Note that more eﬃcient
+frequent set mining algorithms as can be found in the FIMI repository will per-
+form even better, also for a higher number of iterations. As our theoretical results
+already indicated that 2 iterations already result in a very accurate approxima-
+tion of the expected supports of all itemsets. This also shows in practice.
+
+To this end, we compare the collections of frequent patterns and their support
+obtained using the exact method and our sampling method. First, the collection
+of frequent itemsets is generated using UCP-Aprori [ALWW09]. Based on this,
+we evaluate the errors in support computed with the sampling method.
+
+kosarak
+
+t40
+
+precision
+
+recall
+
+precision
+
+recall
+
+Iter min avg max min avg max
+1 97.67 98.95 100 97.93 99.28 100
+2 98.27 99.41 100 98.88 99.62 100
+5 99.13 99.63 100 99.10 99.70 100
+10 99.43 99.77 100 99.34 99.74 100
+20 99.32 99.74 100 99.60 99.83 100
+30 99.53 99.79 100 99.60 99.83 100
+40 99.69 99.87 100 99.60 99.84 100
+50 99.60 99.83 100 99.75 99.92 100
+
+Iter min avg max min avg max
+1 92.88 96.16 100 93.66 96.95 100
+2 94.22 97.25 99.54 95.91 97.73 100
+5 97.10 98.52 100 96.88 98.48 100
+10 98.16 99.12 100 98.43 99.14 100
+20 98.87 99.37 100 95.25 98.70 100
+30 99.39 99.65 100 99.26 99.64 100
+40 99.46 99.65 100 99.42 99.71 100
+50 99.63 99.82 100 99.68 99.80 100
+
+Fig. 3. Summary of Precision and Recall
+
+In terms of support error, we compute the average of the absolute diﬀerence
+between the support of itemsets found by both methods. The error is depicted
+in Figures 1(b) and 2(b). It can be seen that, as expected and predicted by
+the statistical evaluation, the higher the number of iterations grows, the lower
+the error becomes. But even for relatively low number (5 or 10 iterations), the
+average error in support estimation drops below 1%.
+
+8
+
+Toon Calders, Calin Garboni, and Bart Goethals
+
+For itemsets having the support close to the minimum support threshold,
+small variations of support can introduce false positives when the real support
+is overestimated or false negatives when the real support is underestimated.
+To evaluate the impact of this, we report Precision and Recall of our method
+w.r.t. the true collection in terms of patterns found as frequent. We plot in
+Figures 1(c), 1(d), 2(c) and 2(d) the values of precision and recall for diﬀerent
+number of iterations. A summary of these values is reported in Figure 3 as the
+overall minimum, average and maximum for each dataset and diﬀerent numbers
+of iterations. The values conﬁrm the quality of the approximation.
+
+Acknowledgements. We are grateful to Charu C. Aggarwal, Yan Li, Jianyong
+Wang and Jing Wang for making available the executables and datasets.
+
+References
+
+[ALWW09] Charu C. Aggarwal, Yan Li, Jianyong Wang, and Jing Wang. Frequent
+pattern mining with uncertain data. In Proc. of KDD ’09, pages 29–38, New York,
+NY, USA, 2009. ACM.
+
+[AS94] Rakesh Agrawal and Ramakrishnan Srikant. Fast algorithms for mining associ-
+ation rules in large databases. In Proc. of VLDB ’94, pages 487–499, San Francisco,
+CA, USA, 1994. Morgan Kaufmann Publishers Inc.
+
+[CK08] Chun K. Chui and Ben Kao. A decremental approach for mining frequent
+
+itemsets from uncertain data. In Washio et al. [WSTI08], pages 64–75.
+
+[CKH07] Chun K. Chui, Ben Kao, and Edward Hung. Mining frequent itemsets from
+In Zhi-Hua Zhou, Hang Li, and Qiang Yang, editors, PAKDD,
+
+uncertain data.
+volume 4426 of Lecture Notes in Computer Science, pages 47–58. Springer, 2007.
+
+[Goe05] Bart Goethals. Frequent set mining. In In The Data Mining and Knowledge
+
+Discovery Handbook, chapter 17, pages 377–397. Springer, 2005.
+
+[HPYM04] Jiawei Han, Jian Pei, Yiwen Yin, and Runying Mao. Mining frequent
+patterns without candidate generation: A frequent-pattern tree approach. Data
+Min. Knowl. Discov., 8(1):53–87, 2004.
+
+[LMB08] Carson Kai-Sang Leung, Mark Anthony F. Mateo, and Dale A. Brajczuk. A
+tree-based approach for frequent pattern mining from uncertain data. In Washio
+et al. [WSTI08], pages 653–661.
+
+[PHL+01] Jian Pei, Jiawei Han, Hongjun Lu, Shojiro Nishio, Shiwei Tang, and
+Dongqing Yang. H-mine: Hyper-structure mining of frequent patterns in large
+databases.
+In Proc. of ICDM ’01, pages 441–448, Washington, DC, USA, 2001.
+IEEE Computer Society.
+
+[WSTI08] Takashi Washio, Einoshin Suzuki, Kai Ming Ting, and Akihiro Inokuchi,
+editors. Advances in Knowledge Discovery and Data Mining, 12th Paciﬁc-Asia
+Conference, PAKDD 2008, Osaka, Japan, May 20-23, 2008 Proceedings, volume
+5012 of Lecture Notes in Computer Science. Springer, 2008.
+
+[ZG03] Mohammed J. Zaki and Karam Gouda. Fast vertical mining using diﬀsets.
+In Lise Getoor, Ted E. Senator, Pedro Domingos, and Christos Faloutsos, editors,
+Proc. of KDD ’03, pages 326–335. ACM, 2003.
+
+[ZPOL97] Mohammed J. Zaki, Srinivasan Parthasarathy, Mitsunori Ogihara, and Wei
+Li. New algorithms for fast discovery of association rules. In Proc. of KDD ’97,
+pages 283–286, 1997.
+
+

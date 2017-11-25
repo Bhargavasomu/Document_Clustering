@@ -1,0 +1,1201 @@
+Robust Synchronization-Based Graph Clustering
+
+Junming Shao1, Xiao He2, Qinli Yang2, Claudia Plant3, and Christian B¨ohm2
+
+1 University of Mainz, 55122 Mainz, Germany
+2 University of Munich, 80538 Munich, Germany
+
+3 Florida State University, FL 32306-4120 Tallahassee, USA
+
+Abstract. Complex graph data now arises in various ﬁelds like social
+networks, protein-protein interaction networks, ecosystems, etc. To re-
+veal the underlying patterns in graphs, an important task is to partition
+them into several meaningful clusters. The question is: how can we ﬁnd
+the natural partitions of a complex graph which truly reﬂect the intrinsic
+patterns? In this paper, we propose RSGC, a novel approach to graph
+clustering. The key philosophy of RSGC is to consider graph cluster-
+ing as a dynamic process towards synchronization. For each vertex, it
+is viewed as an oscillator and interacts with other vertices according
+to the graph connection information. During the process towards syn-
+chronization, vertices with similar connectivity patterns tend to natu-
+rally synchronize together to form a cluster. Inherited from the powerful
+concept of synchronization, RSGC shows several desirable properties:
+(a) it provides a novel perspective for graph clustering based on pro-
+posed interaction model; (b) RSGC allows discovering natural clusters
+in graph without any data distribution assumption; (c) RSGC is also ro-
+bust against noise vertices. We systematically evaluate RSGC algorithm
+on synthetic and real data to demonstrate its superiority.
+
+Keywords: Graph Clustering, Synchronization, Kuramoto Model.
+
+1
+
+Introduction
+
+As a data format, graphs are characterized as a set of interconnected units.
+These units, often called nodes or vertices, are linked to each other by edges
+expressing their relationships. In recent years, the study of graph clustering has
+attracted a huge attentions and many techniques have been developed based on
+diﬀerent partitioning criteria, e.g. betweenness, modularity and clique. Although
+established approaches have already achieved some success, ﬁnding the real and
+intrinsic clusters in graphs is still a big challenge [7]. Moreover, previous studies of
+graph clustering mainly focused on unweighted graphs. A fresh and increasingly
+challenging care is to study weighted graphs where each link is associated with
+a large heterogeneity in the capacity and intensity.
+
+In view of these challenges, in this paper we consider graph clustering from
+a diﬀerent perspective: synchronization. Synchronization is a prevalent phe-
+nomenon in nature that a group of events spontaneously come into co-occurrence
+with a common rhythm through mutual interactions. A paradigmatic example
+
+J. Pei et al. (Eds.): PAKDD 2013, Part I, LNAI 7818, pp. 249–260, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+250
+
+J. Shao et al.
+
+of synchronization phenomena is the synchronous ﬂashing of ﬁreﬂies observed in
+some South Asian forests. Brieﬂy, synchronization means adjustment of states
+of oscillators due to weak interaction so that their states can coincide. To bet-
+ter illustrate the concept of synchronization, let us take social networks as an
+example. People in a social network with similar characteristics, e.g. common in-
+terest, friends, or similar calling behaviors from phone companies tend to group
+together. In such network, for a certain problem, in the beginning, each person
+may has his/her own opinion. As time evolves, people tend to be aﬀected by
+their friends and change opinion gradually. In principle, the closer relationship
+they are, the higher inﬂuence between each other. Through the discussion, ﬁ-
+nally people with similar characteristics tend to achieve the same opinion. The
+dynamic process of opinion formation in the social network can be reviewed
+as a common synchronization phenomenon. From this example, what makes us
+interested is that the process of opinion formation in the social networks (a dy-
+namic process towards synchronization) is very similar to a dynamic clustering
+process. More importantly, the interactions among vertices during the process of
+synchronization are completely governed by the intrinsic structural of the graph.
+Therefore, inspired by natural synchronization phenomena and established
+models, for graph clustering, a new intuitive idea is to consider it as a dynamic
+process towards synchronization. We consider each vertex as an oscillator and it
+interacts with other vertices relying on its intrinsic connection information. The
+graph clustering is thus transformed into investigating the dynamics of vertices
+during the process towards synchronization. A graph cluster is ﬁnally deﬁned as
+the vertices which can ﬁnally group together after synchronization.
+
+The remainder of this paper is organized as follows: in the following section, we
+brieﬂy survey related work. Section 3 presents our algorithm in detail. Section 4
+contains an extensive experimental evaluation and we ﬁnally conclude the paper
+in Section 5.
+
+2 Related Work
+
+During the past several decades, many approaches have been proposed for graph
+clustering. Due to space limitation, we only provide a very brief survey on graph
+clustering related to our work.
+
+Spectral Clustering: These approaches refer to a class of well-known tech-
+niques which rely on the Eigenvector decomposition of a similarity matrix to
+partition objects into disjoint clusters. The algorithm proposed by [14] allows
+detecting arbitrarily shaped clusters by considering the clustering problem from a
+graph-theoretic perspective. A cluster is obtained by removing the weakest edges
+between highly connected subgraphs, which is formally deﬁned by the normalized
+cut or similar objective functions. To overcome the diﬃculty of parametrization,
+Zelnik-Manor and Perona [18] proposed a new method to estimate the number
+of clusters by investigating the structure of the Eigenvectors.
+
+Multi-Level Clustering. Metis is a set of serial of multi-level partitioning
+techniques proposed by Karypis and Kumar [11]. For graph partitioning, an
+
+Robust Synchronization-Based Graph Clustering
+
+251
+
+initial clustering is performed on the coarsest graph, and then, a sequence of
+successively ﬁner graphs is constructed level by level. At each level, an iterative
+reﬁnement algorithm such as Kernighan-Lin (KL) or Fiduccia-Mattheyses (FM)
+is used to further improve the bisection. In all, these methods are fast and give
+high-quality partitions in most cases. However, like spectral clustering, a suitable
+number of k clusters has to be set for the algorithm. In addition, these multilevel
+algorithms restrict to detect clusters of nearly equal size.
+
+Markov Clustering. The Markov Cluster algorithm (MCL) is a popular al-
+gorithm used in life sciences for fast clustering of weighted graphs. MCL [6]
+simulates a ﬂow on the graph by calculating successive powers of the associ-
+ated adjacency matrix. At each iteration, an inﬂation step is applied to enhance
+the contrast between regions of strong or weak ﬂow in the graph. The process
+converges towards a partition of the graph, with a set of high-ﬂow regions (the
+clusters) separated by boundaries with no ﬂow. The value of the inﬂation pa-
+rameter strongly inﬂuences the number of clusters.
+
+MDL-Based Clustering. The key idea of these methods is to detect clus-
+ters by using a model of probability density functions (PDFs) to describe the
+data structure and link the clustering problem to data compression. One of fun-
+damental techniques in this line is Cross-Association [5] approach, which ﬁnds
+groups in unweighted graphs by loss-less compression with Minimum Descrip-
+tion Length (MDL). Similar to Cross-Association, the algorithm called PaCCo
+[13], is proposed for weighted graph, which combines the MDL principle with a
+bisecting k-Means strategy. The MDL principle provides a good way to qualify
+the clustering results and thus avoids the parameter setting.
+
+Synchronization. Arenas et al. [1] apply the Kuramoto model for network anal-
+ysis, and study the relationship between topological scales and dynamic time
+scales in complex networks. From bioinformatics, Kim et.al. [4] propose a strat-
+egy to ﬁnd groups of genes by analyzing the cell cycle speciﬁc gene expression
+with a modiﬁed Kuramoto model. Recently, Shao et.al proposed an extension of
+the Kuraomto model for clustering and outlier detection [15], [2], [16] on vector
+data based on the concept of synchronization and MDL principle.
+
+3 Synchronization-Based Graph Clustering
+
+In this section, we introduce RSGC algorithm, which consider graph clustering
+as a dynamic process. In the following, we start with the vertex feature represen-
+tation and then introduce an interaction model for graph clustering. In Section
+3.3 we discuss the algorithm RSGC in detail.
+
+3.1 Vertex Feature Representation
+
+Given an undirected graph G, the only information we can gain is its connectivity
+patterns. In this study, we ﬁrst compute the proposed Transitive distance of any
+two vertices and then transform them into a feature vector space. Each vertex
+
+252
+
+J. Shao et al.
+
+(a) Graph
+
+4
+
+2
+
+3
+
+5
+
+1
+
+7
+
+6
+
+8
+
+(b) Jaccard Distance
+
+(c) Transitive Distance
+
+Vi
+1
+1
+1
+1
+1
+1
+1
+
+Vj
+2
+3
+4
+5
+6
+7
+8
+
+Jd(Vi,Vj)
+
+0.25
+0.40
+0.67
+0.83
+
+1
+1
+1
+
+Jd(4,6) =0.57
+Jd(5,6) =0.50
+
+Transitive(cid:3)
+Jd(6,7) =0.60
+Jd(6,8) =0.60
+
+Vi Vj Td(Vi,Vj)
+1
+1
+1
+1
+1
+1
+1
+
+0.25
+0.40
+0.67
+0.83
+1.24
+1.84
+1.84
+
+2
+3
+4
+5
+6
+7
+8
+
+Fig. 1. Illustration of computing the dissimilarity among vertices
+
+is ﬁnally mapped as a feature vector to represent its initial phase. Before that,
+let us ﬁrst introduce some necessary deﬁnitions.
+Deﬁnition 1 (Jaccard distance). Given any two vertices u and v in Graph
+G, the Jaccard distance Jd(u, v) of two vertices u and v is deﬁned as:
+
+Jd(u, v) = 1 − ρ(u, v)
+
+(1)
+
+where ρ(u, v) is the Jaccard coeﬃcient [10] between vertices u and v,
+
+ρ(u, v) =
+
+|Γ (u) ∩ Γ (v)|
+|Γ (u) ∪ Γ (v)|
+
+(2)
+Here Γ (·) is neighbors of one vertex. Relying on Eq. (1), the Jaccard distance of
+the pairs of non-neighbor vertices is always 1, which is insuﬃcient to represent the
+similarity of any two vertices eﬀectively. Therefore, we further deﬁne Transitive
+distance as follows.
+Deﬁnition 2 (Transitive distance). Given two vertices u and v have no
+common neighbors, {S1,··· , SN} are all shortest paths between vertices u and
+,··· , wk|Sk−2|, v}, k ∈ (1,··· , N ). The Transitive distance be-
+v and Sk = {u, wk
+tween vertices u and v is deﬁned as the minimal Jaccard distance of these paths.
+
+1
+
+T d(u, v) =
+
+⎧
+⎪⎨
+
+⎪⎩
+
+min
+
+k∈(1,···,N)
+
+Jd(u, v)
+
+(cid:6)
+Jd(u, wk|Sk−2|) + Jd(wk|Sk−2|, v)
+
+(cid:7)
+
+Jd(u, v) = 1 AND
+Jd(u, wk|Sk−2|) (cid:2)= 1
+
+(3)
+
+else
+
+Figure 1 gives an example to illustrate the Transitive distance computation from
+vertex 1 to all other vertices. Based on Transitive distance, the distance matrix
+for all vertices can be computed. Finally, we map it into points in a feature
+vector space and each vertex is represented as a feature vector. Here, we apply
+the well-known method, called F astM ap [8], to transform the distance matrix
+in a metric space into a feature vector space. In this study, we simply map each
+vertex into a 2-dimensional feature space. In principle, the higher dimensional
+feature space is selected, the less connection information among vertices is lost.
+However, the diﬃculty of clustering in high dimensional space is also increased.
+
+Robust Synchronization-Based Graph Clustering
+
+253
+
+3.2 Interaction Model
+
+Currently, one of the most successful approaches to explore the synchronization
+phenomena is Kuramoto Model [12]. It describes the dynamics of a large set of
+phase oscillators by coupling the sine of their phase diﬀerences. Formally, the
+Kuramoto model (KM) consists of N phase oscillators where the phase of the
+i-th unit, denoted by θi, evolves in time according to the following dynamics:
+
+dθi
+dt = ωi +
+
+K
+N
+
+N(cid:2)
+
+j=1
+
+sin(θj − θi), (i = 1, . . . , N ),
+
+(4)
+
+where ωi stands for its natural frequency and K describes the coupling strength
+between units. sin(·) is the coupling function.
+
+The KM describes the global synchronization behavior of all coupled phase
+oscillators. However, in real-world graphs or networks, the connectivity among
+vertices are often not full but partial, which indicates that only a local ensemble
+of vertices are connected. Therefore, it is necessary to extensively reformulate
+Eq.(4). The natural and intuitive way is to model the interactions in graph with
+its intrinsic connection patterns.
+
+Deﬁnition 3
+
+(Interaction Model). Let u be a vertex in the graph G.
+Γ (u) are the neighbors of vertex u and ui is the i − th feature of vertex u. The
+interaction range Ru of vertex u is the maximal distance to these neighbors,
+according to Eq.(4), the dynamics of i− th phase ui of vertex u is governed by:
+
+dui
+dt = ωi +
+
+(cid:3)
+
+K
+v∈Γ (u)
+
+W (u, v)
+
+(cid:2)
+
+v∈Γ (u)
+
+W (u, v) · Φ(u, v) · sin(vi − ui).
+
+(5)
+
+where W (v, u) is the edge weight between vertices u and v. The Φ(u, v) is used
+to check whether the vertex v should interact with the vertex u, which is deﬁned
+as:
+
+(cid:4)
+
+Φ(u, v) =
+
+0 dist(v, u) > Ru
+1 else
+
+Then, let dt = Δt, the Equation (5) can be further written as:
+ui(t+1) = ui(t)+Δt·ωi+
+
+Δt · K
+
+W (v, u)·Φ(u(t), v(t))·sin(vi(t)−ui(t))
+
+(cid:9)
+
+(cid:8)
+
+v∈Γ (u) W (v, u)
+
+v∈Γ (u)
+
+(6)
+Here, without knowing external knowledge, all vertices (oscillators) are assumed
+having the same frequency w. The term Δt · ωi is thus the same for each vertex
+and ignored. Δt · K = C is a constant and ﬁxed as 1. Finally the dynamics of
+i − th phase ui of the vertex u over time is provided by:
+ui(t+1) = ui(t)+
+
+W (v, u)·Φ(u(t), v(t))·sin(vi(t)−ui(t))
+
+(cid:2)
+
+(cid:3)
+
+1
+v∈Γ (u)
+
+W (v, u)
+
+v∈Γ (u)
+
+(7)
+The vertex u at time step t = 0: u(0) represents the initial phase of the vertex
+(original feature vector). The ui(t + 1) describes the renewal phase value of i-th
+phase of vertex u at the t = (0, . . . , T ) time evolution.
+
+254
+
+J. Shao et al.
+
+15
+
+10
+
+5
+
+0
+0
+
+0.2
+
+0.4
+
+0.6
+
+0.8
+
+1
+
+(a) Weighted Graph
+
+(b) Edge Weights Distribution (c) Feature Representation
+
+Fig. 2. Vertices Feature Representation
+
+(a) t = 0
+
+(b) t = 4
+
+(c) t = 8
+
+30
+
+25
+
+20
+
+15
+
+10
+
+5
+
+0
+
+4
+
+3
+
+2
+
+1
+
+0
+
+0
+
+3
+
+2
+
+1
+
+r
+e
+
+t
+
+e
+m
+a
+r
+a
+P
+
+ 
+r
+e
+d
+r
+O
+
+6
+
+5
+
+4
+
+3
+
+2
+
+1
+
+0
+0
+
+5
+
+10
+
+15
+
+20
+
+Time Steps
+
+25
+
+30
+
+35
+
+40
+
+(d) Dynamics of Vertices
+
+(e) Graph Order Parameter (f) Graph partitioning result
+
+Fig. 3. The detail states of vertices during the process towards synchronization
+
+In order to investigate local dynamic eﬀects so that the clusters of synchro-
+nized vertices can be discovered, we deﬁne a graph order parameter rg, measuring
+the coherence of the local oscillator population in graphs.
+Deﬁnition 4 (Graph Order Parameter) The graph order parameter rg
+characterizing the degree of local synchronization in graphs is provided by:
+
+(cid:2)
+
+(cid:6)
+W (v, u) · Φ(u, v) · ||v − u||
+
+(8)
+
+W (v, u)
+
+v∈Γ (u)
+
+rg =
+
+1
+N
+
+(cid:5)
+
+N(cid:2)
+
+i=1
+
+(cid:3)
+
+1
+v∈Γ (u)
+
+The more vertices are synchronized together, the value of rg will become much
+smaller. The dynamics of all vertices will terminate when the rg converges, which
+indicates that the vertices in clusters synchronize together (in phase).
+
+3.3 The RSGC Algorithm
+
+Generally, the process of the graph clustering based on synchronization involves
+three steps: (1) Vertices Feature Representation; (2) Dynamics on Graph and (3)
+
+Robust Synchronization-Based Graph Clustering
+
+255
+
+Clusters Discovering. For illustration, we introduce a simple weighted graph in
+Figure 2(a). Figure 2 (b) plots the edge weights distribution of the graph. With
+Transitive distance and FastMap, each vertex is projected into a feature space,
+which is indicated in Figure 2(c). After that, the dynamics of all vertices can be
+simulated according to Eq.(7). Figure 3(f) displays the dynamic movement of
+all vertices during the process towards synchronization. Figure 3 (a)-(c) further
+depict the detailed states of vertices at time step t = 0 to t = 8. The process of
+synchronization will be terminated when the graph order parameter rg converges,
+which indicates in Figure 3(e). The result of graph partitioning is shown in
+Figure 3(f). Finally, the pseudocode of RSGC algorithm is further described in
+Algorithm 1.
+
+Algorithm 1. RSGC algorithm
+
+Input: Graph G(V, E, W )
+
+Compute matrix A with Jaccobi Coeﬃcient ;
+Obtain dissimilarity matrix D with transitive distance & A;
+Transform D into features vectors F using FastMap;
+for (Each u ∈ F ) do
+
+u(0) = Fu(0)
+
+end for
+while (loopFlag = True) do
+
+for (Each u ∈ F ) do
+
+Obtain new phase u(t + 1) using Eq.(7);
+
+(cid:8)
+
+(cid:10)
+
+end for
+Compute graph order parameter rg;
+F (t + 1) =
+if rg converges then
+loopFlag = False;
+C = synCluster(F (t + 1));
+
+u(t + 1);
+
+N
+1
+
+end if
+
+end while
+
+return C;
+
+4 Experiments
+
+To extensively study the performance of RSGC, we conduct experiments on
+several synthetic and real-world data sets. We compare RSGC to representatives
+of various graph clustering paradigms: M etis, M CL and two parameter-free
+weighted graph clustering approaches: information-theoretic clustering P aCCo
+[13] and the spectral clustering approach [18] (named Spectral in the following).
+All experiments have been performed on a workstation with 2.0 GHz CPU and
+8.0 GB RAM.
+
+256
+
+J. Shao et al.
+
+(a) Diﬀerent Sizes
+
+(b) Various Densities
+
+(c) Outliers Handling
+
+Fig. 4. Performance of RSGC
+
+4.1 Evaluation Criteria
+
+To provide an objective comparison of eﬀectiveness, we evaluate the graph clus-
+tering algorithms in two ways. If class label information is available, three
+information-theoretical measures: normalized mutual information (NMI), ad-
+justed mutual information (AMI) and adjusted variation information (AVI) [17]
+are directly applied for clustering comparison. For the comparison of diﬀerent
+algorithms on the real data sets without class-label information, we evaluate
+them based on a measure called modularity[9], which is applied to quantiﬁes the
+quality of a division of a network into modules or communities.
+
+4.2 Proof of Concept
+
+Intrinsic Cluster Structure Discovery. We ﬁrst evaluate the performance
+of RSGC to discover natural graph partitioning in diﬃcult settings, starting
+with subgraphs of arbitrary size. The data set displayed in Figure 4(a) consists
+of 4 clusters with diﬀerent sizes, ranging from 20 to 80. The intra-connection is
+approximately 40% and the distribution of edge weights is Gaussian. RSGC suc-
+cessfully detects all clusters without any edge weights distribution assumptions.
+Moreover, we generate four clusters with diﬀerent densities. For each cluster, it
+includes 20 vertices and the probabilities of intra-connection of each cluster vary
+from 20% to 80%, see Figure 4(b).
+Outliers Handling. Inherit from the concept of synchronization, RSGC algo-
+rithm allows detecting outliers, where these vertices in graphs are diﬃcult to
+synchronize with other vertices and have diﬀerent dynamics. As displayed in
+Figure 4(c), the outliers are found by exploring these vertices which are out of
+synchronization.
+
+4.3 Synthetic Data
+
+For comparison, we further create a graph consisting of four clusters with dif-
+ferent settings to evaluate their eﬀectiveness. The number of vertices per cluster
+varied from 25 to 100. Meanwhile, the probabilities of intra-connection of each
+cluster ranging from 20% to 80% and the inter-connection among clusters is
+randomly interlinked with 10% . The weights of all connections are generated
+
+Robust Synchronization-Based Graph Clustering
+
+257
+
+Table 1. Performance of graph clustering algorithms on the simple synthetic data set
+
+Algorithms RSGC Metis MCL PaCCo Spectral
+
+NMI
+AMI
+AVI
+
+1
+1
+1
+
+0.686 0.922 0.924
+0.680 0.920 0.922
+0.684 0.936 0.953
+
+0.963
+0.962
+0.975
+
+with Gaussian distribution. In addition, 6 nodes are randomly inserted into the
+graph with very few connections. The quality of clustering results based on dif-
+ferent clustering approaches is illustrated in Table 1. RSGC successfully ﬁnd all
+4 clusters and irregular nodes automatically. The experiment shows that RSGC
+outperforms Metis and is also comparable to algorithms of M CL, Spectral and
+P aCCo.
+
+4.4 Real World Data
+
+In this section, we evaluate the performance of RSGC on several real-world
+data sets. Due to space limitation and diﬃcult parametrization, we limit the
+comparison to the parameter-free graph clustering algorithms RSGC, Spectral
+and P aCCo. We obtain ﬁve author-collaboration networks from diﬀerent com-
+munities: Network Theory (Netsci), PhD Student Network in Computer Science
+(CS-PhD), Computational Geometry (Geom), Arxiv General Relativity (CA-
+GrQc), Erdos Research (Erdos) 1 2 ; three Protein-Protein Interaction networks
+from three species, which are S. cerevisiae (Scere), Escherichia coli (Ecoli) and
+C.elegans (Celeg) and a Autonomous Systems network of routers comprising the
+Internet (As) 3.
+
+Table 2 shows the clustering results in terms of modularity score. It is obvious
+that RSGC perform well on all these data sets, which obtain the best modularity
+scores for all experiments except the Spectral algorithm on As data set. For the
+algorithm of P aCCo, it can not yield good partition results for most data sets,
+especially for the unweighted graphs. The reason behind it is that P aCCo tends
+to fail if the weight distribution does not correspond to the cluster model. Like
+P aCCo, Spectral also obtain relatively few clusters except for the CS-PhD and
+As data sets.
+Case Study: To further evaluate the performance of RSGC, we illustrate it on
+a case study on a protein-protein interaction (PPI) network. Here, we use the
+latest version of PPI network of C.elegans (Celeg), which contains 2880 proteins
+and 4812 known interactions. We analyze this interaction network with RSGC
+and also compare its performance to P aCCo and Spectral. RSGC discovers 32
+clusters, while P aCCo and Spectral produce only 2 clusters, respectively. In the
+context of biology, we can evaluate the biological signiﬁcance of obtained clus-
+ters with the help of the Gene Ontology database, which provides the ontology
+
+1
+
+2
+
+3
+
+http://vlado.fmf.uni-lj.si/pub/networks/data/default.htm
+http://www-personal.umich.edu/~mejn/netdata,
+http://snap.stanford.edu/data/
+http://dip.doe-mbi.ucla.edu/dip/Main.cgi,http://snap.stanford.edu/data/
+
+258
+
+J. Shao et al.
+
+Table 2. Performance of graph clustering algorithms on real world data sets
+
+Data Set
+
+NetSci
+CS-Phd
+Geom
+
+CA-GrQc
+
+As
+
+Erdos
+Scere
+Ecoli
+Celeg
+
+PaCCo
+
+Spectral
+
+RSGC
+
+#cluster Modularity #cluster Modularity #cluster Modularity
+
+11
+2
+54
+2
+2
+2
+2
+2
+2
+
+0.542
+0.077
+0.327
+0.352
+0.151
+0.049
+0.085
+0.052
+0.019
+
+4
+40
+6
+4
+19
+2
+3
+2
+2
+
+0.696
+0.531
+0.067
+0.144
+0.439
+0.001
+0.053
+0.002
+0.005
+
+19
+36
+44
+46
+39
+24
+32
+25
+32
+
+0.779
+0.715
+0.465
+0.627
+0.382
+0.422
+0.196
+0.224
+0.309
+
+Table 3. Biological signiﬁcant clusters detected by diﬀerent clustering algorithms
+
+Molecular Function Annotations
+
+RSGC
+
+P aCCo structural constituent of ribosome
+Spectral structural constituent of ribosome
+Biological Processing Annotations
+
+structural constituent of ribosome
+acetylcholine receptor activity
+protein binding
+
+P-value
+1.2e-17
+3.1e-6
+0.002
+2.3e-9
+1.3e-19
+P-value
+2.1e-24
+embryo development
+2.9e-11
+reproduction
+growth
+0.004
+multicellular organismal reproductive pro. 0.006
+0.007
+protein localization
+0.007
+morphogenesis of an epithelium
+0.009
+germ cell development
+0.011
+translation
+inductive cell migration
+0.045
+3.7e-20
+6.8e-18
+3.1e-37
+
+embryo development ending in birth
+
+RSGC
+
+P aCCo reproduction
+
+Spectral reproduction
+
+of deﬁned terms representing gene product properties on three vocabularies of
+annotations: Molecular Function, Biological Process and Cellular Component.
+Researchers can apply P-value to demonstrate the biological signiﬁcance, which
+is deﬁned as the probability to observe by chance at least x elements at the
+intersection between the query set and the reference set [3].
+
+Under the evaluation with Molecular Function annotations, RSGC ﬁnds three
+clusters which are enriched for three molecular functions. In contrast, P aCCo
+and Spectral only obtain one biological signiﬁcance cluster for molecular func-
+tions. In addition, for all three approaches, they ﬁnd a signiﬁcant cluster enriched
+for the function structural constituent of ribosome, where the P-values are 1.2e-
+17, 2.3e-9 and 1.3e-19 for RSGC, P aCCo and Spectral respectively. In addition,
+
+Robust Synchronization-Based Graph Clustering
+
+259
+
+1200
+1200
+1200
+1200
+1200
+1200
+1200
+1200
+
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+
+)
+)
+)
+)
+)
+)
+)
+c
+c
+c
+c
+c
+c
+c
+e
+e
+e
+e
+e
+e
+e
+S
+S
+S
+S
+S
+S
+(
+(
+(
+(
+(
+(
+(cid:3)
+(cid:3)
+(cid:3)
+(cid:3)
+(cid:3)
+(cid:3)
+e
+e
+e
+e
+e
+e
+m
+m
+m
+m
+m
+T
+T
+T
+T
+T
+
+i
+i
+i
+i
+i
+
+800
+800
+800
+800
+800
+800
+800
+
+600
+600
+600
+600
+600
+600
+
+400
+400
+400
+400
+400
+
+200
+200
+200
+200
+
+0
+0
+0
+
+RSGC
+RSGC
+RSGC
+RSGC
+RSGC
+RSGC
+RSGC
+P
+Pacco
+Pacco
+Pacco
+Pacco
+Pacco
+Pacco
+l
+Spectral
+S
+Spectral
+Spectral
+Spectral
+Spectral
+Metis
+Metis
+Metis
+Metis
+Metis
+MCL
+MCL
+MCL
+MCL
+
+500
+500
+
+Number of(cid:3)Vertices
+Number of(cid:3)Vertices
+
+5000
+5000
+
+Fig. 5. The runtime of the diﬀerent graph clustering algorithms
+
+RSGC ﬁnds another two clusters enriched for protein binding (P-value = 2.5e-
+03), acetylcholine receptor activity (P-value = 3.1e-06). Therefore, RSGC can
+detect more clusters which make sense biologically. Similarly, we also evaluate
+the clusters using biological processing annotations. Here, RSGC successfully
+obtains 9 signiﬁcant clusters which are enriched for biological processing while
+P aCCo and Spectral have two and one signiﬁcant clusters respectively. All of
+RSGC, P aCCo and Spectral methods discover one signiﬁcant cluster which is
+enriched for the term reproduction with the P-values of 2.8e-11, 3.7e-20, 3.1e-37
+respectively. Moreover, RSGC also reveals another 8 signiﬁcant clusters enriched
+for diﬀerent biological process, such as embryo development, multicellular organ-
+ismal reproductive process , morphogenesis of an epithelium, etc. Please refer to
+Table 3 for details.
+
+4.5 Runtime
+
+For runtime comparisons, we generated several synthetic data sets, where the
+number of clusters k varied ranges from 10 to 50 and each cluster contained
+100 vertices. Approximately 30 % of the intra cluster edges were connected and
+5% inter cluster edges were linked. To obtain more accurate runtime results,
+for each method, each data set was processed for 10 times and then found the
+mean of the 10 rounds. Fig. 5 clearly shows that RSGC is faster than Spectral
+and P aCCo. However, RSGC is slightly slower than the parameter dependent
+approach M CL and M etis.
+
+5 Conclusions
+
+In this paper, we introduce RSGC, a natural graph clustering algorithm based
+on synchronization. The key idea is to consider the graph clustering as a dynamic
+process towards synchronization. The extensive experiments demonstrate that
+RSGC algorithm has several desirable properties: RSGC provides a natural way
+for graph clustering, where the proposed interaction model well ﬁts the real-world
+networks, such as the interaction weights and range. Relaying on the proposed
+interaction model, RSGC allows discovering graph clusters with arbitrary size
+
+260
+
+J. Shao et al.
+
+and density without any data distribution assumption. RSGC is robust against
+noise vertices or outliers.
+
+Acknowledgments. Junming Shao is supported by the Alexander von
+Humboldt-Foundation.
+
+References
+
+1. Arenas, A., Diaz-Guilera, A., Perez-Vicente, C.J.: Synchronization reveals topo-
+
+logical scales in complex networks. Phys. Rev. Lett. 96(11), 1–4 (2006)
+
+2. B¨ohm, C., Plant, C., Shao, J., Yang, Q.: Clustering by synchronization. In: KDD,
+
+pp. 583–592 (2010)
+
+3. Brohee, S., Faust, K., Lima-Mendez, G., Vanderstocken, G., van Helden, J.: Net-
+work analysis tools: from biological networks to clusters and pathways. Nat.
+Protoc. 3, 1616–1629 (2008)
+
+4. Bae, C.S., Kim, C.S., Tcha, H.J.: Synchronization clustering algorithm for identi-
+fying interesting groups of genes from cell cycle expression data. BMC Bioinfor-
+matics 9(56) (2008)
+
+5. Chakrabarti, D., Papadimitriou, S., Modha, D.S., Faloutsos, C.: Fully automatic
+
+cross-associations. In: KDD, New York, pp. 79–88 (2004)
+
+6. Dongen, S.: A cluster algorithm for graphs. Technical report, CWI (Centre for
+
+Mathematics and Computer Science), The Netherlands (2000)
+
+7. Evans, T.: Clique graphs and overlapping communities. Journal of Statistical Me-
+
+chanics, P12037 (2010)
+
+8. Faloutsos, C., Lin, K.: Fastmap: A fast algorithm for indexing, data-mining and
+
+visualization of traditional and multimedia datasets. In: SIGMOD (1995)
+
+9. Girvan, M., Newman, M.E.J.: Community structure in social and biological net-
+
+works. PNAS 99(12), 7821–7826 (2002)
+
+10. Jaccard, P.: Distribution de la ﬂore alpine dans la Bassin de Dranses et dans
+quelques regions voisines. Bulletin de la Soci´et´e Vaudoise des Sciences Na-
+turelles 37, 241–272 (1901)
+
+11. Karypis, G., Kumar, V.: A fast and high quality multilevel scheme for partitioning
+
+irregular graphs. SIAM Journal on Scientiﬁc Computing 20, 359–392 (1998)
+
+12. Kuramoto, Y.: Chemical oscillations, waves, and turbulence. Springer, Berlin
+
+(1984)
+
+13. Mueller, N., Haegler, K., Shao, J., Plant, C., B¨ohm, C.: Weighted graph compres-
+
+sion for parameter-free clustering with pacco. In: SDM (2011)
+
+14. Ng, A.Y., Jordan, M.I., Weiss, Y.: On spectral clustering: Analysis and an
+
+algorithm. In: NIPS 14, pp. 849–856 (2001)
+
+15. Shao, J., Plant, C., Yang, Q., Boehm, C.: Detection of Arbitrarily Oriented Syn-
+chronized Clusters in High-Dimensional Data. In: ICDM 2011, pp. 607–616 (2011)
+16. Shao, J., B¨ohm, C., Yang, Q., Plant, C.: Synchronization based outlier detection.
+In: Balc´azar, J.L., Bonchi, F., Gionis, A., Sebag, M. (eds.) ECML PKDD 2010,
+Part III. LNCS (LNAI), vol. 6323, pp. 245–260. Springer, Heidelberg (2010)
+
+17. Vinh, N.X., Epps, J., Bailey, J.: Information theoretic measures for clusterings
+comparison: is a correction for chance necessary? In: ICML 2009, New York, NY,
+USA, pp. 1073–1080 (2009)
+
+18. Zelnik-Manor, L., Perona, P.: Self-tuning spectral clustering. In: NIPS, vol. 17, pp.
+
+1601–1608 (2004)
+
+

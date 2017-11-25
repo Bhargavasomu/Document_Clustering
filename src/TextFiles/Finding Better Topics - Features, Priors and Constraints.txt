@@ -1,0 +1,1829 @@
+Finding Better Topics: Features, Priors
+
+and Constraints
+
+Xiaona Wu, Jia Zeng, Jianfeng Yan, and Xiaosheng Liu
+
+School of Computer Science and Technology, Soochow University,
+
+Suzhou 215006, China
+
+zengja@gmail.com
+
+Abstract. Latent Dirichlet allocation (LDA) is a popular probabilis-
+tic topic modeling paradigm. In practice, LDA users usually face two
+problems. First, the common and stop words tend to occupy all topics
+leading to bad topic interpretability. Second, there is little guidance on
+how to improve the low-dimensional topic features for a better cluster-
+ing or classiﬁcation performance. To ﬁnd better topics, we re-examine
+LDA from three perspectives: continuous features, asymmetric Dirich-
+let priors and sparseness constraints, using variants of belief propagation
+(BP) inference algorithms. We show that continuous features can remove
+the common and stop words from topics eﬀectively. Asymmetric Dirich-
+let priors have substantial advantages over symmetric priors. Sparseness
+constraints do not improve the overall performance very much.
+
+Keywords: Latent Dirichlet allocation, belief propagation, continuous
+features, asymmetric Dirichlet priors, sparseness constraints.
+
+1
+
+Introduction
+
+Latent Dirichlet allocation (LDA) [1] is a widely-used probabilistic topic model-
+ing paradigm, which has found many important applications in natural language
+processing and computer vision areas. LDA represents documents as mixtures
+over latent topics, where each topic is a distribution over a ﬁxed vocabulary.
+Using approximate inference techniques like variational Bayes (VB) [1], Gibbs
+sampling (GS) [2] or belief propagation (BP) [3], LDA automatically learns the
+topic-word and document-topic distributions from a large collection of docu-
+ments. In practice, LDA users usually encounter two problems. First, the com-
+mon and stop words tend to occupy all topics. For example, if we use LDA
+to extract topics from a machine learning corpus like NIPS, we ﬁnd that the
+common words “learning” and “model” dominate (having very high likelihood)
+almost all topic-word distributions. This phenomenon makes the interpretability
+of topics undesirable [4]. Second, there is relatively little guidance on how to im-
+prove the lower-dimensional topic features for a better retrieval, clustering and
+classiﬁcation performance. Therefore, we explore LDA from three perspectives:
+continuous features, asymmetric Dirichlet priors and sparseness constraints to
+ﬁnd better topics.
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part II, LNAI 8444, pp. 296–310, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+Finding Better Topics: Features, Priors and Constraints
+
+297
+
+LDA has long been used for discrete features such as word tokens and counts.
+Continuous features or term weighting schemes have been rarely discussed such
+as term frequency-inverse document frequency (TF-IDF) [5] and LTC [6]. One
+major concern is that LDA cannot generate continuous observations in its prob-
+abilistic modeling process. So, in practice users have to manually remove stop
+words having little contribution to the meaning of the text [7]. But, removing
+common words requires contextual knowledge of the entire corpus, which is often
+a big challenge to users without prior knowledge. Recently, continuous features
+for LDA have gained intensive research interests. A simple term-frequency fea-
+ture scheme [8] has been used for tagged document within the framework of
+LDA. Point-wise mutual information (PMI) features [9] have been incorporated
+into the GS inference algorithm referred to as pmiGS. The PMI feature gives
+common and stop words some lower weights. Then, pmiGS infers topic-word
+distributions from weighted word counts. The results show that the PMI fea-
+ture not only lowers the likelihood of common and stop words in the topic-word
+distribution, but also gains a no-trivial improvement in cross-language retrieval
+tasks. This line of research inspires us to consider continuous features for LDA
+to improve the topic interpretability.
+
+Most LDA algorithms [2, 3, 7] consider ﬁxed symmetric Dirichlet priors over
+document-topic and topic-word distributions for simplicity. Although it is possi-
+ble to automatically learn Dirichlet hyperparameters from training data accord-
+ing to the maxumum-likelihood criterion [10], the extensive empirical studies [11]
+conﬁrm that the inferred symmetric priors do not signiﬁcantly improve the topic
+modeling performance than the ﬁxed ones. However, asymmetric Dirichlet priors
+over document-topic and symmetric Dirichlet priors over topic-word distribu-
+tions have substantial advantages on removing the common words and choosing
+the number of topics [12]. The asymmetric prior over document-topic distri-
+bution can guide common or stop words to be grouped into a few topics with
+higher likelihoods because these words often occupy the larger proportion of each
+document. So, asymmetric priors are also eﬀective in ﬁnding better topics.
+
+If we can control the sparseness of document-topic and topic-word distribu-
+tions, we can possibly control the quality and interpretability of lower-dimensional
+topic features. Sparse topic coding (STC) [13] can directly control the sparsity of
+the inferred representations by relaxing the normalization constraint, which can
+be integrated with any convex loss function. STC identiﬁes sparse topic meanings
+of words and improves time eﬃciency and classiﬁcation accuracy. Also, sparse cod-
+ing can be directly combined with LDA’s extensions [14] for computer vision ap-
+plications. In sparse coding, each document or word only has a few salient topical
+meanings or senses. Sparse distributions carry salient information for a better in-
+terpretability, so that the low-dimensional sparse topic features may be more dis-
+tinguishable. Therefore, we will consider adding sparse constrains [15] on LDA’s
+document-topic and topic-word distributions.
+
+Although continuous features, asymmetric priors and sparseness constraints
+for LDA have been studied either by GS [2] or by VB [1] inference algorithms, we
+re-examine these three perspectives within the novel BP inference framework [3],
+
+298
+
+X. Wu et al.
+
+which is very competitive in both speed and accuracy. As a result, we incoporate
+continuous features, asymmetric Dirichlet priors and sparseness constraints into
+BP algorithms to ﬁnd better topics than traditional GS and VB algorithms.
+Besides, most of previous studies focus only on one of three aspects, and lack
+a comprehensive comparison in terms of generalization performance, document
+clustering/classiﬁcation and topic interpretability. Here, we compare these three
+aspects on diﬀerent data sets, and provide evidence on which one can produce
+high-quality topics.
+
+2 Background
+
+(cid:2)K
+
+k=1
+
+We begin by reviewing batch BP algorithms for learning collapsed LDA [3,16,17].
+The probabilistic topic modeling task can be interpreted as a labeling problem, in
+which the objective is to assign a set of thematic topic labels, zW×D = {zk
+w,d},
+to explain the observed elements in document-word matrix, xW×D = {xw,d}.
+The notations 1 ≤ w ≤ W and 1 ≤ d ≤ D are the word index in vocabulary
+and the document index in corpus. The notation 1 ≤ k ≤ K is the topic index.
+The nonzero element xw,d (cid:3)= 0 denotes the number of word counts at the index
+{w, d}. For each word token xw,d,i = {0, 1}, 1 ≤ i ≤ xw,d, there is a topic label
+w,d,i = {0, 1},
+w,d,i = 1, 1 ≤ i ≤ xw,d, so that the soft topic label for the
+zk
+zk
+word index {w, d} is zk
+zk
+w,d,i/xw,d.
+w,d =
+The collapsed LDA [18] has joint probability p(x, z|αvk, βuw), where the
+Dirichlet hyperparameters {αvk, βuw},
+w uw = 1, α, β > 0. In prac-
+tice, we may use the ﬁxed symmetric hyperparameters {vk = 1/K, uw = 1/W}
+and the concentration parameters {α, β} are provided by users for simplicity [2].
+To maximize the joint probability in terms of z, the BP algorithm [3] computes
+the posterior probability, μw,d(k) = p(zk
+, x), called message,
+μw,d(k) = 1. The
+which can be normalized by local computation, i.e.,
+approximate message update equation is
+
+w,d,i = 1|zk−(w,d,i)
+(cid:2)K
+
+(cid:2)xw,d
+i=1
+
+k=1
+
+(cid:2)
+
+(cid:2)
+
+k vk = 1,
+
+μw,d(k) ∝ [ˆθ−w,d(k) + αvk] × [ ˆφw,−d(k) + βuw]
+w xw,d + α] × [ ˆφ−(w,d)(k) + β]
+
+(cid:2)
+[
+
+,
+
+where the suﬃcient statistics for LDA model are
+
+ˆθ−w,d(k) =
+
+ˆφw,−d(k) =
+
+(cid:3)
+
+−w
+(cid:3)
+
+−d
+
+xw,dμw,d(k),
+
+xw,dμw,d(k),
+
+(1)
+
+(2)
+
+(3)
+
+where −w and −d denote all word indices except w and all document indices
+except d. Obviously, the message update equation (1) depends on all other neigh-
+boring messages µ−(w,d) excluding the current message μw,d. Two multinomial
+parameters, the document-topic distribution θ and the topic-word distribution
+
+Finding Better Topics: Features, Priors and Constraints
+
+299
+
+m w,d 
+
+α 
+
+v 
+
+θ d 
+
+z w,d,i 
+
+x w,d,i 
+
+φ k 
+
+N 
+
+D 
+
+K 
+
+β 
+
+u 
+
+α 
+
+θ d 
+
+v 
+
+β 
+
+z w,d 
+
+Φ w 
+
+u 
+
+z -w,d 
+
+z w,-d 
+
+m -w,d 
+
+x -w,d 
+
+x w,-d 
+
+m w,-d 
+
+(cid:11)(cid:36)(cid:12)(cid:3)
+
+(cid:11)(cid:37)(cid:12)(cid:3)
+
+Fig. 1. (A)Generative graphical representation of LDA based on continuous features,
+asymmetric Dirichlet priors and sparseness constraints, (B)Factor graph and message
+passing
+
+φ, can be calculated from suﬃcient statistics ˆθd(k) and ˆφw(k) by normaliza-
+tion. Message passing process will iterate Eqs. (1), (2) and (3) until all messages
+converge to a local stationary point [3].
+
+As mentioned in Section 1, LDA users often use the document-topic distribu-
+tion in (2) as the lower-dimensional features for document retrieval, clustering
+and classiﬁcation. The word-topic distribution in (3) is used to ﬁnd the hot words
+in each topic. Usually, users will inspect the hot words with higher likelihood in
+each topic to understand the topic’s semantic meaning. Observing (2) and (3),
+we ﬁnd that these two distributions are determined by three factors:
+
+1. The features or observations: the word counts xw,d.
+2. The Dirichlet priors or hyperparameters: the base vectors {vk, uw} and the
+
+concentration parameters {α, β} in Eq. (1).
+{w, d}.
+
+3. The message: the K-tuple vector μw,d(k) for the topic likelihood at index
+
+In this paper, we will regulate these three factors to ﬁnd better topics including
+document-topic (2) and topic-word distributions (3).
+
+3 Finding Better Topics
+
+The major reason that the common and stop words occupy almost all topics is
+that LDA uses word counts as features. The bigger the word counts, the higher
+the inﬂuence to the topic distributions. In Eqs. (2) and (3), the normalized mes-
+sage μw,d(k) is multiplied by the nonzero word count xw,d. Thus, xw,d can be
+regarded as the weight of μw,d(k) in estimating document-topic and topic-word
+distributions. In this way, the topics may be dominated by those high-frequent
+common and stop words. We see that the bigger word count xw,d corresponds
+to the greater inﬂuence of the estimated distributions in (2) and (3). This phe-
+nomenon motivates us to use the continuous features such as TF-IDF or LTC
+to lower the weights of common and stop words during message passing.
+
+300
+
+X. Wu et al.
+
+As far as Dirichlet priors are concerned, if we use the symmetric priors {vk =
+1/K, uw = 1/W}, the common and stop words have equal likelihoods to be
+assigned to all topics in Eq. (1). However, if we use the asymmetric priors, words
+will have higher likelihood to be assigned to the topic with higher priors. In this
+way, most common and stop words may be assigned to a few topic groups with
+higher priors [12]. This phenomenon motivates us to incorporate the asymmetric
+Dirichlet prior learning into the message passing process (1), (2) and (3).
+
+The message μw,d(k) represents the topic likelihood for each word token xw,d,i.
+If the message is not sparse, the word token may have multiple topic meanings
+leading to unclear explanations. So, we encourage passing those sparse messages
+by adding a weight proportional to the sparseness of the message. This weighted
+message passing strategy can strengthen the sparseness of document-topic and
+topic-word distributions in (2) and (3). According to [13] and [14], the sparseness
+will make the lower-dimensional topic features more distinguishable for clustering
+or classiﬁcation purposes. This motivates us to add sparseness constraints on
+messages during their passing process.
+
+(cid:2)
+
+w,d. Note that if xw,d =
+
+Fig. 1(A) shows the continuous features, asymmetric Dirichlet priors and
+sparseness constraints denoted by red colors in the generative graphical represen-
+tation of LDA. The asymmetric Dirichlet priors are divided into the connection
+parameters {α, β} and the base measure vectors {v, u}, and mw,d is the sparse-
+ness constraints for the message μw,d(k) ∼ zk
+i xw,d,i
+becomes continuous observations like TF-IDF, the generative model in Fig. 1(A)
+cannot generate such observations. However, the factor graph representation of
+the collapsed LDA [3] shows that it is possible to describe the continuous fea-
+tures using the undirected factor graph, which does not need to encode the
+generative relations between variables. In this way, we may think that the factor
+graph is a close approximation to LDA [3]. Fig. 1(B) shows the factor graph
+representation and the message passing process based on continuous features,
+asymmetric Dirichlet priors and sparseness constraints. We see that the mes-
+sage μw,d(k) ∼ zk
+w,d can be inferred by its neighboring messages including
+w,−d, mw,−d), βuw} via factor nodes
+{(x−w,d, zk−w,d, m−w,d), αvk} and {(xw,−d, zk
+θd and φw, respectively. We group the variables (xw,d, zk
+w,d, mw,d) together be-
+cause they work together to inﬂuence the neighboring messages according to (1).
+From the message passing over factor graphs, we can derive the similar message
+update equation to (1) that considers continuous features, asymmetric priors
+and sparseness constraints within the uniﬁed BP framework.
+
+3.1 Continuous Features
+
+In linguistics, the high frequent stop words like “the, and, of” which occur in
+most of the documents do not contribute to the topic formation. To avoid stop
+words dominating every topic, we have to remove stop words before running
+LDA according to a corpus-speciﬁc stop word list. However, even if the stop
+words have been removed, there still are many common words such as “model,
+learning, data” in the machine learning corpus. In such cases, we may use the
+
+Finding Better Topics: Features, Priors and Constraints
+
+301
+
+continuous features such as TF-IDF [5] and LTC [6] that give the lower weights
+to the “common word” messages in (1). Let xw,d/
+w xw,d be the frequency of
+word w in document d, and
+d xw,d be the total number of times that the word
+w occurs in all documents. We get the continuous TF-IDF feature as
+
+(cid:2)
+
+(cid:2)
+
+xtf idf
+w,d =
+
+xw,d(cid:2)
+
+w xw,d
+
+× log
+
+(cid:4)
+
+(cid:5)
+,
+
+(cid:2)
+
+D
+d xw,d
+
+and the LTC feature as
+
+log(
+
++ 1) × log
+
+(cid:4)
+
+(cid:5)
+
+D(cid:2)
+
+xw,d
+
+d
+
+xw,d(cid:2)
+
+xw,d
+
+w
+
+xltc
+
+w,d =
+
+(cid:6)
+
+(cid:2)D
+
+d=1
+
+(cid:7)
+
+log(
+
+(cid:4)
+
++ 1) × log
+
+D(cid:2)
+
+xw,d
+
+d
+
+xw,d(cid:2)
+
+xw,d
+
+w
+
+(4)
+
+(5)
+
+.
+
+(cid:5)(cid:8)2
+
+The diﬀerence between (5) and (4) is that (5) uses the logarithm of word fre-
+quency and is normalized by the geometric mean of the numerator. This nor-
+malization makes LTC features more distinguishable than TF-IDF features.
+
+and xltc
+
+We simply replace the discrete word count feature xw,d by the continuous
+features xtf idf
+w,d in Eqs. (2), (3) and (1). Without loss of generality,
+w,d
+we focus on LTC features for topic modeling. We refer to the message passing
+algorithms for LTC feature as ltcBP. Obviously in (2) and (3), the higher TF-IDF
+and LTC values will have the bigger inﬂuence to the topic formation. Generally,
+the stop and common words have lower TF-IDF and LTC weights, so that they
+will be automatically removed from hot word list in each topic during the message
+passing process.
+
+3.2 Asymmetric Priors
+
+There are several approaches to learn Dirichlet priors from training data. Here,
+we choose to place Gamma priors on the hyperparameters α ∼ G[C, S], where C
+and S are shape and scale parameters of Gamma distribution. Generally, these
+parameters are ﬁxed by users during learning Dirichlet priors. We adopt the
+improved method of Minka’s ﬁxed point iteration [10,12]. However, this method
+is based on discrete counts on topic labels rather than messages in BP (1). To
+solve this problem, we sample the topic label zk
+w,d,i for each word token xw,d,i
+from the conditional probability μw,d(k). From the sampled [zk
+w,d,i = 1], we get
+two topic count matrices
+
+γd(k) =
+
+ηw(k) =
+
+W(cid:3)
+
+xw,d(cid:3)
+
+w=1
+D(cid:3)
+
+i=1
+xw,d(cid:3)
+
+d=1
+
+i=1
+
+[zk
+
+w,d,i = 1],
+
+[zk
+
+w,d,i = 1].
+
+(6)
+
+(7)
+
+302
+
+X. Wu et al.
+
+1
+
+2
+
+3
+4
+5
+
+6
+
+7
+
+8
+9
+10
+11
+
+12
+13
+14
+15
+
+16
+
+input : xW×D, K, T, αv, βu, C, S.
+output: θd,φw.
+w,d(k)←−initialization and normalization;
+μ1
+ˆθ1−w,d(k) ← (cid:2)
+w,−d(k) ← (cid:2)
+ˆφ1
+α ← 50, vk ← 50/K, βuw ← 0.01, C ← 1.001, S ← 1;
+for t ← 1 to T do
+
+−w xw,dμ1
+−d xw,dμ1
+
+w,d(k);
+w,d(k);
+
+w,−d(k)+βut
+
+w]
+(k)+βt] ;
+
+[
+
+(cid:2)
+
+k]×[ ˆφt
+
+w,d (k);
+w,d (k);
+
+w,d (k) ∝ [ ˆθt−w,d(k)+αvt
+μt+1
+w xw,d+αt]×[ ˆφt−(w,d)
+ˆθt+1−w,d(k) ← (cid:2)
+−w xw,dμt+1
+w,−d(k) ← (cid:2)
+ˆφt+1
+−d xw,dμt+1
+sampling z from μt+1
+γd(k) ← (cid:2)W
+(cid:2)xw,d
+ηw(k) ← (cid:2)D
+(cid:2)xw,d
+(cid:2) b1
+k ← αvt
+n=1
+αvt+1
+(cid:2) b2
+w ← βt+1/W ;
+
+w,d (k);
+i=1 zk
+w,d,i;
+i=1 zk
+w,d,i;
+(cid:2) n
+In,k
+f =1
+
+using ηw(k) to learn symmetric βt+1;
+βut+1
+
+(cid:2) n
+
+w=1
+
+d=1
+
+n=1
+
+f =1
+
+In
+
+k
+
+1
+
++C
+
+f−1+αvt
+k
+f−1+αt − 1
+
+1
+
+S
+
+;
+
+end
+θd(k) ← ˆθd(k)+αvk
+ˆθd(k)+α
+
+(cid:2)
+
+k
+
+; φw(k) ← ˆφw (k)+βuw
+ˆφw (k)+β .
+
+(cid:2)
+
+w
+
+Fig. 2. The asBP algorithm for LDA
+
+Based on these two count matrices, we can directly use the Minka’s ﬁxed point
+iteration
+
+αvk ← αvk
+
+where
+
+(cid:2)b1
+
+n=1
+(cid:2)b2
+
+In,k
+
+In
+
+n=1
+
+(cid:2)n
+(cid:2)n
+
+f =1
+
+f =1
+
+1
+
++ C
+f−1+αvk
+f−1+α − 1
+
+S
+
+1
+
+,
+
+(8)
+
+(9)
+
+(10)
+
+In,k =
+
+D(cid:3)
+
+d=1
+
+δ(γd(k) − n),
+
+In =
+
+D(cid:3)
+
+d=1
+
+δ(len(d) − n),
+
+where b1 = maxd γd(k), b2 = maxd len(d), and len(d) is the total number of
+observations in document d, and n and f are positive integers. The value αvk
+acts as an initial set for the topic k in all documents. In,k is the number of
+documents in which the topic k has been seen exactly n times. In is the number
+of documents that contain a total of n observations. In(·) =
+In,k is the
+total number of documents whose topics (1, . . . , K) has been seen exactly n
+times. For the symmetric Dirichlet priors, the base measure is ﬁxed as vk = 1/K
+and the concentration parameter α is updated as
+
+(cid:2)K
+
+k=1
+
+αvk ← α
+K
+
+×
+
+(cid:2)b3
+
+In(·)
+In
+
+(cid:2)n
+(cid:2)n
+
+f =1
+
+f =1
+
+1
+
+f−1+α/K
+f−1+α
+
+1
+
+,
+
+(11)
+
+n=1
+
+n=1
+(cid:2)b2
+
+where b3 = maxd,kγd(k). It is the same way to learn asymmetric or symmetric
+βuw according to the count matrix ηw(k) .
+
+Finding Better Topics: Features, Priors and Constraints
+
+303
+
+Symmetric and asymmetric Dirichlet priors over {θ, φ} play diﬀerent roles in
+topic modeling. Similar to [12], we implement an asymmetric prior over θ and a
+symmetric prior over φ, which is referred to as the asBP algorithm. In practice,
+this implementation performs the best than other combinations of priors [12].
+Fig. 2 summaries the asBP algorithm for learning LDA, where T is the total
+number of learning iterations. The asymmetric prior αvk can be learned by
+Eqs. (9), (10), (8). At the ﬁrst t ≤ 100 iterations, asBP is the same with the batch
+BP which updates and normalizes all messages for all topics. For t > 100, we
+learn the asymmetric prior αvk and the symmetric prior βuw every 20 iterations.
+
+3.3 Sparseness Constraints
+
+In addition to the continuous features and asymmetric Dirichlet priors, sparse-
+ness constraints over messages also has an eﬀect on the topic interpretability. In
+this paper, we adopt a sparseness measure based on the L1 norm and the L2
+norm [15],
+
+√
+
+mw,d =
+
+(cid:2)
+
+K − (
+
+(cid:9)(cid:2)
+
+k |μw,d(k)|)/
+√
+K − 1
+
+k[μw,d(k)]2
+
+,
+
+(12)
+
+where K is the number of topics and the dimensionality of μw,d(k). The quantity
+mw,d is the sparseness of μw,d. Usually, the messages of stop and common words
+have relatively lower sparseness because they often occupy many topics for a
+lower interpretability. For example, when the number of topics is 10 in CORA
+data set, the meaningful words such as “reinforcement”, “Bayesian” have rela-
+tively higher sparseness values 0.9999 and 0.9615 than 0.8663 and 0.8417 of the
+common words such as “learning” and “model”. Our intuition is that we need to
+encourage passing those messages with higher sparseness values, so we use the
+sparseness value (12) as the weight of message during message update (1). More
+speciﬁcally, we simply use the weighted sum mw,dxw,dμw,d(k) in Eqs. (2), (3)
+and (1). Such a weighted message passing strategy will encourage sparse mes-
+sages with higher weights in topic formation. We refer this message passing
+algorithm as conBP. If all sparseness constraints mw,d = 1, conBP will become
+the standard BP algorithm for learning LDA [3].
+
+4 Experiments
+
+In this section, we evaluate the eﬀectiveness of the proposed ltcBP, asBP, and
+conBP algorithms on six publicly available data sets. Table 1 summarizes the
+statistics of six data sets, where D is the total number of documents, N d the
+average document length, N the total number of tokens, W the vocabulary size,
+and “stop” indicates whether there are stop words. All algorithms are evaluated
+by ﬁve performance metrics. Lower perplexity [3,11] indicates better generaliza-
+tion performance. The lower-dimensional document-topic distributions can be
+fed into standard SVM classiﬁers for document classiﬁcation. The higher classiﬁ-
+cation accuracy implies the more distinguishable ability of the lower-dimensional
+
+304
+
+X. Wu et al.
+
+Table 1. Data set statistics
+
+W ST OP
+
+D N d N
+Data sets
+2410 57
+136394 2961
+CORA
+2785 127 352647 7061
+WEK
+1740 1323 2301375 13649
+NIPS
+2000 200 399669 36863
+20NEWS
+NIPS (STOP)
+1740 2939 5114634 70629
+20NEWS (STOP) 2000 372 743180 37370
+
+no
+no
+no
+no
+yes
+yes
+
+Algorithm
+
+pmiGS
+
+asGS
+
+BP
+
+ltcBP
+
+asBP
+
+conBP
+
+NIPS(STOP)
+training set the and test performance error class classiﬁcation on
+network neural networks the recurrent control output to systems of
+learning the in a on reinforcement task learn to control
+the of in cells cell and cortex direction neurons cortical
+data and error prediction set training model validation regression selection
+the network input output networks neural a i is to
+state a and learning q policy reinforcement the value for
+and in model of cells cell j neurons system c
+the of in a to is by are this with
+the of a and in for to is learning r with generalization
+the network of neural a input networks to output is
+the a of and to learning state in is for q s reinforcement
+the of and in to a model cells by is
+classiﬁer classiﬁers classiﬁcation nearest classes neighbor classify class classiﬁed classifying
+associative memory capacity hopﬁeld memories neuron stored neurons recall retrieval
+robot controller arm control trajectory plant motor trajectories controllers robotics
+cortex receptive orientation cortical cells visual selectivity tuning dominance spatial
+classiﬁcation training class classiﬁer the set data performance classes classiﬁers
+network units hidden input layer output the networks unit training
+learning state q action s value reinforcement policy optimal time
+visual motion cells direction ﬁeld spatial model receptive orientation response
+the of a and is in i for to we
+the of and classiﬁcation training class classiﬁer to for in
+the network units of to input hidden output layer unit
+the of and control to in model is motor trajectory
+the to learning and is robot s goal environment task
+
+20NEWS(STOP)
+you jpeg if ﬁle gif image it from on this
+comp windows edu ibm os sys misc ms mac hardware
+space gov nasa sci at au access digex jpl on
+edu rutgers christian not are religion may all who mit
+jpeg image you ﬁle gif ﬁles images color bit format
+comp graphics x video sys mac monitor hardware card screen
+space sci dec launch shuttle nasa mission toronto henry orbit
+rutgers christian edu god he of religion geneva jesus church
+the is to a of in and that it this
+the image is it jpeg to graphics of a from
+windows comp os ms edu i to the misc a
+the space nasa gov to and of sci s on
+rutgers edu of the christian in god to that is
+graphics x comp ﬁle windows code image program ﬁles motif
+windows os ms comp de dos nl tu apps win
+nasa space jpl gov elroy sci alaska launch orbit moon
+god jesus christians faith bible his christ he paul religion
+image jpeg ﬁle graphics images color ﬁles gif format bit
+windows comp os ms dos x microsoft unix window program
+space nasa sci launch shuttle venus gov station mission orbit
+rutgers christian god geneva religion athos church jesus soc may
+the of in to and a on for was by
+image jpeg ﬁle you it from graphics images the ﬁles
+windows comp os ms edu i misc cs for dos
+edu gov com nasa apr stratus usenet indiana ucs jpl
+rutgers edu christian of in that god we religion i
+
+Fig. 3. Top ten words of four topics when K = 50. Blue and black colors denote stop
+and common words, respectively. Red color denotes meaningful key words in each topic.
+
+topic features. We can also use the document-topic distribution as the soft doc-
+ument clustering results. Normalized mutual information (NMI) [19] evaluates
+the performance of clustering by comparing predicted clusters with true class
+labels of a corpus. When displaying topics to users, each topic is generally rep-
+resented as a list of the most probable words (for example, top ten hot words in
+each topic). Topic “coherence” [20] evaluates the topic quality. Point-wise mu-
+tual information (PMI) [21] is very similar to coherence. The higher coherence
+and PMI values correspond to the better topic interpretability.
+
+For a fair comparison, we implement all algorithms using the MATLAB
+C/C++ MEX platform publicly available at [22] and run experiments on the Sun
+ﬁre X4270 M2 server. The initial hyperparameters is set as α = 50/K, β = 0.01,
+where K is the number of topics. We use the same T = 1000 training itera-
+tions for all algorithms. We compare our algorithms with the four benchmark
+topic modeling algorithms such as BP [3], asGS [12], pmiGS [9] and STC [13].
+Since STC outputs the word-topic distribution containing negative values, we
+only compare our algorithms with STC in terms of document clustering and
+classiﬁcation tasks.
+
+Fig. 3 shows the top ten words of four topics when K = 50. The meaningful
+key words of each topic are highlighted with the red color, and the stop and
+
+y
+t
+i
+x
+e
+l
+p
+r
+e
+P
+g
+n
+i
+n
+i
+a
+r
+T
+
+ 
+
+800
+
+600
+
+400
+
+200
+
+0
+
+ 
+
+y
+c
+a
+r
+u
+c
+c
+A
+
+75
+
+70
+
+65
+
+60
+
+55
+
+Finding Better Topics: Features, Priors and Constraints
+
+305
+
+CORA
+
+50
+
+75 100
+
+WEK
+
+ 
+
+BP
+asGS
+asBP
+conBP
+
+800
+
+600
+
+400
+
+200
+
+0
+
+NIPS
+
+1500
+
+1000
+
+500
+
+50
+
+75 100
+
+0
+
+ 
+
+50 75 100
+
+Number of topics
+
+2000
+
+ 
+
+1500
+
+1000
+
+500
+
+0
+
+20NEWS
+
+50 75 100
+
+Fig. 4. Training perplexity as a function of the number of topics
+
+ltcBP+SVM
+asBP+SVM
+conBP+SVM
+BP+SVM
+pmiGS+SVM
+asGS+SVM
+STC+SVM
+STC
+
+80
+
+75
+
+70
+
+65
+
+CORA
+
+60
+
+80
+
+100
+
+16
+
+14
+
+12
+
+10
+
+8
+
+NIPS
+
+WEK
+
+60
+
+80
+
+100
+
+60
+
+80
+
+100
+
+Number of Topics
+
+70
+
+65
+
+60
+
+55
+
+50
+
+45
+
+20NEWS
+
+60
+
+80
+
+100
+
+Fig. 5. Document classiﬁcation accuracy as a function of the number of topics
+
+common words are highlighted with blue and black colors, respectively. We use
+the subjective “word intrusion” [4] to evaluate the topic interpretability, i.e., the
+number of conﬂict stop and common words in each topic. It is easy to see that
+ltcBP performs the best to remove almost all stop and common words in each
+topic, which demonstrates the eﬀectiveness of the continuous LTC features in
+topic modeling. Note that asBP can also remove the most stop words by cluster-
+ing them such as “the of a and is in i for we” in a separate topic on both NIPS
+(STOP) and 20NEWS (STOP). This result shows that the asymmetric prior has
+an eﬀect on allocating the most frequent stop words to a speciﬁc topic with a
+higher prior value vk. But asBP still has diﬃculty in handling some common
+words like “learning” and “model”. Note that asGS can also cluster stop words
+in one topic, but some topics contain more common words than those of asBP.
+BP performs the worst since its extracted topics are inﬂuenced by those high-
+frequent stop and common words. Although pmiGS uses the continuous PMI
+feature in topic modeling, it performs signiﬁcantly worse than ltcBP because
+it cannot remove most stop and common words in each topic. The underlying
+reason is that LTC features are more eﬀective in lowering the weights of stop
+and common words in topic modeling. We see that using sparseness constraints
+cannot eﬀectively remove stop and common words from each topic. The conBP is
+only slightly better than BP, but signiﬁcantly worse than both asBP and ltcBP.
+So, to ﬁnd more interpretable topic-word distributions, the continuous features
+and asymmetric priors provide the best performance.
+
+306
+
+X. Wu et al.
+
+ltcBP
+asBP
+conBP
+BP
+pmiGS
+asGS
+STC
+
+0.5
+
+0.45
+
+0.4
+
+0.35
+
+0.3
+
+0.25
+
+0.2
+
+0.2
+
+0.15
+
+0.1
+
+0.05
+
+0
+
+ 
+
+WEK
+
+60
+
+80
+
+100
+
+Number of topics
+
+0.6
+
+0.55
+
+0.5
+
+0.45
+
+0.4
+
+0.35
+
+0.3
+
+NIPS
+
+60
+
+80
+
+100
+
+20NEWS
+
+60
+
+80
+
+100
+
+CORA
+
+60
+
+80
+
+100
+
+Fig. 6. The NMI as a function of the number of topics
+
+CORA
+
+WEK
+
+NIPS
+
+20NEWS
+
+0.4
+
+0.35
+
+0.3
+
+0.25
+
+0.2
+
+0.15
+
+0.1
+
+ 
+
+I
+
+M
+N
+
+s
+
+m
+h
+t
+i
+r
+o
+g
+A
+
+l
+
+conBP
+
+asBP
+
+ltcBP
+
+BP
+
+pmiGS
+
+asGS
+
+−2000 −1500 −1000 −500
+
+−1500
+
+−1000
+
+−500
+
+−1400 −1000
+
+Coherence
+
+−600
+
+−200
+
+−2500−2000−1500−1000 −500
+
+0
+
+Fig. 7. The coherence of CORA, WEK, NIPS and 20NEWS datasets when K = 100
+
+Fig. 4 shows the training perplexity as a function of the number of topics
+on CORA, WEK, NIPS and 20NEWS for K = {50, 75, 100}. Note that ltcBP,
+pmiGS and STC do not describe how to generate word tokens, so that they can-
+not be measured by the perplexity metric. Except on NIPS, asGS yields a lower
+perplexity value than BP. We see that conBP has almost the same perplexity of
+BP, which implies that sparseness constraints do not improve the likelihood of
+word generation. On all data sets, we see that the training perplexity of asBP
+is the lowest, showing the highest topic modeling accuracy. The result shows
+that learning asymmetric Dirichlet prior of αvk and the symmetric prior βuw
+can improve the topic modeling accuracy. The training perplexity has a smaller
+diﬀerence on the NIPS data set. One possible reason is that each document in
+NIPS contains more word tokens, so that the prior has a smaller impact on
+the message update (1). To summarize, learning an asymmetric Dirichlet prior
+over the document-topic distributions and an symmetric Dirichlet prior over
+the topic-word distributions still has substantial advantages on improving the
+document-topi and topic-word distributions to generate word tokens.
+Fig. 5 shows the document classiﬁcation accuracy as a function of the number
+of topics on CORA, WEK, NIPS and 20NEWS for K = {50, 75, 100}. In our
+experiments, we randomly divide each data set into half as training and test sets.
+Then, we use the standard linear SVM classiﬁer to classify the lower-dimensional
+document-topic features produced by the topic modeling algorithms. As far as
+STC is concerned, it can directly output the class predictions. Also, we can
+use STC to generate lower-dimensional topic features and use SVM to do the
+classiﬁcation.
+
+Finding Better Topics: Features, Priors and Constraints
+
+307
+
+conBP
+asBP
+ltcBP
+BP
+pmiGS
+asGS
+
+CORA
+
+WEK
+
+NIPS
+
+20NEWS
+
+s
+
+m
+h
+t
+i
+r
+o
+g
+A
+
+l
+
+−2500 −2000 −1500 −1000
+
+−2000
+
+−1500
+
+−1000
+
+−2000
+
+PMI
+
+−1600
+
+−1200
+
+−2500
+
+−1500
+
+−500
+
+Fig. 8. The PMI of CORA, WEK, NIPS and 20NEWS datasets when K = 100
+
+Table 2. Performance on CORA, WEK, NIPS and 20NEWS datasets when K = 100
+
+Datasets
+
+CORA
+
+WEK
+
+Perplexity Accuracy NMI
+
+PMI
+
+Coherence Perplexity Accuracy NMI
+
+conBP
+
+496.16
+
+ltcBP
+
+asBP
+
+BP
+
+pmiGS
+
+asGS
+
+STC
+
+Datasets
+
+ltcBP
+
+asBP
+
+−
+
+352.29
+
+491.31
+
+−
+
+393.79
+
+−
+
+−
+
+1215.72
+
+conBP
+
+1230.30
+
+BP
+
+pmiGS
+
+asGS
+
+STC
+
+1226.43
+
+−
+
+1288.02
+
+−
+
+74.58
+75.42
+
+75.00
+
+75.33
+
+69.68
+
+73.92
+
+67.94
+
+13.84
+
+14.07
+
+13.38
+
+13.73
+
+13.38
+
+13.84
+14.99
+
+79.51
+
+83.32
+84.46
+
+80.45
+
+77.21
+
+82.82
+
+81.38
+
+56.30
+69.50
+
+69.40
+
+66.70
+
+58.90
+
+66.80
+
+57.20
+
+PMI
+
+Coherence
+0.2251 −1458.8 −620.45
+0.2469 −1380.6 −426.72
+0.2347 −1381.4 −428.86
+0.2297 −1370.9 −403.68
+0.2015 −1418.9 −553.56
+0.2532 −1425.0 −526.96
+0.2027
+
+−
+
+−
+
+PMI
+
+Coherence
+0.5511 −1837.3 −1461.1
+0.4386 −1549.2 −793.0
+0.4498 −1386.9 −474.63
+0.4511 −1374.8 −411.8
+0.3242 −1518.1 −772.23
+0.4079 −1604.7 −906.59
+0.3785
+
+−
+
+−
+
+Perplexity Accuracy NMI
+
+PMI
+
+Coherence Perplexity Accuracy NMI
+
+NIPS
+
+20NEWS
+
+0.3168 −1536.1 −781.42
+0.3150 −1447.6 −609.72
+0.3107 −1466.7 −673.98
+0.3069 −1444.5 −631.86
+0.2161 −1788.9 −1075.10
+0.2852 −1485.5 −677.81
+0.1981
+
+−
+
+−
+
+−
+
+462.66
+
+541.94
+
+539.41
+
+−
+
+497.56
+
+−
+
+0.1365 −1254.1 −415.10
+0.1632 −1357.2 −227.49
+0.1577 −1357.5 −225.55
+0.1626 −1358.3 −226.54
+0.0785 −1389.7 −279.01
+0.1489 −1349.9 −249.15
+0.1449
+
+−
+
+−
+
+−
+
+1039.56
+
+1222.99
+
+1219.04
+
+−
+
+1096.89
+
+−
+
+We see that BP and asBP performs comparably, and outperform other meth-
+ods. Their classiﬁcation performance is relatively stable as the number of topics
+changes. Although ltcBP can eﬀectively remove stop and common words, it
+does not perform the best in document classiﬁcation. On possible reason is that
+the distributions of stop and common words also provide useful information for
+classiﬁcation. Surprisingly, STC cannot predict the class label very well when
+compared with other methods. But STC works well on the lower-dimensional
+topic features. As we see, conBP works slightly better than BP on classiﬁcation
+when K = 100, which implies that sparseness constraints do not provide useful
+information in this task. Overall, asBP performs the best in document clas-
+siﬁcation. For example, asBP outperforms BP and asGS by around 0.6% and
+3.7% on CORA for K = 50, and by around 4.0% and 3.9% on 20NEWS data
+set for K = 100 in terms of classiﬁcation accuracy. This result shows that the
+asymmetric priors play an important role in regulating document-topic features
+for classiﬁcation. When the dimensionality of latent space is small, learning an
+asymmetric Dirichlet prior over the document-topic distributions and symmetric
+Dirichlet prior over the topic-word distributions is worse than heuristically set
+symmetric Dirichlet priors on NIPS. One reason is that the Dirichlet prior have
+more eﬀects on shorter documents than longer documents.
+
+308
+
+X. Wu et al.
+
+Fig. 6 shows the document clustering results measured by NMI. This result
+conﬁrms that STC and pmiGS often predict the wrong clusters of documents on
+all data sets. All BP-based algorithms perform equally well but conBP performs
+slightly better when K = 100. It is interesting to see that the performance of
+document clustering is not consistent with that of document classiﬁcation in
+Fig. 5. One possible reason is the unknown number of clusters in the clustering
+task.
+
+Fig. 7 shows the coherence on all data sets when K = 100. Because STC has
+no topic-word distributions, it cannot be measured by the coherence metric. The
+plot produces a separate box for K = 100 coherence values of each algorithm.
+On each box, the central mark is the median, the edges of the box are the 25th
+and 75th percentiles, the whiskers extend to the most extreme data points not
+considered outliers, and outliers are plotted individually by the black dot sign.
+We see that asBP and conBP have higher coherence median values with smaller
+variances. BP also yields a stable coherence value. However, ltcBP and pmiGS
+have lower coherence values. The major reason is that they remove most common
+words, which contribute much to the coherence metric.
+
+Fig. 8 shows the PMI values of all algorithms when K = 100. Because STC
+has no topic-word distributions, it cannot be measured by the PMI metric. The
+plot produces a separate box for K = 100 PMI values of each algorithm. On each
+box, the central mark is the median, the edges of the box are the 25th and 75th
+percentiles, the whiskers extend to the most extreme data points not considered
+outliers, and outliers are plotted individually by the black dot sign. We see that
+most results are consistent with those of Fig. 7. For example, asBP, conBP and
+BP have relatively smaller variances and median values, while ltcBP and pmiGS
+have relatively bigger variances and median values. Both Fig. 7 and 8 conﬁrm
+that asBP provide more coherent and related word groups. Note that asBP
+clusters stop and common words in a separate topic, which enhances coherence
+and PMI when compared with ltcBP.
+
+Table 2 summarizes the overall performance of all algorithms on four data
+sets when K = 100. We mark the best performance by the bold face. We see
+that asBP wins 8/20 columns and all variants of BP win around 18/20 columns.
+This result conﬁrms that BP and its variants ﬁnd better document-topic and
+topic-word distributions. As far as perplexity is concerned, asBP is always the
+best method, which means that it is very likely to recover the observed words
+from the document-topic and topic-word distributions. We see that ltcBP and
+asBP learns better document-topic distributions for soft document clustering
+with relatively higher NMI values. Moreover, both ltcBP and asBP can ef-
+fectively remove stop and common words as shown in Fig. 3. Although STC
+uses sparse coding for document classiﬁcation, it performs relatively worse than
+conBP partly because conBP incorporates the sparseness constraints naturally.
+Note that conBP often provides a stable clustering and classiﬁcation perfor-
+mances though it is not the best. On CORA and 20NEWS, conBP outperforms
+BP with a large margin, which reﬂects that sparseness constraints can improve
+clustering and classiﬁcation performance. When compared with pmiGS, ltcBP
+
+Finding Better Topics: Features, Priors and Constraints
+
+309
+
+wins all columns, conﬁrming the eﬀectiveness of LTC features for topic modeling
+as well as BP framework for learning LDA. Form Table 2, we suggest continuous
+features and asymmetric priors for topic modeling because sparseness constraints
+do not provide signiﬁcant improvement. The underlying reason is that the esti-
+mated document-topic and topic-word distributions are already very sparse so
+that any sparseness constraints can give only marginal improvement.
+
+5 Conclusions
+
+In this paper, we extensively explore three factors to ﬁnd better topics: contin-
+uous features, asymmetric priors, and sparseness constraints within the uniﬁed
+BP framework. We develop several novel BP-based algorithms to study the three
+perspectives. Through extensive experiments, we advocate asymmetric priors for
+topic modeling because they can enhance the overall performance in terms of
+several metrics. Also, the continuous features can improve the interpretability
+of topic-word distributions by eﬀectively remove almost all stop and common
+words. Finally, we ﬁnd that sparseness constraints do not improve the topic mod-
+eling performance very much, partly because the sparse nature of document-topic
+and topic-word distributions of LDA.
+
+Acknowledgements. This work is supported by NSFC (Grant No. 61003154,
+61373092, 61033013, 61272449 and 61202029), Natural Science Foundation of
+the Jiangsu Higher Education Institutions of China (Grant No. 12KJA520004),
+Innovative Research Team in Soochow University (Grant No. SDT2012B02), and
+Guangdong Province Key Laboratory Project(Grant No. SZU-GDPHPCL-2012-
+09).
+
+References
+
+1. Blei, D.M., Ng, A.Y., Jordan, M.I.: Latent Dirichlet allocation. J. Mach. Learn.
+
+Res. 3, 993–1022 (2003)
+
+2. Griﬃths, T.L., Steyvers, M.: Finding scientiﬁc topics. Proc. Natl. Acad. Sci. 101,
+
+5228–5235 (2004)
+
+3. Zeng, J., Cheung, W.K., Liu, J.: Learning topic models by belief propagation. IEEE
+
+Trans. Pattern Anal. Mach. Intell. 33(5), 1121–1134 (2013)
+
+4. Chang, J., Boyd-Graber, J., Gerris, S., Wang, C., Blei, D.: Reading tea leaves: How
+
+humans interpret topic models. In: NIPS, pp. 288–296 (2009)
+
+5. Salton, G., McGill, M.J.:
+
+Introduction to modern information retrieval.
+
+McGraw-Hill, New York (1983)
+
+6. Buckley, C.: Automatic query expansion using SMART: Trec 3. In: Proceedings of
+
+The Third Text REtrieval Conference (TREC-3), pp. 69–80 (1994)
+
+7. Hoﬀman, M., Blei, D., Bach, F.: Online learning for latent Dirichlet allocation. In:
+
+NIPS, pp. 856–864 (2010)
+
+8. Ramage, D., Heymann, P., Manning, C.D., Garcia-Molina, H.: Clustering the
+
+tagged web. In: Web Search and Data Mining, pp. 54–63 (2009)
+
+310
+
+X. Wu et al.
+
+9. Wilson, A.T., Chew, P.A.: Term weighting schemes for latent Dirichlet allocation.
+In: North American Chapter of the Association for Computational Linguistics:
+Human Language Technologies, pp. 465–473 (2010)
+
+10. Minka, T.P.: Estimating a Dirichlet distribution. Technical report, Microsoft Re-
+
+search (2000)
+
+11. Asuncion, A., Welling, M., Smyth, P., Teh, Y.W.: On smoothing and inference for
+
+topic models. In: UAI, pp. 27–34 (2009)
+
+12. Wallach, H., Mimno, D., McCallum, A.: Rethinking LDA: Why priors matter. In:
+
+NIPS, pp. 1973–1981 (2009)
+
+13. Zhu, J., Xing, E.P.: Sparse topical coding. In: UAI (2011)
+14. Zhu, W., Zhang, L., Bian, Q.: A hierarchical latent topic model based on sparse
+
+coding. Neurocomputing 76(1), 28–35 (2012)
+
+15. Hoyer, P.O.: Non-negative matrix factorization with sparseness constraints. Journal
+
+of Machine Learning Research 5, 1457–1469 (2004)
+
+16. Zeng, J., Cao, X.-Q., Liu, Z.-Q.: Residual belief propagation for topic modeling. In:
+Zhou, S., Zhang, S., Karypis, G. (eds.) ADMA 2012. LNCS, vol. 7713, pp. 739–752.
+Springer, Heidelberg (2012)
+
+17. Zeng, J., Liu, Z.Q., Cao, X.Q.: A new approach to speeding up topic modeling,
+
+arXiv:1204.0170 [cs.LG] (2012)
+
+18. Heinrich, G.: Parameter estimation for text analysis. Technical report, University
+
+of Leipzig (2008)
+
+19. Zhong, S., Ghosh, J.: Generative model-based document clustering: A comparative
+
+study. Knowl. Inf. Syst. 8(3), 374–384 (2005)
+
+20. Mimno, D.M., Wallach, H.M., Talley, E.M., Leenders, M., McCallum, A.: Optimiz-
+
+ing semantic coherence in topic models. In: EMNLP, pp. 262–272 (2011)
+
+21. Newman, D., Karimi, S., Cavedon, L.: External evaluation of topic models. In:
+
+Australasian Document Computing Symposium, pp. 11–18 (2009)
+
+22. Zeng, J.: TMBP: A topic modeling toolbox using belief propagation. J. Mach.
+
+Learn.Res. 13, 2233–2236 (2012)
+
+

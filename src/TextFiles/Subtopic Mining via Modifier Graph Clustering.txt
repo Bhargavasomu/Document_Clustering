@@ -1,0 +1,1038 @@
+Subtopic Mining via Modiﬁer Graph Clustering
+
+Hai-Tao Yu and Fuji Ren
+
+The University of Tokushima, Japan
+yu-haitao@iss.tokushima-u.ac.jp,
+
+ren@is.tokushima-u.ac.jp
+
+Abstract. Understanding the information need encoded in a user query
+has long been regarded as a crucial step of eﬀective information retrieval.
+In this paper, we focus on subtopic mining that aims at generating a
+ranked list of subtopic strings for a given topic. We propose the modiﬁer
+graph based approach, under which the problem of subtopic mining re-
+duces to that of graph clustering over the modiﬁer graph. Compared with
+the existing methods, the experimental results show that our modiﬁer-
+graph based approaches are robust to the sparseness problem. In par-
+ticular, our approaches that perform subtopic mining at a ﬁne-grained
+term-level outperform the baseline methods that perform subtopic min-
+ing at a whole query-level in terms of I-rec, D-nDCG and D#-nDCG.
+
+Keywords: Subtopic mining, Kernel-object, Modiﬁer graph.
+
+1
+
+Introduction
+
+Recent studies show that billions of daily searches are made by web users. Instead
+of formulating natural language queries, the vast majority of users are submitting
+short queries with little or no context, which are often ambiguous and/or under-
+speciﬁed. For example, the query Harry Potter could refer to a book or a movie.
+For the movie, a user may be interested in the main character or the reviews. In
+view of the above-mentioned facts, the technique of search result diversiﬁcation
+(e.g., [1, 13]) has been proposed and attracted signiﬁcant attention. It provides
+a diversiﬁed search result, which features a trade-oﬀ between relevance (rank-
+ing more relevant web pages in higher positions) and diversity (satisfying users
+with diﬀerent information needs). For a better diversiﬁed search result, an accu-
+rate estimation of the information needs or subtopics underlying a given topic,
+which is referred to as subtopic mining [17, 19], becomes an important problem.
+Since the query log records the historical search behaviors performed by massive
+users (e.g., clicked web pages in response to a query, subsequently reformulated
+queries, etc), many researchers [10, 14, 16] performed subtopic mining via query
+log mining and have shown that the click information (e.g., page co-click and ses-
+sion co-occurrence) are valuable for determining the topical relevance of queries.
+However, as shown by Bonchi et al. [5], many methods have been proposed for
+and tested on head queries, which work poorly for unseen queries or queries with
+sparse click information. As query frequency is known to obey the power-law,
+these methods leave a large ratio of queries uncovered.
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part I, LNAI 8443, pp. 337–347, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+338
+
+H.-T. Yu and F. Ren
+
+In this paper, we propose an eﬀective approach that performs subtopic mining
+at the term level, which outperforms baseline methods that work at the query-
+level. Subsequently, Section 2 discusses the related work. Section 3 formalizes
+the target problem. Section 4 details the proposed approach. Section 5 discusses
+the experimental results. We conclude our work in section 6.
+
+2 Related Work
+
+To capture the underlying subtopics encoded within user queries, considerable
+studies [6, 7, 15, 21, 22, 23] have been conducted from various aspects. For
+example, Beeferman and Berger [2] viewed the query log as a bipartite graph,
+and the obtained clusters were interpreted as subtopics covering diverse queries.
+The research by Jones and Klinkner [11] showed that users’ search tasks are
+interleaved or hierarchically organized. They studied how to segment sequences
+of user queries into a hierarchical structure. Sadikov et al. [16] and Radlinski
+et al. [14] tried to infer the underlying subtopics of a query by clustering its
+reﬁnements. The web page co-click and session co-occurrence information were
+viewed as indicators of topical relevance. Hu et al. [10] interpreted a subtopic as
+a set of keywords and URLs, their key intuition was that: many users add one
+or more additional keywords to expand the query to clarify their search intents.
+Diﬀerent from the above methods that have treated a whole query as the
+minimum analysis unit. A number of studies (e.g., [20, 21]) performed intent
+analysis at a term-level. For example, Wang et al. [21] studied how to extract
+broad aspects from query reformulations, each broad aspect is represented by
+a set of keywords. Rather than raw terms based subtopic analysis, we perform
+subtopic mining by encapsulating intent roles [24]. We believe that our approach
+achieves a robust subtopic mining, especially for tail or unseen queries.
+
+3 Problem Formalization
+
+The Intent tasks [17, 19] of NTCIR-9 1 and NTCIR-10 2 are the prototypes
+on which our formalization builds. The core notations are: (1) Topic ( ¨T ): it
+refers to an input instance for testing; (2) Subtopic (¨t): it refers to a possible
+information need or an intent underlying a topic; (3) Subtopic string (tStr):
+it is viewed as an expression of a subtopic. For example, for the topic Harry
+Potter, Harry Potter ﬁction and Harry Potter reading are two subtopic strings
+about the subtopic book. A topic and a subtopic string can either be a real query
+or a query-like string derived from other resources, e.g., query suggestions.
+
+Formally, for a given topic ¨T , suppose there are k possible subtopics X =
+{¨t1, ..., ¨tk}. Let Y = {tStr1, ..., tStrn} be a set of n subtopic strings with re-
+
+spect to X. The problem of subtopic mining is formalized as: ﬁnding a ranked
+list of subtopic strings L that ranks subtopic strings representing more popular
+
+1 http://research.nii.ac.jp/ntcir/ntcir-9/index.html
+2 http://research.nii.ac.jp/ntcir/ntcir-10/index.html
+
+Subtopic Mining via Modiﬁer Graph Clustering
+
+339
+
+subtopics at higher positions and includes as many subtopics as possible. The
+quality of L depends on its consistency with the ideal ranked list L
+(e.g., a
+ranked list created by human assessors).
+
+∗
+
+4 Subtopic Mining through Modiﬁer Graph Clustering
+
+4.1 Intent Role Oriented Modiﬁer Graph
+
+Let Γ , Q, s, q, t, d denote the query log, query set, a session, a query, a term
+and a web page respectively, D(q) = {d} denote the clicked web pages of q, t (cid:2) q
+denote that t is a composing term of q, q ∈ s denote that q occurred in s. Fig.
+1 shows some click behaviors, where q1 and q2 occur in session sk, d1, d2 and d3
+are the clicked web pages. Some query log oriented notations are given as: (1)
+Co-Session: For qi (cid:4)= qj, iﬀ ∃s that meets qi ∈ s and qj ∈ s, qi and qj are co-
+session queries, i.e., CoSession(qi, qj), e.g., q1 and q2 in Fig. 1; (2) Co-Click: For
+qi (cid:4)= qj, iﬀ D(qi)∩ D(qj) (cid:4)= ∅, qi and qj are co-click queries, i.e., CoClick(qi, qj),
+e.g., q1 and q2 in Fig. 1; (3) Co-Query: For ti (cid:4)= tj, iﬀ ∃q that meets ti (cid:2) q
+and tj (cid:2) q, ti and tj are co-query terms, i.e., CoQuery(ti, tj), e.g., t2 and t3 in
+Fig. 1; (4) Term-Level Co-Session: For ti (cid:4)= tj, iﬀ ∃qm ∈ Q and ∃qn ∈ Q that
+meet CoSession(qm, qn) ∧ ti (cid:2) qm ∧ tj (cid:2) qn, ti and tj are co-session terms, i.e.,
+T CoSession(ti, tj), e.g., t1 and t2 in Fig. 1; (5) Term-Level Co-Click: For
+ti (cid:4)= tj, iﬀ ∃qm ∈ Q and ∃qn ∈ Q that meet CoClick(qm, qn)∧ ti (cid:2) qm ∧ tj (cid:2) qn,
+ti and tj are co-click terms, i.e., T CoClick(ti, tj), e.g., t1 and t3 in Fig. 1. In this
+paper, the statistics of co-session and co-click of a query log that are deﬁned at
+a query level, are called query-level knowledge in query log (QKQL). In contrast,
+the statistics of co-query, term-level co-session and term-level co-click that are
+deﬁned at a term level are called term-level knowledge in query log (TKQL).
+
+Rather than raw terms based analysis, we encapsulate the terms with intent
+roles (Kernel-object & modiﬁer ) by Yu and Ren [24]. Kernel-object (ko) refers to
+the term that abstracts the core object of the underlying subtopic encoded in a
+query. Modiﬁer (mo) refers to the co-appearing terms with kernel-object, which
+explicitly specify user’s interested aspects. A query that can be represented with
+kernel-object and modiﬁer is deﬁned as a role-explicit query. Otherwise, a role-
+implicit query. Because topic and subtopic string are query-like strings, thus,
+they can be analogously classiﬁed as role-explicit ones and role-implicit ones.
+Table 1 shows 3 role-explicit subtopic strings, the 1st column (In/Out ) implies
+whether they are included in query log SogouQ(Section 5.1). For convenience,
+we directly use kernel-object and modiﬁer to refer to the terms annotated as
+kernel-object and modiﬁer respectively. Moreover, when determining the kernel-
+object and modiﬁer for a given role-explicit query, topic or subtopic string, the
+method by Yu and Ren [24] is used as a black box in our study, which selects
+the annotation with the maximum likelihood as the optimal annotation using a
+generative model.
+
+Deﬁnition 1 (Co-kernel-object Elements). Given a kernel-object ko, co-
+kernel-object elements refer to a set of role-explicit subtopic strings that share
+the same kernel-object, denoted as CoKO(ko)={tStr}.
+
+340
+
+H.-T. Yu and F. Ren
+
+	
+
+
+ 
+
+ 
+
+
+
+
+
+
+
+Fig. 1. Example click behaviors
+
+Table 1. Role-explicit subtopic strings
+
+In/Out
+
+Annotated subtopic string
+
+(cid:9320)(cid:6207)
+(cid:2) (cid:3)(cid:4) (cid:5)
+
+(Harry P otter
+(cid:5)
+(cid:2)
+
+game
+(cid:2) (cid:3)(cid:4) (cid:5)
+
+)
+
+In (cid:2808)(cid:2137)(cid:8978)(cid:10409)
+(cid:5)
+
+(cid:2)
+
+(cid:3)(cid:4)
+ko
+
+In (cid:2808)(cid:2137)(cid:8978)(cid:10409)
+(cid:5)
+
+(cid:2)
+
+(cid:3)(cid:4)
+ko
+
+Out (cid:2808)(cid:2137)(cid:8978)(cid:10409)
+(cid:5)
+
+(cid:2)
+
+(cid:3)(cid:4)
+ko
+
+mo
+
+mo
+
+mo
+
+(cid:4671)(cid:16932)
+(cid:2) (cid:3)(cid:4) (cid:5)
+
+(Harry P otter
+(cid:5)
+(cid:2)
+
+f iction
+)
+(cid:2) (cid:3)(cid:4) (cid:5)
+
+(cid:19509)(cid:16939)
+(cid:2) (cid:3)(cid:4) (cid:5)
+
+(Harry P otter
+(cid:5)
+(cid:2)
+
+reading
+)
+(cid:5)
+(cid:2)
+
+mo
+
+mo
+
+(cid:3)(cid:4)
+mo
+
+(cid:3)(cid:4)
+ko
+
+(cid:3)(cid:4)
+ko
+
+(cid:3)(cid:4)
+ko
+
+Deﬁnition 2 (Modiﬁer Graph). Modiﬁer graph Gko = {V, E} is an undi-
+rected weighted graph derived from co-kernel-object elements CoKO(ko), (i) The
+node set consists of modiﬁers, i.e., V = {mo|tStr ∈ CoKO(ko), mo (cid:2) tStr};
+(ii) The edge set is given as: E = {e = (moi, moj)|δT KQL(moi, moj) > 0},
+T CoSession(moi,moj)
+maxV T CoSession+1 +
+T CoClick(moi,moj)
+λ3
+maxV T CoClick+1 , namely, the TKQL of a pair of modiﬁers is normalized by
+the maximum ones (maxV CoQuery, maxV T CoSession and maxV T CoClick)
+respectively, and the edge weight is a linear combination of the normalized
+values.
+
+CoQuery(moi,moj )
+maxV CoQuery+1 + λ2
+
+δT KQL(moi, moj) = λ1
+
+where
+
+Assuming that CoKO(ko = (cid:2814)(cid:2143)(cid:8984)(cid:10415)(HarryP otter)) merely consists of the
+three subtopic strings in Table 1, Fig. 2 shows the corresponding mod-
+iﬁer graph based on the TKQL of SogouQ in Table 2(given as Co-
+Query:TCoSession:TCoClick ). Obviously, (cid:4677)(cid:16938)(ﬁction) and (cid:19515)(cid:16945)(reading) are
+strongly interacted (a weight of 0.9991); (cid:9326)(cid:6213)(game) and (cid:4677)(cid:16938)(ﬁction) (a weight
+of 0.0313), (cid:9326)(cid:6213)(game) and (cid:19515)(cid:16945)(reading) (a weight of 0.0049) are weakly inter-
+acted. If we perform graph clustering over this modiﬁer graph, (cid:9326)(cid:6213)(game) is
+likely to be grouped into a cluster. (cid:4677)(cid:16938)(ﬁction) and (cid:19515)(cid:16945)(reading) are likely to
+be grouped into another cluster. Many studies (e.g., [4, 5, 14, 22]) have shown
+that the QKQL helps to determine the topical relevance among queries. Anal-
+ogously, the TKQL derived from QKQL manifests the topical relevance among
+terms. Put another way, the larger value of δT KQL(moi, moj), the more rele-
+vant subtopics indicated by moi and moj. Thus, (cid:4677)(cid:16938)(ﬁction) and (cid:19515)(cid:16945)(reading)
+express a relevant subtopic, (cid:9326)(cid:6213)(game) expresses a diﬀerent subtopic. Because
+the subtopics underlying the co-kernel-object elements depend on the composing
+modiﬁers, we can further deduce that (cid:2814)(cid:2143)(cid:8984)(cid:10415)(cid:19515)(cid:16945)(Harry Potter reading) and
+(cid:2814)(cid:2143)(cid:8984)(cid:10415)(cid:4677)(cid:16938)(Harry Potter ﬁction) express the same or similar subtopic, while
+(cid:2814)(cid:2143)(cid:8984)(cid:10415)(cid:9326)(cid:6213)(Harry Potter game) express a diﬀerent subtopic. Not surpris-
+ingly, the partition of a modiﬁer graph uncovers the prior unknown subtopics of
+a set of co-kernel-object elements.
+
+4.2 Modiﬁer Graph Construction and Clustering
+Given the kernel-object ko with respect to a topic ¨T , we construct the mod-
+iﬁer graph Gko through the following two steps: Step-1: Obtaining suﬃcient
+
+Subtopic Mining via Modiﬁer Graph Clustering
+
+341
+
+Table 2. TKQL derived from SogouQ
+
+(cid:9320)(cid:6207)(game) (cid:4671)(cid:16932)(ﬁction) (cid:19509)(cid:16939)(reading)
+
+(cid:9320)(cid:6207)(game)
+
+(cid:104)
+
+7:78:20
+
+1:13:1
+
+(cid:4671)(cid:16932)(ﬁction)
+
+7:78:20
+
+(cid:104)
+
+700:993:3637
+
+(cid:19509)(cid:16939)(reading)
+
+1:13:1
+
+700:993:3637
+
+(cid:104)
+
+
+	
+ÿ
+   ÿ
+
+	
+ÿ
+
+ ÿ
+
+  ÿ
+
+
+	ÿ
+
+Fig. 2. A modiﬁer graph
+
+co-kernel-object elements CoKO(ko). We ﬁrst manage to obtain a set of candi-
+date subtopic strings, say, {ctStr}, which is further used as the base for generat-
+ing CoKO(ko). Here recall is the key point, it ensures the coverage of diﬀerent
+subtopics. The adopted resources are: (1) Query log; (2) Query suggestions for
+topic ¨T ; (3) Noun phrase (NP) and verb phrase (VP) segments extracted from
+the result snippets for topic ¨T by a search engine. Speciﬁcally, all the queries
+or segments that include ko as a substring are selected as candidate subtopic
+strings. The query suggestions are directly selected as candidate subtopic strings.
+According to Deﬁnition 1, the co-kernel-object elements are all role-explicit ones
+that can be represented with kernel-object and modiﬁers. When deriving the
+CoKO(ko) based on a set of candidate subtopic strings, we relax the restriction
+as: regardless of whether a candidate subtopic string is role-explicit or role-
+implicit, once it includes ko as a substring, we intuitively assume that it is a
+co-kernel-object element. The substring ko is directly regarded as its kernel-
+object, the remaining parts are directly segmented into modiﬁers (stop-words
+are discarded). Step-2: Adding weighted edges. Given the co-kernel-object ele-
+ments CoKO(ko), the modiﬁer graph Gko can be obtained by adding an edge
+for each pair of distinct modiﬁers moi and moj iﬀ δT KQL(moi, moj) > 0.
+
+Suppose π denotes a parameter-free graph clustering algorithm, given an
+modiﬁer graph Gko, a group of modiﬁer clusters are generated, say, M C =
+{mck}, where mck = {moi} denotes a cluster of modiﬁers. Corresponding to each
+modiﬁer cluster mck, we generate a cluster of subtopic strings, say, sck = {tStrm},
+which is used to represent a subtopic, e.g., ¨tk. Thus, a set of subtopic string
+clusters SC = {sc} can be obtained based on the set of modiﬁer clusters M C.
+Speciﬁcally, for each modiﬁer moi ∈ mck, we select the subtopic string tStrm
+that meets moi (cid:2) tStrm, and add tStrm into the corresponding subtopic string
+cluster sck. For example, given the two modiﬁer clusters by clustering the modiﬁer
+graph in Fig. 2 (Section 4.1), i.e., mc1 = {(cid:9320)(cid:6207)(game)} and mc2 = {(cid:4671)(cid:16932)(f iction),
+(cid:19509)(cid:16939)(reading)}, for mc1, sc1 = {(cid:2808)(cid:2137)(cid:8978)(cid:10409)(cid:9320)(cid:6207)(HarryP ottergame)} will be gener-
+ated due to (cid:9320)(cid:6207)(game) (cid:2) (cid:2808)(cid:2137)(cid:8978)(cid:10409)(cid:9320)(cid:6207) (HarryP ottergame), and so does sc2 =
+{(cid:2808)(cid:2137)(cid:8978)(cid:10409)(cid:19509)(cid:16939)(HarryP otterreading), (cid:2808)(cid:2137)(cid:8978)(cid:10409)(cid:4671)(cid:16932)(HarryP otterf iction)}.
+
+When allocating the subtopic string of which the composing modiﬁers belong
+to diﬀerent modiﬁer clusters, we obey the following priority rules: (1) Add this
+subtopic string into the subtopic string cluster, of which the corresponding modi-
+ﬁer cluster encloses more composing modiﬁers; (2) If two modiﬁer clusters enclose
+the same number of modiﬁers of a particular subtopic string, add this subtopic
+
+342
+
+H.-T. Yu and F. Ren
+
+string into the subtopic string cluster, of which the corresponding modiﬁer clus-
+ter encloses the most frequent modiﬁer. The idea of the above rules are straight-
+forward, i.e., a larger number of modiﬁers means a larger expressive power, and a
+more frequency modiﬁer carries a larger expressive power than a rare modiﬁer.
+
+4.3 Generating the Ranked List
+
+Deﬁnition 3 (Expression Power). Expression power of a subtopic string is
+deﬁned as the generating probability of its composing modiﬁers, which measures
+its eﬀectiveness of describing the subtopic represented by the subtopic string clus-
+ter it belongs to. It is given as: EP (tStr) =
+
+{moj∈V } |moj|+|V |+ , where |mo| denotes modiﬁer frequency in
+V and |V |+ denotes the number of distinct modiﬁers, we assume that there is
+a probability distribution for modiﬁers, which is sampled repeatedly by users to
+form mutually-independent modiﬁers to specify kernel-object oriented subtopics.
+
+moi(cid:4)tStr p(moi).
+
+By p(moi) =
+
+|moi|+1
+
+(cid:2)
+
+(cid:2)
+
+|sck|
+
+Deﬁnition 4 (Subtopic Popularity). Subtopic popularity is deﬁned as the
+likelihood of a particular subtopic. Formally, it is given as SP (¨tk) = SP (sck) =
+scs∈SC |scs| , where ¨tk denotes the subtopic represented by the subtopic string
+(cid:2)
+|tStrm| and |tStrm| denotes the frequency of
+cluster sck, |sck| =
+tStrm in CoKO(ko).
+
+tStrm∈sck
+
+(cid:3)
+
+|SC| + (1 − β) ∗ (cid:3)
+
+Based on Deﬁnition 4, the gain value of putting a subtopic string tStrr at
+
+log(r+1) , where tStrr ∈ sck, i.e., the gain value
+
+the r-th slot is given as: G(r) = SP (sck)
+builds upon the subtopic popularity of the subtopic string cluster that tStrk
+belongs to. The discounted cumulative gain of L with a cutoﬀ r is given as:
+DCG(r) = β ∗ N1+(r)
+r
+j=1 G(j), where N1+(r) denotes the number
+of distinct clusters that the top-r subtopic strings cover. If we view the cluster
+number |SC| as the number of possible subtopics, N1+(r)
+|SC|
+is used to represent the
+r
+j=1 G(j) aims to rank subtopic strings that indicate popular
+subtopic diversity.
+subtopics at higher positions. Analogous to the metric of D#-nDCG [18], we let
+β = 0.5. Inspired by the Maximum Marginal Relevance (MMR) [8] criterion
+that combines relevance and novelty in the context of text retrieval, Algorithm 1
+generates the target ranked list L by iteratively selecting the subtopic string
+that achieves the maximum margin.
+
+(cid:3)
+
+In particular, by Steps 1-6, from the subtopic string cluster that achieves
+the maximum subtopic popularity, the subtopic string that has the maximum
+expression power is selected as the ﬁrst element of L. By Steps 7-12, given the
+top-(j − 1) subtopic strings, the subtopic string that achieves the maximum
+margin (i.e., DCG(j) − DCG(j − 1)) when being selected as the j-th element
+of L is put at the j-th slot of L. Because the discounted cumulative gain value
+(DCG) combines both subtopic diversity and relevance, the obtained L thus
+captures a trade-oﬀ between subtopic diversity and popularity.
+
+Subtopic Mining via Modiﬁer Graph Clustering
+
+343
+
+Rank the subtopic strings of sck in order of their decreasing expression power;
+
+η: required size of L; SC = {sck}: the set of subtopic string clusters.
+
+Algorithm 1. The algorithm for generating the ranked list L
+Input:
+1: for each sck ∈ SC do
+2:
+3: end for
+∗
+4: Select the subtopic string cluster sc
+5: Select the subtopic string tStr
+6: Put tStr∗ at the ﬁrst slot of the target ranked list L and remove it from sc
+∗
+7: Set j = 2;
+8: while j ≤ η and |SC| > 0 do
+that meets: tStr
+9:
+10:
+11:
+12: end while
+
+at the j-th slot of L and remove tStr
+
+∗
+
+= arg max{scn∈SC}(DCG(j) − DCG(j − 1));
+
+Select tStr
+∗
+Put tStr
+j + +;
+
+∗
+
+= arg maxsck∈SC SP (sck);
+
+= arg maxtStrm∈sc∗ EP (tStrm);
+
+∗
+that meets: sc
+
+∗
+
+that meets: tStr
+
+∗
+
+;
+
+∗
+
+from the cluster it belongs to;
+
+5 Experiments
+
+5.1 Experimental Setup
+
+The publicly available topic set and resources (e.g., Chinese query log SogouQ,
+query suggestions and the ideal ranked list for each topic) from the Intent task
+of NTCIR-10 [17] are adopted, the top-100 result snippets of Google are used.
+Yu and Ren [24] have shown that the role-implicit queries are often question
+queries or verbose queries that merely require a speciﬁc answer. In this paper,
+we focus on role-explicit topics that generally have multiple subtopics, 6 role-
+implicit topics (i.e., 0244, 0245, 0249, 0256, 0270, 0283) are excluded, e.g., 0256:
+(cid:1270)(cid:1150)(cid:7269) RTF (what is RTF). The remaining 92 topics are used as Topic-Set-A.
+
+Fig. 3 (in Section 5.2) shows to what extent we can rely on the QKQL. The x-
+axes denote the count of instances that appeared in SogouQ. The y-axes denote
+the count of topics. The asterisk corresponds to co-session queries, the circle
+corresponds to candidate subtopic strings. We found that: 46 topics have co-
+session queries less than 10, 38 topics have candidate subtopic strings in SogouQ
+less than 10. For topics of this kind, the so called sparseness problem is a big
+trouble. By excluding the 38 topics from Topic-Set-A, of which the count of
+candidate subtopic strings in SogouQ is less than 10, we built the Topic-Set-B.
+Two typical methods [9, 16] for query intent inference are compared. Deng et
+al. [9] proposed the Click Frequency Inverse Query Frequency model for query
+clustering (denoted as CFIQF ). Under CFIQF, each query is represented by a
+vector of clicked documents. Sadikov et al. [16] performed intent inference by
+clustering the reﬁnements of a given query (denoted as RC ). A Markov graph
+is built based on the document click and session co-occurrence of the reﬁne-
+ments. Finally, the problem of reﬁnement clustering is reduced to the problem
+of Euclidean-vector clustering. As did by Sadikov et al. [16], the complete-linkage
+clustering algorithm is used for the two baselines.
+
+The metric D#-nDCG [18] suggested by NTCIR-10 [17] is used as the test
+metric, which is a linear combination of I-rec and D-nDCG. I-rec indicates the
+
+344
+
+H.-T. Yu and F. Ren
+
+proportion of subtopics covered by the top subtopic strings and measures di-
+versity. D-nDCG measures overall relevance across subtopics. In our study, we
+evaluate I-rec, D-nDCG, D#-nDCG with cutoﬀ values of 10 and 20.
+
+When quantifying the edges of a modiﬁer graph, we let λ1 = λ2 = λ3 = 1
+3 ,
+i.e. co-query, term-level co-session and term-level co-click were treated equally.
+For modiﬁer graph clustering, two parameter-free graph clustering algorithms
+Louvain [3] and LinLog [12] have been tested, the corresponding modiﬁer graph
+based approaches are denoted as MG-Lou and MG-Lin respectively.
+
+5.2 Experimental Results
+
+Based on Topic-Set-B, Table 3 shows the results with cutoﬀ values of l = 10&20.
+
+Table 3. Topic-Set-B based comparison with cutoﬀ values of l = 10&20
+
+I-rec@10 D-nDCG@10 D#-nDCG@10 I-rec@20 D-nDCG@20 D#-nDCG@20
+CFIQF(5)
+0.1782
+CFIQF(10) 0.3066
+CFIQF(15) 0.3093
+0.0353
+RC(5)
+0.0595
+RC(10)
+0.0806
+RC(15)
+MG-Lou
+0.4375
+0.4650
+MG-Lin
+
+0.1753
+0.2688
+0.2715
+0.0333
+0.0501
+0.0672
+0.4375
+0.4275
+
+0.1475
+0.2417
+0.3116
+0.0285
+0.0461
+0.0764
+0.4777
+0.4899
+
+0.1768
+0.2877
+0.2904
+0.0343
+0.0548
+0.0739
+0.4375
+0.4462
+
+0.1782
+0.3066
+0.3903
+0.0353
+0.0595
+0.1024
+0.5579
+0.5878
+
+0.1168
+0.1767
+0.2328
+0.0216
+0.0327
+0.0504
+0.3975
+0.3921
+
+As the complete-linkage clustering algorithm requires a predeﬁned cluster
+number, diﬀerent values (e.g., 5 is marked as (5)) were tested for the baselines.
+As shown in Table 3, the baseline methods exhibit diﬀerent performances due
+to diﬀerent cluster numbers. For example, the D#-nDCG@10 value of CFIQF is
+0.2904 (4th column) with a cluster number of 15, which is better than the values
+generated with cluster numbers of 5 and 10. However, the number of subtopics
+indeed varies from topic to topic. A predeﬁned cluster number can’t guarantee
+a natural subtopic mining. RC operates by clustering the query reﬁnements (es-
+sentially co-session queries) of a given topic, its low performance implies that
+the clustered reﬁnements greatly deviates from the ranked list by human asses-
+sors. By clustering the subtopic strings via co-click information, CFIQF shows
+a better performance than RC.
+
+Diﬀerent from the baseline methods that rely on QKQL, the modiﬁer graph
+based approaches make use of TKQL. The results show that both MG-Lou and
+MG-Lin outperform the baselines in terms of I-rec, D-nDCG and D#-nDCG. The
+reasons are: The proposed approaches work at a term level instead of a whole
+query level. Based on the TKQL, they can determine the subtopics of subtopic
+strings from diﬀerent resources rather than merely the queries of a query log. For
+example, though (cid:2814)(cid:2143)(cid:8984)(cid:10415)(cid:19515)(cid:16945)(Harry Potter reading) (Table 1) is not included
+in SogouQ, we can determine its underlying subtopic based on its composing
+modiﬁer (cid:19515)(cid:16945)(reading). On the contrary, the baseline methods will fail due to
+no click information. Leveraging on the two ad-hoc graph clustering algorithms,
+
+Subtopic Mining via Modiﬁer Graph Clustering
+
+345
+
+our modiﬁer graph based approaches can determine the possible subtopics per
+topic instead of a uniform cluster number.
+
+Based on Topic-Set-A, Table 4 shows the results with cutoﬀs of l = 10&20.
+
+Table 4. Topic-Set-A based comparison with cutoﬀ values of l = 10&20
+
+I-rec@10 D-nDCG@10 D#-nDCG@10 I-rec@20 D-nDCG@20 D#-nDCG@20
+CFIQF(5)
+0.1130
+CFIQF(10) 0.1449
+CFIQF(15) 0.1506
+0.0145
+RC(5)
+0.0391
+RC(10)
+0.0411
+RC(15)
+MG-Lou
+0.4111
+0.4121
+MG-Lin
+
+0.1086
+0.1401
+0.1468
+0.0153
+0.0373
+0.0392
+0.4182
+0.4119
+
+0.1042
+0.1352
+0.1430
+0.0160
+0.0355
+0.0373
+0.4253
+0.4117
+
+0.1130
+0.1449
+0.2142
+0.0145
+0.0391
+0.0543
+0.5334
+0.5309
+
+0.0714
+0.0890
+0.1242
+0.0104
+0.0230
+0.0282
+0.4024
+0.3945
+
+0.0922
+0.1169
+0.1692
+0.0125
+0.0311
+0.0413
+0.4679
+0.4627
+
+Compared with Topic-Set-B, Topic-Set-A contains 38 topics that have sparse
+QKQL. This is the very reason why the performances of the baseline methods are
+greatly impacted. For example, the best performance of CFIQF (D#-nDCG@20
+at the 7th column) is decreased from 0.3116 (Table 3) to 0.1692 (Table 4). In
+contrast, our modiﬁer graph based approaches exhibit stable performances. For
+example, the best performances (results in bold) in Tables 3 and 4 do not diﬀer
+a lot, which demonstrates that the modiﬁer graph based approaches are robust
+to the sparseness problem.
+
+To understand the impact that diﬀerent graph clustering algorithms may have
+on modiﬁer graph clustering, Fig. 4 illustrates the cluster number (i.e., the num-
+ber of subtopic string clusters) distribution based on Topic-Set-A. The asterisk
+represents the oﬃcial number of subtopics per topic. The circle and triangle rep-
+resent the cluster number per topic under the Louvain algorithm and the LinLog
+algorithm respectively.
+
+i
+
+s
+c
+p
+o
+t
+ 
+f
+o
+ 
+t
+n
+u
+o
+C
+
+45
+
+40
+
+35
+
+30
+
+25
+
+20
+
+15
+
+10
+
+5
+
+0
+
+ 
+0
+
+ 
+
+100
+
+ 
+
+Co−session queries
+Candidate subtopic strings
+
+5
+
+10
+
+15
+
+20
+
+25
+
+30
+
+35
+
+40
+
+45
+
+>=50
+
+Count of instances appeared in SogouQ
+
+r
+e
+b
+m
+u
+n
+ 
+r
+e
+t
+s
+u
+C
+
+l
+
+90
+
+80
+
+70
+
+60
+
+50
+
+40
+
+30
+
+20
+
+10
+
+ 
+
+0
+200
+
+Official
+Louvain algorithm
+LinLog algorithm
+
+210
+
+220
+
+230
+
+240
+
+250
+
+260
+
+270
+
+280
+
+290
+
+300
+
+Topic ID
+
+Fig. 3. The extent we can rely on QKQL
+
+Fig. 4. Cluster number distribution
+
+From Fig. 4, we found that: The two algorithms group the same modiﬁer graph
+into diﬀerent number of clusters due to diﬀerent optimization criteria, and the
+LinLog algorithm generally outputs smaller numbers of clusters. Unfortunately,
+both of the two algorithms commonly generate diﬀerent cluster numbers com-
+pared with the oﬃcial subtopic number. If we directly regard the cluster number
+
+346
+
+H.-T. Yu and F. Ren
+
+as the subtopic number (as we did in this paper), the approximated subtopic
+recall value would not be accurate enough. A particular algorithm should be
+devised for better clustering the modiﬁer graph.
+
+6 Conclusions and Future Work
+
+In this paper, we performed subtopic mining via modiﬁer graph clustering, which
+makes use of TKQL rather than QKQL. Compared with the baselines that treat
+a whole subtopic string or query as the minimum analysis unit, our modiﬁer
+graph based approaches achieve a better performance in terms of I-rec, D-nDCG
+and D#-nDCG. A limitation of our current study is that the proposed approach
+is tested against Chinese topics. Whether it works eﬀectively against English
+topics is planned as the future work. Moreover, devising a speciﬁc algorithm for
+modiﬁer graph clustering would be an interesting future research direction.
+
+Acknowledgements. This research has been partially supported by the Min-
+istry of Education, Science, Sports and Culture, Grant-in-Aid for Scientiﬁc Re-
+search (A), 22240021.
+
+References
+
+[1] Agrawal, R., Gollapudi, S., Halverson, A., Ieong, S.: Diversifying search results.
+
+In: Proceedings of the 2nd WSDM, pp. 5–14 (2009)
+
+[2] Beeferman, D., Berger, A.: Agglomerative clustering of a search engine query log.
+
+In: Proceedings of the 6th KDD, pp. 407–416 (2000)
+
+[3] Blondel, V.D., Guillaume, J.L., Lambiotte, R., Lefebvre, E.: Fast unfolding of
+
+communities in large networks. Journal of Statistical Mechanics (2008)
+
+[4] Boldi, P., Bonchi, F., Castillo, C., Donato, D., Gionis, A., Vigna, S.: The query-
+ﬂow graph: model and applications. In: Proceedings of the 17th CIKM, pp. 609–
+618 (2008)
+
+[5] Bonchi, F., Perego, R., Silvestri, F., Vahabi, H., Venturini, R.: Recommendations
+for the long tail by term-query graph. In: Proceedings of the 20th WWW, pp.
+15–16 (2011)
+
+[6] Bonchi, F., Perego, R., Silvestri, F., Vahabi, H., Venturini, R.: Eﬃcient query
+recommendations in the long tail via center-piece subgraphs. In: Proceedings of
+the 35th SIGIR, pp. 345–354 (2012)
+
+[7] Cao, B., Sun, J.T., Xiang, E.W., Hu, D.H., Yang, Q., Chen, Z.: PQC: personalized
+
+query classiﬁcation. In: Proceedings of the 18th CIKM, pp. 1217–1226 (2009)
+
+[8] Carbonell, J., Goldstein, J.: The use of mmr, diversity-based reranking for reorder-
+ing documents and producing summaries. In: Proceedings of the 21st SIGIR, pp.
+335–336 (1998)
+
+[9] Deng, H., King, I., Lyu, M.R.: Entropy-biased models for query representation on
+
+the click graph. In: Proceedings of the 32nd SIGIR, pp. 339–346 (2009)
+
+[10] Hu, Y., Qian, Y., Li, H., Jiang, D., Pei, J., Zheng, Q.: Mining query subtopics
+
+from search log data. In: Proceedings of the 35th SIGIR, pp. 305–314 (2012)
+
+Subtopic Mining via Modiﬁer Graph Clustering
+
+347
+
+[11] Jones, R., Klinkner, K.L.: Beyond the session timeout: automatic hierarchical
+segmentation of search topics in query logs. In: Proceedings of the 17th CIKM,
+pp. 699–708 (2008)
+
+[12] Noack, A.: Energy models for graph clustering. Journal of Graph Algorithms and
+
+Applications 11(2), 453–480 (2007)
+
+[13] Radlinski, F., Dumais, S.: Improving personalized web search using result diver-
+
+siﬁcation. In: Proceedings of the 29th SIGIR, pp. 691–692 (2006)
+
+[14] Radlinski, F., Szummer, M., Craswell, N.: Inferring query intent from reformula-
+
+tions and clicks. In: Proceedings of the 19th WWW, pp. 1171–1172 (2010)
+
+[15] Ren, F., Sohrab, M.G.: Class-indexing-based term weighting for automatic text
+
+classiﬁcation. Information Sciences 236, 109–125 (2013)
+
+[16] Sadikov, E., Madhavan, J., Wang, L., Halevy, A.: Clustering query reﬁnements by
+
+user intent. In: Proceedings of the 19th WWW, pp. 841–850 (2010)
+
+[17] Sakai, T., Dou, Z., Yamamoto, T., Liu, Y., Zhang, M., Song, R.: Overview of the
+NTCIR-10 INTENT-2 task. In: Proceedings of NTCIR-10 Workshop, pp. 94–123
+(2013)
+
+[18] Sakai, T., Song, R.: Evaluating diversiﬁed search results using per-intent graded
+
+relevance. In: Proceedings of the 34th SIGIR, pp. 1043–1052 (2011)
+
+[19] Song, R., Zhang, M., Sakai, T., Kato, M.P., Liu, Y., Sugimoto, M., Wang, Q.,
+Orii, N.: Overview of the NTCIR-9 INTENT task. In: Proceedings of NTCIR-9
+Workshop Meeting, pp. 82–105 (2011)
+
+[20] Song, Y., Zhou, D., He, L.: Query suggestion by constructing term-transition
+
+graphs. In: Proceedings of the 5th WSDM, pp. 353–362 (2012)
+
+[21] Wang, X., Chakrabarti, D., Punera, K.: Mining broad latent query aspects from
+
+search sessions. In: Proceedings of the 15th KDD, pp. 867–876 (2009)
+
+[22] Wen, J.R., Nie, J.Y., Zhang, H.J.: Clustering user queries of a search engine. In:
+
+Proceedings of the 10th WWW, pp. 162–168 (2001)
+
+[23] Yin, X., Shah, S.: Building taxonomy of web search intents for name entity queries.
+
+In: Proceedings of the 19th WWW, pp. 1001–1010 (2010)
+
+[24] Yu, H., Ren, F.: Role-explicit query identiﬁcation and intent role annotation. In:
+
+Proceedings of the 21st CIKM, pp. 1163–1172 (2012)
+
+

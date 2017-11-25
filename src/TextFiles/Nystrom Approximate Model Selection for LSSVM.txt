@@ -1,0 +1,1416 @@
+Nystr¨om Approximate Model Selection for LSSVM
+
+Lizhong Ding and Shizhong Liao
+
+School of Computer Science and Technology
+
+Tianjin University, Tianjin 300072, China
+
+szliao@tju.edu.cn
+
+Abstract. Model selection is critical to least squares support vector machine
+(LSSVM). A major problem of existing model selection approaches is that a
+standard LSSVM needs to be solved with O(n3) complexity for each iteration,
+where n is the number of training examples. In this paper, we propose an ap-
+proximate approach to model selection of LSSVM. We use Nystr¨om method to
+approximate a given kernel matrix by a low rank representation of it. With such
+approximation, we ﬁrst design an efﬁcient LSSVM algorithm, and then theoreti-
+cally analyze the effect of kernel matrix approximation on the decision function
+of LSSVM. Based on the matrix approximation error bound of Nystr¨om method,
+we derive a model approximation error bound, which is a theoretical guarantee of
+approximate model selection. We ﬁnally present an approximate model selection
+scheme, whose complexity is lower than existing approaches. Experimental re-
+sults on benchmark datasets demonstrate the effectiveness of approximate model
+selection.
+
+Keywords: model selection, Nystr¨om method, matrix approximation,
+squares support vector machine.
+
+least
+
+1 Introduction
+
+Support vector machine (SVM) [18] is a learning system for training linear learning
+machines in the kernel-induced feature spaces, while controlling the capacity to prevent
+overﬁtting by generalization theory. It can be formulated as a quadratic programming
+problem with linear inequality constraints. The least squares support vector machine
+(LSSVM) [16] is a least squares version of SVM, which considers equality constraints
+instead of inequalities for classical SVM. As a result, the solution of LSSVM follows
+directly from solving a system of linear equations, instead of quadratic programming.
+Model selection is an important issue in LSSVM research. It involves the selection
+of kernel function and associated kernel parameters and the selection of regularization
+parameter. Typically, the form of kernel function will be determined as several types,
+such as polynomial kernel and radial basis function (RBF) kernel. In this situation, the
+selection of kernel function amounts to tuning the kernel parameters. Model selection
+can be reduced to the selection of kernel parameters and regularization parameter which
+minimize the expectation of test error [4]. We usually refer to these parameters collec-
+tively as hyperparameters. Common model selection approaches mainly adopt a nested
+two-layer inference [11], where the inner layer trains the classiﬁer for ﬁxed hyperpa-
+rameters and the outer layer tunes the hyperparameters to minimize the generalization
+
+P.-N. Tan et al. (Eds.): PAKDD 2012, Part I, LNAI 7301, pp. 282–293, 2012.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2012
+
+Nystr¨om Approximate Model Selection for LSSVM
+
+283
+
+error. The generalization error can be estimated either via testing on some unused data
+(hold-out testing or cross validation) or via a theoretical bound [17,5].
+
+The k-fold cross validation gives an excellent estimate of the generalization error
+[9] and the extreme form of cross validation, leave-one-out (LOO), provides an almost
+unbiased estimate of the generalization error [14]. However, the naive model selection
+strategy based on cross validation, which adopts a grid search in the hyperparameters
+space, unavoidably brings high computational complexity, since it would train LSSVM
+for every possible value of the hyperparameters vector. Minimizing the estimate bounds
+of the generalization error is an alternative to model selection, which is usually realized
+by the gradient descent techniques. The commonly used estimate bounds include span
+bound [17] and radius margin bound [5]. Generally, these methods using the estimate
+bounds reduce the whole hyperparameters space to a search trajectory in the direction
+of gradient descent, to accelerate the outer layer of model selection, but multiple times
+of LSSVM training have to be implemented in the inner layer to iteratively attain the
+minimal value of the estimates. Training LSSVM is equivalent to computing the inverse
+of a full n × n matrix, so its complexity is O(n3), where n is the number of training ex-
+amples. Therefore, it is prohibitive for the large scale problems to directly train LSSVM
+for every hyperparameters vector on the search trajectory. Consequently, efﬁcient model
+selection approaches via the acceleration of the inner computation are imperative.
+
+As pointed out in [5,3], the model selection criterion is not required to be an unbiased
+estimate of the generalization error, instead the primary requirement is merely for the
+minimum of the model selection criterion to provide a reliable indication of the mini-
+mum of the generalization error in hyperparameters space. We argue that it is sufﬁcient
+to calculate an approximate criterion that can discriminate the optimal hyperparame-
+ters from the candidates. Such considerations drive the proposal of approximate model
+selection approach for LSSVM.
+
+Since the high computational cost for calculating the inverse of a kernel matrix is a
+major problem of LSSVM, we consider to approximate a kernel matrix by a “nice” ma-
+trix with a lower computational cost when calculating its inverse. The Nystr¨om method
+is an effective technique for generating a low rank approximation for the given kernel
+matrix [19,13,8]. Using the low rank approximation, we design an efﬁcient algorithm
+for solving LSSVM, whose complexity is lower than O(n3). We further derive a model
+approximation error bound to measure the effect of Nystr¨om approximation on the deci-
+sion function of LSSVM. Finally, we present an efﬁcient approximate model selection
+scheme. It conforms to the two-layer iterative procedure, but the inner computation has
+been realized more efﬁciently. By rigorous experiments on several benchmark datasets,
+we show that approximate model selection can signiﬁcantly improve the efﬁciency of
+model selection, and meanwhile guarantee low generalization error.
+
+The rest of the paper is organized as follows. In Section 2, we give a brief introduc-
+tion of LSSVM and a reformulation of it. In Section 3, we present an efﬁcient algorithm
+for solving LSSVM. In Section 4, we analyze the effect of Nystr¨om approximation on
+the decision function of LSSVM. In Section 5, we present an approximate model selec-
+tion scheme for LSSVM. In Section 6, we report experimental results. The last section
+gives the conclusion.
+
+284
+
+L. Ding and S. Liao
+
+2 Least Squares Support Vector Machine
+We use X to denote the input space and Y the output domain. Usually we will have
+X ⊆ Rd, Y = {−1, 1} for binary classiﬁcation. The training set is denoted by
+
+S = ((x1, y1) , . . . , (xn, yn)) ∈ (X × Y)n .
+
+We seek to construct a linear classiﬁer, f (x) = w· φ(x) + b, in a feature space F , deﬁned
+by a feature mapping of the input space, φ : X → F . The parameters (w, b) of the linear
+classiﬁer are given by the minimizer of a regularized least-squares training function
+
+L =
+
+(cid:5)w(cid:5)2 +
+
+1
+2
+
+1
+2μ
+
+n(cid:2)
+
+i=1
+
+[yi − w · φ(xi) − b]2,
+
+(1)
+
+where μ > 0 is called regularization parameter. The basic training algorithm for LSSVM
+[16] views the regularized loss function (1) as a constrained minimization problem
+
+n(cid:2)
+
+1
+2μ
+
+(cid:5)w(cid:5)2 +
+1
+2
+εi = yi − w · φ(xi) − b.
+
+ε2
+i
+
+i=1
+
+,
+
+min
+
+s.t.
+
+Further, we can obtain the dual form of Equation (2) as follows
+
+n(cid:2)
+
+j=1
+
+α jφ(x j) · φ(xi) + b + μαi = yi,
+
+i = 1, 2, . . . , n,
+
+(2)
+
+(3)
+
+(cid:3)
+
+αi = 0. Noting that φ(xi)· φ(x j) corresponds to the kernel function K(xi, x j),
+
+where
+we can write Equation (3) in a matrix form
+
+n
+i=1
+
+(cid:4)
+
+(cid:5) (cid:4)
+α
+b
+
+(cid:5)
+
+=
+
+(cid:4)
+
+(cid:5)
+
+y
+0
+
+,
+
+(4)
+
+K + μIn 1
+0
+
+1T
+
+i, j=1, In is the n× n identity matrix, 1 is a column vector of n ones,
+where K = [K(xi, x j)]n
+α = (α1, α2, . . . , αn)T ∈ Rn is a vector of Lagrange multipliers, and y ∈ Yn is the label
+vector.
+
+If we let Kμ,n = K + μIn, we can write the ﬁrst row of Equation (4) as
+
+−1
+μ,n1b) = y.
+μ,n(y−1b). Replacing α with K
+−1
+Therefore, α = K
+(4), we can obtain
+−1
+μ,n1b = 1TK
+
+(5)
+μ,n(y−1b) in the second row of Equation
+−1
+−1
+μ,ny.
+
+Kμ,n(α + K
+
+1TK
+
+(6)
+
+The system of linear equations (4) can then be rewritten as
+
+(cid:4)
+
+0
+Kμ,n
+−1
+0T 1TK
+μ,n1
+
+(cid:5) (cid:4)
+
+(cid:5)
+−1
+α + K
+μ,n1b
+b
+
+(cid:4)
+
+=
+
+y
+−1
+1TK
+μ,ny
+
+(cid:5)
+
+.
+
+(7)
+
+Nystr¨om Approximate Model Selection for LSSVM
+
+285
+
+Since Kμ,n = K + μIn is positive deﬁnite, the inverse of Kμ,n exists.
+
+Equation (7) can be solved as follows: we ﬁrst solve
+
+Kμ,nρ = 1
+
+and
+
+Kμ,nν = y.
+
+The solution (α, b) of Equation (4) are then given by
+
+(8)
+
+(9)
+
+b =
+
+1Tν
+1Tρ
+
+and
+
+α = ν − ρb.
+(cid:3)
+
+The decision function of LSSVM can be written as f (x) =
+
+n
+i=1
+
+αiK(xi, x) + b.
+
+If Equation (8) is solved, we can easily obtain the solution of LSSVM. However, the
+complexity of calculating the inverse of the matrix Kμ,n is O(n3). In the following, we
+will demonstrate that Nystr¨om method can be used to speed up this process.
+
+3 Approximating LSSVM Using Nystr¨om Method
+
+We ﬁrst introduce a fundamental result of matrix computations [10]: for any matrix
+A ∈ Rm×n and positive integer k, there exists a matrix Ak such that
+
+(cid:5)A − Ak(cid:5)ξ =
+
+min
+
+D∈Rm×n:rank(D)≤k
+
+(cid:5)A − D(cid:5)ξ
+
+for ξ = F, 2. (cid:5) · (cid:5)F and (cid:5) · (cid:5)2 denote the Frobenius norm and the spectral norm. Such Ak
+is called the optimal rank k approximation of the matrix A. It can be computed through
+the singular value decomposition (SVD) of A. If A ∈ Rn×n is symmetric positive semi-
+deﬁnite (SPSD), A = UΣUT, where U is a unitary matrix and Σ = diag(σ1, . . . , σn) is
+a real diagonal matrix with σ1 ≥ ··· ≥ σn ≥ 0. For k ≤ rank(A), Ak =
+σiUiUiT,
+where Ui is the ith column of U.
+We now brieﬂy review the Nystr¨om method [8,19]. Let K ∈ Rn×n be an SPSD matrix.
+The Nystr¨om method generates a low rank approximation of K using a subset of the
+columns of the matrix. Suppose we randomly sample c columns of K uniformly without
+replacement. Let C denote the n × c matrix formed by theses columns. Let W be the
+c × c matrix consisting of the intersection of these c columns with the corresponding
+c rows of K. Without loss of generality, we can rearrange the columns and rows of K
+based on this sampling such that:
+(cid:6)
+
+k
+i=1
+
+(cid:3)
+
+(cid:7)
+
+(cid:6)
+
+(cid:7)
+
+K =
+
+W KT
+21
+K21 K22
+
+W
+K21
+
+,
+
+C =
+
+.
+
+(10)
+
+Since K is SPSD, W is also SPSD. The Nystr¨om method uses W and C from Equation
+(10) to construct a rank k approximation (cid:8)K of K for k ≤ c deﬁned by:
+
+(cid:8)K = CW+
+
+k CT ≈ K,
+(cid:3)
+
+(11)
+
+where Wk is the optimal rank k approximation to W and W+
+generalized inverse of Wk. Since W is SPSD, Wk =
+(cid:3)
+
+k is the Moore-Penrose
+=
+
+σiUiUiT and therefore W+
+k
+
+k
+i=1
+
+i UiUiT for k ≤ rank(W).
+σ−1
+
+k
+i=1
+
+286
+
+L. Ding and S. Liao
+
+If we write the SVD of W as W = UW ΣWUT
+= UW,kΣ+
+
+W+
+k
+
+W, then
+W,kUT
+,
+W,k
+
+(12)
+
+where ΣW,k and UW,k correspond the top k singular values and singular vectors of W.
+The diagonal elements of ΣW,k are all positive, since W is SPSD and k ≤ rank(W).
+
+If we plug Equation (12) into Equation (11), we can obtain
+
+(cid:8)K = CUW,kΣ+
+W,kUT
+W,kCT
+(cid:14)
+(cid:15)T
+(cid:9)
+= CUW,k
+CUW,k
+(cid:10)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:11)(cid:12)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:13)
+
+Σ+
+(cid:10)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:11)(cid:12)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:13)
+W,k
+
+Σ+
+W,k
+
+(cid:9)
+
+V
+
+VT
+
+(cid:9)
+
+∈ Rn×k.
+
+,
+
+(13)
+
+Σ+
+W,k
+
+where we let V := CUW,k
+For LSSVM, we need to solve the inverse of K + μIn. To reduce the computational
+cost, we intend to use the inverse of (cid:8)K + μIn as an approximation of the inverse of
+K + μIn. Since VVT is positive semi-deﬁnite, the invertibility of (cid:8)K + μIn is guaranteed.
+To efﬁciently calculate the inverse of (cid:8)K + μIn, we further introduce the Woodbury
+
+formula [12]
+
+(A + XYZ)
+
+−1 = A
+
+−1 − A
+
+−1X
+
+(cid:16)
+Y
+
+−1 + Z A
+
+−1X
+
+(cid:17)−1
+
+−1,
+
+Z A
+
+where A ∈ Rn×n, X ∈ Rn×k, Y ∈ Rk×k and Z ∈ Rk×n.
+
+Now, we can obtain
+
+(cid:17)−1
+
+−1
+
+(μIn + K)
+≈ (cid:16)
+μIn + VVT
+(cid:14)
+(cid:16)
+In − V
+1
+μ
+
+=
+
+μIk + VTV
+
+(cid:17)−1
+
+(cid:15)
+
+VT
+
+.
+
+(14)
+
+(15)
+
+The last equality of Equation (15) is directly derived from the Woodbury formula with
+A = μIn, X = V, Y = Ik and Z = VT.
+
+The essential step of solving LSSVM is to solve Equation (8). If we let u = [ρ, ν]
+
+and z = [1, y], Equation (8) is equivalent to
+
+(μIn + K) u = z.
+
+Using Equation (15) to replace μIn + K with μIn + (cid:8)K, we can obtain
+
+(cid:14)
+
+(cid:16)
+
+z − V
+
+u =
+
+1
+μ
+
+(cid:17)−1
+
+(cid:15)
+VT z
+
+.
+
+μIk + VTV
+
+We further introduce a temporary variable t to efﬁciently solve Equation (16):
+
+(cid:17)
+
+(cid:16)
+μIk + VTV
+μ (z − V t).
+1
+
+t :
+
+u =
+
+t = VT z,
+
+We now present an algorithm of solving LSSVM (Algorithm 1).
+
+We estimate the computational complexity of Algorithm 1 in Theorem 1.
+
+(16)
+
+(17)
+
+Nystr¨om Approximate Model Selection for LSSVM
+
+287
+
+Algorithm 1. Approximating LSSVM using Nystr¨om method
+Input: n × n kernel matrix K, label vector y, c < n, k < c, μ;
+Output: (α, b);
+1: Calculate C, UW,k and Σ+
+(cid:9)
+W,k according to (10) and (12) using Nystr¨om method;
+Σ+
+2: Calculate V = CUW,k
+W,k according to (13);
+3: Let z = [1, y] and solve the linear system
+
+(cid:16)
+μIk + VTV
+
+t = VT z to obtain t;
+
+(cid:17)
+
+4: Calculate u =
+
+5: Calculate b =
+return (α, b);
+
+1
+
+μ (z − V t) and let ρ, ν be the ﬁrst and second column of u;
+1Tρ and α = ν − ρb according to (9);
+
+1Tν
+
+Theorem 1. The computational complexity of Algorithm 1 is O(c3 + nck).
+
+(cid:17)
+
+(cid:16)
+
+μIk + VTV
+
+Proof. The computational complexity of step 1 is O(c3), since the main computational
+part of this step is the SVD on W. In step 2, matrix multiplications are required, so
+is solved by computing
+its complexity is O(kcn). In step 3, the inverse of
+Cholesky factorization of it with the complexity O(k3). The complexity of VT z is O(nk).
+The last matrix multiplication to obtain t requires O(k2). Therefore the total complexity
+of step 3 is O(k3 + nk). The complexity of step 4 is O(nk). The complexity of step 5 is
+O(n), since the multiplication and subtraction between two vectors need to be done. For
+Nystr¨om approximation, we have k < c < n, so the total complexity of Algorithm 1 is
+O(c3 + nck). For large scale problems, we usually set c (cid:9) n.
+Compared to Related Work. Theorem 1 shows that if Nystr¨om approximation is
+given, we can solve LSSVM in O(k3). Williams et al. [19] used Nystr¨om method to
+speed up Gaussian Process (GP) regression. After Nystr¨om approximation was given,
+they solved GP regression with O(nk2) complexity. Cortes et al. [6] scaled kernel ridge
+regression (KRR) using Nystr¨om method. The complexity of their method is O(n2c)
+with Nystr¨om approximation (Section 3.3 of [6]).
+
+4 Error Analysis
+
+In this section, we analyze the effect of Nystr¨om approximation on the decision function
+of LSSVM.
+
+We assume that approximation is only used in training. At testing time the true kernel
+function is used. This scenario has been considered by [6]. The decision function f
+derived with the exact kernel matrix K is deﬁned by
+
+f (x) =
+
+n(cid:2)
+
+i=1
+
+αiK(x, xi) + b =
+
+(cid:5)T (cid:4)
+
+(cid:4)
+α
+b
+
+(cid:5)
+
+,
+
+kx
+1
+
+where kx = (K(x, x1), . . . , K(x, xn))T. We deﬁne κ > 0 such that K(x, x) ≤ κ and
+(cid:8)K(x, x) ≤ κ.
+
+288
+
+L. Ding and S. Liao
+
+We ﬁrst consider the effect of Nystr¨om approximation on ρ of Equation (8). Let ρ(cid:10)
+
+denote the solution of ((cid:8)K + μIn)ρ(cid:10) = 1. We can write
+−11 − (K + μIn)
+
+ρ(cid:10) − ρ = ((cid:8)K + μIn)
+
+−11
+
+((cid:8)K + μIn)
+For last equality, we used the identity A
+invertible matrices A, B. Thus, (cid:5)ρ(cid:10) − ρ(cid:5)2 can be bounded as follows:
+
+−1((cid:8)K − K)(K + μIn)
+−1 − B
+
+−1 = −A
+
+−1(A − B)B
+
+−1
+
+1.
+
+= − (cid:18)
+
+(cid:19)
+
+(cid:5)ρ(cid:10) − ρ(cid:5)2 ≤ (cid:5)((cid:8)K + μIn)
+
+−1(cid:5)2 (cid:5)(cid:8)K − K(cid:5)2 (cid:5)(K + μIn)
+
+−1(cid:5)2 (cid:5)1(cid:5)2
+
+(18)
+
+−1 for any two
+
+≤ (cid:5)1(cid:5)2
+
+μ2
+
+√
+
+n
+μ2
+
+(cid:5)(cid:8)K − K(cid:5)2 =
+
+(cid:5)(cid:8)K − K(cid:5)2.
+
+(19)
+
+Since (cid:8)K and K are positive semi-deﬁnite matrices, the eigenvalues of (cid:8)K+μIn and K+μIn
+are larger than or equal to μ. Therefore the eigenvalues of ((cid:8)K + μIn)
+−1 and (K + μIn)
+−1
+are less than or equal to 1/μ.
+
+We further consider ν of Equation (8). Replacing 1 with y, we can obtain the similar
+
+bound
+
+(cid:5)ν(cid:10) − ν(cid:5)2 ≤ (cid:5)y(cid:5)2
+
+μ2
+
+(cid:5)(cid:8)K − K(cid:5)2 =
+
+√
+
+n
+μ2
+
+(cid:5)(cid:8)K − K(cid:5)2.
+
+(20)
+
+As the assumptions, we use the true kernel function at testing time, so no approxi-
+mation affects kx. For simplicity, we assume the offset b to be a constant ζ. Therefore,
+the approximate decision function f
+(cid:4)
+(cid:5)T
+α
+ζ
+
+is given by f
+(cid:4)
+
+(x) = [α(cid:10)
+(cid:5)T (cid:4)
+(cid:5)
+
+= (α(cid:10) − α)T kx.
+
+(x) − f (x) =
+
+(cid:4)
+α(cid:10) − α
+
+We can obtain
+
+; ζ]T[kx; 1].
+
+(cid:5)T −
+
+(cid:4)
+α(cid:10)
+ζ
+
+(21)
+
+⎛⎜⎜⎜⎜⎜⎝
+
+⎞⎟⎟⎟⎟⎟⎠
+
+=
+
+(cid:5)
+
+(cid:10)
+
+(cid:10)
+
+(cid:10)
+
+f
+
+kx
+1
+
+kx
+1
+
+0
+
+By Schwarz inequality,
+
+√
+nκ(cid:5)α(cid:10) − α(cid:5)2.
+From Equation (9), we know that α = ν − ρb = ν − ρζ, so
+
+(x) − f (x)| ≤ (cid:5)α(cid:10) − α(cid:5)2(cid:5)kx(cid:5)2 =
+
+| f
+
+(cid:10)
+
+(cid:5)α(cid:10) − α(cid:5)2 ≤ (cid:5)ν(cid:10) − ν(cid:5)2 + ζ(cid:5)ρ − ρ(cid:10)(cid:5)2
+(cid:6) √
+n
+μ2
+
+(cid:5)(cid:8)K − K(cid:5)2 + ζ
+
+√
+n
+μ2
+
+≤
+
+(cid:7)
+
+(cid:5)(cid:8)K − K(cid:5)2
+
+≤ (1 + ζ)
+
+(cid:5)(cid:8)K − K(cid:5)2.
+
+(22)
+
+(23)
+
+√
+
+n
+μ2
+
+√
+n
+n2μ2
+0
+
+We let μ0 = μ/n. Substituting the upper bound of (cid:5)α(cid:10) − α(cid:5)2 into Equation (22), we can
+obtain
+
+(x) − f (x)| ≤ √
+
+(cid:10)
+
+| f
+
+nκ(1 + ζ)
+
+(cid:5)(cid:8)K − K(cid:5)2 =
+
+(cid:5)(cid:8)K − K(cid:5)2.
+
+κ(1 + ζ)
+
+nμ2
+0
+
+(24)
+
+We further introduce a kernel matrix approximation error bound of Nystr¨om method
+[13] to upper bound (cid:5)(cid:8)K − K(cid:5)2.
+
+(cid:5)K − (cid:8)K(cid:5)F ≤ (cid:5)K − Kk(cid:5)F + 
+(cid:3)
+
+⎡⎢⎢⎢⎢⎢⎢⎢⎣
+⎛⎜⎜⎜⎜⎜⎜⎝ n
+
+c
+
+(cid:2)
+
+i∈D(c)
+
+⎞⎟⎟⎟⎟⎟⎟⎠
+
+⎛⎜⎜⎜⎜⎜⎜⎜⎝
+
+Kii
+
+(cid:29)(cid:30)
+
+1
+2
+
+⎞⎟⎟⎟⎟⎟⎟⎟⎠
+⎤⎥⎥⎥⎥⎥⎥⎥⎦
+
+,
+
+K2
+ii
+
++ η max(nKii)
+
+n(cid:2)
+
+i=1
+
+n
+
+Nystr¨om Approximate Model Selection for LSSVM
+
+289
+
+Theorem 2. Let K ∈ Rn×n be an SPSD matrix. Assume that c columns of K are sampled
+uniformly at random without replacement, let (cid:8)K be the rank-k Nystr¨om approximation
+log(2/δ)g(c,n−c)
+to K, and let Kk be the best rank-k approximation to K. For  > 0, η =
+1−1/(2 max{a,s}), if c ≥ 64k/4, then with probability at least 1 − δ,
+with g(a, s) =
+
+a+s−1/2
+
+(cid:9)
+
+as
+
+·
+
+1
+
+c
+
+i∈D(c) Kii is the sum of largest c diagonal entries of K.
+
+where
+Since (cid:5)K − (cid:8)K(cid:5)2 ≤ (cid:5)K − (cid:8)K(cid:5)F, if we combine Equation (24) with Theorem 2, we can
+directly obtain the following theorem.
+Theorem 3. Let K ∈ Rn×n be an SPSD matrix. Assume that c columns of K are sampled
+uniformly at random without replacement, let (cid:8)K be the rank-k Nystr¨om approximation
+log(2/δ)g(c,n−c)
+to K, and let Kk be the best rank-k approximation to K. For  > 0, η =
+1−1/(2 max{a,s}), if c ≥ 64k/4, then with probability at least 1 − δ,
+with g(a, s) =
+⎞⎟⎟⎟⎟⎟⎟⎟⎟⎟⎟⎠ ,
+⎛⎜⎜⎜⎜⎜⎜⎜⎜⎜⎜⎝
+⎞⎟⎟⎟⎟⎟⎟⎟⎠
+⎤⎥⎥⎥⎥⎥⎥⎥⎦
+
+(x) − f (x)| ≤ κ(1 + ζ)
+nμ2
+0
+
+(cid:5)K − Kk(cid:5)F + 
+
++ η max(nKii)
+
+⎛⎜⎜⎜⎜⎜⎜⎝ n
+
+(cid:2)
+
+as
+
+a+s−1/2
+
+n(cid:2)
+
+(cid:29)(cid:30)
+
+(cid:10)
+
+| f
+
+K2
+ii
+
+⎞⎟⎟⎟⎟⎟⎟⎠
+
+⎛⎜⎜⎜⎜⎜⎜⎜⎝
+
+c
+
+i∈D(c)
+
+⎡⎢⎢⎢⎢⎢⎢⎢⎣
+
+Kii
+
+n
+
+i=1
+
+(cid:9)
+
+·
+
+1
+
+1
+2
+
+c
+
+(cid:3)
+
+where
+
+i∈D(c) Kii is the sum of largest c diagonal entries of K.
+
+Theorem 3 measures the effect of kernel matrix approximation on the decision func-
+tion of LSSVM. It enables us to bound the relative performance of LSSVM when the
+Nystr¨om method is used to approximate the kernel matrix. We refer to the bound given
+in Theorem 3 as a model approximation error bound.
+
+5 Approximate Model Selection for LSSVM
+
+In order to ﬁnd the hyperparameters that minimize the generalization error of LSSVM,
+many model selection approaches have been proposed, such as the cross validation,
+span bound [17], radius margin bound [5], PRESS criterion [1] and so on. However,
+when optimizing model selection criteria, all these approaches need to solve LSSVM
+completely in the inner layer for each iteration.
+
+Here we discuss the problem of approximate model selection. We argue that for
+model selection purpose, it is sufﬁcient to calculate an approximate criterion that can
+discriminate the optimal hyperparameters from candidates. Theorem 3 shows that when
+Nystr¨om approximation is used, the change of learning results of LSSVM is bounded,
+which is a theoretical support for approximate model selection. In the following, we
+present an approximate model selection scheme, as shown in Algorithm 2.
+
+(cid:16)
+
+(cid:17)
+
+(cid:16)−γ(cid:5)xi − x j(cid:5)2
+
+(cid:17)
+
+to describe the scheme, but
+
+We use the RBF kernel K
+
+xi, x j
+
+= exp
+
+this scheme is also suitable for other kernel types.
+
+290
+
+L. Ding and S. Liao
+
+Algorithm 2. Approximate Model Selection Scheme for LSSVM
+Input: S = {(xi, yi)}n
+i=1;
+Output: (γ, μ)opt;
+Initialize: (γ, μ) = (γ0, μ0);
+repeat
+
+1: Generate kernel matrix K;
+2: Calculate α and b for LSSVM with K and μ using Algorithm 1;
+3: Calculate model selection criterion T using α and b;
+4: Update (γ, μ) to minimize T ;
+until the criterion T is minimized ;
+return (γ, μ)opt;
+
+Let S denote the iteration steps of optimizing model selection criteria. The complex-
+ity of solving LSSVM by calculating the inverse of the exact kernel matrix is O(n3). For
+radius margin bound or span bound [5], a standard LSSVM needs to be solved in the
+inner layer for each iteration, so the total complexity of these two methods is O(S n3).
+For PRESS criterion [1], the inverse of kernel matrix also needs to be calculated for
+each iteration, so its complexity is O(S n3). From Theorem 1, we know that using Algo-
+rithm 1, we could solve LSSVM in O(c3 + nck). Therefore, if we use the above model
+selection criteria in the outer layer, the complexity of approximate model selection is
+O(S (c3 + nck)). For t-fold cross validation, let S γ and S μ denote the grid steps of γ and
+μ. If LSSVM is directly solved, the complexity of t-fold cross validation is O(tS γS μn3).
+However, the complexity of approximate model selection using t-fold cross validation
+as outer layer criterion will be O(tS γS μ(c3 + nck)).
+
+6 Experiments
+
+In this section, we conduct experiments on several benchmark datasets to demonstrate
+the effectiveness of approximate model selection.
+
+6.1 Experimental Scheme
+
+The benchmark datasets in our experiments are introduced in [15], as shown in Table 1.
+For each dataset, there are 100 random training and test pre-deﬁned partitions1 (except
+20 for the Image and Splice dataset). The use of multiple benchmarks means that the
+evaluation is more robust as the selection of data sets that provide a good match to the
+inductive bias of a particular classiﬁer becomes less likely. Likewise, the use of multiple
+partitions provides robustness against sensitivity to the sampling of data to form training
+and test sets.
+
+In R¨atsch’s experiment [15], model selection is performed on the ﬁrst ﬁve training
+sets of each dataset. The median values of the hyperparameters over these ﬁve sets are
+then determined and subsequently used to evaluate the error rates throughout all 100
+partitions. However, for this experimental scheme, some of the test data is no longer
+
+1 http://www.fml.tuebingen.mpg.de/Members/raetsch/benchmark
+
+Nystr¨om Approximate Model Selection for LSSVM
+
+291
+
+Table 1. Datasets used in experiments
+
+Dataset
+
+Thyroid
+Heart
+Breast
+Banana
+Ringnorm
+Twonorm
+Waveform
+Diabetes
+Flare solar
+German
+Splice
+Image
+
+Features
+
+Training
+
+5
+13
+9
+2
+20
+20
+21
+8
+9
+20
+60
+18
+
+140
+170
+200
+400
+400
+400
+400
+468
+666
+700
+1000
+1300
+
+Test
+
+75
+100
+77
+4900
+7000
+7000
+4600
+300
+400
+300
+2175
+1010
+
+Replications
+
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+20
+20
+
+statistically “pure” since it has been used during model selection. Furthermore, the use
+of median of the hyperparameters would introduce an optimistic bias [3]. In our ex-
+periments, we perform model selection on the training set of each partition, then train
+the classiﬁer with the obtained optimal hyperparameters still on the training set, and
+ﬁnally evaluate the classiﬁer on the corresponding test set. Therefore, we can obtain
+100 test error rates for each dataset (except 20 for the Image and Splice dataset). The
+statistical analysis of these test error rates is conducted to assess the performance of
+the model selection approach. This experimental scheme is rigorous and can avoid the
+major ﬂaws of the previous one [3]. All experiments are performed on a Core2 Quad
+PC, with 2.33GHz CPU and 4GB memory.
+
+6.2 Effectiveness
+
+Following the experimental setup in Section 6.1, we perform model selection respec-
+tively using 5-fold cross validation (5-fold CV) and approximate 5-fold CV, that is,
+approximate model selection by minimizing 5-fold CV error (as shown in Algorithm
+2). The CV is performed on a 13 × 11 grid of (γ, μ) respectively varying in [2
+−15, 29]
+−15, 25] both with step 22. We set c = 0.1n and k = 0.5c in Algorithm 1.
+and [2
+
+We compare effectiveness of two model selection approaches. Effectiveness includes
+efﬁciency and generalization. Efﬁciency is measured by average computation time for
+model selection. Generalization is measured by the mean test error rate (TER) of the
+classiﬁers trained with the optimal hyperparameters produced by different model selec-
+tion approaches.
+
+Results are shown in Table 2. We use the z statistic of TER [2] to estimate the sta-
+tistical signiﬁcance of differences in performance. Let ¯x and ¯y represent the means of
+TER of two approaches, and ex and ey the corresponding standard errors, then the z
+statistic is computed as z = ( ¯x − ¯y)/
+y and z = 1.64 corresponds to a 95% sig-
+niﬁcance level. From Table 2, approximate 5-fold CV is signiﬁcantly outperformed by
+5-fold CV only on the Splice dataset, but the difference is just 2.5%. Besides, according
+
++ e2
+
+(cid:9)
+
+e2
+x
+
+292
+
+L. Ding and S. Liao
+
+Table 2. Comparison of computation time and test error rate (TER) of 5-fold cross validation
+(5-fold CV) and approximate 5-fold CV
+
+Dataset
+
+Thyroid
+Heart
+Breast
+Banana
+Ringnorm
+Twonorm
+Waveform
+Diabetes
+Flare solar
+German
+Splice
+Image
+
+5-fold CV
+
+Approximate 5-fold CV
+
+Time(s)
+
+1.043
+1.127
+1.671
+7.105
+7.601
+7.097
+7.423
+10.760
+19.477
+24.501
+42.210
+141.792
+
+TER(%)
+4.680±2.246
+16.750±3.616
+27.012±4.636
+10.758±0.590
+2.044±0.358
+2.528±0.234
+10.172±0.783
+23.583±1.738
+34.230±1.965
+23.890±2.231
+11.326±0.547
+2.876±0.725
+
+Time(s)
+
+0.508
+0.623
+0.725
+1.960
+2.058
+2.213
+2.378
+2.727
+5.446
+6.740
+14.275
+28.743
+
+TER(%)
+4.800±2.359
+16.080±3.678
+26.454±4.675
+10.941±0.713
+2.872±3.895
+2.446±0.163
+10.352±1.054
+23.406±1.700
+34.230±1.860
+23.943±2.304
+13.862±1.304
+4.628±0.944
+
+to the Wilcoxon signed rank test [7], neither of 5-fold CV and approximate 5-fold CV
+is statistically superior at the 95% level of signiﬁcance.
+
+However, Table 2 also shows that approximate 5-fold CV is more efﬁcient than 5-fold
+CV on all datasets. It is worth noting that the larger the training set size is, the efﬁciency
+gain is more obvious, which is in accord with the results of complexity analysis.
+
+7 Conclusion
+
+In this paper, Nystr¨om method was ﬁrst introduced into the model selection problem.
+A brand new approximate model selection approach of LSSVM was proposed, which
+fully exploits the theoretical and computational virtue of Nystr¨om approximation. We
+designed an efﬁcient algorithm for solving LSSVM and bounded the effect of kernel
+matrix approximation on the decision function of LSSVM. We derived a model approx-
+imation error bound, which is a theoretical support for approximate model selection.
+We presented an approximate model selection scheme and analyzed its complexity as
+compared with other classic model selection approaches. This complexity shows the
+promise of the application of approximate model selection for large scale problems. We
+ﬁnally veriﬁed the effectiveness of our approach by rigorous experiments on several
+benchmark datasets.
+
+The application of our theoretical results and approach to practical large problems
+will be one of major concerns. Besides, a new efﬁcient model selection criterion directly
+dependent on kernel matrix approximation will be proposed in near future.
+
+Acknowledgments. The work is supported in part by the Natural Science Foundation
+of China under grant No. 61170019, and the Natural Science Foundation of Tianjin
+under grant No. 11JCYBJC00700.
+
+Nystr¨om Approximate Model Selection for LSSVM
+
+293
+
+References
+
+1. Cawley, G.C., Talbot, N.L.C.: Fast exact leave-one-out cross-validation of sparse least-
+
+squares support vector machines. Neural Networks 17(10), 1467–1475 (2004)
+
+2. Cawley, G.C., Talbot, N.L.C.: Preventing over-ﬁtting during model selection via Bayesian
+regularisation of the hyper-parameters. Journal of Machine Learning Research 8, 841–861
+(2007)
+
+3. Cawley, G.C., Talbot, N.L.C.: On over-ﬁtting in model selection and subsequent selec-
+tion bias in performance evaluation. Journal of Machine Learning Research 11, 2079–2107
+(2010)
+
+4. Chapelle, O., Vapnik, V.: Model selection for support vector machines. In: Advances in Neu-
+
+ral Information Processing Systems, vol. 12, pp. 230–236. MIT Press, Cambridge (2000)
+
+5. Chapelle, O., Vapnik, V., Bousquet, O., Mukherjee, S.: Choosing multiple parameters for
+
+support vector machines. Machine Learning 46(1), 131–159 (2002)
+
+6. Cortes, C., Mohri, M., Talwalkar, A.: On the impact of kernel approximation on learning
+accuracy. In: Proceedings of the 13th International Conference on Artiﬁcial Intelligence and
+Statistics (AISTATS), Sardinia, Italy, pp. 113–120 (2010)
+
+7. Demˇsar, J.: Statistical comparisons of classiﬁers over multiple data sets. Journal of Machine
+
+Learning Research 7, 1–30 (2006)
+
+8. Drineas, P., Mahoney, M.: On the Nystr¨om method for approximating a Gram matrix for
+improved kernel-based learning. Journal of Machine Learning Research 6, 2153–2175 (2005)
+9. Duan, K., Keerthi, S., Poo, A.: Evaluation of simple performance measures for tuning SVM
+
+hyperparameters. Neurocomputing 51, 41–59 (2003)
+
+10. Golub, G., Van Loan, C.: Matrix Computations. Johns Hopkins University Press, Baltimore
+
+(1996)
+
+11. Guyon, I., Saffari, A., Dror, G., Cawley, G.: Model selection: Beyond the Bayesian / frequen-
+
+tist divide. Journal of Machine Learning Research 11, 61–87 (2010)
+
+12. Higham, N.: Accuracy and stability of numerical algorithms. SIAM, Philadelphia (2002)
+13. Kumar, S., Mohri, M., Talwalkar, A.: Sampling techniques for the Nystr¨om method. In: Pro-
+ceedings of the 12th International Conference on Artiﬁcial Intelligence and Statistics (AIS-
+TATS), Clearwater, Florida, USA, pp. 304–311 (2009)
+
+14. Luntz, A., Brailovsky, V.: On estimation of characters obtained in statistical procedure of
+
+recognition. Technicheskaya Kibernetica 3 (1969) (in Russian)
+
+15. R¨atsch, G., Onoda, T., M¨uller, K.: Soft margins for AdaBoost. Machine Learning 42(3),
+
+287–320 (2001)
+
+16. Suykens, J., Vandewalle, J.: Least squares support vector machine classiﬁers. Neural Pro-
+
+cessing Letters 9(3), 293–300 (1999)
+
+17. Vapnik, V., Chapelle, O.: Bounds on error expectation for support vector machines. Neural
+
+Computation 12(9), 2013–2036 (2000)
+
+18. Vapnik, V.: Statistical Learning Theory. John Wiley & Sons, New York (1998)
+19. Williams, C., Seeger, M.: Using the Nystr¨om method to speed up kernel machines. In: Ad-
+vances in Neural Information Processing Systems 13, pp. 682–688. MIT Press, Cambridge
+(2001)
+
+

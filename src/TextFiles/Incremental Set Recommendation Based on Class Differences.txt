@@ -1,0 +1,847 @@
+Incremental Set Recommendation Based
+
+on Class Diﬀerences
+
+Yasuyuki Shirai1, Koji Tsuruma1, Yuko Sakurai2, Satoshi Oyama3,
+
+and Shin-ichi Minato1,3
+
+1 JST-ERATO MINATO Discrete Structure Manipulation System Project,
+
+Hokkaido University, Sapporo, Japan
+
+{shirai,tsuruma}@erato.ist.hokudai.ac.jp
+
+2 Graduate School of Information Science and Electrical Engineering,
+
+Kyushu University, Fukuoka, Japan
+
+3 Graduate School of Information Science and Technology,
+
+ysakurai@inf.kyushu-u.ac.jp
+
+Hokkaido University, Sapporo, Japan
+{oyama,minato}@ist.hokudai.ac.jp
+
+Abstract. In this paper, we present a set recommendation framework
+that proposes sets of items, whereas conventional recommendation meth-
+ods recommend each item independently. Our new approach to the set
+recommendation framework can propose sets of items on the basis on the
+user’s initially chosen set. In this approach, items are added to or deleted
+from the initial set so that the modiﬁed set matches the target classi-
+ﬁcation. Since the data sets created by the latest applications can be
+quite large, we use ZDD (Zero-suppressed Binary Decision Diagram) to
+make the searching more eﬃcient. This framework is applicable to a wide
+range of applications such as advertising on the Internet and healthy life
+advice based on personal lifelog data.
+
+Keywords: recommendation, classiﬁcation, collaborative ﬁltering, zero-
+suppressed binary decision diagram.
+
+1
+
+Introduction
+
+Several techniques on information ﬁltering and information recommendation
+such as collaborative ﬁltering and content-based ﬁltering have been reported
+[5][1][11]. In conventional collaborative ﬁltering, items are recommended on the
+basis of their relevance to the user’s preferences. Each item is recommended in-
+dependently of the others; that is, the relationship of a recommended item to
+the other items is not considered.
+
+In the real world, however, a user is often interested in a combination of items,
+such as the keywords in an advertisement and the places to be visited during a
+sightseeing tour. Recently proposed set recommendation techniques[12,10] con-
+sider the unit of recommendation to be a set of items and the constraints and
+requirements among them.
+
+P.-N. Tan et al. (Eds.): PAKDD 2012, Part I, LNAI 7301, pp. 183–194, 2012.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2012
+
+184
+
+Y. Shirai et al.
+
+In this paper, we extend this approach to incorporate the use of an algorithm
+to present recommendations for modifying the user’s initially chosen set. In
+our incremental set recommendation framework, it is assumed that each record
+(”item set”) in a database has been classiﬁed as a class such as positive/negative,
+and modiﬁcations are recommended that would change the item set so that it
+matched the target classiﬁcation.
+
+An example application of our framework is a recommendation system that
+uses a database in which the action history data for a group of people are stored.
+The data could be exercise history or dietary behavior, for example. Each person
+in the database is classiﬁed as either a success or failure w.r.t. to some target
+(e.g., weight loss). Those in the ”failure” group could use the system to obtain
+recommendations for speciﬁc behavior improvements that are based on the data
+for those in the ”success” group. The recommendations are made on the basis of
+the diﬀerences between the two groups and should change the user’s actions and
+lifestyle as little as possible. ”Behavior improvements” for the exercise history
+example means the addition and/or deletion of item sets representing the type
+and amount of exercises performed, while for the dietary behavior example,
+it means the addition and/or deletion of item sets representing the type and
+quantity of food eaten. Another example application is a system for describing
+the items for sale on an Internet shopping site. The descriptions of poorly selling
+items would be modiﬁed on the basis of the descriptions of items that sell well.
+The rest of the paper is organized as follows: Section 2 gives the basic def-
+initions. In Section 3, we describe the implementation of our framework using
+a Zero-suppressed Binary Decision Diagram (ZDD) data structure. We present
+and discuss the results of its evaluation in Section 4. We conclude in Section 5
+with a brief summary, some additional comments, and a mention of future work.
+
+2 Deﬁnition
+
+We will provide some deﬁnitions and notations as follows :
+
+Deﬁnition 1 (Item). An item is an atomic entity that represents a character-
+istic or feature and is denoted by a lower-case character, a, b, c, . . .. A set of all
+items to be considered is denoted by Σ.
+
+In the exercise history example, each item could be the name of an exercise.
+
+Deﬁnition 2 (Data Record and Class). A data record is a collection of
+items that represent the attributes or characteristics of the target object (we use
+D to represent a data record). A class is a name for a set of data records, and
+is denoted by α, β, γ, ω or φ. Each data record belongs to only one class.
+
+“Positive” or “Negative” is an example of a class.
+
+Deﬁnition 3 (Pattern Set/Class Membership). A pattern set is a set of
+pairs, each of which consists of an item set and its weight (natural number). If the
+weight values are all the same, they can be omitted. A pattern set is denoted by
+Cω where ω is the class identiﬁer (Cω = {p : wp|p ∈ 2Σ, wp ∈ N}). If q : wq ∈ Cω
+(simply we write q ∈ Cω), q is called a pattern of class ω.
+
+Incremental Set Recommendation Based on Class Diﬀerences
+
+185
+
+Example : Let Cα = {{a, b, c} : 2,{a, b, d} : 1,{b, c, d} : 3}. {a, b, c} is a pattern
+of class α, whereas {a, b},{a, b, c, d} and {b, d, e} are not. We sometimes use
+polynomial notation for pattern set such as Cα = 2abc + abd + 3bcd. A diﬀerence
+of two pattern set, such as Cα − Cβ, is deﬁned as a diﬀerence of polynomials.
+
+Deﬁnition 4 (Removable/Universal/Addable Items). For a data record
+D, the items in D can be divided into removable items (D−
+) and universal items
+(D∗
+). The recommendation algorithm can suggest the deletion of items only if
+they are elements of D−
+. A set of addable items, denoted by D+, is the set of
+items that can be added to D.
+
+Universal items intuitively correspond to essential features of the record. If no
+universal item is speciﬁed, D∗
+
+= ∅.
+
+Deﬁnition 5 (Delete/Add-Constraints). The upper bounds on the numbers
+of items that can be added or deleted for a data record D are denoted by N D
+add,
+N D
+delete, respectively.
+Deﬁnition 6 (Recommendation Candidate). For a data record D ∈ Cφ(D (cid:4)∈
+Cω), if there could be a candidate D(cid:4) ∈ Cω(D(cid:4) (cid:4)∈ Cφ) that is a modiﬁcation of D
+by adding and/or deleting items under the conditions of N D
+delete, and if
+in Cω − Cφ is equal to or greater than the given natural number
+the weight of D(cid:4)
+M (called weight condition), D(cid:4)
+is called a recommendation candidate for class
+ω that satisﬁes N D
+
+add and N D
+
+add, N D
+
+delete and M .
+
+Example: Let N D
+add = 1 and N D
+M = 2 in the above example, D(cid:4)
+class Cα.
+
+delete = 1 for D = {a, b, f} and weight condition
+= {a, b, c} is a recommendation candidate for
+
+3 Set Recommendation Based on Class Diﬀerences
+
+In general, the number of instances of each class could be quite large. For ex-
+ample, the number of articles for sale or the number of customers on a major
+Internet shopping site could reach several million. As another example, lifelog
+services using mobile devices generates enormous amount of data in recent years.
+To handle such huge numbers of data records, we use a ZDD (Zero-Suppressed
+Binary Decision Diagram) data structure. In this section, we ﬁrst present an
+example of our set recommendation framework based on class diﬀerences. We
+then brieﬂy introduce ZDD and our recommendation algorithm which uses the
+ZDD structure.
+
+3.1 Example
+
+Suppose we have pattern sets for classes α and β as follows:
+
+Cα = {{a, b, c} : 1,{b, c} : 2,{c} : 1,{d, e} : 2,{e} : 3}
+Cβ = {{a, c} : 1,{a, b, d} : 1}
+
+(1)
+
+(2)
+
+186
+
+Y. Shirai et al.
+
+Suppose further that Σ = {a, b, c, d, e} and D = {a, c} (D ∈ Cβ). The rec-
+ommendation for D would consist of the following candidates (D(cid:4)
+) under the
+condition that N D
+delete = 1 and the weight condition M = 1: “Add b”,
+“Delete a and add b”, “Delete a”. After those modiﬁcation, D(cid:4)
+would be identi-
+ﬁed as class α, rather than as class β. If we restrict the recommendation so that
+M = 2, we get only “Delete a and add b”.
+
+add = N D
+
+In this work, we use a VSOP (Valued-Sum Of Products) calculator based on
+ZDD for calculating the recommended items. We review ZDD and VSOP brieﬂy
+in the next subsection.
+
+3.2 ZDD and VSOP
+
+Binary decision diagrams[2,4] (BDDs) are well-known and widely used for ef-
+ﬁciently manipulating large-scale Boolean function data. A BDD is a directed
+graph representation of the Boolean function. The reduction rules in BDD con-
+sist of “node deletion rule” (delete all redundant nodes with two edges that point
+to the same node) and “node sharing rule” (share all equivalent sub-graphs).
+
+ZDDs (Zero-suppressed BDDs) [6,4] are special type of BDDs which are suit-
+able for implicitly handling large-scale combinatorial item set data. The reduc-
+tion rules of ZDDs are slightly diﬀerent from those of BDDs. They are illustrated
+in Fig. 1 (a).
+
+– Share equivalent nodes as well as ordinary BDDs.
+– Delete all nodes whose 1-edge directly points to the 0-terminal node, and
+
+jump through to the 0-edge’s destination.
+
+ZDDs are especially more eﬀective then BDDs for representing “sparse” com-
+binations such as purchase history data. For instance, sets of combinations se-
+lecting 10 out of 1000 items can be represented by ZDDs up to 100 times more
+compactly than by ordinary BDDs.
+
+VSOP (Valued-Sum-Of-Products Calculator)[7] is a program developed for
+calculating a combinatorial item set where each product term has a value, speci-
+ﬁed by symbolic expressions based on ZDD techniques. The value of each product
+can also be considered as a coeﬃcient or a weight for each term. For example, the
+formula (5abc + 3ab + 2bc + c) represents a VSOP with four terms abc, ab, bc and
+c, each of which is valued as 5, 3, 2, and 1, respectively. VSOP supports numer-
+ical arithmetic operations based on Valued-Sum-Of-Products algebra, such as
+addition, subtraction, multiplication, division, and numerical comparison. The
+details of the algebra and arithmetic operations of a VSOP calculator are de-
+scribed in [6,7].
+
+When dealing with integer values in binary coding, we have to consider the
+expression of negative numbers. VSOP adopted another binary coding[8] based
+on (−2), namely, each bit represents 1(= (−2)0),−2(= (−2)1), 4(= (−2)2),−8(=
+(−2)3), 16(= (−2)4), . . .. For example, −12 can be decomposed into (−2)5 +
+(−2)4 + (−2)2. In this encoding, each integer number as a coeﬃcient can be
+uniquely represented.
+
+Incremental Set Recommendation Based on Class Diﬀerences
+
+187
+
+Fig. 1 (b) shows the example of the VSOP representation for abc− ac + 2bc +
+c + 2de + 3e − abd. Since ac satisﬁes the top nodes labeled +1 and −2, the
+coeﬃcient of item ac can be calculated by +1 − 2 = −1.
+
+Fig. 1. ZDD Representation
+
+3.3 Set Recommendation with ZDD Structure
+
+In this subsection, we show the method for calculating a set of items to be
+recommended using ZDD. We ﬁrst consider the following polynomials (valued
+sum of products) for (1) and (2) in Section 3.1:
+
+Cα − Cβ = abc − ac + 2bc + c + 2de + 3e − abd
+
+For a given D, we have to output a set of terms from Cα − Cβ , that are mod-
+iﬁcation of D under the constraints of Nadd and Ndelete, and whose coeﬃcients
+are equal to or larger than given integer M .
+Fig. 2 shows an example search process on the ZDD structure for Cα − Cβ,
+where Nadd = Ndelete = 1 and D = ac. In this ﬁgure, the search process starts
+with each top node +1,−2, +4 respectively and then item sets satisfying the
+constraints are extracted for each top node +1,−2, +4. The pair of numbers
+for item addition and deletion is attached to each edge, as shown in Fig. 2. If
+the pair does not satisfy condition Nadd or Ndelete, searching along that path is
+terminated. For example, since the pair on the edge from c (left side in Fig. 2)
+is (0, 2), which does not satisfy the Ndelete condition, searching along the path
+below that node is terminated.
+Item sets that need to be found under the condition of M = 2 must satisfy
+one of (0, 0, 1), (1, 0, 1), (0, 1, 1), or (1, 1, 1) for the top nodes (+1,−2, +4) in
+Fig. 2. For example, suppose D = ac, Nadd = 1 and Ndelete = 1. Since the
+
+188
+
+Y. Shirai et al.
+
+Fig. 2. Search on ZDD Structure
+
+numbers of added items and deleted items w.r.t bc are 1 and 1 respectively, and
+since bc satisﬁes (0, 1, 1) for the top nodes (+1,−2, +4), bc is a recommendation
+candidate under the condition of M = 2. As another example, since the numbers
+of added items and deleted items w.r.t abc are 1 and 0 respectively, and since
+the candidates abc satisﬁes (1, 0, 0) for the top nodes (+1,−2, +4), abc could
+be a recommendation candidate under the condition of M = 1 as well as bc
+described above. By the same way, c is also a recommendation candidate under
+the condition of M = 1
+
+The naive search algorithm on a ZDD structure is shown in Algorithm 1.
+
+4 Experiments
+
+We ﬁrst evaluate the eﬃciency of our approach based on ZDD, using artiﬁcial
+data, and then we show the examples using actual Internet application data.
+
+4.1 Performance Evaluation
+
+The problem we provided for performance evaluation in this experiment consists
+of 170 items in total (|Σ| = 170), and each record contains 5 items. There are
+two classes: positive and negative.
+
+There are two execution scenarios: one used a random data set, and the other
+used a ﬁxed pattern data set. In the random data set, items occurs randomly in
+each record; in the ﬁxed pattern data set, ﬁxed positive and negative patterns
+were prepared (20 patterns for each class), and each pattern consisted of three
+items.
+
+In the ﬁxed pattern data set, three items in each record are taken from the
+ﬁxed patterns, and two are taken from the random patterns. In actual applica-
+tions, such as an Internet purchase history, there would be some ﬁxed patterns
+
+Incremental Set Recommendation Based on Class Diﬀerences
+
+189
+
+Algorithm 1. Naive Search Algorithm on ZDD structure
+
+Given D (target items), Nadd, Ndelete (upper limits of number of “add” items,
+“delete” items), M (≥ 1) (weight condition), ZDD (ZDD structure whose top nodes
+are 1, . . . , N (ex. -1,-2,4,. . . )).
+
+for i = 1 to N do
+
+initialize (pathi = {}, AddList = {}, DeleteList = {})
+L = L + get candidate(pathi, i, AddList, DeleteList)
+
+end for
+merge output(L, M ) (merge the results for each node (1, . . . , n) and output the re-
+sults whose coeﬃcients ≥ M )
+Function get candidate(path, n, AddList, DeleteList) {n is a node of ZDD}
+if |DeleteList| > Ndelete or |AddList| > Nadd then
+
+return null
+
+else if n is a terminal node 1 then
+
+return path
+
+else if n is a terminal node 0 then
+
+return null
+
+else
+
+let n0, n1 : node which is connected by 0 edge, 1 edge of node n, respectively.
+if n ∈ D then
+
+get candidate(path, n0, AddList, DeleteList + {n})
+get candidate(path + {n}, n1, AddList, DeleteList)
+
+else
+
+get candidate(path, n0, AddList, DeleteList)
+get candidate(path + {n}, n1, AddList + {n}, DeleteList)
+
+end if
+
+end if
+End Function
+
+in both classes. In this experiment, we used three data set sizes for each class:
+1, 5, and 10 million records.
+
+The system was implemented in Java, and the experiments were run on SUSE
+Linux Enterprise Server 10 with a quad-core AMD Opteron 3 GHz CPU, and
+512 GB RAM. The execution times are shown in Table 1. The times shown are
+an average for ten trials. In the tables, “sequential search” in which all items in
+each record were ordered and stored in memory was done for comparison.
+
+With the random data sets, there were no substantial diﬀerences between
+the ZDD-based search and the sequential search. This is because a ZDD data
+structure is not much more compact or eﬃcient rather than a ﬂat data structure.
+The number of ZDD nodes for the random data sets were respectively 2696527,
+11789288, and 20738481. Their relationship is almost linear. In contrast, with the
+ﬁxed pattern data sets, there were marked diﬀerences between the two searches.
+The ZDD-based search was more eﬃcient due to the compact representation by
+ZDD. The numbers of ZDD nodes for the ﬁxed pattern data sets were respectively
+
+190
+
+Y. Shirai et al.
+
+Table 1. Experimental Results for Performance Evaluation
+
+(a) For Random Data Set (Time : msec)
+
+Nadd = 1, Ndelete = 1, M = 1
+Nadd = 2, Ndelete = 2, M = 1
+Nadd = 3, Ndelete = 3, M = 1
+Nadd = 3, Ndelete = 3, M = 2
+Nadd = 3, Ndelete = 3, M = 3
+
+ZDD-based Search
+
+1M
+13
+16
+72
+74
+73
+
+5M
+12
+27
+326
+308
+328
+
+10M
+17
+47
+522
+521
+541
+
+Sequential Search
+1M
+63
+70
+92
+93
+98
+
+5M
+255
+349
+496
+513
+502
+
+10M
+514
+652
+1152
+1123
+1163
+
+(b) For Fixed Pattern Data Set (Time : msec)
+
+Nadd = 1, Ndelete = 1, M = 1
+Nadd = 2, Ndelete = 2, M = 1
+Nadd = 3, Ndelete = 3, M = 1
+Nadd = 3, Ndelete = 3, M = 2
+Nadd = 3, Ndelete = 3, M = 3
+
+ZDD-based Search
+
+1M
+6
+6
+7
+7
+7
+
+5M
+5
+8
+9
+9
+9
+
+10M
+7
+9
+13
+17
+15
+
+Sequential Search
+1M
+72
+79
+94
+95
+94
+
+5M
+279
+384
+450
+419
+424
+
+10M
+564
+609
+784
+769
+776
+
+313594, 363112, and 377979. These data sets were relatively small and did not
+linearly increase in size. This was reﬂected in the total execution times.
+
+In actual applications, there are usually ﬁxed patterns in item occurrences for
+each class. Although actual application data are not as strongly biased as in our
+experiment, we can nevertheless conclude that the ZDD-based search approach
+is well suited for actual applications.
+
+4.2 Example : Internet Shopping Advertising
+
+As one Internet application, we used data from Rakuten Ichiba [13], the largest
+online shopping mall in Japan, with over 30,000 online stores (September 2009).
+The company has released some of their data for use in academic research[13].
+We investigated the relationship between article descriptions at the time of
+article introduction for sale and the number of user reviews attached to each
+article. The descriptions had been written (in Japanese) by a person working
+for the shop where the article was to be sold. Article descriptions are important
+because they attract customers through on-line searching.
+
+The data ﬁelds in the original data are shop code, purchase article id, article
+name, article description, price, category, and number of reviews. There are 31
+top categories in total. We used data labeled with the category “Ladies Fashion”
+and “Japanese Sake” (liquor).
+
+In order to deﬁne characteristics from each description, we ﬁrst extracted the
+nouns, adjectives, verbs, and adverbs from the descriptions using the Japanese
+language morphological analysis program called Chasen1. After some modiﬁ-
+
+1 http://chasen.naist.jp
+
+Incremental Set Recommendation Based on Class Diﬀerences
+
+191
+
+cations (n-gram word concatenation to generate collocation, word selection by
+T F × IDF measurement, etc.), the item sets (Σ) were deﬁned. The explanatory
+variables for each article consists of the occurrences of the selected words in
+the article descriptions. The class of the article was determined by the number
+of reviews. That is, we classiﬁed an article “positive” if it had more than two
+reviews and “negative” if it had no reviews.
+In the Japanese Sake category, there were 517 items in total (|Σ| = 517), 3085
+positive records, and 3372 negative records. Each record generally had ﬁve to
+ten items. We set Ndelete and Nadd to respectively 2 and 4. In the Ladies Fashion
+category, there were 1475 items in total (|Σ| = 1475), 3166 positive records, and
+7194 negative records. Both Ndelete and Nadd were set to 3.
+
+Table 2 shows some of the results translated from the original Japanese. We as-
+sumed that all items in D (original item set) were removable (i.e., it did not con-
+tain any universal items) and set weight condition M to 1. For the Japanese Sake
+category, we found that keywords that created attractive images were preferred
+rather than technical keywords such as “rice malt” and “carefully screened.”
+These results reﬂect the Internet shopping situation for Japanese Sake; that is,
+people who like to buy Japanese sake on the Internet generally put more empha-
+sis on the image or feeling of drinking sake rather than the technical details, un-
+like those who buy it in actual shops. For the Ladies Fashion category, keywords
+giving speciﬁc descriptions of each article, such as “tiered skirt,” “hemline,” and
+“shoulder strap adjustment” were preferred to ones that created a visual image
+of their usage or that described the technical details. That is, people shopping on
+the Internet for fashion prefer speciﬁc images and speciﬁcations, unlike people
+shopping in actual shops.
+
+4.3 Example : AOL Search Logs
+
+As the other Internet application, we used data from AOL’s Search Log Collec-
+tion [14]. This collection consists of about 21 million web search queries input by
+about 650,000 AOL users from March to May 2006. The records include ‘Query,’
+‘ItemRank,’ and ‘ClickURL’ (the last two items were included only if the user
+had clicked on a search result).
+
+We used records in which there was a ‘ClickURL’ entry and the ‘ItemRank’
+was less than 5 as the positive data and those without a ‘ClickURL’ entry as
+negative data. The objective of this analysis was to present sets of items to be
+deleted from or added to the original queries so as to increase the likelihood that
+the user would click on a search result.
+
+The results are shown in Table 3 (words preceded by “*” are universal items).
+We found that, if the user wants to ﬁnd speciﬁc information about travel, it would
+be better to add a speciﬁc place-name such as europe, south africa, or italy. From
+the last example in the table, the keyword ‘cheap’ would not be adequate if the
+user wanted a reasonable price. Better keywords would be ‘discounts,’ ‘best,’ and
+’packages.’
+
+192
+
+Y. Shirai et al.
+
+Table 2. Example : Internet Shopping Advertising
+
+Original
+
+Added Items
+
+Deleted Items
+
+Category
+Sake
+
+Ladies
+
+water,
+actual
+
+rice malt, production area, box,
+gift
+low temperature, slow, distilla-
+tion, actual producer, distilled
+spirit, ﬂavor , production area
+river-bed
+screened,
+distilled
+production area, ﬂavor, tasty
+cold storage, representative, re-
+ﬁned sake, barm, acid degree
+recommend, cold storage, barm,
+father, acid degree
+skirt, casual, polyurethane, hip,
+real scale
+
+carefully-
+producer,
+characteristics,
+
+spirit,
+
+brandy,
+
+plum
+woman
+rich, black malt,
+tasty
+
+rice malt, produc-
+tion area
+low
+slow, distillation
+
+temperature,
+
+deepness,
+distilled spirit
+
+barley
+
+water,
+
+river-bed
+carefully-screened,
+characteristics
+
+bright, limited, ﬂa-
+vor
+wonderful,
+sake
+tiered skirt, appeal casual,
+
+brand
+
+representative,
+reﬁned sake
+recommend, father
+
+hemline, casual
+
+shopping, travel, event, import
+love, casual, travel, event, import shoulder strap ad-
+justment, beautiful
+leg
+camel-hair, autumn
+and winter
+
+boot-cut,
+polyurethane, silhouette, body
+
+straight,
+
+pants,
+
+polyurethane,
+hip
+shopping
+love, casual, travel
+
+pants
+
+These results shows that our recommendation ﬂamework can suggest possi-
+ble candidates for query modiﬁcations, in order to get more appropriate search
+results for users.
+
+5 Summary and Future Works
+
+In this paper, we have described a new approach to the set recommendation prob-
+lem: changes (item addition and deletion) to a set of items are recommended on
+the basis of class diﬀerences. Since recommendation services are becoming more
+and more popular, our framework should be eﬀective for actual applications
+rather than simply being used for collaborative ﬁltering. The use of our algo-
+rithms, which use the ZDD data structure, results in eﬃcient calculation for
+huge data sets, especially when the data is biased, as it generally is in actual
+applications. Although we only considered the case of two classes for simplicity,
+we can easily consider a case in which there are three or more classes or there
+are multiple classiﬁcation criteria for the input data.
+
+In related work, Dong et al.[3] proposed using an emerging patterns approach
+to detecting diﬀerences in classes and using a classiﬁcation framework based on
+the emerging patterns. While frequent pattern mining generally cannot detect
+the characteristic item pattern for each class, their approaches focus on detecting
+
+Incremental Set Recommendation Based on Class Diﬀerences
+
+193
+
+Table 3. Example : AOL Search Logs
+
+Original
+
+Added Items
+
+Deleted Items
+
+adventure,*travel,blogs
+
+*family,travel,vacations
+
+cheap,*europe,*vacation
+
+tours,student
+africa
+family
+italy
+south,africa
+europe
+packages,rome
+best
+cheap
+packages
+discounts
+best
+packages
+
+blogs
+blogs
+blogs
+adventure
+adventure
+vacations
+vacations
+travel
+travel
+travel
+cheap
+cheap
+cheap
+
+item sets that are meaningful for classiﬁcation. Although their motivation is very
+similar to ours, they have not yet reported a recommendation procedure based
+on emerging patterns.
+
+Other researchers have developed set recommendation procedures based on
+certain constraints such as recommendation costs, orders and other conditions
+[12,10]. These procedures are practically applicable to trip advice and univer-
+sity course selection, for example. Although we do not assume any constraint
+between items as pre-deﬁned knowledge, incorporating such constraints into our
+recommendation framework should improve its eﬀectiveness.
+
+Searching under the constraints described in this paper is closely related to
+searching based on the Levenshtein distance (edit distance). Eﬃcient algorithms,
+such as dynamic programming approach, have been developed to calculate the
+distance, and many implementations including approximation approaches have
+been introduced [9]. The problem we focused on in this paper is slightly diﬀerent
+from those for the edit distance. Our problem is to ﬁnd similar items from given
+polynomials under the constraints of a limited number of item additions and
+deletions with a weight constraint. A comparison of the problems remains for
+future work.
+
+Future work also includes extending our results in several directions :
+
+– The search procedure based on the ZDD structure described in this paper
+still contains redundant processes. Eﬃcient search strategies such as using a
+cache of pre-searched results need to be investigated.
+
+– We assume in this framework that items occur only positively in patterns.
+In actual applications, however, “don’t care” plays an important role in
+recommendation. We need to investigate ways to incorporate such items.
+
+Acknowledgment. We are grateful to Rakuten, Inc., for providing the Internet
+shopping data used in this research.
+
+194
+
+Y. Shirai et al.
+
+References
+
+1. Adomavicius, G., Tuzhilin, A.: Toward the next generation of recommender sys-
+tems: A survey of the state-of-the-art and possible extensions. IEEE Transactions
+on Knowledge and Data Engineering 17(6), 734–749 (2005)
+
+2. Bryant, R.E.: Graph-based algorithms for Boolean function manipulation. IEEE
+
+Transactions on Computers 35(8) (August 1986)
+
+3. Dong, G., Zhang, X., Wong, L., Li, J.: CAEP: Classiﬁcation by Aggregating Emerg-
+ing Patterns. In: Arikawa, S., Nakata, I. (eds.) DS 1999. LNCS (LNAI), vol. 1721,
+pp. 30–42. Springer, Heidelberg (1999)
+
+4. Knuth, D.E.: The Art of Computer Programming. Bitwise Tricks & Techniques,
+
+vol. 4(1), pp. 117–126. Addison-Wesley (2009)
+
+5. Melville, P., Sindhwani, V.: Recommender Systems. In: Encyclopedia of Machine
+
+Learning, pp. 829–838. Springer (2010)
+
+6. Minato, S.: Zero-Suppressed BDDs for Set Manipulation in Combinatorial Prob-
+lems. In: Proc. of 30th ACM/IEEE Design Automation Conference, DAC 1993
+(1993)
+
+7. Minato, S.: VSOP (Valued-Sum-of-Products) Calculator for Knowledge Process-
+ing Based on Zero-Suppressed BDDs. In: Jantke, K.P., Lunzer, A., Spyratos, N.,
+Tanaka, Y. (eds.) Federation over the Web. LNCS (LNAI), vol. 3847, pp. 40–58.
+Springer, Heidelberg (2006)
+
+8. Minato, S.: Implicit Manipulation of Polynomials Using Zero-Suppressed BDDs.
+
+In: Proc. of IEEE The European Design and Test Conference (1995)
+
+9. Navarro, G.: A Guided Tour to Approximate String Matching. ACM Computing
+
+Surveys 33(1) (2001)
+
+10. Parameswaran, A., Venetis, P., Garcia-Molina, H.: Recommendation Systems with
+Complex Constraints: A Course Recommendation Perspective. Transactions on
+Information Systems 29(4) (2011)
+
+11. Su, X., Khoshgoftaar, T.M.: A survey of collaborative ﬁltering techniques. In: Ad-
+
+vances in Artiﬁcial Intelligence (2009)
+
+12. Xie, M., Lakshmanan, L.V.S., Wood, P.T.: Breaking out of the box of recommen-
+dations: From Items to Packages. In: Proc. of the 4th ACM Conf. on Recommender
+Systems (2010)
+
+13. (Rakuten data disclosure), http://rit.rakuten.co.jp/rdr/index_en.html
+14. (AOL search logs), http://www.gregsadetsky.com/aol-data
+
+

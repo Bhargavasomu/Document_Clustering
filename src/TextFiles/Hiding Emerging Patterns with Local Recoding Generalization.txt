@@ -1,0 +1,1076 @@
+Hiding Emerging Patterns with Local Recoding
+
+Generalization
+
+Michael W.K. Cheng, Byron Koon Kau Choi, and William Kwok Wai Cheung
+
+Department of Computer Science
+
+Hong Kong Baptist University, Kowloon Tong, Hong Kong
+{michael,choi,william}@comp.hkbu.edu.hk
+
+Abstract. Establishing strategic partnership often requires organizations to pub-
+lish and share meaningful data to support collaborative business activities. An
+equally important concern for them is to protect sensitive patterns like unique
+emerging sales opportunities embedded in their data. In this paper, we contribute
+to the area of data sanitization by introducing an optimization-based local recod-
+ing methodology to hide emerging patterns from a dataset but with the underlying
+frequent itemsets preserved as far as possible. We propose a novel heuristic solu-
+tion that captures the unique properties of hiding EPs to carry out iterative local
+recoding generalization. Also, we propose a metric which measures (i) frequent-
+itemset distortion that quantiﬁes the quality of published data and (ii) the degree
+of reduction in emerging patterns, to guide a bottom-up recoding process. We
+have implemented our proposed solution and experimentally veriﬁed its effec-
+tiveness with a benchmark dataset.
+
+Keywords: Emerging patterns, pattern hiding, data sanitization,
+itemsets.
+
+frequent
+
+1 Introduction
+
+Organizations often publish and share their data to support business collaboration. In
+the context of marketing and sales, companies can leverage on the customer pools of
+each other for cross-selling so that the involved parties can gain sales volume increase.
+Due to the equally important need of privacy protection, customers often expect their
+data to be anonymized before sharing [27] and studies on privacy-preserving data pub-
+lishing have bloomed [12]. Furthermore, trade secrets embedded in data are valuable to
+organizations [6] and needed to be properly protected. For instance, patterns like recent
+increase in the sales volume of a product line for a certain customer group (emerging
+marketing trends) can be an example. Leaking of related intelligence could cause com-
+pany loss in gaining the ﬁrst-mover advantage. Even though companies understand that
+data sharing is unavoidable to support collaborative activities like cross-selling, they
+may face a great hindrance to data sharing if the emerging sales opportunities of their
+own business cannot be hidden.
+
+Among others, emerging patterns [19] embedded in data carry sensitive information,
+that data owners may prefer to hide. In fact, previous studies have revealed that emerg-
+ing patterns are highly discriminative when used as features for classiﬁcation [31,11,8],
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part I, LNAI 6118, pp. 158–170, 2010.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2010
+
+Hiding Emerging Patterns with Local Recoding Generalization
+
+159
+
+and thus carry salient features of the data. The hiding, however, is technically challeng-
+ing as collaborative data analysis is still often expected to facilitate collaboration. That
+is, some statistical properties of the data to-be-shared are preserved as far as possible.
+In particular, frequent itemset mining has already been well-supported in most com-
+mercial data-mining packages. Therefore, in this paper, we study how to hide emerging
+patterns while preserving frequent itemsets.
+
+To hide emerging patterns, we adopt recoding generalization methods. In particular,
+we adopt local recoding which is (intuitively) a value-grouping generalization process,
+given an attribute generalization hierarchy. To ensure that the generalized data neither
+(i) reveal sensitive information nor (ii) produce a highly distorted mining result, we
+propose metrics for quantifying the two competing objectives. With the metrics, we
+present an iterative, bottom-up optimization framework. Compared with hiding frequent
+itemsets [25], hiding emerging patterns is more technically challenging. In particular,
+the a priori anti-monotone property does not hold in emerging patterns. Thus, the search
+space of emerging patterns is huge. Worst still, a local recoding may hide an emerging
+pattern while generating new emerging patterns. To the best of our knowledge, there
+has not been work on hiding emerging patterns.
+
+2 Related Work
+
+Studies on data sanitization can be dated back to the earlier work on statistical disclo-
+sure control [1]. Recent development in privacy preserving data mining [26] has con-
+tributed to some advances in privacy measure and data sanitization method. For example,
+to avoid personal identity to be recovered from an anonymized demographic dataset,
+a number of privacy measures were proposed in the literature, e.g., k-anonymity [27]
+and (cid:2)-diversity [22]. Other privacy measures include km-anonymity [28] and (h,k,p)-
+coherence [33]. Given a particular measure, recoding generalization [19,14,18,26,9,32,20]
+and perturbation [2,10,17] are two commonly adopted data sanitization approaches. Re-
+coding generalization is often preferred over the perturbation approach as the dataset
+sanitized by recoding generalization is still semantically consistent with the original one,
+even though it is “blurred”. While this study aims at hiding emerging patterns instead of
+personal identities, the concepts like equivalence classes and recoding generalization are
+adopted in the proposed methodology.
+
+To control the distortion of the data caused by the sanitization, attempts have been
+made to preserve as much information of the original dataset as possible to, say, pre-
+serve the subsequent classiﬁcation accuracy [15] and clustering structure [13]. In addi-
+tion, there has been some recent work studying the tradeoff between privacy and utility
+[21] in the context of privacy-preserving data publishing. In this work, we try to pre-
+serve the frequent itemsets of the data as far as possible.
+
+Recently, there has been work [25,24] on hiding patterns like frequent itemsets where
+users specify a subset of frequent itemsets, namely sensitive frequent itemsets, that are
+not supposed to be disclosed to the public. In our study, we focus on hiding emerging
+patterns, which makes a unique contribution to the area of pattern hiding. Emerging
+patterns (EP) are features that are distinctive from one class to another and has been
+found to be effective for building highly accurate classiﬁers [16,31,11,8]. Mining EPs
+
+160
+
+M.W.K. Cheng, B.K.K. Choi, and W.K.W. Cheung
+
+from large databases is technically intriguing as the total number of EPs, in the worst
+case, is exponential to the total number of attributes in transactions, and there has not
+been a corresponding notion of the apriori anti-monotone property of frequent itemsets
+in EPs so that the search space can be pruned. Previous work on EPs mainly focuses
+only on the mining efﬁciency, e.g., using a border-based approach [4], a constraint-
+based approach [34], or focusing only on jumping EPs [3]. So far, there exists no related
+work on emerging pattern hiding.
+
+3 Background and Problem Statement
+
+In the following, we present the deﬁnitions, notations used and the problem statement.
+A transactional dataset is a set of transactions. Let I = {i1, i2, ..., in} be a ﬁnite set
+of distinct items in D. A transaction t has a set of nominal attributes A = {a1, a2, ...,
+am} and each attribute ai takes values from a set Vi ⊆ I. We make two simple remarks
+about these notations. (i) While we assume transactional data with nominal attributes,
+data of a continuous domain can be cast into nominal data, for example by deﬁning
+ranges. (ii) One may consider a relation as a set of transactions of a ﬁxed arity.
+
+An itemset X is a (proper) subset of I. SuppD(X) denotes the support of an itemset
+X in a dataset D, which can be computed as
+. Given a support thresh-
+old σ, X is said to be a σ-frequent itemset if SuppD(X) ≥ σ. The growth rate of an
+itemset is the ratio of its support in one dataset to that in the other.
+Deﬁnition 1. [7] Given two datasets, namely D1 and D2, the growth rate of an itemset
+X, denoted as GR(X, D1, D2), from D1 to D2 is deﬁned as GR(X, D1, D2) =
+
+|{t | X∈t∧t∈D}|
+
+|D|
+
+⎧
+⎪⎪⎨
+
+⎪⎪⎩
+
+0
+∞
+SuppD2 (X)
+SuppD1 (X)
+
+, if SuppD1 = 0 and SuppD2 = 0
+, if SuppD1 = 0 and SuppD2 > 0
+, otherwise.
+
+Deﬁnition 2. [7] Given a growth rate threshold ρ and two datasets D1 and D2, an
+itemset X is a ρ-emerging pattern (ρ-EP) from D1 to D2 if GR(X, D1, D2) ≥ ρ.
+Intuitively, given two datasets, emerging patterns (EPs) [7] are the itemsets whose sup-
+port increases signiﬁcantly from one dataset to another. The formal deﬁnition of EPs is
+presented in Deﬁntion 2. An emerging pattern with a growth rate ∞ (i.e., itemset that
+appears in one dataset but not the other) is called a jumping emerging pattern.
+
+For ease of presentation, we may skip σ, ρ, D1 and D2 of EPs when they are not
+
+essential to our discussions.
+Example 1. Figure 1 (a) shows a simpliﬁed hypothetical dataset D of the Adult dataset
+[30]. It contains some census information of the United States. More description of the
+dataset can be found in Section 7. We opt to present some nominal attributes of Adult
+for discussions. Each record (or transaction) represents a person. Consider two subsets
+D1 containing married people and D2 containing those who do not. From Figure 1 (a),
+we ﬁnd the following emerging patterns, among many others.
+
+– The pattern (MSE, manager) has a support of 75% in D1 and 20% in D2. Therefore,
+the growth rate of (MSE, manager) from D1 to D2 is 3.75. When we set ρ to 3, (MSE,
+manager) is a ρ-emerging pattern in D2.
+
+Hiding Emerging Patterns with Local Recoding Generalization
+
+161
+
+ID Edu. Martial Occup.
+
+Rel.
+
+Race Sex
+
+1 BA married executive wife
+black F
+2 MSE married manager husband black M
+3 MSE married manager wife white F
+4 MSE married manager husband black M
+5 BA never manager
+NA white M
+NA white F
+6 MSE never manager
+NA black M
+7 HS
+NA white M
+8 BA never manager
+9 BA never manager
+NA black F
+
+repair
+
+never
+
+(a)
+
+(b)
+
+Fig. 1. (a) A hypothetical subset of Adult and (b) The problem statement illustration
+
+– High-school graduate (HS) has a support of 0% in D1 but 20% in D2. Hence, its
+
+growth rate from D2 to D1 is inﬁnite. (HS) is a jumping emerging pattern in D1.
+
+Next, we state the formal problem statement of this paper below (Figure 1 (b)).
+Problem statement. Given two datasets (D1, D2), σ and ρ, we want to sanitize (D1,
+D2) to (D(cid:4)
+2 can be mined while the distortion
+(cid:5)(cid:6)
+between σ-frequent itemsets of (D1, D2) and those of (D(cid:4)
+
+2) such that no ρ-EPs from D(cid:4)
+
+2) is minimized.
+
+1, D(cid:4)
+
+1 to D(cid:4)
+
+1, D(cid:4)
+
+4 Multidimensional Local Recoding
+
+Our algorithm for hiding emerging pattern is based on local recoding generalization
+(multi-local-recode in Figure 3). In this section, we give an overview of recoding
+generalization, or recoding for simplicity.
+
+Recoding. As discussed in Section 1, recoding has been proposed for anonymization.
+The idea of recoding is to modify values into more general ones such that more tuples
+will share the same values and cannot be distinguished individually. Thus, anonymiza-
+tion can be achieved. Here, we recode values in emerging patterns with some non-
+emerging values. Thus, the recoded patterns become less emerging.
+
+Multidimensional local recoding. In this work, we adopt the notion of multidimen-
+sional local recoding [9,32,20], from the context of k-anonymity. It recodes values at
+“cell level”. It relies on equivalence classes. An equivalence class of attributes A is a
+set of tuples T , where πA(T ) is a singleton. That is, the tuples in T have the same value
+in attributes A. In a recoding, the tuples in an equivalence class (of a set of attributes)
+and those in another equivalence class are recoded into the lowest common ancestors
+along the hierarchies. One subtle point is that this recoding does not require the entire
+equivalence class to be recoded, as long as anonymity can be achieved. Hence, both
+original and generalized values may co-exist in the recoded dataset.
+
+Example 2. Let us revisit the dataset in Figure 1 (a) and the emerging pattern (MSE,
+manager). The emerging pattern is related to the attributes of education background
+(Edu.) and occupation (Occup.). Regarding (Edu., Occup.), the equivalence classes
+in D2 are {{5, 8, 9}, {6}, {7}}, where the numbers are the IDs. In multidimensional
+lcoal recoding, we may recode the Edu. attribute of the subset of {2, 3, 4} and {5, 8,
+
+M.W.K. Cheng, B.K.K. Choi, and W.K.W. Cheung
+
+162
+9}. For example, we may recode {2, 3, 4} with {8, 9}. and we may recode BA and MSE
+into degree holder Deg. The growth rate of (Deg., manager) in the recoded dataset is
+75%/40% = 1.875. Hence, (Deg., manager) is not ρ-emerging when ρ = 3. In addition,
+after such a recoding, all BA, MSE and Deg. appear in the recoded dataset.
+
+Other notions of recoding, including single-dimensional global recoding [5,14,18,26]
+and multidimensional global recoding [19], generalize values in a relatively coarse gran-
+ularity and very often result in over-generalization.
+
+5 Metric for Multidimensional Local Recoding
+
+In this section, we deﬁne an utility gain (util gain) to quantify the effectiveness
+of a local recoding. util gain will guide the process for hiding emerging patterns
+local-recoding, in Figure 3. A recoding is effective if (i) the distortion of frequent
+itemsets is small and (ii) the reduction in the growth rate of emerging patterns is large.
+
+Metric for the distortion of frequent itemsets. For presentation clarity, we will present
+our proposed metric for global recoding followed by its adaption for local recoding.
+
+(A) Distortion metric for single-dimensional global recoding. Single-dimensional global
+recoding performs recoding on the domain of an attribute in a dataset. It recodes a value
+of the domain to another (generalized) value. That is, if a particular value is recoded, the
+attribute of all the tuples containing that particular value will be recoded. No frequent
+itemsets disappear but may appear in a generalized form after a recoding (Figure 2 (a)).
+Inspired by the distortion metric proposed in [20], we propose a metric for measur-
+ing the recoding distance (RDist) between the original and generalized form of a tuple.
+Then, we deﬁne a metric called value distance (V D) which measures the distance be-
+tween the original and generalized form of a single attribute value. We will use V D as
+a building block for the deﬁnition of distortion (RD). Since a recoding always assumes
+an attribute hierarchy, we may skip the hierarchy H when it is clear from the context.
+
+Deﬁnition 3. Recoding Distance (RDist): Consider a recoding G which generalizes a
+set of non-generalized values V to a single generalized value vg, where V is the set of
+values under vg in an attribute hierarchy. The recoding distance of G RDist(G) is |V |.
+Deﬁnition 4. Value Distance (V D): Let h be the height of an attribute hierarchy H,
+where level h and 0 is the most generalized and speciﬁc level, respectively. Consider
+a value v at level p which is generalized to a value v(cid:4)
+at level q. Let Gi denotes the
+recoding that generalizes an attribute from level i − 1 to i, where 0 < i ≤ h. The value
+distance between v and v(cid:4)
+Value distance is unfavorable to recoding (i) many values into one single generalized
+value; and (ii) a value into a generalized value that is close to the top of the hierarchy.
+This gives a measure for the distortion of a value due to a recoding. Next, we extend
+V D to measure the distortion of a tuple and frequent itemsets due to recoding.
+Deﬁnition 5. Tuple Distance (TD): Suppose a tuple f = (v1, v2, . . . , vn) is gener-
+alized to f(cid:4) = (v(cid:4)
+is deﬁned as:
+T D(f, f(cid:4)) = (cid:6)
+
+2, . . . , v(cid:4)
+1, v(cid:4)
+n). The tuple distance between f and f(cid:4)
+i=1 V D(vi, v(cid:4)
+).
+
+i·RDist(Gi)
+
+is: V D(v, v(cid:4)) = (cid:6)
+
+q
+i=p
+
+.
+
+h
+
+n
+
+i
+
+Hiding Emerging Patterns with Local Recoding Generalization
+
+163
+
+All
+
+Deg
+
+BA MSE PHD HS
+
+(a)
+
+F
+
+F’
+
+(i)
+
+F
+
+(b)
+
+F’
+
+(ii)
+
+Fig. 2. (a) An attribute hierarchy of Edu.; and (b) the relationship between F and F (cid:2)
+recoding and (ii) local recoding
+
+in (i) global
+
+Deﬁnition 6. Recoding Distortion (RD): Let F = {f1, f2 . . . fn} be a set of σ-frequent
+itemsets in D and F (cid:4)
+, where
+m ≤ n. The corresponding frequent itemset of fi due to global recoding is denoted
+is deﬁned as: RD(F, F (cid:4)) =
+as f(cid:4)
+(cid:6)
+
+} be the set of σ-frequent itemsets in D(cid:4)
+
+j = G(fi). The recoding distance between F and F (cid:4)
+i=1 T D(fi, G(fi)).
+
+2 . . . f(cid:4)
+
+= {f(cid:4)
+
+1, f(cid:4)
+
+m
+
+n
+
+Example 3. Following up Example 2, we compute the (global) recoding distortion of
+generalizing (MSE, manager) to (Deg., manager). Figure 2 shows the attribute hier-
+archy of Edu.The recoding distortion RD({(MSE, manager)}, {(Deg., manager)}),
+RD, can be computed as follows: RD = T D((MSE, manager), (Deg., manager)) =
+V D(MSE, Deg.) + V D(manager, manager) = (cid:6) 2
+
+2 + 2×0
+
+i·RDist(Gi)
+
+2 = 1.5
+
+= 1×3
+
+i=0
+
+h
+
+(B) Distortion metric for local recoding. Since single-dimensional global recoding may
+often lead to over-generalization, we adopted local recoding. We remark that there are
+two unique challenges in computing recoding distance for local recoding (Figure 2 (b)).
+(B.i) An itemset in F having no correspondence in F (cid:4)
+. Local recoding allows part of
+the tuples that share the same attribute values to be generalized. Such recoding may
+generalize some supporting tuples of a frequent itemset which makes the itemset (in the
+original or generalized form) not frequent anymore. To address this, we measure the
+distortion of the disappeared frequent itemset to the most general form. The reason is
+that the frequent itemset can be trivially recovered when the entire dataset is generalized
+to the most general form.
+F (cid:4)
+value in f . Then, RD of f is the recoding distance between f and fmax.
+
+Speciﬁcally, given a f in F , if we cannot ﬁnd a corresponding frequent itemset in
+, we ﬁrst create an itemset, fmax, which contains the most generalized value of each
+
+Example 4. Reconsider the dataset in Figure 1 (a). Suppose we recode the Edu. at-
+tribute of Records 1 and 2 to Deg. When σ is 40%, {BA} and {MSE} were frequent
+itemsets (not minimal for illustration purposes) before recoding and there is no frequent
+itemset after recoding.
+(B.ii) An itemset in F having more than one corresponding itemset in F (cid:4)
+. As discussed,
+local recoding may generalize a frequent itemset f in F into more than one correspon-
+dence in F (cid:4)
+, denoted as Ff . In this case, we calculate the tuple distance of each of the
+corresponding itemsets in Ff and take the minimum tuple distance as the tuple distance
+of f . This is because the itemset with the minimum tuple distortion has been revealed
+in F (cid:4)
+
+, even when there may be more distorted itemsets.
+
+164
+
+M.W.K. Cheng, B.K.K. Choi, and W.K.W. Cheung
+
+With the above, we have the following recoding distance for local recoding:
+
+Deﬁnition 7. Recoding Distance for Local Recoding (RDlocal): Let F = {f1, f2 . . .
+fn} be a set of σ-frequent itemsets in D and F (cid:4)
+} be the set of
+σ-frequent itemsets in D(cid:4)
+. The corresponding frequent itemset(s) of fi due to local
+recoding is denoted as Ff = G(fi). The recoding distance between F and F (cid:4)
+is:
+RDlocal(F, F (cid:4))= 1
+
+2 . . . f(cid:4)
+
+(cid:6) n
+
+= {f(cid:4)
+
+1, f(cid:4)
+
+m
+
+n
+
+i=1
+
+T Dlocal (fi ,G(fi))
+T Dlocal(fi ,fmax) , where T Dlocal(fi, G(fi)) =
+(cid:2)
+
+if f has 1 correspondent in F
+if f has no correspondent in F
+
+(cid:2)
+
+⎧
+⎪⎪⎪⎨
+⎪⎪⎪⎩
+
+θq × T D(fi, G(fi)),
+(1 − θq) × T D(fi, fmax),
+θq × min(T D(fi, fj )),
+where fj ∈ G(fi),
+
+otherwise,
+
+θq is a parameter that speciﬁes the relative importance of the itemset distortion and
+missing itemsets, due to G, and T Dlocal(fi, fmax) is for normalizing RDlocal.
+Example 5. Following up Example 4, when σ is 30%, the frequent itemset {(BA)} cor-
+responds to the frequent itemsets {(BA), (Deg)} in the recoded datasets.
+Metric for the change in growth rate. The second component of our heuristics con-
+cerns the growth rate of the emerging patterns. Intuitively, we aim at a recoding that
+signiﬁcantly reduces the growth rate of the emerging patterns in order to hide them.
+Given an emerging pattern e and the result of a local recoding e(cid:4)
+, the reduction in
+growth rate due to the recoding can be easily deﬁned as the growth rate of e minus
+the growth rate of e(cid:4)
+. Then, the growth rate reduction of E due to a local recoding G,
+denoted as RGlocal(G, E), can be deﬁned as the total reduction in the growth rate of e
+in E divided by the total growth rate of e in E.
+Putting all these together. Based on the derivations above, the utility gain due to a
+local recoding G for a set of emerging patterns E is deﬁned as:
+util gain(G, E) = θpRGlocal(G, E) − (1 − θp)RDlocal(F, F (cid:2)).
+The two parameters θp and θq, where θp, θq ∈ [0,1], are speciﬁed by users.
+
+6 Algorithm for Hiding Emerging Patterns
+
+In this section, we present the overall algorithm hide-eps (shown in Figure 3) for
+hiding emerging patterns with a minimal distortion in frequent itemsets.
+Overview of hide-eps. The main ideas of hide-eps can be described as follows.
+First, we determine the emerging patterns to be hidden (Line 02) and the frequent item-
+sets (incrementally) to be preserved (Line 04). We refer the details of Lines 02 and 04
+to previous works [29,34], since our focus is on hiding emerging patterns. For each se-
+lected emerging pattern (Line 05), we carry out a local recoding local-recoding-sa
+(Line 06, more details soon). This process (Lines 03-08) is repeated until there is no
+more emerging pattern to hide (Line 03). To avoid sub-optima, we present hide-eps
+in the style of simulated annealing search (Lines 01, 07 and 18).
+Next, we discuss the details of the major steps of the algorithm.
+Mining emerging patterns (mine-eps, Lines 02 and 08). During recoding, we in-
+voke mine-eps [34] to determine if all the emerging patterns have been hidden (Line
+
+Hiding Emerging Patterns with Local Recoding Generalization
+
+165
+
+Procedure hide-eps
+Input: two datasets, Di and Dj , the threshold of growth rate and frequent itemsets ρ and σ,
+the heuristic parameters p and q, an initial temperature t0 and the cooling parameter α
+
+Output: transformed datasets (Di, Dj )
+
+H.init()
+
+01 t = t0
+02 E := mine-eps(Di, Dj , ρ)
+03 while E (cid:5)= ∅
+04 F := incr-mine-fis(Di ∪ Dj , σ)
+e := next-overlapping-ep(E)
+05
+if e is not null
+06
+if t > 0.01 then t = α × t
+
+// initialization
+// [34]
+
+// [29]
+
+(Di, Dj ) := local-recoding-sa(Di, Dj , e, F , t, α, H)
+
+07
+08 E := mine-eps(Di, Dj , ρ)
+09 return (Di, Dj )
+Procedure local-recoding-sa
+Input: two datasets, Di and Dj , an emerging pattern e, a frequent itemset F , a temperature t, a hashtable H for caching
+
+the utility gain of local recodings
+Output: transformed datasets (Di, Dj )
+10 let Di be the dataset where e has a higher support
+11 denote ce be the equiv. class of e in Di
+
+12 compute equiv. classes C of Dj of the attributes of e
+
+// compute the utility gain of the local recoding of each equiv. class ck in C with ce
+
+13 for each ck in C
+14
+15
+16
+17
+
+if determine-missing-FIS(G(ce,ck), F ) = ∅ then
+
+if determine-new-singleton-eps(G(ce,ck), E) = ∅ then
+
+if H[ce][ck] is null then
+
+H[ce][ck]
+
+:= util gain(G(ce,ck ), E)
+
+// Section 5
+
+18 ck := get-next-step-sa(ce, H, t)
+19 Di := multi-local-recode(Di, ce, ck)
+20 Dj := multi-local-recode(Dj, ce, ck)
+21 return (Di, Dj )
+
+// Section 4
+
+Fig. 3. The overall algorithm
+
+08). To the best of our knowledge, there does not exist any incremental algorithm for
+mining emerging patterns. As veriﬁed by our experiments, mine-eps is a bottleneck of
+runtime of hide-eps. However, it should be remarked that the emerging patterns may
+often be altered slightly by most local recodings, in practice. To address this perfor-
+mance issue, in Section 7, we tested another version of hide-eps, where mine-eps is
+invoked only when all previously mined emerging patterns have been hidden.
+Incremental mining of frequent itemsets (incr-mine-fis, Line 04). A local re-
+coding may alter the existing frequent itemsets. Figure 2 (b) (ii) shows an example.
+Since a local recoding changes only part of D1 and D2, we need not mine the dataset
+from scratch but do it incrementally using algorithms like [29].
+Selecting emerging patterns for recoding (next-overlapping-ep, Line 05). Given
+a set of emerging patterns E, next-overlapping-ep determines the emerging pat-
+tern e in E such that it overlaps with the remaining emerging patterns the most. The
+intuition is that reducing the growth rate of e may indirectly reduce the growth rate of
+the overlapping emerging patterns as well. We verify with some experiments that this
+approach consistently outperforms a number of other strategies (see Section 7).
+Determining the next local recoding (local-recoding-sa, Lines 06, 10-21). As-
+sume that ce is the equivalence class of the emerging pattern e. We ﬁrst compute the
+
+166
+
+M.W.K. Cheng, B.K.K. Choi, and W.K.W. Cheung
+
+equivalence classes of the attributes of e to generalize with ck (Line 12). We apply the
+utility gain deﬁned in Section 5 to determine the goodness of local recodings (Line 16).
+Since there can be many equivalence classes, this is another bottleneck of runtime. We
+speed up that step using (i) a hashtable (Lines 01 and 16-17) to cache the utility gain
+values computed, and (ii) two ﬁlters on equivalence classes (Lines 14 and 15). The ﬁrst
+ﬁlter is that we ignore the equivalence classes that would result in missing frequent item-
+sets, which is obviously undesirable. This can be computed by the change in support of
+itemsets in F due to a local recoding. Second, we discard a local recoding that would
+yield new single-attribute emerging patterns. This can be computed by determining the
+growth rate of the equivalence classes with the attributes of e. We did not compute
+possible new multi-attribute emerging patterns because of its daunting complexity.
+
+With the utility gain of equivalence classes, we use a simulated annealing search
+(get-next-step-sa, Line 18), as a black box, to get the next local recoding.
+Analysis. Given that AE is the set of attributes of the emerging pattern E, and D and
+H are the overall domain size and the maximum height of the hierarchy of all possible
+AE’s, respectively. In the worst case, there can be O(D × H) possible recodings. Also,
+local recoding allows tuple-wise recoding and thus in the worst case, |D1| + |D2| recod-
+ing operations can be carried out. Thus, the search space of ﬁnding the optimal recoding
+is O((|D1| + |D2|) × D × H). This work proposes a heuristic search for this problem.
+While the loop (Lines 03-08) may repeat many times in the worst case, the number of
+iterations needed was found small in practice. As discussed, mine-eps and the compu-
+tation of util gain are the bottlenecks of runtime. The runtime of the former is exper-
+imentally evaluated in [34]. The time complexity for the latter is O(|Ae|×D×H×|F|),
+where e ∈ E, |Ae| × D × H is the number of possible equivalence classes and for each
+class, O(|E|) and O(|F|) are used to compute RGlocal and RDlocal, respectively.
+
+7 Experimental Evaluation
+
+To verify the effectiveness and efﬁciency of our proposed algorithms, we conducted
+several experiments on Adult dataset [30] using the attribute hierarchies from [14].
+
+We implemented our algorithm in JAVA SDK 1.61. We have run our experiments on
+a PC with a Quad CPU at 2.4GHz and 3.25GB RAM. The PC is running Windows XP
+operating system. We have used system calls to invoke the implementations from [34]
+and [23] to determine emerging patterns and frequent itemsets, respectively.
+
+The simpliﬁed Adult dataset contains 8 attributes. We removed the records with
+missing values. The records in the dataset were divided into two classes - people who
+have more than $50k/year (7508 records) and people who do not (22654 records).
+The effect of the parameters θp and θq. The ﬁrst experiment is to verify the effects on
+the parameters θp and θq on the heuristic algorithm. In this experiment, we do not apply
+any ﬁlter (i.e., Lines 14-15 in hide-eps) and SA search (Line 18) in order to observe the
+effects on the parameters clearly. Instead, we used a Greedy search. The performance
+was presented in “distortion on the frequent itemsets / the number of missing frequent
+1 The implementation is available at http://www.comp.hkbu.edu.hk/∼michael/source.rar
+
+Hiding Emerging Patterns with Local Recoding Generalization
+
+167
+
+itemsets”, unless otherwise speciﬁed. When σ and ρ were set to 40% and 5, respec-
+tively, the frequent itemsets obtained are: {(Husband, Married-civ-spouse, Male),
+(Married-civ-spouse, White), (Married-civ-spouse, United-States), (Male,
+Private, White), (Male, Private, United-States), (Male, White, United-
+States), (Private, White, United-States)}.
+
+When we recode all attributes to All in the frequent itemsets, we obtain the maxi-
+
+mum distortion of the frequent itemsets of Adult 623.1.
+
+To illustrate the possible effect of recodings on the resulting frequent itemsets, we list
+the frequent itemsets after we applied Greedy, where θp and θq were both set to 0.8:
+{(Relationship, United-States), (Married, White, United-States), (Male,
+Private, White), (Male, Private, United-States), (Male, White, United-
+States), Private, White, United-States)}. The distortion obtained is 21.5 (out
+of 623.1).
+
+Next, we varied θp and θq and measured the performance of Greedy. The perfor-
+mance is shown in Table 1 (LHS). The average runtime is 58 mins and 16 out of 58
+mins is spent on mining EPs. The average number of local recodings is 14.
+
+Table 1. The effect of the parameters in util gain on Greedy’s performance (LHS) and the
+performance of the determine-new-singleton-eps ﬁlter (RHS)
+
+θp\θq
+
+0
+0.2
+0.4
+0.6
+0.8
+1.0
+
+0.0
+
+0.2
+
+0.4
+
+0.6
+
+0.8
+
+1.0
+
+73.3/1 50.0/1 50.0/1 50.0/1 50.0/3 50.0/1
+73.3/1 59.7/1 38.2/1 38.2/1 46.5/1 11.5/4
+73.3/1 59.7/1 38.2/1 21.5/1 46.5/1 11.5/4
+73.3/1 59.7/1 21.5/1 38.2/1 46.5/1 11.5/4
+73.3/1 59.7/1 21.5/1 21.5/1 38.2/1
+11.5/3 11.5/3 11.5/3 11.5/3 11.5/3 11.5/3
+
+0/5
+
+θp\θq
+
+0
+0.2
+0.4
+0.6
+0.8
+1.0
+
+0.0
+
+0.2
+
+0.4
+
+0.6
+
+0.8
+
+1.0
+
+62.7/0 43.7/1 43.7/1 35.8/3 35.8/3 11.1/4
+62.7/0 32.0/1 32.0/1 15.7/2 9.7/3 7.5/4
+62.7/0 32.0/1 16.8/1 21.9/2 9.7/3 7.5/4
+0/5
+71.5/0 32.0/1 16.8/1 21.9/2 7.2/3
+71.5/0 32.0/1 16.8/1 15.7/2 7.2/3
+0/5
+73.1/1 73.1/1 73.1/1 73.1/1 73.1/1 73.1/1
+
+We make four observations from Table 1 (LHS). Firstly, when θp is set to 0, the algo-
+rithm concerns only distortion (regardless the corresponding reduction in growth rate)
+during local recodings. In such a case, the distortion on frequent itemsets of various θq’s
+is in general large. The reason is that when θp is 0, the heuristics does not effectively re-
+duce the growth rate and the search takes more recodings that are not relevant to hiding
+emerging patterns. Secondly, when θp is 1, the algorithm concerns only the reduction
+in growth rate. Note that 3 out of 7 frequent itemsets have disappeared. Thirdly, when
+we set θq to 1, we do not concern the missing frequent itemsets. Hence, more frequent
+itemsets were lost. Similarly, when we set θq to 0, we concern only the frequent item-
+sets that do not disappear. Since there is one missing frequent itemset during recodings,
+overlooking this led to more distortion. Fourthly, we found that a signiﬁcant runitme
+(42 mins) was spent on calculating the utility gain of equivalence classes. The reason is
+that no ﬁlters had been applied yet.
+
+In all, we found that on Adult, Greedy yields frequent itemsets with a distortion
+21.5 (out of 623.1) and 1 missing frequent itemset when both θp and θq are moderate.
+The effect of the determine-new-singleton-eps ﬁlter. This ﬁlter is used to avoid
+recoding equivalence classes that would yield new single-attribute EPs (Line 15 of
+hide-eps). The performance of Greedy with this ﬁlter is shown in Table 1 (RHS).
+
+168
+
+M.W.K. Cheng, B.K.K. Choi, and W.K.W. Cheung
+
+We observe from Table 1 (RHS) that there are similar trends on the performance
+with various θp and θq. The distortion is sometimes smaller but the missing frequent
+itemsets may sometimes be more. However, the average runtime of this experiment is
+26 mins (compared to 58 previously). Speciﬁcally, the time for computing utility gain
+has been reduced from 42 to 15 mins. The number of recodings reduces from 14 to 9.
+The runtime improvement is due to (i) the smaller number of equivalence classes for
+computing the utility gain and (ii) fewer (if any) new EPs generated during hide-eps.
+
+The effect of the determine-missing-FIS ﬁlter. From the previous experiments,
+we note that there are missing frequent itemsets in most cases. Here, we test the ef-
+fectiveness of determine-missing-FIS ﬁlter (Line 14). The performance is shown
+in Table 2 (LHS). The average runtime for computing the utility gain increased from
+15 to 21 mins and the number of recodings increased from 9 to 14. At ﬁrst glance, the
+distortion might have increased. However, there is no missing frequent itemset for all
+θp’s and θq’s. This improvement comes at the expense of a slight increase in runtime.
+
+Table 2. The performance of the determine-missing-FIS ﬁlter (LHS) and the perfor-
+mance of invoking mine-eps only when E is empty (RHS)
+θp\θq
+
+θp\θq
+
+0.4
+
+0.8
+
+0.2
+
+1.0
+
+0.4
+
+0.6
+
+0.8
+
+0.0
+NA
+
+0
+0.2
+0.4
+0.6
+0.8
+1.0
+
+89.2/0 89.2/0 89.2/0 71.5/0 71.5/0
+105.3/0 89.2/0 78.6/0 78.6/0 41.5/0 41.5/0
+105.3/0 78.6/0
+41.5/0 41.5/0
+105.3/0 78.6/0
+41.5/0 41.5/0
+105.3/0 78.6/0 61.3/0 61.3/0 41.5/0 41.5/0
+105.3/0 105.3/0 105.3/0 105.3/0 105.3/0 105.3/0
+
+50/0
+50/0
+
+50/0
+50/0
+
+0.6
+
+0.2
+
+0.0
+1.0
+NA 97.2/0 97.2/0 81.3/0 70.1/0 81.3/0
+105.3/0 97.2/0 97.6/0 81.3/0 59.3/0 59.3/0
+105.3/0 97.6/0 64.9/0 64.9/0 59.3/0 59.3/0
+105.3/0 78.6/0 64.9/0 64.9/0 59.3/0 59.3/0
+105.3/0 78.6/0 64.9/0 70.1/0 59.3/0 59.3/0
+105.3/0 105.3/0 105.3/0 105.3/0 105.3/0 105.3/0
+
+0
+0.2
+0.4
+0.6
+0.8
+1.0
+
+The effect of calling mine-eps when E is empty. In the last experiment, 15 out of 36
+mins was spent on mining EPs. In this experiment, we attempt to improve the runtime by
+hiding all existing EPs ﬁrst before calling mine-eps, as opposed to calling mine-eps
+after each recoding. The performance is shown in Table 2 (RHS). From the result, we
+found that there is a slight increase in distortion. However, the time for mining EPs is
+reduced from 15 to 8 mins. The average runtime for computing the utility gain increased
+from 21 to 23 mins and the number of iterations remains unchanged.
+
+The effect of hiding the EP with the minimum overlapping. To justify the decision
+of hiding the maximum overlapping EP in Line 05 of hide-eps, we conducted an
+experiment which ﬁrst hides the EP with the minimum overlapping. The result is shown
+in Table 3 (LHS). We observed that the distortion is slightly larger than that of the
+maximum overlapping. However, the average runtime for computing the utility gain
+increased from 23 to 39 mins and the time for mining EP increased from 8 to 23 mins.
+
+Simulated annealing search. After demonstrating the effects of various settings with
+Greedy, we applied SA on the algorithm (Line 18 of hide-eps). We set a low tem-
+perature (T =10) of SA with a high cooling rate (α=0.4). Hence, SA initially has some
+chances to avoid local sub-optima and then converges to Greedy quickly. To explore
+the search space more, each SA was allowed to restart ﬁfty times. The results are shown
+in Table 3 (RHS). SA introduces some randomness in the performance. Compared to
+the best versions (Table 2), SA often produces better results, at the expense of runtime.
+
+Hiding Emerging Patterns with Local Recoding Generalization
+
+169
+
+Table 3. The performance of hiding the EP with the minimum overlapping (LHS) and the perfor-
+mance of simulated annealing search (RHS)
+θp\θq
+
+θp\θq
+
+0.0
+
+0.2
+
+0.4
+
+0.6
+
+0.8
+
+1.0
+
+1.0
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+0.0
+NA 101.8/0 101.8/0 95.6/0 95.6/0 95.6/0
+127.1/0 98.3/0 75.8/0 75.8/0 53.7/0 53.7/0
+127.1/0 98.3/0 50.0/0 50.0/0 53.7/0 53.7/0
+127.1/0 78.6/0 67.2/0 58.5/0 53.7/0 53.7/0
+127.1/0 80.2/0 61.3/0 65.3/0 48.1/0 48.1/0
+127.1/0 127.1/0 127.1/0 127.1/0 127.1/0 127.1/0
+
+0
+0.2
+0.4
+0.6
+0.8
+1.0
+
+0
+0.2
+0.4
+0.6
+0.8
+1.0
+
+67.4/0 27.8/0 58.5/0 50.0/0 44.3/0 23.6/0
+80.1/0 62.5/0 22.4/0 53.8/0 47.8/0 52.1/0
+84.1/0 81.4/0 55.7/0 29.3/0 53.7/0 37.4/0
+85.0/0 50.0/0 97.0/0 31.8/0 40.5/0 22.8/0
+64.9/0 45.2/0 30.0/0 59.6/0 39.5/0 32.3/0
+84.1/0 31.7/0 47.9/0 44.1/0 28.9/0 51.6/0
+
+8 Conclusions
+
+We presented a heuristic local-recoding algorithm for hiding emerging patterns of a
+dataset while preserving its frequent itemsets as far as possible. We tested our algorithm
+with a benchmark dataset and showed its effectiveness.
+
+References
+
+1. Adam, N.R., Worthmann, J.C.: Security-control methods for statistical databases: A compar-
+
+ative study. ACM Computing Surveys 21(4), 515–556 (1989)
+
+2. Agrawal, D., Aggarwal, C.: On the design and quantiﬁcation of privacy preserving data min-
+
+ing algorithms. In: PODS (2001)
+
+3. Bailey, J., Manoukian, T., Ramamohanarao, K.: Fast algorithms for mining emerging pat-
+
+terns. In: ECML/PKDD (2002)
+
+4. Bayardo, J.R.: Efﬁciently mining long patterns from databases. In: SIGMOD (1998)
+5. Bayardo, R., Agrawal, R.: Data privacy through optimal k-anonymization. In: ICDE (2005)
+6. Davenport, T.H., Harris, J.G.: Competing on Analytics: The New Science of Winning, 1st
+
+edn. Harvard Business School Press (2007)
+
+7. Dong, G., Li, J.: Efﬁcient mining of emerging patterns: Discovering trends and differences.
+
+In: SIGKDD (1999)
+
+8. Dong, G., Zhang, X., Wong, L.: CAEP: Classiﬁcation by aggregating emerging patterns.
+In: Arikawa, S., Furukawa, K. (eds.) DS 1999. LNCS (LNAI), vol. 1721, p. 30. Springer,
+Heidelberg (1999)
+
+9. Du, Y., Xia, T., Tao, Y., Zhang, D., Zhu, F.: On multidimensional k-anonymity with local
+
+recoding generalization. In: ICDE, pp. 1422–1424 (2007)
+
+10. Evﬁmievski, A., Strikant, R., Agrawal, R., Gehrke, J.: Privacy preserving mining of associa-
+
+tion rules. In: SIGKDD (2002)
+
+11. Fan, H., Ramamohanarao, K.: A Bayesian approach to use emerging patterns for classiﬁca-
+
+tion. In: ADC (2003)
+
+12. Fung, B., Wang, K., Fu, A., Yu, P.: Privacy-Preserving Data Publishing: Concepts and Tech-
+
+niques. Chapman & Hall/CRC (2010)
+
+13. Fung, B., Wang, K., Wang, L., Debbabi, M.: A framework for privacy-preserving cluster
+
+analysis. In: ISI (2008)
+
+14. Fung, B., Wang, K., Yu, P.: Top-down specialization for information and privacy preserva-
+
+tion. In: ICDE (2005)
+
+15. Fung, B., Wang, K., Yu, P.: Anonymizing classiﬁcation data for privacy preservation.
+
+TKDE 10(5), 711–725 (2007)
+
+16. Ramamohanarao, H.F.K.: Pattern based classiﬁers. In: WWW (2007)
+
+170
+
+M.W.K. Cheng, B.K.K. Choi, and W.K.W. Cheung
+
+17. Kargupta, H., Datta, S., Wang, Q., Sivakumar, K.: Random-data perturbation techniques and
+
+privacy-preserving data mining. KAIS 7(4), 387–414 (2005)
+
+18. LeFevre, K., Dewitt, D., Ramakrishnan, R.: Incognito: Efﬁcient full-domain k-anonymity.
+
+In: SIGMOD (2005)
+
+19. LeFevre, K., Dewitt, D., Ramakrishnan, R.: Mondrian multidimensional k-anonymity. In:
+
+ICDE (2006)
+
+20. Li, J., Wong, R., Fu, A., Pei, J.: Anonymization by local recoding in data with attribute
+
+hierarchical taxonomies. TKDE 20(9), 1181–1194 (2008)
+
+21. Li, T., Li, N.: On the tradeoff between privacy and utility in data publishing. In: SIGKDD
+
+(2009)
+
+22. Machanavajjhala, A., Kifer, D., Gehrke, J., V´enkitasubramaniam, M.: L-diversity: Privacy
+
+beyond k-anonymity. TKDD 1(1), 3 (2007)
+
+23. MAFIA. Mining Maximal Frequent Itemsets,
+
+http://himalaya-tools.sourceforge.net/Mafia/
+
+24. Moustakides, G., Verykios, V.: A maxmin approach for hiding frequent itemsets. DKE 65(1),
+
+75–79 (2008)
+
+25. Oliveira, S., Zaiane, O.R.: Privacy preserving frequent itemset mining. In: ICDM Workshop
+
+on Privacy, Security and Data Mining, vol. 14, pp. 43–54 (2002)
+
+26. Sweeney, L.: Achieving k-anonymity privacy protection using generalization and suppres-
+
+sion. IJUFKS 10(5), 571–588 (2002)
+
+27. Sweeney, L.: k-anonymity: A model for protecting privacy. In: IJUFKS, pp. 557–570 (2002)
+28. Terrovitis, M., Mamoulis, N., Kalnis, P.: Privacy-preserving anonymization of set-valued
+
+data. PVLDB 1(1), 115–125 (2008)
+
+29. Tobji, M.A.B., Abrougui, A., Yaghlane, B.B.: Guﬁ: A new algorithm for general updating of
+
+frequent itemsets. In: CSEWORKSHOPS (2008)
+30. UCI Machine Learning Repository. Adult Datas,
+
+http://archive.ics.uci.edu/ml/datasets
+
+31. Wang, Z., Fan, H., Ramamohanarao, K.: Exploiting maximal emerging patterns for classiﬁ-
+
+cation. In: AUS-AI (2004)
+
+32. Xu, J., Wang, W., Pei, J., Wang, X., Shi, B., Fu, A.: Utility-based anonymization using local
+
+recoding. In: SIGKDD (2006)
+
+33. Xu, Y., Wang, K., Fu, A.W.-C., Yu, P.S.: Anonymizing transaction databases for publication.
+
+In: SIGKDD (2008)
+
+34. Zhang, X., Dong, G., Ramamohanarao, K.: Exploring constraints to efﬁciently mine emerg-
+
+ing patterns from large high-dimensional datasets. In: SIGKDD (2000)
+
+

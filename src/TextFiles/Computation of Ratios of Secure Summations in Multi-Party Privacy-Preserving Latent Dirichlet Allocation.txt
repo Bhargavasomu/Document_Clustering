@@ -1,0 +1,1685 @@
+ 
+
+Computation of Ratios of Secure Summations  
+
+in Multi-party Privacy-Preserving  
+
+Latent Dirichlet Allocation 
+
+Bin Yang1 and Hiroshi Nakagawa2 
+
+1 Graduate School of Information Science and Technology, The University of Tokyo, Japan 
+
+yangbin@r.dl.itc.u-tokyo.ac.jp 
+
+2 Information Technology Center, The University of Tokyo, Japan 
+
+nakagawa@dl.itc.u-tokyo.ac.jp 
+
+Abstract. In this paper, we focus our attention on the problem of Gibbs sam-
+pling  for  privacy-preserving  Latent  Dirichlet  Allocation,  which  is  equals  to  a 
+problem of computing the ratio of two numbers, both of which are the summa-
+tions of the private numbers distributed in different parties. Such a problem has 
+been studied in the case that each party is semi-honest. Here we propose a new 
+solution based on a weaken assumption that some of the parties may collaborate 
+together to extract information of other parties. 
+
+Keywords: Privacy, Data Mining, Latent Dirichlet Allocation, Collusion. 
+
+1   Introduction 
+
+In recent years, with the increased concerns on privacy protection of personal infor-
+mation, a number of techniques such as randomization and homomorphic encryption 
+have  been  suggested  in  order  to  perform  data  mining  with  the  private  information 
+preserved.  In  this  paper,  we  propose  a  new  privacy  preserving  data  mining  method 
+with  m  parties  from  a  general  problem  in  data  mining:  Latent  Dirichlet  Allocation 
+model (LDA, Blei et al. [1]). LDA is a generative probabilistic model for collections 
+of discrete data such as text corpora, which can be seen as a special mixture model, in 
+which  each  document  is  generated  by  choosing  a  distribution  over  topic  and  then 
+choosing  each  word  in  the  document  from  a  distribution  according  to  the  topic  se-
+lected. We can employ a Markov chain Monte Carlo algorithm (Griffiths et al. [2]) for 
+inference in this model. 
+
+This  paper  is  organized  as  follows.  We  introduce  the  terminology  of  privacy-
+preserving data mining and Latent Dirichlet Allocation in section 2. In section 3, we 
+formulate the  main problem. And in section 4,  we describe our main protocol: RSS 
+protocol, and evaluate the security and efficiency of this protocol. Section 5 illustrates 
+how  to  assemble  our  protocol  to  solve  the  problem  of  privacy-preserving  LDA  
+described  in  section  2.  In  section  6,  we  present  experimental  evaluations  of  these 
+techniques. Finally, we conclude with a summary in section 7. 
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part I, LNAI 6118, pp. 189–197, 2010. 
+© Springer-Verlag Berlin Heidelberg 2010 
+
+190 
+
+B. Yang and H. Nakagawa 
+
+2   Preliminary 
+
+Large numbers of conclusions in privacy-preserving data mining have been obtained 
+by  researchers,  and  almost  all  of  them  are  under  the  assumption  of  semi-honest.  In 
+particular, one is a semi-honest party means that the party follows the protocol prop-
+erly  with the exception that it keeps a record of all its intermediate computation re-
+sults  and  tries  to  deduce  additional  information  from  them  other  than  the  protocol 
+result. In this paper, we also consider a problem called collusion that a subset of the 
+participants, a coalition, might get together after the execution of the protocol in an 
+attempt  to  deduce  additional  information  of  non-coalition  parties,  although  every 
+party also follows the protocol properly, as same as in semi-honest assumption. 
+
+A protocol is called t-private if no coalition containing at most t parties can get any 
+
+additional information from its execution. 
+
+We will utilize some standard cryptographic tools and secure protocols to preserve 
+privacy  in  our  protocols.  For  convenience,  we  name  the  two  parties  "Alice"  and 
+"Bob" in the case of 2-party system. 
+
+Homomorphic encryption. Public key encryption is a fundamental and widely used 
+technology.  The  asymmetric  key  algorithm  generates  a  pair  of  encryption  keys  –  a 
+public key and a private key. The public key used to encrypt a message is different 
+from the private key used to decrypt it. The private key is kept secret, while the public 
+key  may  be  widely  distributed.  Given  a  key  pair  (sk,  pk)  and  a  message  msg, 
+c=Epk(msg) denotes an encryption of msg, and d=Dsk(c) denotes the decryption of c. In 
+particular, we call such an encryption system a homomorphic encryption, if there is an 
+operation *, satisfying the following condition for any msg1 and msg2: 
+
+Epk(msg1+msg2) = Epk(msg1)*Epk(msg2). 
+
+ 
+
+Secure linear function evaluation (SLFE). Alice has b, while Bob has c and d. After 
+running  the  secure  linear  function  evaluation  protocol,  called  SLFE(b,c,d),  Alice 
+learns the value of d-bc, and Bob learns nothing. 
+
+Protocol SLFE: 
+1.Alice generates pk and sk, computes E=Epk(-b), then sends E and pk to Bob; 
+2.Bob computes E'=Epk(d)*Ec, then sends E' back to Alice; 
+3.Alice decrypts E' by sk, D=Dpk(E'). 
+
+Here Epk and Dsk denote the encrypt function and the decrypt function of a homomor-
+phic encryption system respectively. From the homomorphism, we can get Ec = Epk(-b)c 
+=Epk(-b)*Epk(-b)*…*Epk(-b) = Epk(-bc), hence D=d-bc. 
+
+2.1   Latent Dirichlet Allocation 
+
+Typically,  LDA  model is a generative probabilistic  model proposed to research text 
+corpora. A document is seen as a sequence of words. A corpus is a collection of  M 
+documents,  then  we  can  also  see  a  corpus  as  a  sequence  of  N  words,  denoted  by 
+w=(w1,w2,…,wN). A document can deal with multiple topics, and the words that ap-
+pear  in  that  document  reflect  the  particular  set  of  topics  it  addresses.  Each  topic  is 
+treated as a probability distribution over words in the vocabulary. Thus we can view a 
+
+ 
+
+ Computation of Ratios of Secure Summations in Multi-party Privacy-Preserving LDA 
+
+191 
+
+document as a probabilistic mixture of these topics. If there are T topics in total, we 
+can write the probability of the ith word in a document as 
+ 
+
+(1) 
+where zi is a latent variable indicating the topic from which the ith word wi was drawn. 
+P(wi|zi=j) is the probability of the  word wi under the  jth topic,  whereas P(zi=j) is the 
+probability of that the topic of ith word, zi, is equal to j. In other words, each word is 
+generated by drawing a topic zi from P(z) first, and then drawing a word from P(wi|zi). 
+
+zwP
+
+∑ =
+
+(
+)
+zPj
+
+wP
+i
+
+=
+
+=
+
+=
+
+)
+
+(
+
+)
+
+(
+
+j
+
+|
+
+T
+
+1
+
+j
+
+i
+
+i
+
+i
+
+2.1.1   Gibbs Sampling for LDA  
+To infer zi for each word wi using Gibbs sampling, we need only compute the poste-
+rior probabilities that wi is assigned to topic j, for j from 1 to T, which were derived by 
+Griffiths et al. [2]: 
+
+),(
+jip
+
+=
+
+(
+zP
+
+i
+
+=
+
+j
+
+|
+
+wz
+−
+
+,
+
+i
+
+∝
+
+)
+
+)
+(
+w
+n
+i
+−
+,
+ji
+⋅
+)(
+n
+−
+,
+ji
+
++
+β
+⋅
++
+β
+W
+
+)
+(
+d
+n
+i
+−
+,
+ji
+)
+(
+d
+n
+i
+⋅−
+,
+i
+
++
++
+
+α
+ 
+α
+T
+
+(2) 
+
+W
+
+⋅
+)(
+,
+ji
+
+)
+(
+id
+jin−
+,
+
+)
+(
+iw
+jin−
+,
+
+z-i=(z1,z2,…,zi-1,zi+1,…,zN) is a sequence of  N-1 topics corresponding to the sequence 
+of words w except wi; 
+ is the number of times that word wi has been assigned to 
+topic  j  except  the  current  assignment  of  zi; 
+ is  the  number  of  times  that  a  word 
+from  document  di  has  been  assigned  to  topic  j  except  the  current  assignment  of  zi; 
+− =
+ is  the  number  of  times  that  a  word  from  the  corpus  has  been  as-
+n
+signed to topic j except the current assignment of zi; and 
+ber of words in the current document di except the current assignment of zi. 
+
+ is the num-
+
+∑ =
+
+∑ =
+
+⋅− =
+
+(
+)
+w
+n
+−
+,
+ji
+
+To draw a sampling for a latent variable of a word wi, we only need to compute T 
+probabilities: P(zi=1|z-i,w), …, P(zi=T|z-i,w), each of which means the probability that 
+zi is equal to j under the condition of z-i and w. 
+
+(
+)
+d
+i
+−
+,
+ji
+
+d
+i
+,
+i
+
+n
+
+n
+
+w
+
+1
+
+T
+
+1
+
+)
+
+(
+
+j
+
+2.1.2   Distributed LDA  
+Now we consider a scenario in which more than one parties hold their own data, re-
+spectively. They attempt to run Gibbs sampling to infer all zi with respect to the whole 
+corpus spreading around them  without revealing anything. In this case, because any 
+single  document  is  located  in  just  one  party,  this  party  can  compute 
+, 
+thus  compute  the  second  item  of  (2)  locally.  Then  the  only  remaining  problem  is 
+computing  the  first  item  of  (2)  in  m  parties  setting.  Because  the  first  item  of  (2)  is 
+only related to i and j, we can express it as a function of i and j: 
+
+ and 
+
+)
+(
+id
+jin−
+,
+
+)
+(
+id
+in ⋅−
+,
+
+),(
+jiq
+
+)
+(
+w
+n
+i
+= ⋅
+−
+,
+ji
+)(
+n
+−
+,
+ji
+
+β
++
+.
+β
++
+W
+
+ 
+
+(3) 
+
+Let 
+
+iw
+
+)
+
+(
+jn
+
+ denote the number of times that word wi has been assigned to topic j in-
+
+cluding the current assignment of zi, and 
+
+⋅ =
+
+)(
+j
+
+n
+
+w
+i
+
+)
+
+(
+j
+n
+
+w
+i
+
+(
+j
+
+1
+
+=
+)
+
+n
+=
+
++
+(
+)
+w
+i
+−
+,
+ji
+(
+)
+w
+n
+i
+−
+,
+ji
+
+ if
+ if
+
+n
+
+⎧
+⎪
+⎨
+⎪⎩
+
+ 
+
+w
+
+W
+
+∑ =
+=
+j
+z
+≠
+j
+z
+
+1
+
+i
+
+i
+
+w
+
+)
+
+n
+
+(
+j
+
+. Then we have: 
+
+ 
+
+(4) 
+
+192 
+
+B. Yang and H. Nakagawa 
+
+⋅
+)(
+j
+n
+
+=
+⋅
+)(
+j
+
+n
+=
+
++
+
+⋅
+)(
+−
+,
+ji
+⋅
+)(
+n
+−
+,
+ji
+
+1
+
+n
+
+⎧
+⎪
+⎨
+⎪⎩
+
+ if
+ if
+
+j
+j
+
+=
+≠
+
+z
+z
+
+i
+
+i
+
+ 
+
+When the data size is quite large, we propose the following approximation: 
+
+),(
+jiq
+
+≈
+
+),
+('
+jwq
+
+i
+
+=
+
+w
+i
+
++
+(
+n
+j
+⋅
+)(
+Wn
+j
+
+)
++
+
+β
+.
+β
+
+ 
+
+(5) 
+
+(6) 
+
+Here we notice that q'(wi,j) is dependent only on wi and j but not on i. And because 
+the  number  of  words  in  vocabulary  is  less  than  the  number  of  words  in  corpus,  we 
+attempt  to  approximate  q(i,j)  by  q'(wi,j),  then  draw  a  sampling  with  privacy  being 
+protected. From (4) and (5), 
+
+),
+('
+jwq
+
+i
+
+=
+
+(
+)
+w
+n
+i
+−
+,
+ji
+⋅
+)(
+n
+−
+,
+ji
+
+β
+++
+1
+β
+++
+1
+W
+),(
+jiq
+
+⎧
+⎪
+⎨
+⎪
+⎩
+
+=
+
+≠
+
+ if
+
+j
+
+ if
+
+j
+
+z
+
+i
+
+ 
+
+z
+
+i
+
+(7) 
+
+which means that this kind of approximation always make q'(wi,j) keep the value of 
+q(i,j) except that q'(wi,j) is a little bigger than q(i,j) when j is equal to current topic. 
+This means that the value of zi is a little harder to be changed when sampling. Hence, 
+it  will  somewhat  cause  a  slow  convergence.  However,  this  kind  of  approximation 
+always does  keep the convergence  in Gibbs sampling because of the following rea-
+sons: 1) It is so near to the real value if data size if big enough; 2) The second term of 
+right hand side of formula (2) is still intact. 3) When converged, this approximation 
+holds because all the values of probabilities are proportional to the real values except 
+what corresponds to current topic. This will be verified by experiments in section 6. 
+
+In the rest of the paper, the index attached to the left-top of a variable denotes the 
+(w) denotes the number of times 
+
+party which the variable belongs to. For instance,  knj
+that word w has been assigned to topic j in all documents in party k. So we can get: 
+
+=
+
+w
+i
+
+)
+
+n
+
+(
+j
+
+m
+
+∑ =
+
+k
+
+1
+
+w
+i
+
+)
+
+k
+
+n
+
+(
+j
+
+ and 
+
+⋅ =
+
+)(
+j
+
+n
+
+m
+
+∑ =
+
+k
+
+1
+
+k
+
+n
+
+⋅
+)(
+j
+
+ 
+
+(8) 
+
+The variables with nothing being attached to the left-top denote the variables corre-
+
+sponding to the whole m parties, as shown in (8). 
+
+To draw a sampling for a word w, we need to compute q'w=(q'(w,1),…, q'(w,T))T. 
+Hence, it is sufficient for sampling all the words in the corpus that we only compute 
+q'w for w from 1 to W. In other words, we need not compute anything for all words in 
+the entire corpus. Therefore, our whole strategy of sampling is a 2-step iteration: one 
+step is securely computing q'w for w from 1 to W, and the other step is locally sam-
+pling  each  word  in  each  party  using  q'w.  Since  sampling  step  is  similar  to  original 
+LDA, we concentrate our attention on the computation of q'1,…,q'W, expressed as: 
+
+=
+
+Q
+
+[
+q'
+1
+
+q'
+2
+
+L q'
+
+W
+
+]
+
+=
+
+)1,1('
+q
+)2,1('
+q
+
+)1,2('
+q
+)2,2('
+q
+
+M
+,1('
+
+q
+
+T
+
+)
+
+M
+,2('
+
+q
+
+T
+
+)
+
+⎡
+⎢
+⎢
+⎢
+⎢
+⎣
+
+L
+L
+O
+L
+
+('
+Wq
+('
+Wq
+
+)1,
+)2,
+
+M
+
+('
+TWq
+
+,
+
+)
+
+ 
+
+⎤
+⎥
+⎥
+⎥
+⎥
+⎦
+
+(9) 
+
+ 
+
+ Computation of Ratios of Secure Summations in Multi-party Privacy-Preserving LDA 
+
+193 
+
+3   Problem Formulation 
+
+The  problem  of  privacy-preserving  LDA  encountered  the  problem  that  how  to  se-
+curely compute the ratio of two summations of the data spreading around m parties 
+with nothing of each party being revealed. We formulate our problem as below. 
+
+Problem of RSS (Ratio of Secure Summations): 
+Input: 
+
+Party 1 has a pair of data (1x, 1y); 
+Party 2 has a pair of data (2x, 2y); 
+…… 
+Party m has a pair of data (mx, my). 
+
+Output: 
+
+All the m parties collaborate to compute: 
+
+=
+
+r
+
+∑
+∑
+
+m
+=
+1
+i
+m
+=
+1
+
+i
+
+                                              (10) 
+
+i
+
+i
+
+x
+
+y
+
+Condition: 
+
+Neither ix nor iy of party i is revealed to any party other than i. 
+Moreover, ∑ =
+
+ are revealed to nobody. 
+
+i y
+
+i x
+
+ and ∑ =
+
+m
+
+i
+
+m
+
+1
+
+1
+
+i
+
+Here  it  is  worthy  emphasizing  that  although  the  ratio  of  summations  r  is  known  to 
+each party after this computation,  ix and  iy and any other function of them could not 
+be evaluated by any party other than i. 
+
+4   Protocol 
+
+We propose a symmetric protocol solving the RSS problem. 
+
+Stage 1. Each party generates 2m+1 random numbers in this stage. 
+
+Protocol 2-1: 
+1. Each party defines 2m+1 variables of : 
+
+Party 1: 1b1, 1b2, …, 1bm, 1c1, 1c2, …, 1cm, 1d; 
+Party 2: 2b1, 2b2, …, 2bm, 2c1, 2c2, …, 2cm, 2d; 
+…… 
+Party m: mb1, mb2,…, mbm, mc1, mc2,…, mcm, md. 
+
+And then generates a random value uniformly to each variable, except 
+
+1b1, 2b2,…, mbm and 1c1, 2c2,…, mcm are reserved to be decided; 
+
+2. For each party i, where i from 1 to m: 
+2-1.Party  i  runs  SLFE(ibj,  jci,  jd)  with  the  collaboration  of  party  j  where 
+  jci,  where 
+
+j=1,…,i-1,i+1,…,m,  hence  computes  the  values:  iej=jd-ibj
+j=1,…,i-1,i+1,…,m; 
+
+2-2.Party i views ibi
+
+ici as a single variable, and decides the value of ibi
+
+ici from 
+
+the following equation, where only ibi
+
+ici is unknown: 
+
+ie1+ ie2+…+ iei-1+(id-ibi
+
+ici)+iei+1+…+ iem=0. 
+
+ 
+
+ 
+
+194 
+
+B. Yang and H. Nakagawa 
+
+Therefore, each party generated 2m+1 numbers satisfying the following condition: 
+
+m
+
+∑ =1
+
+i
+
+j
+
+i
+cb
+i
+
+j
+
+=
+
+d
+
+    (j=1,2,…,m), 
+
+(11) 
+
+where 
+
+In next stage, We only use the value of ibi
+
+pute the values of ibi and ici, even though they are two variables actually. 
+
+d=1d+2d+…+md. 
+
+(12) 
+ici but not ibi and ici, so we do not com-
+
+Stage 2. In this stage, each party collaborate to compute the value of 
+
+m
+
+∑ =1
+
+j
+
+Protocol 2-2: 
+1. For i from 1 to m, party i computes  ib1
+
+ix,  ib2
+
+ix,…, ibm
+
+ix, and sends  ib1
+
+party 1, ib2
+
+ix to party 2, …, ibm
+
+ix to party m, respectively; 
+
+2. For i from 1 to m, party i receives 1bi
+
+2x from party 2, … , 
+2x,  …, 
+mx locally, by multiplying ic1, ic2,…, icm, to each number respectively. 
+
+mx  from  party  m,  respectively,  and  then  computes  1bi
+icm
+
+1x from party 1, 2bi
+
+1x,  2bi
+
+mbi
+mbi
+Then summates these m numbers to if and publish it. 
+mx 
+
+ic2
+3. All parties compute the summation f, 
+
+2x+…+mbi
+
+1x+2bi
+
+if =1bi
+
+icm
+
+ic2
+
+ic1
+
+ic1
+
+j
+
+⋅
+dx
+
+. 
+
+ix to 
+
+In the case that i=j, since ibi
+
+Actually, f is the summation of jbi
+we can get that f is just what we want: 
+
+icj
+
+ i.e. f = 1f + 2f +…+ mf. 
+ici is known to party i, ibi
+
+ix can be computed locally. 
+jx, for i and j from 1 to m. In addition, from (11), 
+
+ici
+
+i
+
+f
+
+=
+
+m
+=
+1
+
+m
+=
+1
+
+∑ ∑
+=
+∑ ∑
+    
+x
+
+m
+=
+1
+
+j
+
+j
+
+j
+
+j
+
+j
+
+i
+cb
+i
+
+j
+
+m
+=
+1
+
+i
+
+j
+
+i
+cb
+i
+
+j
+
+=
+ 
+x
+
+j
+
+m
+=
+1
+
+∑ ∑
+=
+∑
+ 
+
+m
+=
+1
+
+j
+
+j
+
+i
+
+j
+
+m
+=
+1
+⋅
+dx
+
+i
+cb
+i
+
+j
+
+x
+
+j
+
+ 
+
+(13) 
+
+Stage 3. In terms of iy, we achieve the operators in stage 1 to regenerate another series 
+of bs, and cs, with the values of 1d, 2d,…, md not being changed, such that 
+
+m
+
+∑ =
+
+i
+
+1
+
+j
+
+i
+'
+cb
+
+i
+
+'
+
+j
+
+=
+
+d
+
+    (j=1,2,…,m), 
+
+ 
+
+where d=1d+2d+…+md. Hence we can compute the following value by protocol 2-2: 
+
+f'
+
+m
+
+= ∑ =1
+
+j
+
+j
+
+⋅
+dy
+
+ 
+
+(14) 
+
+Therefore, the value of f/f' is just the ratio r in (10), which we want to evaluate: 
+
+=
+
+f
+f
+
+'
+
+∑
+∑
+
+m
+=
+1
+j
+m
+=
+1
+
+j
+
+j
+
+j
+
+⋅
+dx
+⋅
+dy
+
+=
+
+∑
+∑
+
+m
+=
+1
+j
+m
+=
+1
+
+j
+
+ 
+
+j
+
+j
+
+x
+
+y
+
+(15) 
+
+The value d=1d+2d+…+md is known to nobody unless all the m parties publish their 
+own id. Thus all parties can deduce nothing. In addition, we achieve stage 1 for only 
+two times, and achieve stage 2 repeatedly. 
+
+ 
+
+ Computation of Ratios of Secure Summations in Multi-party Privacy-Preserving LDA 
+
+195 
+
+Security. Following theorem ensures the security of the RSS protocol. 
+Theorem. The RSS protocol is (m-1)-private. 
+
+Performance.  For  convenience,  we  denote  ta,  tc,  tr,  te  and  td  the  time  of  arithmetic, 
+communication, random number generation, encryption and decryption, respectively. 
+Because of the symmetry of RSS protocol, all parties can execute the protocol in 
+parallel. Thus the running time of one party is equal to the global running time. We 
+summarize the running time of RSS protocol in Table 1.  
+
+Table 1. The running time of the RSS protocol  
+
+ 
+ta 
+tr 
+te 
+td 
+tc 
+
+Stage1 
+
+Stage2 
+
+Stage3 
+
+2m 
+2m 
+2m 
+m 
+2m 
+
+5m 
+m 
+- 
+- 
+3m 
+
+1 
+- 
+- 
+- 
+- 
+
+Total 
+14m+1 
+
+6m 
+4m 
+2m 
+10m 
+
+ 
+In summary, The running time with respect to each operation is O(m). 
+To compute R ratios, RSS protocol needs just two times stage 1, 2R times stage 2 
+
+and R time stage 3. Thus we summarize the result in Table 2.  
+
+Table 2. Running time of the RSS protocol corresponding to the R times of computations  
+
+ta 
+
+tr 
+
+te 
+
+td 
+
+tc 
+
+O(Rm)  O(Rm) 
+
+O(m) 
+
+O(m) 
+
+O(Rm) 
+
+ 
+Compared with tc, te and td, the values of ta and tr are so small that we can ignore it 
+
+in our protocols. So we can say that te and td are O(m) in RSS protocol. 
+
+5   Implementations and Performance 
+
+Our main task of distributed LDA is to securely compute a matrix Q defined by (9) 
+which  contains  WT  ratios  of  secure  summations  defined  by  (6).  We  can  utilize  our 
+protocol to compute one ratio in terms of w by setting the variables as follows: 
+
+1
+
+=
+(1
+nx
+j
+
+w
+
+)
+
++
+
+=
+2
+nx
+
++
+
+w
+
+)
+
+(
+j
+
+=
+
+m
+
+m
+
+x
+
+w
+
+)
+
+n
+
+(
+j
+
++
+
+1
+
+=
+ny
+
+⋅
+)(1
+j
+
++
+
+=
+
+2
+
+y
+
+2
+
+n
+
+⋅
+)(
+j
+
++
+
+,...,
+
+m
+
+y
+
+=
+
+m
+
+n
+
+⋅
+)(
+j
+
+2
+
+β
+,
+m
+β
+W
+,
+m
+
+β
+,...,
+m
+β
+W
+m
+
+Hence we can securely compute one ratio as 
+
+2
+
++++
+...
++++
+...
+
+x
+y
+
+2
+
+1
+
+1
+
+x
+y
+
+=
+
+m
+
+m
+
+x
+y
+
+)
+
+w
+
++
+(
+n
+j
++
+⋅)(
+Wn
+j
+
+β
+ 
+β
+
+ 
+
+β
+,
+m
+β
+W
++
+.
+m
+
+(16) 
+
+(17) 
+
+Sampling can be drawn, after all the WT values in Q are computed. 
+
+ 
+
+196 
+
+B. Yang and H. Nakagawa 
+
+6   Experiments 
+
+In our 2-step iteration of distributed LDA, sampling step is as same as original LDA. 
+As we have mentioned, the approximation in our method makes convergence slower 
+than original LDA. To evaluate it, we compare the results of these two methods in the 
+same machine. The experiment data is a corpus with 300 documents. All documents 
+contain about 200,000 words. The number of words in vocabulary is W=20, where the 
+words occurring in almost every document are omitted. The number of topics is T=5. 
+Here we just evaluate and compare generated assignments of both methods. As shown 
+in  Figure  1,  more  than  167,000  data  are  changed  in  first  round  of  both  methods. 
+Original  LDA  converges  after  about  10th  round,  while  approximate  LDA  converges 
+after about 18th round. The final results of sampling of both methods are also the same 
+as each other in terms of generated assignments corresponding to each of them. 
+
+ 
+
+Fig. 1. Speeds of convergence of original LDA and approximate LDA. Horizontal axis denotes 
+the times of sampling, while vertical axis denotes the number of data being changed each time. 
+
+In multi-computer environment, sampling step is achieved by m parties in parallel, 
+and without updating parameters, so the 1-round cost of sampling step in distributed 
+LDA is less than 1/m of original LDA. 
+
+Now we discuss the computing step. Since original LDA does not contain this step, 
+the efficiency of this step is with strong relation to the whole efficiency of distributed 
+LDA. By the limitation of number of computers, we just simulate such a system in a 
+single computer by running all the necessary steps in sequence, recording the running 
+time  of  each  step,  and  then  overlapping  the  time  of  parallel  steps  to  compute  the 
+whole running time. Splitting all experiment data into  m parties,  we implement just 
+one round of secure computation in computing step. To compare the cost in different 
+cases, we simulate the cases that m is 5, 10 and 30, and T is 5, 10 and 50, where the 
+data are different from experiment of text analysis above. The result is shown in Table 
+3. Here, we just fixed W=10 in each case. We notice from Table 3 that the cost of RSS 
+protocol is proportional to m, because the total cost is O(m) when T is fixed. In addi-
+tion, the increment of the cost of RSS protocol is not so fast when T increases, since te 
+and td is independent on T.  
+
+ 
+
+ Computation of Ratios of Secure Summations in Multi-party Privacy-Preserving LDA 
+
+197 
+
+Table 3. Running time (sec.) of one round of RSS protocol  
+
+ 
+
+T=5 
+T=10 
+T=50 
+
+m=5 
+89 
+165 
+774 
+
+m=10 
+178 
+329 
+1547 
+
+m=30 
+548 
+989 
+4644 
+
+7   Conclusions 
+
+In this paper, we have introduced a protocol of computation of ratio of secure summa-
+tions. Our RSS protocol has higher security in the case of coalition. Furthermore, we 
+also discussed the performance of the RSS protocols in this paper. 
+
+We have also introduced the Privacy-Preserving distributed LDA model which can 
+be applied by the RSS protocol. Moreover, the RSS protocol can be utilized in large 
+numbers  of  secure  computation  problems  in  privacy-preserving  data  mining,  which 
+require computing ratios of secure summations. 
+
+References 
+
+1.  Blei, D.M., Ng, A.Y., Jordan, M.I.: Latent Dirichlet Allocation. Journal of Machine Learn-
+
+ing Research 3, 993–1022 (2003) 
+
+2.  Griffiths, T.L., Steyvers, M.: Finding scientific topics. In: PNAS, pp. 5228–5235 (2004) 
+3.  Jha, S., Kruger, L., McDamiel, P.: Privacy Preserving Clustering. In: 10th European Sym-
+
+posium On Research In Computer Security, Milan, Italy (2005) 
+
+4.  Bishop, C.M.: Pattern Recognition and Machine Learning. Springer, Heidelberg (2006) 
+5.  Goldreich,  O.:  Foundations  of  Cryptography,  Basic  Tools,  vol. 1.  Cambridge  University 
+
+Press, Cambridge (2001) 
+
+6.  Goldreich,  O.:  Foundations  of  Cryptography,  Basic  Applications,  vol. 2.  Cambridge  
+
+University Press, Cambridge (2004) 
+
+7.  Chor,  B.,  Gereb-Graus,  M.,  Kushilevitz,  E.:  On  the  Structure  of  the  Privacy  Hierarchy. 
+
+Journal of Cryptology 7, 53–60 (1994) 
+
+8.  Chor,  B.,  Ishai,  Y.:  On  Privacy  and  Partition  Arguments.  Information  and  Computa-
+
+tion 167, 2–9 (2001) 
+
+9.  Aggarwal,  C.C.,  Yu,  P.S.:  Privacy-Preserving  Data  Mining:  Models  and  Algorithms. 
+
+Springer, Heidelberg (2008) 
+
+10.  Paillier, P.: Public-Key  Cryptosystems  based  on  Composite  Degree  Residue  Classes.  In: 
+Stern, J. (ed.) EUROCRYPT 1999. LNCS, vol. 1592, pp. 223–238. Springer, Heidelberg 
+(1999) 
+
+11.  Damgard,  I.,  Jurik,  M.:  A  Generalisation,  a  Simplification  and  some  Applications  of 
+Paillier’s  Probabilistic  Public-Key  System.  In:  Kim,  K.-c.  (ed.)  PKC  2001.  LNCS, 
+vol. 1992, pp. 119–136. Springer, Heidelberg (2001) 
+
+12.  Benaloh, J.C.: Secret sharing homomorphisms: keeping shares of a secret secret. In: Od-
+lyzko,  A.M.  (ed.)  CRYPTO  1986.  LNCS,  vol. 263,  pp.  251–260.  Springer,  Heidelberg 
+(1987) 
+
+13.  Vaidya,  J.,  Kantarcıoglu,  M.,  Clifton,  C.:  Privacy-preserving  Naïve  Bayes  classification. 
+
+The VLDB Journal 17, 879–898 (2008) 
+
+ 
+
+

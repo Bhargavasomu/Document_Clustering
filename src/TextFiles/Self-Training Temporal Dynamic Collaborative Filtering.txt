@@ -1,0 +1,1105 @@
+Self-training Temporal Dynamic Collaborative
+
+Filtering
+
+Cheng Luo1, Xiongcai Cai1,2, and Nipa Chowdhury1
+
+1 School of Computer Science and Engineering
+
+2 Centre of Health Informatics
+
+University of New South Wales, Sydney NSW 2052, Australia
+
+{luoc,xcai,nipac}@cse.unsw.edu.au
+
+Abstract. Recommender systems (RS) based on collaborative ﬁlter-
+ing (CF) is traditionally incapable of modeling the often non-linear and
+non Gaussian tendency of user taste and product attractiveness lead-
+ing to unsatisﬁed performance. Particle ﬁltering, as a dynamic modeling
+method, enables tracking of such tendency. However, data are often ex-
+tremely sparse in real-world RS under temporal context, resulting in less
+reliable tracking. Approaches to such problem seek additional informa-
+tion or impute all or most missing data to reduce sparsity, which then
+causes scalability problems for particle ﬁltering. In this paper, we de-
+velop a novel semi-supervised method to simultaneously solve the prob-
+lems of data sparsity and scalability in a particle ﬁltering based dynamic
+recommender system. Speciﬁcally, it exploits the self-training princi-
+ple to dynamically construct observations based on current prediction
+distributions. The proposed method is evaluated on two public bench-
+mark datasets, showing signiﬁcant improvement over a variety of existing
+methods for top-k recommendation in both accuracy and scalability.
+
+Keywords: Temporal Recommender, Collaborative Filtering, Particle
+Filtering.
+
+1
+
+Introduction
+
+Collaborative ﬁltering [10] generates personalized recommendation to match
+users’ interests and its performance can be improved by exploiting temporal
+information, as the tendency of user preferences and item attractiveness is not
+static [10,11]. There are four general approaches in temporal CF, i.e, heuristic,
+binning-based, online updating and dynamic-based approaches. Heuristic ap-
+proach penalizes the importance of data before a pivot point[6,10], which tends
+to undervalue the past data. In binning-based approach, training and testing
+data could be from the same interval [11]. The prediction for users’ interests is
+actually post hoc about what interests would have been in the past, rather than
+what interests would be in the future. Although online updating approach only
+uses past information to make prediction [8,12], it usually focuses on scalability
+and ignores the dynamics of user taste and item attractiveness. Dynamic-based
+approach explicitly models temporal dynamics by a stochastic state space model,
+
+V.S. Tseng et al. (Eds.): PAKDD 2014, Part I, LNAI 8443, pp. 461–472, 2014.
+c(cid:2) Springer International Publishing Switzerland 2014
+
+462
+
+C. Luo, X. Cai, and N. Chowdhury
+
+which shows advantages over the other methods [13]. However, in such an ap-
+proach, item attractiveness is assumed to be static with Gaussian distributions,
+which may be oversimpliﬁed. To overcome such problems, we ﬁrst utilize particle
+ﬁltering [16] as a dynamic technique to model non-Gaussian behaviors and track
+latent factors representing user preferences and item attractiveness.
+
+Furthermore, under the temporal context, the data sparsity problem [19] be-
+comes challenging as many users would be inactive for some consecutive time
+slots. Although matrix factorization [15] could realize sparsity reduction, the
+tendency tracked by particle ﬁltering may be unreliable due to insuﬃcient ob-
+servations at every time step. Exploiting additional information, such as con-
+textual information or common patterns [10], or imputing all or most missing
+data are two common approaches in CF to reduce sparsity. However, this extra
+information collection is usually not only infeasible in practice but also compu-
+tational complexity. Therefore, we do not consider utilizing side information in
+this paper. Missing data are usually imputed as negative [18,14] or other heuris-
+tic values [10]. Deterministic optimization [17] and current model estimation [9]
+are also used to yield some reasonable imputed values. However, these methods
+are only developed under static context and based on some heuristic rules or
+point estimators. Meanwhile, all these methods impute all or most missing data,
+leading to an unaﬀordable computational complexity for succeeding recommen-
+dation algorithms, since it not only heavily reduces the scalability of algorithms
+but also inﬂuences the recommendation accuracy.
+
+In this paper, we aim to solve the problems of data sparsity and scalability
+in particle ﬁltering-based temporal dynamic recommender systems. We utilize
+self-training principle [22] to dynamically construct feedback data to enhance
+our particle ﬁltering-based recommendation method. In particular, we use la-
+tent factors to compactly represent user preferences and item attractiveness re-
+spectively at each time step, whose initial settings are learned by probabilistic
+matrix factorization (PMF) [15]. Based on such a representation, we develop a
+novel self-training mechanism based on the distributions of the current personal-
+ized prediction to complement recent observations with negative items sampled
+from missing data. The mechanism is then cooperated with particle ﬁltering
+techniques to simultaneously track the tendency of user preferences and item at-
+tractiveness. For top-k recommendation [21,4], a personalized list for each user
+is generated based on current user and item latent factors.
+
+We discuss related work in Section 2. Particle ﬁltering for PMF is described
+in Section 3. Self-training for the particle ﬁltering based method is developed
+in Section 4. Experimental results are in Section 5. Conclusion is presented in
+Section 6.
+
+2 Related Work
+
+There have been few studies [13,11,20] on exploiting temporal dynamics to im-
+prove the performance of RS. Among these studies, [13] is the most related one
+to our work, which uses Kalman ﬁlter as temporal priors to track user latent fac-
+tors. However, item latent factors are only updated but not tracked. Meanwhile,
+
+Self-training Temporal Dynamic Collaborative Filtering
+
+463
+
+the usage of Kalman ﬁlter restricts the dynamic and observation functions to be
+linear and Gaussian. Particle ﬁltering has been used to dynamically update a log-
+normal distribution that models user preferences [3] in music recommendation,
+assuming the staticness of item popularity. Moreover, the method is not based
+on latent factors, and very application-speciﬁc (otherwise, no proper features).
+Conventional CFs with imputation [19] all suﬀer from the domination of im-
+puted ratings. Sampling missing feedback is only used in non-temporal context
+and one class CF (OCCF) problem [5]. An OCCF problem can be deducted
+from our problem by setting, for example, relevant ratings as positive examples.
+User-oriented and item-oriented mechanisms, which only based on the times
+that items or users present, are proposed in [14] as sampling methods. In these
+methods, recommendation accuracy is compromised in order to boost the scal-
+ability. To obtain a more accurate recommendation, samples are selected based
+on pairwise estimation for OCCF to iteratively train the model parameters [21].
+All of these sampling methods are developed under static context for OCCF.
+Unlike our proposed method, these algorithms do not aim to solve problems of
+scalability and sparsity at the same time.
+
+3 Particle Filtering for Matrix Factorization
+
+Probabilistic matrix factorization method, as a model-based approach in CF,
+has been widely used due to its simplicity and eﬃciency. In particular, assuming
+N users and M items, let R ∈ RN×M be a user-item preference matrix with an
+entry ru,i representing the rating given by user u to item i. Rating ru,i is gener-
+ated with a Gaussian distribution P (ru,i|Uu, Vi) conditioned on K dimensional
+user and item latent factors U ∈ RN×K and V ∈ RM×K . Prior distributions
+P (U ) and P (V ) are formulated to contain regularization terms [15]. These latent
+variables are further assumed to be marginally independent while any rating ru,i
+is assumed to be conditionally independent given latent vectors Uu and Vi for
+user u and item i [15]. The likelihood distribution over preference matrix R is,
+
+P (R|U, V, α) =
+
+N(cid:2)
+
+M(cid:2)
+
+Yu,i · N (ru,i|UuV T
+
+i
+
+, α−1),
+
+(1)
+
+u=1
+
+i=1
+
+where N (x|μ, α−1) is a Gaussian distribution with mean μ and precision α, and
+Yu,i is an indicator variable with value 1 when rating ru,i is not missing and
+value 0 when the rating is not observed. Priors P (U ) and P (V ) are given as,
+
+P (U|αU ) =
+
+(cid:3)N
+
+u=1
+
+N (Uu|0, α−1
+U I)
+
+p(V |αV ) =
+
+(cid:3)M
+i=1
+
+N (Vi|0, α−1
+
+V I).
+
+Maximizing the log-posteriors over U and V is equivalent to minimizing the
+sum-of-square error function with quadratic regularization terms for PMF [15],
+leading to the following objective function,
+
+E =
+
+1
+2
+
+N(cid:4)
+
+M(cid:4)
+
+u=1
+
+i=1
+
+Yu,i(ru,i − UuV T
+
+i )2 +
+
+λU
+2
+
+N(cid:4)
+
+u=1
+
+||Uu||2
+
+F ro +
+
+λV
+2
+
+M(cid:4)
+
+i=1
+
+||Vi||2
+
+F ro,
+
+(2)
+
+464
+
+C. Luo, X. Cai, and N. Chowdhury
+
+where λU = αU /α, λV = αV /α, and || · ||Fro denotes the Frobenius norm.
+
+We use a state space approach [16] to track the tendency of user preferences
+and item attractiveness. With linear and Gaussian assumption, it is straight-
+forward to deﬁne the state to be a joint vector of user and item latent factors,
+due to the existence of analytical and tractable solution. However, it is shown
+[15] that empirical distributions of the posterior Hence, we use particle ﬁlter-
+ing to simultaneously track these latent factors. Particle ﬁltering iteratively ap-
+proximates regions of high density as discrete sample points. As the number of
+particles goes to inﬁnity, the approximation converges to the true distribution
+[16]. In practice, given d-dimensional state space, the number of required parti-
+cles should be O(2d) to achieve a satisﬁable result [16]. To make a compromise
+between the accuracy of user/item representation and tractability of particle
+ﬁltering, we separately track latent factors for each user and item.
+
+We assume that the tendency of user u’s preference and item i’s properties
+follows a ﬁrst-order random walk driven by multivariate normal noise, due to
+the lack of prior knowledge. The transition functions at time t are as follows,
+
+U u
+
+t = U u
+
+t , V i
+
+t = V i
+
+t−1 + di
+t,
+
+t ∼ N (0, σU I ) and di
+
+t−1 + cu
+(3)
+t ∼ N (0, σV I ) are deﬁned as unrelated Gaussian
+where cu
+process noises. The posterior distribution of U u
+is approximated by particle
+t
+t |R1:t) =
+) where wu,(s)
+wu,(s)
+ﬁltering with S particles as P (U u
+U,t δ(U u
+U,t
+s=1
+is a weight of s-th particle at time t, and U u,(s)
+is obtained by propagating U u,(s)
+t−1
+using dynamics in Eq (3). The estimation of item v’s latent factors at time t is
+obtained in a similar way. Using the transition prior in Eq (3) as the proposal
+distribution, the weight at time t for all the particles is evaluated recursively as
+wt = wt−1 · P (Rt|Ut, Vt) where P (Rt|Ut, Vt) is the observation function.
+
+t −U u,(s)
+
+(cid:5)S
+
+t
+
+t
+
+The observation function should reﬂect the ability of a particle to reconstruct
+given ratings. The objective function in Eq (2) is an immediate candidate in
+which P (R|U, V, θ) ∝ e−E. However, this candidate function is sub-optimality for
+a top-k recommendation task, because an algorithm attempting to minimize the
+root-mean-squared-error in prediction does not have a satisﬁable performance
+for a top-k recommendation task [4]. Moreover, the objective function in Eq (2)
+assumes that unobserved data in both training and testing cases are missing at
+random. That is, the probability that a rating to be missing is independent of its
+value. Nevertheless, it is shown [18] that feedback in RS is generally not missing
+at random (NMAR). Low ratings are much more likely to be missing than high
+ratings [18] because users are free to choose items to give feedback.
+
+To design a suitable observation function, the key idea is to consider the
+ranking of all the items, no matter whether they are observed or not. By treating
+all missing data as negative with weights (wAMAN), the observation function
+over imputed ratings ¯Ru
+
+t for s-th particle of user u is as follows,
+
+P ( ¯Ru
+
+t |U u,(s)
+
+t
+
+,{V i,(s(cid:2)
+
+t
+
+)
+
+}) =
+
+S(cid:2)(cid:4)
+
+s(cid:2)=1
+
+exp{− M(cid:4)
+
+i=1
+
+wi,(s(cid:2)
+V,t Wu,i(¯ru,i
+
+t − U u,(s)
+
+)
+
+t
+
+(V i,(s(cid:2)
+
+t
+
+)
+
+)T )2},
+
+(4)
+
+Self-training Temporal Dynamic Collaborative Filtering
+
+465
+
+t
+
+t
+
+)
+
+t = ru,i
+
+if Y u,i = 1 and ¯ru,i
+
+and their weights wi,(s(cid:2)
+
+where ¯ru,i
+t = rm if Y u,i = 0. The rm is an imputed
+value for all the missing data, which is regarded as the average value of ratings in
+the complete but unknown data. Weight Wu,i is deﬁned to reﬂect the conﬁdence
+over imputation and set as a global constant wm for simplicity [18]. Latent factors
+V i,(s(cid:2)
+-th particle for item i. The observation
+function over s(cid:3)
+-th particle of item i is deﬁned similarly. The distributions are
+no longer Gaussian after the introduction of wm and an imputed value for all
+the missing data. Meanwhile, no regularization terms exist in Eq (4) because we
+obtain point mass approximation of posterior distributions via particle ﬁltering
+attempting to avoid overﬁtting. This method is named as PFUV hereafter.
+
+represent s(cid:3)
+
+V,t
+
+)
+
+4 Personalized Self-training Method
+
+In practice, feedback is usually unavailable before recommendation is made,
+which implies observation Rt at the current period is not available to estimate
+the tendency of user preferences and item attractiveness before recommendation.
+It is straightforward to use all the historic observations R1:t−1 to approximate the
+estimation. However, the ratings would be dominated by the past information
+and cannot represent the recent tendency. An alternative approximation uses the
+most recent observation Rt−1 instead. However, under temporal context, the rat-
+ings are too sparse for each user or item to track the current tendency. The data
+sparsity can be reduced by imputing all the missing data as shown in Eq (4). The
+}). However,
+the dynamics in this approximation will drift away from the true tendency due
+to the domination of imputed ratings in ¯Rt−1. Meanwhile, this approximation
+does not have a satisﬁable scalability due to the usage of all the missing data.
+
+observation function can be approximated by P ( ¯Rt−1|U u,(s)
+
+,{V i,(s(cid:2)
+
+)
+
+t
+
+t
+
+Therefore, we exploit self-training principle [22] to solve the above mentioned
+problems. Instead of treating wAMAN, for each user at every time step, we will
+dynamically select a subset of missing items as negative samples to complement
+the user’s most recent observation. This personalized and self-training procedure
+not only distinguishes the past and recent information but also avoids to domi-
+nate recent observation with imputed data. These samples are the most conﬁdent
+negative samples w.r.t the current prediction distribution for each user.
+
+4.1 Self-training Sampling Method
+Given user u and its current unobserved items Im,u
+Im,u
+
+t
+
+t
+
+is selected by a multi-nominal distribution. The distribution is
+
+, a set of N n,u
+
+t
+
+items I n,u
+
+t ⊆
+
+t
+
+t
+
+t
+
+|N n,u
+
+) ∝ θx1
+
+, θ1, . . . , θN m,u
+
+P (x1,··· , xN m,u
+(5)
+is the number of unobserved items for user u until time t, {xi|i ∈
+where N m,u
+{1, . . . , N m,u
+}} represents the times that unobserved item i would be selected as
+}} is the probability that unobserved item i is
+negative, and {θi|i ∈ {1, . . . , N m,u
+disliked by user u. Without restricting xi’s to binary variables, this personalized
+selection is an adaptive mechanism. An unseen item with a high probability will
+
+xN
+m,u
+t
+N m,u
+
+··· θ
+
+1
+
+,
+
+t
+
+t
+
+t
+
+t
+
+466
+
+C. Luo, X. Cai, and N. Chowdhury
+
+be selected more frequently than those with lower probability. As the accumula-
+tion of wm for the same negative sample in Eq (4), more emphasis will be placed
+on the sample. By imposing such restriction, N n,u
+diﬀerent items will be chosen.
+We will adopt this restriction for simplicity.
+
+t
+
+Conﬁdence Estimation. A candidate negative sample should have a small
+prediction error and a small estimation variance if the sample was negative. This
+criterion resembles the bias and variance decomposition of generalized errors [10].
+
+Given the historic data R1:t−1, we deﬁne θi as P (ˆru,i = rm ∧ var(ˆru,i)|R1:t−1)
+where ˆru,i = rm represents the event that the predicted rating equal to the
+imputed value and var(ˆru,i) represents the variance of the prediction. Assuming
+prediction error and variance are conditionally independent given Ut and Vt,
+
+(cid:6)
+
+θi =
+∼ S(cid:4)
+
+s=1
+
+s(cid:2)=1
+
+P (ˆru,i = rm|Ut, Vt)P (var(ˆru,i)|Ut, Vt)P (Ut, Vt|R1:t−1)dUtdVt
+S(cid:2)(cid:4)
+
+U,t wi,(s(cid:2)
+wu,(s)
+
+V,t P (ˆru,i|U u,(s)
+
+)
+
+t
+
+, V i,(s(cid:2)
+
+)
+
+t
+
+)P (var(ˆru,i)|U u,(s)
+
+t
+
+, V i,(s(cid:2)
+
+t
+
+)
+
+),
+
+(6)
+
+where the predicted joint distribution of latent factors is estimated using particle
+ﬁltering described below, S and S(cid:3)
+are the number of particles used to track user
+u’s latent factors and item i’s latent factors, respectively.
+
+In general, ˆUt and ˆVt can be any proper function taking as input {(ws
+
+Predication with Canonical Particles. To estimate a particle’s weight for
+Ut in Eq (6), we need a weight of a particle for Vt. Likewise, we use a weight of a
+particle for Ut to reweight a particle for item latent factors. As the computation
+over all possible pairs of user and item particles is too expensive, we resort to
+canonical particles [7] ˆUt and ˆVt to respectively represent the total eﬀect of
+particles on the estimation for each user and item latent factors at time t.
+t )|s ∈
+U,t, U s
+1 . . . S} and {(ws(cid:2)
+t )|s(cid:3) ∈ 1 . . . S(cid:3)}. To avoid the degeneracy problem [16] in
+particle ﬁltering, we will resample particles proportional to their weights Af-
+ter resampling, we use the expectation of posterior distributions of Ut and Vt
+as canonical particles, which are estimated as ˆU u
+and
+ˆV i
+t =
+Combining with canonical particles ˆVt and Eq 6, the prediction distribution
+
+for user and item latent factors, respectively.
+
+wi,(m)
+V,t V i,(m)
+
+wu,(n)
+U,t U u,(n)
+
+V,t, V s(cid:2)
+
+(cid:5)S
+
+(cid:5)S
+
+t =
+
+m=1
+
+n=1
+
+t
+
+t
+
+of user u’s preference over item i is estimated as follows,
+
+θi ∼ S(cid:4)
+
+U,t P (ˆru,i = rm|U u,(s)
+wu,(s)
+
+t
+
+t )P (var(ˆru,i)|U u,(s)
+
+t
+
+, ˆV i
+
+, ˆV i
+
+t ),
+
+(7)
+
+s=1
+are obtained by propagated U u,(s)
+
+t
+
+where U u,(s)
+t−1 as in Eq (3). A small distance
+between the imputed value and the predicated rating usually means a high conﬁ-
+dence that the item should be negative. Thus, the probability of prediction error
+t )T − rm|}. In terms of
+is deﬁned as P (ˆru,i = rm|U u,(s)
+( ˆV i
+variance estimation, the probability of prediction variance can be estimated by
+P (var(ˆru,i
+
+, ˆV i
+t )) as exp{ 1
+S−1
+
+t ) = exp{−|U u,(s)
+
+s=1(U u,(s)
+
+t − ˆU u
+ˆV i
+
+, . . . , U u,(S)
+
+|U u,(1)
+
+t )}.
+
+(cid:5)S
+
+t ˆV i
+
+, ˆV i
+
+t
+
+t
+
+t
+
+t
+
+t
+
+t
+
+Self-training Temporal Dynamic Collaborative Filtering
+
+467
+
+4.2 Two-Phase Self-training Method
+
+t
+
+t
+
+t
+
+t
+
+In phase I, for each user u, we sample a subset I(cid:3)n,u
+
+Considering the large size and high sparsity of user-item preference matrix, the
+previous sampling mechanism considering all the unobserved items is infeasible in
+practice. We use a two-phase approach to reduce the computational complexity.
+from the unobserved
+items Im,u
+. Generally, these sampling schemes can be implemented in terms
+of any distribution that properly represents NMAR. It is shown in [18] that
+arbitrary data missing mechanism is NMAR as long as they are missing with
+a higher probability than relevant ratings do. We use a uniform distribution
+of Im,u
+to avoid interfering prediction distribution, which has been extensively
+used to handle some large datasets [21,14]. This simple and eﬃcient distribution
+is a rational choice as long as we set N n,u
+to be a reasonably large value, which
+will be discussed in Section 5. For simplicity, we set |I(cid:3)n,u
+In phase II, personalized probability θi will be computed only for candidates
+I(cid:3)n,u
+. Based on Eq (5), negative samples will be selected and then combined
+t
+with observed data Rt−1 to construct a sparsity reduced data ¯Rt at time t. User
+and item latent factors are thus tracked by using this dynamically built data. We
+name this two-phase self-training method as ST-PFUV hereafter. Let N n,u
+t = ˆN
+for simplicity. For computational complexity, at each time step, PFUV takes
+O(KSM N ). As sampling size ˆN is usually comparable with K (cid:8) min(N, M ),
+ST-PFUV takes O(KS(M + N ) ˆN ) ≈ O(K 2S(M + N )), which scales eﬃciently
+as a linear function of user and item size.
+
+.
+
+| = 2 ∗ N n,u
+
+t
+
+t
+
+5 Experiments
+
+The performance of the proposed algorithm is tested on the popular Movie-
+lens 100K [1] and HetRec MovieLens datasets [2]. Both are public benchmark
+datasets. MovieLens 100K contains 530 users and 1493 items with sparsity 93.3%
+(at the 16-th week in 1998). HetRec contains 1775 users and 9228 items with
+sparsity 95.1% (in December 2008). MovieLens spans 8 months with integer scale
+1 - 5 while HetRec spans 12 years with half mark scales from 1 to 5.
+
+Protocol. In our experiments, ratings are grouped into time frames based on
+their timestamps. All the ratings before a predeﬁned time instance ttest are
+training data, and ratings after it are testing data. This setting is preferred over
+a random split over all the data as it is infeasible to make prediction utilizing
+information in the future in a real-world deployment. The training periods for
+MovieLens 100K and HetRec are Sept. ∼ Dec. 1997 and Sept. 1997 ∼ Dec. 2007,
+respectively. Their testing periods are the 1st ∼ 16th weeks in 1998 and Jan. ∼
+Dec. 2008, respectively. Diﬀerent units of time frame are selected to ensure that
+ratings for each user in a time slot are not too sparse. Therefore, the task in
+our experiments is to predict individual’s ranking over all the items in next time
+frame t based on all the information upto t−1. All the algorithms are repeated 10
+times and the average results are reported. They are all implemented in Matlab
+with 3.3G Hz CPU and 8G memory.
+
+468
+
+C. Luo, X. Cai, and N. Chowdhury
+
+We use precision@k, recall@k [4] to measure recommendation relevance, which
+directly assess the quality of top-k recommendations. To measure user satisfac-
+tion in recommendation, we use top-k hitrate [4,18]. As top-k hitrate recall is
+proportional to top-k hitrate precision [18], we only test top-k hitrate recall and
+name it top@k. In order to test temporal performance, the temporal extensions
+of those metrics are deﬁned. Conventional accuracy metrics adopted to RS can
+be found in [4,10], which are omitted here due to space limitation.
+For user u, precision@k over month t is denoted as prec(k, u, t). During the
+prediction at time t − 1, instead of using all the items in testing data as con-
+ventional precision@k does, only items in month t are scanned to determined
+their relevance to a user. The temporal precision is deﬁned as, prectemp(k) =
+prec(k, u, t), which is the average on all users over all the time
+1
+T∗N
+frames T . The temporal recall recalltemp(k) and temporal hitrate toptemp(k) are
+deﬁned in a similar fashion. As a common practice, we treat items with rating 5
+as relevant items, and measure k = 10 for precision. For hitrate, we set k = 10
+and each relevant item is mixed with 500 randomly sampled unobserved items
+to avoid spending too much computational power on evaluation. We set k = 100
+for recall as we are ranking all the items in temporal context. We tune all the
+model parameters under temporal recall and use the identical setting to test the
+performance of algorithms under temporal recall and hitrate.
+
+(cid:5)N
+
+(cid:5)T
+
+t=1
+
+u=1
+
+Baseline Methods. In order to test the performance of the proposed algo-
+rithms (ST-PFUV) that balances imputation and the recent observations, we
+compare it with the following ﬁve algorithms as part of baseline methods: PFUV,
+ST-PFUV-User, TopPopular, PureSVD [4] and AllRank [18]. PFUV is used to
+verify the eﬃciency and scalability of our sampling methods on incorporating
+temporal dynamics. It is empirically shown [14] that user-oriented sampling
+based on user preference has better performance than uniform sampling, we
+therefore hybrid the PFUV method with user-oriented sampling, and name it
+ST-PFUV-User. As TopPopular is a non-personalized algorithm that ranks item
+higher when the item is more often rated as relevant, which is included to verify
+the beneﬁts of considering personalized recommendations in temporal context.
+PureSVD and AllRank are state-of-art algorithms developed to pursuit the top-k
+recommendation task. They are selected to illustrate the ability of our sampling
+methods to cope with non-Gaussian behaviors. These baseline algorithms are
+designed without exploiting any temporal information. In our experiment, to
+make these algorithms dynamic, we retrain all the learned models at each time
+step. This simple extension, which is a common practice in real-world deploy-
+ment, is important to make the comparison fair. To the best of our knowledge,
+most of developed algorithms in temporal RS are compared with static versions
+of some baseline algorithms. We name these dynamic extensions as DynTop-
+Popular, DynPureSVD and DynAllRank. To conﬁrm the necessity of exploiting
+temporal information, we also adopt PMF as the only static baseline method,
+which always predicts the ranking without updating model parameters. To bal-
+ance the accuracy, variance and scalability, we set S = S(cid:3)
+= 1000 and K = 8
+for all the PFUV-based methods. The imputed value is set to rm = 2 which is
+
+Self-training Temporal Dynamic Collaborative Filtering
+
+469
+
+Table 1. Results on MovieLens 100K under temporal accuracy metrics. The best
+performance is in italic font.
+
+Method
+PMF
+DynTopPop
+DynPureSVD
+DynAllRank
+PFUV
+ST-PFUV-User
+ST-PFU
+ST-PFUV
+
+prectemp(k) recalltemp(k) toptemp(k)
+
+0.0310
+0.0465
+0.0233
+0.0546
+0.0401
+0.0408
+0.0498
+0.0613
+
+0.3301
+0.2910
+0.3410
+0.4140
+0.3626
+0.3630
+0.3794
+0.4403
+
+0.1425
+0.1782
+0.2806
+0.3162
+0.2909
+0.2339
+0.3115
+0.3543
+
+(a) Temporal accuracy.
+
+prectemp(k) recalltemp(k) toptemp(k)
+
+Method
+PFUV-Rect-wAMAN 0.0423
+0.0447
+PFUV-Hist-User
+DynAllRank-User
+0.0164
+
+0.3310
+0.3648
+0.2358
+
+0.2400
+0.2439
+0.1151
+
+(b) Eﬀects of recent and historic data.
+
+a lower value than the average observed ratings in MovieLens 100K and Hetrec
+datasets. All the PFUV-based methods are initialized by AllRank.
+
+MovieLens 100K. Table 1a shows results of above methods under temporal
+accuracy metrics. By cross validation method [10], we set weight wm = 0.05,
+regularization constant λ to 0.05 and K = 12 for DynAllRank, and K = 10
+for DynPureSVD and PMF. To reduce variance in particle ﬁltering, we set
+σU = σV = 0.05. By cross validation, we set ˆN = 30 for any method involving
+sampling. The low values in the table are due to the fact that few relevant items
+exist for each user in a time frame. Compared with these baseline methods, ST-
+PFUV has the best performance. All the improvement is statistically signiﬁcant
+under paired t-tests [10] with p < 0.01. This result veriﬁes that the eﬃciency of
+proposed self-training sampling mechanism on modeling temporal dynamics in
+data and systematically selecting informative negative samples for each user. To
+verify the beneﬁt of tracking item latent factors, we set Vt = V0 in ST-PFUV,
+and name it as ST-PFU. Table 1a also shows the beneﬁt of tracking the tendency
+for both users and items.
+
+To further illustrate the power of self-training and the importance of distinguish-
+ing recent and historic ratings, we test the performance of PFUV under two extra
+settings, where ratings consist of 1) the recent observation and wAMAN, 2) all the
+historic data and missing data sampled by user-oriented distribution. We name
+these methods as PFUV-Rect-wAMAN and PFUV-Hist-User. We also extend the
+best baseline method DynAllRank by replacing wAMAN with missing data sam-
+pled by user-oriented distribution. We name it DynAllRank-User. For easy com-
+parison, DynAllRank-User has the same setting as DynAllRank. Table 1b shows
+
+470
+
+C. Luo, X. Cai, and N. Chowdhury
+
+Table 2. Results on HetRec dataset under temporal recall metric. The best perfor-
+mance is in italic font.
+
+Method
+recalltemp(k) 0.1718
+time (second) 432.9
+
+PMF DynAllRank ST-PFUV-User ST-PFUV
+
+0.2263
+947.9
+
+0.2020
+179.3
+
+0.3036
+198.7
+
+(a) Temporal recall and scalability. ˆN = 50 for ST-PFUV and ST-PFUV-User.
+
+ˆN
+ST-PFUV-User 0.1754 0.1882 0.1977 0.2026 0.2020 0.2071 0.2041
+0.2536 0.2826 0.2980 0.3016 0.3036 0.3013 0.3032
+ST-PFUV
+
+30
+
+60
+
+40
+
+50
+
+10
+
+20
+
+70
+
+(b) Eﬀect of diﬀerent number of samples
+
+the performance of these methods. Combining with the results in Table 1a, results
+in Table 1b further conﬁrm the ability of our methods to balance information in-
+trinsic in recent observations and the sparsity reduction introduced by imputation
+to better incorporate temporal and dynamic information.
+
+HetRec MovieLens. In following experiments, we focus on the study of ac-
+curacy and scalability of ST-PFUV over a longer period, and the inﬂuence of
+the number of selected samples. We compare ST-PFUV with the best baseline
+method DynAllRank and the static PMF method. Similar to previous experi-
+ments, ST-PFUV has the best performance in accuracy. Due to space limitation,
+only temporal recall is shown here. By cross validation, we set wm = 0.08, K = 40
+and λ = 0.12 for DynAllRank, and λU = λV = 0.1 for ST-PFUV. For PMF, we
+set K = 40, step size for gradient descent as 0.005 and λ = 0.05.
+
+Table 2a shows the results of these methods under temporal recall, where
+ˆN = 50. The results show that ST-PFUV signiﬁcantly outperforms other meth-
+ods in terms of recommendation accuracy. All the improvement is statistically
+signiﬁcant under paired t-tests with p < 0.01. Compared with results on Movie-
+Lens 100K, ST-PFUV has much greater accuracy improvement over baseline
+methods, verifying its much better exploiting temporal and dynamic informa-
+tion, especially over a longer period. As a sequential approach, our proposed
+algorithms do not require retraining stages. Thus, we average the total running
+time (both retraining time and testing time) to compare the scalability as shown
+in Table 2a. These empirical results conﬁrm that the proposed sampling methods
+are much faster than baseline methods, and the two-phase method ST-PFUV is
+comparable with its one-phase counterpart. Note that PMF has been among the
+fastest state-of-art CF methods.
+
+The results with diﬀerent number of samples are shown in Table 2b. Upto
+ˆN = 50, the performance of ST-PFUV is constantly being improved as the
+eﬀect of sparsity reduction. The performance is not improved signiﬁcantly when
+ˆN is larger, as the built observations are cluttered by negative samples.
+
+To further evaluate temporal behaviors of ST-PFUV, we deﬁne the average
+of accumulated improvement (AAI) over time. Let the performance of any two
+
+Self-training Temporal Dynamic Collaborative Filtering
+
+471
+
+Fig. 1. Comparison of temporal behavior on HetRec dataset by AAI over time
+
+methods under temporal recall in month t be Rec1(t) and Rec2(t), respectively.
+(cid:5)t1
+t=1(Rec1(t) − Rec2(t)). Figure 1 plots the AAI
+The AAI in month t1 is 1
+t1
+among ST-PFUV, ST-PFUV-User, DynAllRank and PMF methods. Except in
+the ﬁrst month of red curve (ST-PFUV vs ST-PFUV-User), all the curves are
+above zero, showing that our method constantly outperforms baseline methods
+over time by selecting negative items via personalized self-training sampling
+scheme. Meanwhile, compared with DynPMF and DynAllRank, the tendency
+of dash and dot dash curves demonstrates that ST-PFUV is more eﬃcient at
+exploiting the underlying temporal patterns. While baseline methods require
+longer training period, ST-PFUV performs well even if the training period is
+short (within 5 months) and accumulated amount of ratings is few.
+
+6 Conclusion
+
+In order to simultaneously solve the problems of data sparsity and scalability
+for temporal dynamic recommender systems, we have developed a novel two-
+phase self-training mechanism to dynamically construct a small but delicate set
+of observations from missing data. Cooperating with a particle ﬁltering-based
+dynamic model, this work facilitates to track temporal dynamic user preference
+and item attractiveness in recommender systems.
+
+The proposed algorithms are evaluated on two public benchmark datasets
+under the temporal accuracy metrics. The empirical results show that the pro-
+posed methods signiﬁcantly improve recommendation performance over a vari-
+ety of state-of-art algorithms. The experiments also illustrate the eﬃciency and
+scalability of the developed self-training temporal recommendation algorithms.
+In future, we would like to investigate more sophisticated techniques to even
+better represent and learn the underlying dynamics of user preferences and item
+
+472
+
+C. Luo, X. Cai, and N. Chowdhury
+
+characteristics. It is also worth exploring likelihood functions for other recom-
+mendation tasks considering multiple criterion.
+
+References
+
+1. MovieLens 100K dataset (2003), http://www.grouplens.org/data/
+2. HetRec MovieLens dataset (2011), http://www.grouplens.org/node/462
+3. Chung, T.S., Rust, R.T., Wedel, M.: My mobile music: An adaptive personalization
+
+system for digital audio players. Marketing Science 28(1), 52–68 (2009)
+
+4. Cremonesi, P., Koren, Y., Turrin, R.: Performance of recommender algorithms on
+
+top-n recommendation tasks. In: RecSys 2010, pp. 39–46 (2010)
+
+5. Diaz-Aviles, E., Drumond, L., Gantner, Z., Schmidt-Thieme, L., Nejdl, W.: What
+is happening right now ... that interests me?: online topic discovery and recom-
+mendation in twitter. In: CIKM 2012, pp. 1592–1596 (2012)
+
+6. Ding, Y., Li, X.: Time weight collaborative ﬁltering. In: CIKM 2005, pp. 485–492
+
+(2005)
+
+7. Grimes, D.B., Shon, A.P., Rao, R.P.N.: Probabilistic bilinear models
+
+for
+
+appearance-based vision. In: ICCV 2003, pp. 1478–1485 (2003)
+
+8. Hong, W., Li, L., Li, T.: Product recommendation with temporal dynamics. Expert
+
+Systems with Applications 39(16), 12398–12406 (2012)
+
+9. Jeong, B., Lee, J., Cho, H.: An iterative semi-explicit rating method for building
+collaborative recommender systems. Expert Systems Applications 36(3), 6181–6186
+
+10. Kantor, P.B.: Recommender systems handbook (2009)
+11. Koren, Y.: Collaborative ﬁltering with temporal dynamics. In: SIGKDD 2009, pp.
+
+447–456 (2009)
+
+12. Liu, N.N., Zhao, M., Xiang, E., Yang, Q.: Online evolutionary collaborative ﬁlter-
+
+ing. In: RecSys 2010, pp. 95–102 (2010)
+
+13. Lu, Z., Agarwal, D., Dhillon, I.S.: A spatio-temporal approach to collaborative
+
+ﬁltering. In: RecSys 2009, pp. 13–20 (2009)
+
+14. Rong, P., Yunhong, Z., Bin, C., Liu, N.N., Lukose, R., Scholz, M., Qiang, Y.:
+
+One-class collaborative ﬁltering. In: ICDM 2008, pp. 502–511 (2008)
+
+15. Salakhutdinov, R., Mnih, A.: Bayesian probabilistic matrix factorization using
+
+markov chain monte carlo. In: ICML 2008, vol. 25, pp. 880–887 (2008)
+
+16. Sanjeev Arulampalam, M., Maskell, S., Gordon, N., Clapp, T.: A tutorial on parti-
+cle ﬁlters for online nonlinear/non-gaussian bayesian tracking. IEEE Transactions
+on Signal Processing 50(2), 174–188 (2002)
+
+17. Sindhwani, V., Bucak, S.S., Hu, J., Mojsilovic, A.: One-class matrix completion
+
+with low-density factorizations. In: ICDM 2010, pp. 1055–1060 (2010)
+
+18. Steck, H.: Training and testing of recommender systems on data missing not at
+
+random. In: SIGKDD 2010, pp. 713–722 (2010)
+
+19. Su, X., Khoshgoftaar, T.M.: A survey of collaborative ﬁltering techniques. Ad-
+
+vances in Artiﬁcial Intelligent 2009, 4:2 (2009)
+
+20. Xiong, L., Chen, X., Huang, T.-K., Schneider, J., Carbonell, J.G.: Temporal col-
+laborative ﬁltering with bayesian probabilistic tensor factorization. In: Proceedings
+of SIAM Data Mining (2010)
+
+21. Zhang, W., Chen, T., Wang, J., Yu, Y.: Optimizing top-n collaborative ﬁltering
+
+via dynamic negative item sampling. In: SIGIR 2013, pp. 785–788 (2013)
+
+22. Zhu, X.: Semi-supervised learning literature survey (2006)
+
+

@@ -1,0 +1,1693 @@
+Two-View Online Learning
+
+Tam T. Nguyen, Kuiyu Chang, and Siu Cheung Hui
+
+School of Computer Engineering
+Nanyang Technological University
+
+50 Nanyang Avenue, Singapore 639798
+
+Abstract. We propose a two-view online learning algorithm that uti-
+lizes two diﬀerent views of the same data to achieve something that is
+greater than the sum of its parts. Our algorithm is an extension of the
+single-view Passive Aggressive (PA) algorithm, where we minimize the
+changes in the two view weights and disagreements between the two clas-
+siﬁers. The ﬁnal classiﬁer is an equally weighted sum of the individual
+classiﬁers. As a result, disagreements between the two views are tolerated
+as long as the ﬁnal combined classiﬁer output is not compromised. Our
+approach thus allows the stronger voice (view) to dominate whenever the
+two views disagree. This additional allowance of diversity between the
+two views is what gives our approach the edge, as espoused by classical
+ensemble learning theory. Our algorithm is evaluated and compared to
+the original PA algorithm on three datasets. The experimental results
+show that it consistently outperforms the PA algorithm on individual
+views and concatenated view by up to 3%.
+
+1
+
+Introduction
+
+In applications where large amount of data arrives in sequence, e.g., stock market
+prediction and email ﬁltering, simple online learning such as Perceptron [1],
+second-order Perceptron [2], and Passive Aggressive (PA) [4] algorithms can be
+easily deployed with reasonable performance and low computational cost.
+
+For some domains, data may originate from several diﬀerent sources, also
+known as views. For example, a web page may have a content view comprising
+text contained within it, a link view expressing its relationships to other web
+pages, and a revision view that tracks the diﬀerent changes that it has undergone.
+When the various data sources are independent, running several instances of
+the same algorithm on it and combining the output via an ensemble learning
+framework works well. A simple concatenation of the two sources in a vector
+space model could unnecessarily favor sources with larger number of dimensions.
+On the other hand, training a separate model on each source fails to make good
+use of the relationship among the sources, even for a baseline ensemble classiﬁer.
+To take advantage of data with multiple views, various methods such as SVM-
+2K [7] and alternatives [9] have been proposed. However, the two-view methods
+proposed so far utilizes support vector machine (SVM) [3], which is fundamen-
+tally a batch learning algorithm that cannot be easily tailored to work well on
+large scale online streaming data.
+
+P.-N. Tan et al. (Eds.): PAKDD 2012, Part I, LNAI 7301, pp. 74–85, 2012.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2012
+
+Two-View Online Learning
+
+75
+
+One simple approach to extend the online learning model to handle two view
+data is to train one model for each view independently, and combine the clas-
+siﬁer outputs just like in classical ensemble learning. However, this approach
+ignores the relationship between the two views. Instead of using the same idea
+as SVM-2K where data in one view is used to improve the SVM performance [3]
+on another view (single view), we take advantage of the relationship between the
+two views to improve the combined performance. Speciﬁcally, we propose a novel
+online learning algorithm based on the PA algorithm, called Two-view Passive
+Aggressive (Two-view PA) learning. Our approach minimizes the diﬀerence be-
+tween the two classiﬁer outputs, but allows the outputs to diﬀer as long as the
+weighted sum of each output leads to the correct result. In classical ensemble
+learning, the more diverse the classiﬁer, the better the combined performance. In
+a way, the Two-view PA can be viewed as an ensemble of two online classiﬁers,
+except that the two views are jointly optimized.
+
+2 Related Work
+
+Online learning has been researched for more than 50 years. Back in 1962, Block
+proposed the seminal Perceptron [1] algorithm, while Novikoﬀ [11] later provided
+theoretical ﬁndings, which started the ﬁrst wave of Artiﬁcial Intelligence research
+in the mid twentieth century. The Perceptron is known to be one of the fastest
+online learning algorithms. However, its performance is still far from satisfactory
+in practice. Recently in 2005, Cesa-Bianchi et al. [2] proposed the Second-order
+Perceptron (SOP) algorithm, which takes advantage of second-order data to
+improve the accuracy of the original Perceptron. Compared with Perceptron,
+SOP works better in terms of accuracy but requires more time to train.
+
+In 2006, Crammer et al. [4] proposed another Perceptron-based algorithm,
+namely the Passive Aggressive (PA) algorithm, which incorporates the margin
+maximizing criterion of modern machine learning algorithms. They not only have
+better performance than that of the SOP algorithm but also run signiﬁcantly
+faster. Moreover, algorithms that improved upon the PA algorithm include the
+Passive-Aggressive Mahalanobis [10], the Conﬁdence-Weight (CW) Linear Clas-
+siﬁer [6], and its latest version, multi-class CW [5]. The CW algorithm updates
+its weight by minimizing the Kullback-Leibler divergence between the new and
+old weights. However, similar to the SOP algorithm, these algorithms are time
+consuming compared to the ﬁrst-order PA.
+
+The PA algorithm works better than the SOP in terms of both speed and
+accuracy. However, it can only process one data stream at one time. On the
+other hand, in batch learning, Farquhar et al. [7] proposed a large margin two-
+view Support Vector Machine (SVM) [3] algorithm called the SVM-2K, which is
+an extension of the well-known SVM algorithm. The two-view learning algorithm
+was shown to give better performance compared to the original SVM on diﬀerent
+image datasets [7]. Thus, SVM-2K provides the inspiration for our current work.
+
+76
+
+T.T. Nguyen, K. Chang, and S.C. Hui
+
+3 Two-View Online Passive Aggressive Learning
+
+3.1 Problem Setting
+
+Online learning aims to learn the weight w of a linear prediction function
+f (x) = sign(w · x). The online learning algorithm operates in rounds, as in-
+put data arrives sequentially. Let xt ∈ R
+n be an example arriving at round t.
+The algorithm predicts its label ˆyt ∈ {−1, +1}, after which it receives the true
+label. If its prediction is correct, the learning process proceeds to the next round.
+Otherwise, it suﬀers a loss (cid:2)(yt, ˆyt), and updates its weight w accordingly. The
+loss can be modeled using the hinge-loss function, which equals to zero when the
+margin exceeds 1, as follows.
+
+(cid:2)
+
+(cid:2)(wt; (xt, yt)) =
+
+0
+1 − yt(wt · xt)
+
+yt(wt · xt) ≥ 1
+
+if
+otherwise
+
+(1)
+
+The overall objective is to minimize the cumulative loss over the entire sequence
+of examples. From this, Crammer et al. [4] formulated three optimization prob-
+lems; one based on hard margin and two using soft margins, respectively named
+PA, PA-I, and PA-II with weight update equations as follows.
+
+where the coeﬃcient τt has one of three forms.
+
+wt+1 = wt + τtytxt
+
+1 − yt(wt · xt)
+
+(cid:3)
+(cid:4) xt (cid:4)2
+C, 1 − yt(wt · xt)
+
+(cid:4) xt (cid:4)2
+
+τt =
+
+τt = min
+
+τt =
+
+1 − yt(wt · xt)
+(cid:4) xt (cid:4)2 + 1
+
+2C
+
+(PA)
+
+(cid:4)
+
+(PA-I)
+
+(PA-II)
+
+The performance of the soft margin based PA-I and PA-II algorithms are al-
+most identical, and both performed better than the hard margin based PA al-
+gorithm [4]. Therefore, in this work, our proposed algorithm will be developed
+based on the PA-I algorithm.
+
+n × R
+
+For
+t , xB
+
+the two-view online learning setting,
+t , yt) ∈ R
+
+(xA
+the ﬁrst view vector, xB
+mon label. The goal is to learn the coupled weights (wA
+deﬁned as follows.
+
+m × [−1, +1], which arrives in sequence where xA
+t ∈ R
+
+training data are triplets
+n is
+m is the second view vector, and yt is their com-
+t ) of a hybrid model
+
+t ∈ R
+
+t , wB
+
+f (xA
+
+t , xB
+
+t ) = sign
+
+1
+2
+
+t · xA
+
+(wA
+
+t + wB
+t
+
+· xB
+t )
+
+To incorporate the hybrid classiﬁer, we modify the loss function as follows.
+
+Two-View Online Learning
+
+77
+
+(cid:2)((wA
+
+t , wB
+
+t ); (xA
+
+t , xB
+
+t , yt)) =
+
+⎧⎪⎨
+⎪⎩ 0
+1 − 1
+2
+
+yt(wA
+
+t · xA
+
+t + wB
+t
+
+· xB
+t )
+
+yt(wA
+
+t · xA
+
+t + wB
+t
+
+if
+
+1
+2
+
+otherwise
+
+· xB
+
+t ) ≥ 1
+
+(2)
+
+3.2 Relationship between Views
+
+The primary challenge of multi-view learning is to properly deﬁne the related-
+ness among the diﬀerent views. In other words, the relatedness quantiﬁes the
+agreement among the views. Moreover, one could simply disregard the agree-
+ment between the two prediction functions, but instead learn the hybrid predic-
+tion function. Speciﬁcally, we want the hybrid prediction function f (xA
+t ) =
+sign 1
+t ) to optimally predict the correct labels of examples. In
+this case, we do not really care whether f (xA
+t ) can individually classify
+the example correctly; what we want is for their equally weighted sum f (xA
+t , xB
+t )
+to correctly predict the class label.
+
+t ) or f (xB
+
+t · xB
+
+t · xA
+
+t + wB
+
+2 (wA
+
+t , xB
+
+Generally, we want the two views to agree with one another. This can be
+
+enforced by minimizing their L1-norm or L2-norm disagreements as follows.
+
+|wA
+
+t · xA
+
+t − wB
+
+t
+
+· xB
+
+t | or
+
+t · xA
+
+t − wB
+
+t
+
+(wA
+
+· xB
+t )2
+
+t=1
+
+(3)
+where | · | denotes the absolute function. Here we use L1-norm instead of L2-
+norm because it is harder to ﬁnd a close-form solution for the latter. In the next
+section, we will deﬁne an optimization problem based on the L1-norm relatedness
+measure.
+
+t=1
+
+T(cid:9)
+
+T(cid:9)
+
+3.3 Two-View Passive Aggressive Algorithm
+
+The ideal objective function should include both the new loss function in (2)
+and the view relatedness function in (3). Similar to the PA algorithm, the new
+weights of the two-view learning algorithm are updated based on the optimiza-
+tion problem as follows.
+
+(wA
+
+t+1
+
+, wB
+
+t+1) =
+
+s.t.
+
+argmin
+
+(wA,wB )∈Rn×Rm
++γ|ytwA · xA
+1 − 1
+2
+
+(ytwA · xA
+
+1
+2
+
+(cid:4) wA − wA
+t − ytwB · xB
+
+t (cid:4)2 +
+t | + Cξ
+
+(cid:4) wB − wB
+
+t (cid:4)2
+
+1
+2
+
+t + ytwB · xB
+
+t ) ≤ ξ; ξ ≥ 0
+
+where γ and C are positive agreement and aggressiveness parameters respec-
+tively. While γ is used to adjust the importance of the agreement between the
+two views, C is used to control the aggressiveness property of the PA algorithm.
+Note that the yt multiplier in the agreement is there just for subsequent deriva-
+tion convenience.
+
+78
+
+T.T. Nguyen, K. Chang, and S.C. Hui
+
+For the absolute function, we have
+
+|ytwA · xA
+t − ytwB · xB
+Suppose z = |ytwA · xA
+expressed as follows.
+
+t | = max(ytwA · xA
+t − ytwB · xB
+
+t − ytwB · xB
+
+t − ytwA · xA
+t )
+t |, the above optimization problem can be
+
+t , ytwB · xB
+
+(wA
+
+t+1
+
+, wB
+
+t+1) =
+
+argmin
+
+(wA,wB )∈Rn×Rm
+1 − 1
+2
+
+s.t.
+
+t (cid:4)2 +γz + Cξ
+
+1
+2
+
+t (cid:4)2 +
+
+(cid:4) wA − wA
+
+1
+2
+(ytwA · xA
+z ≥ ytwA · xA
+z ≥ ytwB · xB
+
+(cid:4) wB − wB
+t ) ≤ ξ;
+ξ ≥ 0;
+t − ytwB · xB
+t ;
+t − ytwA · xA
+t .
+
+t + ytwB · xB
+
+Next, we deﬁne the Lagrangian of the optimization problem as follows.
+
+L =
+
+=
+
+1
+2
+
+(cid:4) wA − wA
+t (cid:4)2 +
+(cid:10)
+1
+2
+(ytwA · xA
+1 − ξ − 1
++τ
++α(ytwA · xA
+t − ytwB · xB
+2
+(cid:4) wA − wA
+t (cid:4)2 +
+1
+2
++(α − β − 1
+τ )ytwA · xA
+2
+
+1
+2
+
+(cid:11)
+
+(cid:4) wB − wB
+t (cid:4)2 +γz + Cξ
+t + ytwB · xB
+− λξ
+t )
+t − z) + β(ytwB · xB
+
+(cid:4) wB − wB
+t + (β − α − 1
+2
+
+t − z)
+t (cid:4)2 +(γ − α − β)z + (C − λ − τ )ξ
+
+t − ytwA · xA
+
+(4)
+
+τ )ytwB · xB
+
+t + τ
+
+where α, β, τ , and λ are positive Lagrangian multipliers.
+
+Setting the partial derivatives of L with respect to the weight wA to zero, we
+
+have,
+
+0 =
+
+∂L
+∂wA = wA − wA
+
+t + (α− β − 1
+2
+
+τ )ytxA
+
+t ⇒ wA = wA
+
+t − (α− β − 1
+2
+
+Similarly, for the other view we have
+
+wB = wB
+
+t − (β − α − 1
+2
+
+τ )ytxB
+t
+
+τ )ytxA
+t
+
+(5)
+
+(6)
+
+Setting the partial derivatives of L with respect to weight z to zero, we have
+
+(7)
+Setting the partial derivatives of L with respect to weight ξ to zero, we have,
+
+0 =
+
+∂L
+∂z = (γ − α − β) ⇒ α + β = γ
+
+∂L
+∂ξ = (C − λ − τ ) ⇒ λ + τ = C
+Note that λ ≥ 0, thus we can conclude that 0 ≤ τ ≤ C.
+
+0 =
+
+(8)
+
+Two-View Online Learning
+
+79
+
+1
+2
+
+L =
+
+Substituting (5), (6), (7), and (8) into (4), we have,
+(β − α − 1
+2
+
+(α − β − 1
+t (cid:4)2 +
+τ )2 (cid:4) xA
+1
+2
+2
+t − (α − β − 1
++(α − β − 1
+wA
+τ )ytxA
+τ )yt
+t
+2
+2
+t − (α − β − 1
++(β − α − 1
+wB
+τ )ytxB
+τ )yt
+t
+2
+2
+(α − β − 1
+(β − α − 1
+τ )2 (cid:4) xA
+t (cid:4)2 − 1
+= − 1
+2
+2
+2
+2
+t + (β − α − 1
+t · xA
++(α − β − 1
+τ )ytwB
+τ )ytwA
+t
+2
+2
+
+t (cid:4)2
+τ )2 (cid:4) xB
+(cid:11)
+(cid:11)
+xA
+t
+xB
+t + τ
+τ )2 (cid:4) xB
+t (cid:4)2
+· xB
+t + τ
+
+(cid:10)
+(cid:10)
+
+Setting the partial derivatives of L with respect to weight τ to zero, we have,
+
+(9)
+
+∂L
+∂τ =
+
+1
+2
+
+0 =
+
+(α − β − 1
+τ ) (cid:4) xA
+2
++1 − 1
+t · xA
+(ytwA
+(cid:10)
+2
+
+1
+2
+
+t (cid:4)2 +
+t + ytwB
+t
+
+(β − α − 1
+2
+
+· xB
+t )
+
+τ ) (cid:4) xB
+
+t (cid:4)2
+
+(cid:11)
+
+⇒ τ =
+
+2
+
+(cid:4) xA
+
+t (cid:4)2 + (cid:4) xB
+
+(α − β)((cid:4) xA
+
+t (cid:4)2 − (cid:4) xB
+
+t (cid:4)2) + 2(cid:2)t
+
+t (cid:4)2
+t · xA
+
+where the loss (cid:2)t = 1 − 1
+2
+denote,
+
+(ytwA
+
+t + ytwB
+
+t · xB
+
+t ). For the sake of simplicity, we
+
+a =
+
+(cid:4) xA
+
+t (cid:4)2 + (cid:4) xB
+
+(10)
+As mentioned in Equation (8), we have τ + λ = C and λ ≥ 0 so we can conclude
+that τ ≤ C. Now τ can be determined as follows:
+
+t (cid:4)2
+
+and
+
+b =(cid:4) xA
+
+t (cid:4)2(cid:4) xB
+
+t (cid:4)2
+
+2
+
+(cid:3)
+
+(cid:10)
+
+(cid:11)(cid:4)
+
+t (cid:4)2 − (cid:4) xB
+
+t (cid:4)2) + 2(cid:2)t
+
+C, a
+
+τ = min
+
+(α − β)((cid:4) xA
+(cid:11)2 (cid:4) xA
+t (cid:4)2 −(cid:2)t
+t (cid:4)2 −(cid:2)t)ytwA
+t · xA
+t (cid:4)2) + 2(cid:2)t
+t (cid:4)2 − (cid:4) xB
+
+(cid:10)
+Substituting (11) into (9), we have,
+(α − β) (cid:4) xB
+L = − 1
+(cid:10)
++a((α − β) (cid:4) xB
+2
+(α − β)((cid:4) xA
++a
+
+a
+
+(cid:10)
+
+a
+
+(β − α) (cid:4) xA
+
+t (cid:4)2 − 1
+(cid:11)
+t + a((β − α) (cid:4) xA
+2
+
+t (cid:4)2 −(cid:2)t
+
+t (cid:4)2 −(cid:2)t)ytwB
+
+t
+
+(11)
+
+(cid:11)2 (cid:4) xB
+t (cid:4)2
+· xB
+
+t
+
+(12)
+Setting the partial derivatives of L with respect to weight α to zero, we have,
+
+0 =
+
+∂L
+∂α = a
+
+(cid:10)
+(cid:10)
++a((cid:4) xB
++a((cid:4) xA
+t = 1 − ytwA
+
+(α − β) (cid:4) xB
+t (cid:4)2 ytwA
+(α − β) (cid:4) xB
+t (cid:4)2 (cid:2)B
+· xA
+
+(cid:11)
+(cid:10)
+(β − α) (cid:4) xA
+t (cid:4)2 +(cid:2)t
+b + a
+(cid:10)
+(cid:11)
+t · xA
+t (cid:4)2 ytwB
+t − (cid:4) xA
+· xB
+t (cid:4)2 +(cid:2)t)
+(β − α) (cid:4) xA
+b + a
+t (cid:4)2 (cid:2)A
+t − (cid:4) xB
+t )
+t = 1 − ytwB
+t and (cid:2)B
+
+· xB
+
+= a
+
+t
+
+t
+
+where (cid:2)A
+Therefore, we can conclude that
+
+t
+
+(cid:11)
+t (cid:4)2 − (cid:4) xB
+
+b
+
+t (cid:4)2 +(cid:2)t
+(cid:11)
+t + (cid:4) xA
+t (cid:4)2 +(cid:2)t)
+
+b
+
+t (cid:4)2)
+
+t . We also have α + β = γ.
+
+80
+
+T.T. Nguyen, K. Chang, and S.C. Hui
+
+α =
+
+γ
+
+2
+
++
+
+1
+2
+
+Similarly, we have
+
+β =
+
+γ
+
+2
+
+− 1
+2
+
+1
+
+(cid:4) xA
+
+t (cid:4)2 + (cid:4) xB
+
+t (cid:4)2
+
+1
+
+(cid:4) xA
+
+t (cid:4)2 + (cid:4) xB
+
+t (cid:4)2
+
+(cid:10)
+
+(cid:10)
+
+(cid:2)B
+t
+(cid:4) xB
+t (cid:4)2
+
+(cid:2)B
+t
+t (cid:4)2
+(cid:4) xB
+
+(cid:11)
+
+(cid:11)
+
+(13)
+
+(14)
+
+− (cid:2)A
+(cid:4) xA
+
+t (cid:4)2
+
+t
+
+− (cid:2)A
+(cid:4) xA
+
+t (cid:4)2
+
+t
+
+Recall that we have α ≥ 0, β ≥ 0, and α+β = γ. Hence, we can conclude that α ≤
+γ and β ≤ γ. Finally, we obtain our Two-view Passive Aggressive formulation as
+shown in Algorithm 1. The optimal value of the two tuning parameters C and
+γ can be estimated via cross validation in practice.
+
+Algorithm 1. Two-view Passive Aggressive Algorithm
+
+Input:
+
+C = positive aggressiveness parameter
+γ = positive agreement parameter
+
+Output:
+
+None
+
+Process:
+Initialize wA
+1
+for t = 1, 2, . . . do
+
+← 0; wB
+
+1
+
+t+1
+
+end
+
+end
+
+m
+
+t
+
+(cid:4)
+
+· xB
+t )
+
+Set (cid:2)A
+
+t + wB
+t
+
+t · xA
+
+t ∈ R
+· xB
+t )
+
+← 0;
+t ∈ R
+Receive instances xA
+n and xB
+t · xA
+1
+(wA
+t + wB
+Predict ˆyt = sign
+t
+(cid:3)
+Receive correct label yt ∈ {−1, +1}
+2
+0, 1 − yt
+Suﬀer loss (cid:2)t ← max
+1
+(wA
+2
+if (cid:2)t > 0 then
+· xB
+t · xA
+t ← 1 − ytwB
+t ; (cid:2)B
+(cid:10)
+(cid:3)
+t
+t (cid:4)2 − (cid:2)A
+(cid:2)B
+t(cid:4)xB
+t(cid:4)xA
+t (cid:4)2
+0, min{γ, 1
+t (cid:4)2 + (cid:4) xB
+t (cid:4)2
+(cid:4) xA
+γ +
+(cid:10)
+(cid:3)
+2
+t (cid:4)2 − (cid:2)A
+(cid:2)B
+t (cid:4)2
+t(cid:4)xB
+t(cid:4)xA
+γ −
+0, min{γ, 1
+t (cid:4)2 + (cid:4) xB
+t (cid:4)2
+(cid:4) xA
+(cid:3)
+2
+t (cid:4)2 − (cid:4) xB
+t (cid:4)2) + 2(cid:2)t
+C, (α − β)((cid:4) xA
+t (cid:4)2
+(cid:4) xA
+t (cid:4)2 + (cid:4) xB
+← wA
+τt)ytxA
+t
+← wB
+
+t ← 1 − ytwA
+α ← max
+
+β ← max
+τt ← min
+
+t − (α − β − 1
+2
+t − (β − α − 1
+2
+
+Update wA
+
+t+1
+wB
+
+τt)ytxB
+t
+
+(cid:11)
+(cid:4)
+}
+(cid:11)
+(cid:4)
+}
+(cid:4)
+
+Two-View Online Learning
+
+81
+
+4 Performance Evaluation
+
+In this section, we evaluate the online classiﬁcation performance of our pro-
+posed Two-view PA on 3 benchmark datasets, Ads [8], Product Review [9], and
+WebKB [12]). The single-view PA algorithm serves as the baseline. We use a
+diﬀerent PA model for each view, naming them PA View 1 and PA View 2. We
+also concatenate the input feature vectors from each view to form a larger fea-
+ture set, and report the results. We denote this alternative approach as PA Cat.
+The dataset summary statistics are shown in Table 1. We note that the Ads and
+WebKB datasets are very imbalanced, which led us to use F-measure instead
+of accuracy to evaluate the classiﬁcation performance. To be fair, we choose
+C = 0.1 and γ = 0.5 for all PA algorithms. All experiments were conducted
+using 5-fold cross validation.
+
+Table 1. Summary statistics of 3 datasets
+
+View
+
+Sample Count
+
+Name
+
+#Dimension #Positive #Negative #Total
+
+Ads
+
+WebKB
+
+Product Review
+
+img & dest url
+alt & base url
+
+page
+link
+
+lexical
+formal
+
+929
+602
+3000
+1840
+2759
+
+5
+
+459
+
+230
+
+2820
+
+3279
+
+821
+
+1051
+
+1000
+
+1000
+
+2000
+
+4.1 View Diﬀerence Comparison
+At round t, the view diﬀerence is deﬁned as |wA
+t |, which shows
+the diﬀerence in prediction output between the two views. Figures 1(a), 2(a),
+and 3(a) show the view diﬀerences for the three datasets, respectively.
+
+t − wB
+
+t · xA
+
+· xB
+
+t
+
+|wA
+
+Figures 1(b), 2(b), and 3(b) plot the cumulative view diﬀerence at round t,
+t |. This measures the relationship between the two
+1
+T
+views as the algorithm adapts to the dataset. The smaller it is, the more related
+the two views.
+
+t − wB
+
+· xB
+
+· xA
+
+t=1
+
+(cid:12)T
+
+t
+
+t
+
+Compared to the Product Review and WebKB datasets, the view diﬀerence
+for the Ads dataset varies very much. This means that the agreement between the
+two views is not stable. As expected, its cumulative view diﬀerence turns out to
+be the largest among the three datasets. Hence, we would expect a classiﬁer based
+on simple concatenation of the two views to yield poor classiﬁcation performance.
+This is in fact conﬁrmed subsequently in the poor PA Cat result for the Ads
+dataset in Table 2.
+
+On the other end of the spectrum, both the average and cumulative view
+diﬀerence for the WebKB dataset is the smallest. Therefore, one should be able
+to combine the two views into a single view and just run a simple PA algorithm
+to obtain a decent classiﬁcation performance. This hypothesis is conﬁrmed in
+Table 2, where the PA Cat result outperforms either view by more than 2%.
+
+82
+
+T.T. Nguyen, K. Chang, and S.C. Hui
+
+4.2 Ads Dataset
+
+The Ads dataset was ﬁrst used by Kushmerick [8] to automatically ﬁlter ad-
+vertisement images from web pages. The Ads dataset comprises more than two
+views. In this experiment, we only use four views including image URL view,
+destination URL view, base URL view, and alt view. The ﬁrst and second orig-
+inal views were concatenated as View 1 and the remaining two original views
+were concatenated as View 2. This dataset has 3279 examples, including 459
+positive examples (ads), with the remaining as negative examples (non-ads).
+
+)
+f
+f
+i
+d
+ 
+w
+e
+v
+(
+g
+o
+
+i
+
+l
+
+−9
+
+−10
+
+−11
+
+−12
+
+−13
+
+−14
+
+−15
+
+−16
+
+−17
+
+−18
+
+−19
+
+ 
+0
+
+ 
+
+PA Cat
+Two−View PA
+
+500
+
+1000
+
+1500
+
+2000
+
+2500
+
+3000
+
+3500
+
+number of examples
+
+)
+f
+f
+i
+d
+ 
+w
+e
+v
+(
+g
+o
+
+i
+
+l
+
+−4
+
+−6
+
+−8
+
+−10
+
+−12
+
+−14
+
+ 
+0
+
+ 
+
+500
+
+1000
+
+1500
+
+2000
+
+2500
+
+3000
+
+3500
+
+number of examples
+
+PA Cat
+Two−View PA
+
+(a) View Diﬀerence
+
+(b) Cumulative View Diﬀerence
+
+Fig. 1. View Diﬀerence of the Ads Dataset
+
+Table 2. F1 measure on 3 datasets
+
+Dataset PA View 1 PA View 2
+
+PA Cat Two-view PA
+Ads 83.69 ± 3.04 76.01 ± 2.88 81.08 ± 1.99 85.74 ± 1.97
+Product Review 86.46 ± 4.59 69.20 ± 5.20 86.87 ± 3.99 88.54 ± 1.85
+WebKB 92.83 ± 1.72 92.71 ± 3.66 94.97 ± 1.80 97.50 ± 1.80
+
+The experimental results on the Ads dataset are shown in Table 2, where the
+F-measure of the proposed algorithm is the best. The Two-view PA performed up
+to 2% better than the runner-up, PA View 1. As previously discussed, PA View
+1 is better than PA Cat since the two views have quite diﬀerent classiﬁcation
+outputs.
+
+4.3 Product Review Dataset
+
+The Product Review dataset is crawled from popular online Chinese cell-phone
+forums [9]. The dataset has 1000 true reviews and 1000 spam reviews. It consists
+of two sets of features: one based on review content (lexical view ) and the other
+based on extracted characteristics of the review sentences (formal view ).
+
+Two-View Online Learning
+
+83
+
+The experimental results on this dataset are shown in Table 2. Again, Two-
+view PA performs better than the other algorithms. The improvement is more
+than 2% compared with the runner-up. In this dataset, PA Cat performed better
+than either view alone. This is expected since the view diﬀerence between the
+two views are quite small, as shown in Figure 2.
+
+Moreover, PA Cat is only 0.41% better than the best individual PA View 1.
+This is because PA Cat does not take into account the view relatedness informa-
+tion. The best performer here is the Two-view PA, which beats the runner-up
+by almost 2%.
+
+4.4 WebKB Course Dataset
+
+The WebKB course dataset has been frequently used in the empirical study of
+multi-view learning. It comprises 1051 web pages collected from the computer
+science departments of four universities. Each page has a class label, course or
+non-course. The two views of each page are the textual content of a web page
+(page view ) and the words that occur in the hyperlinks of other web pages point-
+ing to it (link view ), respectively. We used a processed version of the WebKB
+course dataset [12] in our experiment.
+
+)
+f
+f
+i
+d
+ 
+w
+e
+v
+(
+g
+o
+
+i
+
+l
+
+−9
+
+−10
+
+−11
+
+−12
+
+−13
+
+−14
+
+−15
+
+−16
+
+−17
+
+−18
+
+−19
+
+ 
+0
+
+ 
+
+PA Cat
+Two−View PA
+
+500
+
+1000
+
+1500
+
+2000
+
+number of examples
+
+)
+f
+f
+i
+d
+ 
+w
+e
+v
+(
+g
+o
+
+i
+
+l
+
+−4
+
+−6
+
+−8
+
+−10
+
+−12
+
+−14
+
+ 
+0
+
+ 
+
+PA Cat
+Two−View PA
+
+500
+
+1000
+
+1500
+
+2000
+
+number of examples
+
+(a) View Diﬀerence
+
+(b) Cumulative View Diﬀerence
+
+Fig. 2. View Diﬀerence of the Product Review Dataset
+
+The performance of PA Cat here is also better than the best single view PA.
+However, the view diﬀerence of Two-view PA is much smaller than that of the
+PA algorithm as shown in Figure 3. Hence, Two-view PA performed more than
+3% better than PA Cat, and 5% better than the best individual view PA.
+
+Compared to the Ads and Product Review datasets, the view diﬀerence on
+the WebKB dataset is the smallest. It means that we are able to combine the
+two views into a single view. Therefore, the PA Cat performance on the WebKB
+dataset is improved more than 2% compared with the individual view PA.
+
+84
+
+T.T. Nguyen, K. Chang, and S.C. Hui
+
+−9
+
+−10
+
+−11
+
+−12
+
+−13
+
+)
+f
+f
+i
+
+ 
+
+PA Cat
+Two−View PA
+
+)
+f
+f
+i
+
+ 
+
+d
+w
+e
+v
+(
+g
+o
+
+i
+
+l
+
+−14
+
+−15
+
+−16
+
+−17
+
+−18
+
+−19
+
+ 
+0
+
+ 
+
+d
+w
+e
+v
+(
+g
+o
+
+i
+
+l
+
+200
+
+400
+
+600
+
+800
+
+1000
+
+1200
+
+number of examples
+
+−4
+
+−6
+
+−8
+
+−10
+
+−12
+
+−14
+
+ 
+0
+
+ 
+
+200
+
+400
+
+600
+
+800
+
+1000
+
+1200
+
+number of examples
+
+PA Cat
+Two−View PA
+
+(a) View Diﬀerence
+
+(b) Cumulative View Diﬀerence
+
+Fig. 3. View Diﬀerence of the WebKB Dataset
+
+5 Conclusion and Open Problems
+
+In this paper, we proposed a hybrid model for two-view passive aggressive al-
+gorithm, which is able to take advantage of multiple views of data to achieve
+an improvement in overall classiﬁcation performance. We formulate our learning
+framework into an optimization problem and derive a closed form solution.
+
+There remain some interesting open problems that warrant further investiga-
+tion. For one, at each round we could adjust the weight of each view so that the
+better view dominates. In the worst case where the two views are completely
+related or co-linear, e.g., view 1 is equal to view 2, our Two-view PA degener-
+ates nicely into a single view PA. We would also like to extend Two-view PA to
+handle multiple views and multiple classes. Formulating a multi-view PA is non-
+trivial, as it involves deﬁning multi-view relatedness and minimizing (V choose
+2) view agreements, for a V-view problem. Formulating a multi-class Two-view
+PA should be more feasible.
+
+References
+
+1. Block, H.: The perceptron: A model for brain functioning. Rev. Modern Phys. 34,
+
+123–135 (1962)
+
+2. Cesa-Bianchi, N., Conconi, A., Gentile, C.: A second-order perceptron algorithm.
+
+Siam J. of Comm. 34 (2005)
+
+3. Cortes, C., Vapnik, V.: Support-vector networks. Machine Learning 20, 273–297
+
+(1995)
+
+4. Crammer, K., Dekel, O., Keshet, J., Shalev-Shwartz, S., Singer, Y.: Online passive-
+
+aggressive algorithms. Journal of Machine Learning Research, 551–585 (2006)
+
+5. Crammer, K., Dredze, M., Kulesza, A.: Multi-class conﬁdence weighted algorithms.
+In: Proceedings of the 2009 Conference on Empirical Methods in Natural Lan-
+guage Processing, pp. 496–504. Association for Computational Linguistics, Singa-
+pore (2009)
+
+Two-View Online Learning
+
+85
+
+6. Dredze, M., Crammer, K., Pereira, F.: Conﬁdence-weighted linear classiﬁcation. In:
+ICML 2008: Proceedings of the 25th International Conference on Machine Learn-
+ing, pp. 264–271. ACM, New York (2008)
+
+7. Farquhar, J.D.R., Hardoon, D.R., Meng, H., Shawe-Taylor, J., Szedm´ak, S.: Two
+view learning: Svm-2k, theory and practice. In: Proceedings of NIPS 2005 (2005)
+8. Kushmerick, N.: Learning to remove internet advertisements. In: Proceedings of the
+Third Annual Conference on Autonomous Agents, AGENTS 1999, pp. 175–181.
+ACM, New York (1999)
+
+9. Li, G., Hoi, S.C.H., Chang, K.: Two-view transductive support vector machines.
+
+In: Proceedings of SDM 2010, pp. 235–244 (2010)
+
+10. Nguyen, T.T., Chang, K., Hui, S.C.: Distribution-aware online classiﬁers. In:
+
+Walsh, T. (ed.) IJCAI, pp. 1427–1432. IJCAI/AAAI (2011)
+
+11. Novikoﬀ, A.: On convergence proofs of perceptrons. In: Proceedings of the Sympo-
+
+sium on the Mathematical Theory of Automata, vol. 7, pp. 615–622 (1962)
+
+12. Sindhwani, V., Niyogi, P., Belkin, M.: Beyond the point cloud: from transductive
+to semi-supervised learning. In: Proceedings of the 22nd International Conference
+on Machine Learning, ICML 2005, pp. 824–831. ACM, New York (2005)
+
+

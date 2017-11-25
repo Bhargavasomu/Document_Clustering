@@ -1,0 +1,785 @@
+Resource-Bounded Information Extraction:
+
+Acquiring Missing Feature Values on Demand
+
+Pallika Kanani, Andrew McCallum, and Shaohan Hu
+
+1 University of Massachusetts, Amherst USA
+
+{pallika,mccallum}@cs.umass.edu
+
+2 Dartmouth College USA
+shaohan.hu@dartmouth.edu
+
+Abstract. We present a general framework for the task of extracting
+speciﬁc information “on demand” from a large corpus such as the Web
+under resource-constraints. Given a database with missing or uncertain
+information, the proposed system automatically formulates queries, is-
+sues them to a search interface, selects a subset of the documents, ex-
+tracts the required information from them, and ﬁlls the missing values
+in the original database. We also exploit inherent dependency within the
+data to obtain useful information with fewer computational resources.
+We build such a system in the citation database domain that extracts
+the missing publication years using limited resources from the Web. We
+discuss a probabilistic approach for this task and present ﬁrst results. The
+main contribution of this paper is to propose a general, comprehensive
+architecture for designing a system adaptable to diﬀerent domains.
+
+1 Introduction
+
+The goal of traditional information extraction is to accurately extract as many
+ﬁelds or records as possible from a collection of unstructured or semi-structured
+text documents. In many scenarios, however, we already have a partial database
+and we need only ﬁll in its holes. This paper proposes methods for ﬁnding such
+information in a large collection of external documents, and doing so eﬃciently
+with limited computational resources. For instance, this small piece of informa-
+tion may be a missing record, or a missing ﬁeld in a database that would be
+acquired by searching a very large collection of documents, such as the Web.
+Using traditional information extraction models for this task is wasteful, and in
+most cases computationally intractable. A more feasible approach for obtaining
+the required information is to automatically issue appropriate queries to the ex-
+ternal source, select a subset of the retrieved documents for processing and then
+extract the speciﬁed ﬁeld in a focussed and eﬃcient manner. We can further en-
+hance our system’s eﬃciency by exploiting the inherent relational nature of the
+database. We call this process of searching and extracting for speciﬁc pieces of
+information, on demand, Resource-bounded Information Extraction (RBIE). In
+this paper, we present the design of a general framework for Resource-bounded
+Information Extraction, discuss various design choices involved and present ex-
+perimental results.
+
+M.J. Zaki et al. (Eds.): PAKDD 2010, Part I, LNAI 6118, pp. 415–427, 2010.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2010
+
+416
+
+P. Kanani, A. McCallum, and S. Hu
+
+1.1 Example
+
+Consider a database of scientiﬁc publication citations, such as Rexa, Citeseer
+or Google Scholar. The database is created by crawling the web, downloading
+papers, extracting citations from the bibliographies and then processing them
+by tagging and normalizing. In addition, the information from the paper header
+is also extracted. In order to make these citations and papers useful to the
+users, it is important to have the year of publication information available. Even
+after integrating the citation information with other publicly available databases,
+such as DBLP, a large fraction of the papers do not have a year of publication
+associated with them. This is because, often, the headers or the full text of the
+papers do not contain the date and venue of publication (especially for preprints
+available on the web). Approximately one third of the papers in Rexa are missing
+the year of publication ﬁeld. Our goal is to ﬁll in the missing years by extracting
+them from the web.
+
+We chose this particular example task, since it demonstrates the relational
+aspect of RBIE. Along with extracting headers, the bibliographic information
+is often extracted, creating a citation network. This network information can
+be further exploited by noting that in almost all cases, a paper is published
+before (or the same year) as other papers that cite it. Using these temporal con-
+straints, we obtain 87.7% of the original F1 by using only 13.2% of computational
+resources such as queries and documents.
+
+1.2 Motivation
+
+The knowledge discovery and data mining community has long struggled with
+the problem of missing information. Most real-world databases come with holes
+in the form of missing records or missing feature values. In some cases, the values
+exist, but there is considerable uncertainty about their correctness. Incomplete-
+ness in the database provides incomplete responses to user queries, as well as
+leads to less accurate data mining models and decision support systems. In order
+to make the best use of the existing information, it is desirable to acquire missing
+information from an external source in an eﬃcient manner. The external source
+can be another database that is purchased, or a large collection of free docu-
+ments, such as the web. In the latter case, we may run information extraction
+to obtain the missing values in our database. However, the traditional models of
+information extraction can not be directly applied in this “on demand” setting.
+Note that, in the setting described above, we are often not interested in obtain-
+ing the complete records in the database, but just ﬁlling in the missing values.
+Also, the corpus of documents, such as the web, is extremely large. Moreover, in
+most real scenarios, we must work under pre-speciﬁed resource constraints. The
+resource constraints may be computational, such as processors, network band-
+width, or related to time and money. Any method that aims to extract required
+information in the described setting must be designed to work under the given
+resource constraints.
+
+Acquiring Missing Feature Values on Demand
+
+417
+
+Many of these databases are relational in nature, e.g. obtaining the value of
+one ﬁeld may provide useful information about the remaining ﬁelds. Similarly,
+if the records are part of a network structure with uncertain or missing values,
+as in the case of our example task, then information obtained for one node can
+reduce uncertainty in the entire network. We show that exploiting these kinds
+of dependencies can signiﬁcantly reduce the amount of resources required to
+complete the task.
+
+In this paper, we propose a general framework for resource-bounded informa-
+tion extraction, along with the design of a prototype system used to address the
+task of ﬁnding missing years of publication in citation records. We also present
+ﬁrst results on this task.
+
+2 Related Work
+
+Resource-bounded Information Extraction encompasses several diﬀerent types
+of problems. It deals with extracting information from a large corpus, such as
+the web; it actively acquires this information under resource constraints; and
+it exploits the interdependency within the data for best performance. Here we
+discuss various related tasks and how RBIE is uniquely positioned between them.
+
+2.1 Traditional Information Extraction
+
+In the traditional information extraction settings, we are given a database schema,
+and a set of unstructured or semi-structured documents. The goal is to automat-
+ically extract records from these documents, and ﬁll in the values in the given
+database. These databases are then used for search, decision support and data
+mining. In recent years, there has been much work in developing sophisticated
+methods for performing information extraction over a closed collection of doc-
+uments, e.g.
+[3]. Several approaches have been proposed for diﬀerent phases of
+information extraction task, such as segmentation, classiﬁcation, association and
+coreference. Most of these proposed approaches make extensive use of statistical
+machine learning algorithms, which have improved signiﬁcantly over the years.
+However, only some of these methods remain computationally tractable as the
+size of the document corpus grows. In fact, very few systems are designed to
+scale over a corpus as large as, say, the Web [2,15].
+
+2.2 Information Extraction from the Web
+
+There are some large scale systems that extract information from the web.
+Among these are KnowItAll
+[2], InfoSleuth [11] and Kylin [14]. The goal of
+the KnowItAll system is a related, but diﬀerent task called, “Open Information
+Extraction”. In Open IE, the relations of interest are not known in advance, and
+the emphasis is on discovering new relations and new records through extensive
+web access. In contrast, in our task, what we are looking for is very speciﬁc
+and the corresponding schema is known. The emphasis is mostly on ﬁlling the
+missing ﬁelds in known records, using resource-bounded web querying. Hence,
+
+418
+
+P. Kanani, A. McCallum, and S. Hu
+
+KnowItAll and RBIE frameworks have very diﬀerent application domains. In-
+foSleuth focuses on gathering information from given sources, and Kylin focuses
+only on Wikipedia articles. These systems also do not aim to exploit the inherent
+dependency within the database for maximum utilization of resources.
+
+The Information Retrieval community is rich with work in document relevance
+(TREC). However, traditional information retrieval solutions can not directly be
+used, since we ﬁrst need to automate the query formulation for our task. Also,
+most search engine APIs return full documents or text snippets, rather than
+speciﬁc feature values.
+
+A family of methods closely related to RBIE, is question answering systems
+[8]. These systems do retrieve a subset of relevant documents from the web, along
+with extracting a speciﬁc piece of information. However, they target a single piece
+of information requested by the user, whereas we target multiple, interdependent
+ﬁelds of a relational database. They formulate queries by interpreting a natural
+language question, whereas we formulate and rank them based on the utility of
+information within the database. They do not address the problem of selecting
+and prioritizing instances or a subset of ﬁelds to query. This is why, even though
+some of the components in our system may appear similar to that of QA systems,
+their functionalities diﬀer. The semantic web community has been working on
+similar problems, but their focus is not targeted information extraction.
+
+2.3 Active Information Acquisition
+
+Learning and acquiring information under resource constraints has been studied
+in various forms. Consider these diﬀerent scenarios at training time: active learn-
+ing selects the best instances to label from a set of unlabeled instances; active
+feature acquisition [10] explores the problem of learning models from incomplete
+instances by acquiring additional features; budgeted learning [9] identiﬁes the
+best set of acquisitions, given a ﬁxed cost for acquisitions. More recent work
+[12] deals with learning models using noisy labels. At test time, the two common
+scenarios are selecting a subset of features to acquire [13,1,7], and selecting the
+subset of instances for which to acquire features [6,5].
+
+The interdependency within the data set is often conveniently modeled using
+graphs, but it poses interesting questions about selection of instances to query
+and propagating uncertainty through the graph [4]. In [5], the test instances are
+not independent of each other, and the impact of acquisition in the context of
+graph partitioning is studied. The general RBIE framework described in this pa-
+per aims to leverage these methods for both train and test time for optimization
+of query and instance selection.
+
+In summary, RBIE requires a comprehensive architecture for eﬃciently inte-
+grating multiple functionalities, such as instance and query selection, automatic
+query formulation, and targeted information extraction by exploiting inherent
+data dependency under limited resources. This leads us to the new framework
+presented in this paper.
+
+Acquiring Missing Feature Values on Demand
+
+419
+
+3 A General Framework for Resource-Bounded
+
+Information Extraction
+
+As described in the previous section, we need a new framework for performing
+information extraction to automatically acquire speciﬁc pieces of information
+from a very large corpus of unstructured documents. Fig. 1 shows a top-level
+architecture of our proposed framework. In this section, we discuss the general
+ideas for designing a resource-bounded information extraction system. Each of
+these modules may be adapted to suit the needs of a speciﬁc application, as we
+shall see for our example task.
+
+Fig. 1. General Framework for Resource-bounded Information Extraction
+
+3.1 Overview of the Architecture
+
+We start with a database containing missing values. In general, the missing
+information can either be a complete record, or values of a subset of the features
+for all records, or a subset of the records. We may also have uncertainty over the
+existing feature values that can be reduced by integrating external information.
+We assume that the external corpus provides a search interface that can be
+accessed automatically, such as a search engine API.
+
+The information already available in the database is used as an input to the
+Query Engine. The basic function of the query engine is to automatically formu-
+late queries, prioritize them optimally, and issue them to a search interface. The
+documents returned by the search interface are then passed on to the Document
+Filter. Document Filter removes documents that are not relevant to the original
+database and ranks the remaining documents according to the usefulness of each
+document in extracting the required information.
+
+A machine learning based information extraction system extracts relevant
+features from the documents obtained from the Document Filter, and combines
+
+420
+
+P. Kanani, A. McCallum, and S. Hu
+
+them with the features obtained from the original database. Hence, information
+from the original database and the external source is now merged, to build a
+new model that predicts the values of missing ﬁelds. In general, we may have
+resource constraints at both training and test times. In the training phase, the
+learned model is passed to the Conﬁdence Evaluation System, which evaluates
+the eﬀectiveness of the model learned so far and recommends obtaining more
+documents through Document Filter, or issuing more queries through the Query
+Engine in order to improve the model. In the test phase, the prediction made by
+the learned model is tested by the Conﬁdence Evaluation System. If the model’s
+conﬁdence in the predicted value crosses a threshold, then it is used to ﬁll (or to
+replace a less certain value) in the original database. Otherwise, the Conﬁdence
+Evaluation System requests a new document or a new query to improve the
+current prediction. This loop is continued until either all the required information
+is satisfactorily obtained, or we run out of a required resource. Additionally,
+feedback loops can be designed to help improve performance of Query Engine
+and Document Filter.
+
+This gives a general overview of the proposed architecture. We now turn to a
+more detailed description for each module, along with the many design choices
+involved while designing a system for our speciﬁc task.
+
+3.2 Task Example: Finding Paper’s Year of Publication
+We present a concrete resource-bounded information extraction task and a prob-
+abilistic approach to instantiate the framework described above: We are given a
+set of citations with ﬁelds, such as, paper title, author names, contact informa-
+tion available, but missing year of publication. The goal is to search the web and
+extract this information from web documents to ﬁll in the missing year values.
+We evaluate the performance of our system by measuring the precision, recall
+and F1 values at diﬀerent conﬁdence levels. The following sections describe the
+architecture of our prototype system, along with possible future extensions.
+
+3.3 Query Engine
+The basic function of query engine is to automatically formulate queries, pri-
+oritize them optimally, and issue them to a search interface. There are three
+modules of query engine. The available resources may allow us to acquire the
+values for only a subset of the ﬁelds, for a subset of the records. Input selection
+module decides which feature values should be acquired from the external source
+to optimize the overall utility of the database. The query formulation module
+combines input values selected from the database with some domain knowledge,
+and automatically formulates queries. For instance, a subset of the available
+ﬁelds in the record, combined with a few keywords provided by the user, can
+form useful queries. Out of these queries, some queries are more successful than
+others in obtaining the required information. Query ranking module ranks the
+queries in an optimal order, requiring fewer queries to obtain the missing values.
+In the future, we would like to explore sophisticated query ranking methods,
+based on the feedback from other components of the system.
+
+Acquiring Missing Feature Values on Demand
+
+421
+
+In our system, we use existing ﬁelds of the citation, such as paper title and
+names of author, and combine them with keywords such as “cv”, “publication
+list”, etc. to formulate the queries. We experiment with the order in which we
+select citations to query. In one method, the nodes with most incoming and
+outgoing citation links are queried ﬁrst. We issue these queries to a search API
+and the top n hits (where n depends on the available resources) are obtained.
+
+3.4 Document Filter
+
+The primary function of the document ﬁlter is to remove irrelevant documents
+and prioritize the remaining documents for processing. Following are the two
+main components of the Document Filter. Even though queries are formed using
+the ﬁelds in the database, some documents may be irrelevant. This may be due
+to the ambiguities in the data (e.g. person name coreference), or simply imper-
+fections in retrieval engine. Initial ﬁlter removes documents which are irrelevant
+to the original database. The remaining documents are then ranked by docu-
+ment ranker, based on their relevance to the original database. Remember that
+the relevance used by the search interface is with respect to the queries, which
+may not necessarily be the same as the relevance with respect to the original
+database. In the future, we would like to learn a ranking model, based on the
+feedback from the information extraction module (via Conﬁdence Evaluation
+System) about how useful the document was in making the actual prediction.
+
+In our system, many of the returned documents are not relevant to the orig-
+inal citation record. For example, a query with an author name and keyword
+“resume” may return resumes of diﬀerent people sharing a name with the paper
+author. Hence, even though these documents are relevant to an otherwise use-
+ful query, they are irrelevant to the original citation. Sometimes, the returned
+document does not contain any year information. The document ﬁlter recognizes
+these cases by looking for year information and soft matching the title with body
+of the document.
+
+3.5 Information Extraction
+
+The design of this module diﬀers from traditional information extraction, posing
+interesting challenges. We need a good integration scheme to merge features from
+the original database with the features obtained from the external source. As
+new information (documents) arrives, the parameters of the model need to be
+updated incrementally (at train time), and the conﬁdence in the prediction made
+by the system must be updated eﬃciently (at test time).
+
+Probabilistic Prediction Model. In our task, the ﬁeld with missing values
+can take one of a ﬁnite number of possible values (i.e. a given range of years).
+Hence, we can view this extraction task as a multi-class classiﬁcation problem.
+Features from the original citation and web documents are combined to make
+the prediction using a maximum entropy classifer.
+
+Let ci be a citation (i = 1, . . . , n), qij be a query formed using input from
+citation ci and dijk be a document obtained as a result of qij. Assuming that we
+
+422
+
+P. Kanani, A. McCallum, and S. Hu
+
+use all the queries, we drop the index j. Let yi be a random variable that assigns
+a label to the citation ci. We also deﬁne a variable yik to assign a label to the
+document dik. If Y is the set of all years in the given range, then yi, yik ∈ Y .
+For each ci, we deﬁne a set of m feature functions fm(ci, yi). For each dik, we
+deﬁne a set of l feature functions flk(ci, dik, yik). For our model, we assume that
+fm(ci, yi) is empty. This is because the information from the citation by itself is
+not useful in predicting the year of publication. In the future, we would like to
+design a more general model that takes these features into account. We can now
+construct a model given by
+
+exp(λlfl(ci, dik, yik)),
+
+(1)
+
+P (yik|ci, dik) =
+
+1
+Zd
+
+y exp(λlfl(ci, dik, yik))
+
+(cid:3)
+
+where Zd =
+
+(cid:2)
+
+l
+
+Combining Evidence in Feature Space vs. Output Space. The above
+model outputs yik instead of the required yi. We have two options to model
+what we want. We can either merge all the features flk(ci, dik, yik) from dik’s to
+form a single feature function. This is equivalent to combining all the evidence
+for a single citation in the feature space. Alternatively, we can combine the
+evidence from diﬀerent dik’s in the output space. Following are two possible
+schemes for combining the evidence in the output space. In the ﬁrst scheme, we
+take a majority vote, i.e., the class with the highest number of yik is predicted
+as the winning class and assigned to yi. In the second scheme, highest conﬁdence
+scheme, we take the most conﬁdent vote, i.e., yi = argmaxyik P (yik|ci, dik)
+3.6 Uncertainty Propagation in Citation Graph
+The inherent dependency within the given data set can be exploited for better
+resource utilization. In our case, the citation link structure can be used for infer-
+ring temporal constraints. For example, if paper A cites paper B, then assuming
+that papers from future can’t be cited, we infer that B must have been published
+in the same or earlier year than A. Initially, we have no information about the
+publication year for a citation. As information from the web arrives, this uncer-
+tainty is reduced. If we propagate this reduction in uncertainty (or belief) for
+one of the nodes through the entire graph, we may need fewer documents (or
+fewer queries) to predict the publication year of the remaining nodes. Selecting
+the citations to query in an eﬀective order may further improve eﬃciency.
+Notation. Let c ∈ C be the citation which is currently being queried. Let
+a → b denote that citation a cites citation b. Let CB = {cb|cb → c} and CA =
+{ca|c → ca}. Let X be the random variable that represents year of publication
+of c; Pc(X = x) be the probability that it takes one of ﬁnite values in the given
+(cid:3)(X = x) be the posterior probability from the Document Classiﬁer.
+range, and P
+Propagation Methods. The method Best Index passes the uncertainty mes-
+sage to the neighbors of c as follows:
+
+∀cb ∈ CBPcb(X = x) = P (X = x|x ≥ y)
+
+(2)
+
+Acquiring Missing Feature Values on Demand
+
+423
+
+∀ca ∈ CAPca(X = x) = P (X = x|x < y)
+
+(3)
+c(X = y). P (X = x|x ≥ y) and P (X = x|x < y) are given
+(cid:3)
+Where y = argmaxyP
+by one of the update methods described below. The method Weighted Average
+takes a weighted average over all possible y
+
+(cid:3)
+
+s:
+
+∀cb ∈ CBPcb(X = x) = P
+
+(cid:3)
+c(X = y)
+
+∀ca ∈ CAPca(X = x) = P
+
+(cid:3)
+c(X = y)
+
+P (X = x|x ≥ y)
+
+P (X = x|x < y)
+
+(4)
+
+(5)
+
+(cid:2)
+
+y
+
+(cid:2)
+
+y
+
+Update Methods. If we know that the given paper was published after a
+certain year, then we can set the probability mass from before the corresponding
+index to zero and redistribute it to the years after the index. We only show update
+in one direction here for brevity. The ﬁrst update method, Uniform Update,
+simply redistributes the probability mass, P (x ≥ y) uniformly to the remaining
+years. The second update method, Scale Update, uses conditional probability.
+
+P (X = x|x ≥ y) = 0, x < y
+
+= P (X = x) +
+
+1
+
+P (x ≥ y) , x ≥ y
+
+P (X = x|x ≥ y) = 0, x < y
+
+= P (X = x)
+
+P (x ≥ y) , x ≥ y
+
+(6)
+
+(7)
+
+(8)
+
+(9)
+
+Combination Methods. Along with passing a message to its neighbors, the
+node updates itself by combining information from the Document Classiﬁer and
+the graph structure.
+
+Pc(X = x) = P
+
+(cid:3)
+c(X = y)
+
+P (X = x|x = y)
+
+(10)
+
+(cid:2)
+
+The following options can be used for computing Pc(X = x). Basic, P (X =
+x|x = y) Product Pc(X = x) ∗ P
+
+(cid:3)
+c(X = x) and Sum Pc(X = x) + P
+
+(cid:3)
+c(X = x)
+
+y
+
+3.7 Conﬁdence Evaluation System
+
+At train time, after adding each new training document, the Conﬁdence Eval-
+uation System can measure the ‘goodness’ of the model by evaluating it on a
+validation set. At test time, conﬁdence in the prediction improves as more in-
+formation is obtained. It sets a threshold on the conﬁdence, to either return
+the required information to the database, or to request more information from
+external source. It also makes the choice between obtaining a new document or
+
+424
+
+P. Kanani, A. McCallum, and S. Hu
+
+to issue a new query at each iteration, by taking into account the cost and util-
+ity factors. Finally, it keeps track of the eﬀectiveness of queries and documents
+in making a correct prediction. This information is useful for learning better
+ranking models for Query Engine and Document Filter.
+
+In our system, we train our model using all available resources, and focus on
+evaluating test time conﬁdence. For merging evidence in the output space, we
+employ two schemes. In max votes, we make a prediction if the percentage of
+documents in the winning class crosses a threshold. In highest conﬁdence, we
+make a prediction if P (yik|ci, dik) value of the document with the highest P in
+the winning class passes a threshold. These schemes help determine if we have
+completed the task satisfactorily. For combining evidence in feature space, we
+use the Entropy Method, in which we compute the value H = − (cid:3)
+i pi log pi of
+the current distribution, and compare it against the conﬁdence threshold.
+
+4 Experimental Description and Results
+
+4.1 Dataset and Setup
+
+Our data set consists of ﬁve citation graphs (462 citations) , with years of pub-
+lication ranging from 1989 to 2008. The sampling process is parameterized by
+size of the network (20-100 citations per graph) and density (min in-degree = 3
+and min out-degree = 6). We use ﬁve-fold cross validation on these data sets for
+all our experiments. We use the Mallet infrastructure for training and testing,
+and the Google search API to issue queries. The queries formed using the in-
+formation from input citations include the raw title, title in quotes, and author
+names combined with keywords like “publication list”, “resume”, “cv” , “year”
+and “year of publication”. We issue queries in a random order, and obtain top 10
+hits from google. We use around 7K queries and obtain around 15K documents
+after ﬁltering. The documents are tokenized and tokens are tagged to be possi-
+ble years using a regular expression. The document ﬁlter discards a document
+if there is no year information found on the webpage. It also uses a soft match
+between the title and all n-grams in the body of the page, where n equals the
+title length. The selected documents are passed on in a random order to the
+MaxEnt model, which uses the following features for classiﬁcation: Occurrence
+of a year on the webpage; the number of unique years on the webpage; years on
+the webpage found in any particular order; the years that immediately follow
+or precede the title matches; the distance between a ‘surrounding’ year and its
+corresponding title match and occurrence of the same ‘following’ and ‘preceding’
+year for a title match.
+
+4.2 Results and Discussion
+
+We ﬁrst run our RBIE system without exploiting the citation network informa-
+tion. We ﬁrst present the results for combining evidence in the feature space. We
+measure Precision, Recall and F1 based on using a conﬁdence threshold, where
+F1 is the harmonic mean of precision and recall. As seen in table 1, as we increase
+
+Acquiring Missing Feature Values on Demand
+
+425
+
+Table 1. Baseline results
+
+Entropy Threshold Precision Recall F1 #Queries #Docs
+
+0.1
+0.3
+0.5
+0.7
+0.9
+
+0.9357 0.7358 0.8204
+0.9183 0.8220 0.8666
+0.9013 0.8718 0.8854
+0.8809 0.9041 0.8909
+0.8625 0.9171 0.8871
+
+4497
+3752
+3309
+2987
+2768
+
+9564
+8010
+7158
+6535
+6088
+
+Fig. 2. The change in F1 v.s. the change in use of resources
+
+(a) Highest Conﬁdence Vote (b) Highest Conﬁdence Vote
+
+Highest Conﬁdence
+
+Max Votes Conﬁdence
+
+(c) Majority Vote
+
+(d) Majority Vote
+
+Highest Conﬁdence Vote
+
+Max Votes Conﬁdence
+
+Fig. 3. Diﬀerent combinations of voting and conﬁdence evaluation schemes
+
+the entropy threshold, precision drops, as expected. F1 peaks at threshold 0.7.
+Note that the number of documents is proportional to the number of queries,
+because in our experiments, we stop obtaining more documents or issuing queries
+when the threshold is reached.
+
+Next, we present the results of exploiting citation network information for
+better resource utilization. Fig. 2 shows F1 as well as the fraction of the total
+documents used for the baseline method, and for one of the graph based method
+(Weighted Avg propagation, Scaling update, and Basic combination). The F1
+
+426
+
+P. Kanani, A. McCallum, and S. Hu
+
+Table 2. Comparison of Uncertainty Propagation Methods
+
+Update Combination F1 for Best Index F1 for Weighted Avg
+Uniform
+Uniform
+Uniform Product
+Scaling
+Scaling
+Scaling
+
+0.7192
+0.7273
+0.6475
+0.7249
+0.6875
+0.6295
+
+0.7249
+0.5827
+0.3460
+0.7249
+0.5365
+0.4306
+
+Basic
+Sum
+
+Basic
+Sum
+
+Product
+
+values are smaller compared to the baseline because we use far fewer resources,
+and the uncertainty propagation methods are not perfect. Using this method,
+we are able to achieve 87.7% of the baseline F1, by using only 13.2% of the
+documents. This demonstrates the eﬀectiveness of exploiting relational nature of
+the data. Table 2 shows the results of diﬀerent uncertainty propagation methods
+at entropy threshold 0.7.
+
+We also experiment with combining evidence in the output space using the
+two schemes described in section 3.5, and the conﬁdence evaluation schemes
+described in section 3.7. Fig. 3 shows the four precision-recall curves. We see
+that for High Conﬁdence Conﬁdence evaluation scheme (ﬁg. 3(a),(c)), we obtain
+high values of precision and recall for reasonable values of conﬁdence. That is,
+in the conﬁdence region below 0.9, we obtain a good F1 value. Especially, the
+Majority Vote - High Conﬁdence scheme (ﬁg. 3(c)) performs exceptionally well
+in making predictions. However, in the conﬁdence region between 0.9 to 1.0, the
+Max Vote scheme (ﬁg. 3(b),(d)) gives a better degradation performance.
+
+5 Conclusion and Future Work
+
+We propose a new framework for targeted information extraction under resource
+constraints to ﬁll missing values in a database. We present ﬁrst results on an
+example task of extracting missing year of publication of scientiﬁc papers, along
+with exploiting the underlying citation network for better resource utilization.
+The overall framework is ﬂexible, and can be applied to a variety of problem do-
+mains and individual system components can be adapted to the task. The speciﬁc
+methods recommended here can also be generalized in many diﬀerent relational
+domains, especially when the dataset has an underlying network structure. In
+future, we would like to explore more sophisticated uncertainty propagation
+methods, such as belief-propagation. We would also like to develop individual
+components like Query Engine and Document Filter, by using good ranking
+procedures. Finally, it would be interesting to see how these methods extend to
+extracting multiple interdependent ﬁelds.
+
+Acknowledgments
+
+We thank Andrew McGregor for useful discussions. This work was supported in
+part by the Center for Intelligent Information Retrieval and in part by The CIA,
+
+Acquiring Missing Feature Values on Demand
+
+427
+
+the NSA and NSF under NSF grant #IIS-0326249. Any opinions, ﬁndings and
+conclusions or recommendations expressed in this material are the authors’ and
+do not necessarily reﬂect those of the sponsor.
+
+References
+
+1. Bilgic, M., Getoor, L.: Voila: Eﬃcient feature-value acquisition for classiﬁcation.
+
+In: AAAI, pp. 1225–1230. AAAI Press, Menlo Park (2007)
+
+2. Etzioni, O., Cafarella, M., Downey, D., Kok, S., Popescu, A., Shaked, T., Soderland,
+S., Weld, D., Yates, A.: Web-scale information extraction in knowitall. In: WWW
+2004, May 2004, ACM, New York (2004)
+
+3. Grishman, R., Sundheim, B.: Message understanding conference-6: a brief history.
+
+In: Proceedings of the 16th conference on Computational linguistics (1996)
+
+4. Kanani, P., McCallum, A.: Resource-bounded information gathering for correlation
+clustering. In: Bshouty, N.H., Gentile, C. (eds.) COLT. LNCS (LNAI), vol. 4539,
+pp. 625–627. Springer, Heidelberg (2007)
+
+5. Kanani, P., McCallum, A., Pal, C.: Improving author coreference by resource-
+
+bounded information gathering from the web. In: Proceedings of IJCAI (2007)
+
+6. Kanani, P., Melville, P.: Prediction-time active feature-value acquisition for cus-
+
+tomer targeting. In: Workshop on Cost Sensitive Learning, NIPS 2008 (2008)
+
+7. Krause, A., Guestrin, C.: Near-optimal nonmyopic value of information in graphical
+
+models. In: UAI 2005, p. 5 (2005)
+
+8. Lin, J., Fernandes, A., Katz, B., Marton, G., Tellex, S.: Extracting answers from
+
+the web using knowledge annotation and knowledge mining techniques (2002)
+
+9. Lizotte, D., Madani, O., Greiner, R.: Budgeted learning of naive-Bayes classiﬁers.
+
+In: UAI 2003, Acapulco, Mexico (2003)
+
+10. Melville, P., Saar-Tsechansky, M., Provost, F., Mooney, R.: An expected utility
+
+approach to active feature-value acquisition. In: ICDM 2005, pp. 745–748 (2005)
+
+11. Nodine, M.H., Fowler, J., Ksiezyk, T., Perry, B., Taylor, M., Unruh, A.: Active
+
+information gathering in infosleuth. IJCIS 9(1-2), 3–28 (2000)
+
+12. Sheng, V., Provost, F., Ipeirotis, P.G.: Get another label? improving data quality
+
+and data mining using multiple, noisy labelers. In: SIGKDD (2008)
+
+13. Sheng, V.S., Ling, C.X.: Feature value acquisition in testing: a sequential batch
+
+test algorithm. In: ICML 2006, pp. 809–816. ACM, New York (2006)
+
+14. Wu, F., Hoﬀmann, R., Weld, D.S.: Information extraction from wikipedia: moving
+
+down the long tail. In: 14th ACM SIGKDD, pp. 731–739 (2008)
+
+15. Zhao, S., Betz, J.: Corroborate and learn facts from the web. In: KDD, pp. 995–
+
+1003 (2007)
+
+

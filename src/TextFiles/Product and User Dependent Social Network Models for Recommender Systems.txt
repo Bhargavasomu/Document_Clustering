@@ -1,0 +1,928 @@
+Product and User Dependent Social Network
+
+Models for Recommender Systems
+
+Min Li, Zhiwei Jiang, Bin Luo, Jiubin Tang, Qing Gu(cid:2), and Daoxu Chen
+
+Department of Computer Science, Nanjing University,
+
+minli@software.nju.edu.cn, jzwpm@163.com, tjb@telecomjs.com,
+
+Nanjing, Jiangsu 210000, China
+{luobin,guq,cdx}@nju.edu.cn
+
+Abstract. Social network based applications such as Facebook, Mys-
+pace and LinkedIn have become very popular among Internet users,
+and a major research problem is how to use the social network infor-
+mation to better infer users’ preferences and make better recommender
+systems. A common trend is combining the user-item rating matrix and
+users’ social network for recommendations. However, existing solutions
+add the social network information for a particular user without con-
+sidering the diﬀerent characteristics of the products to be recommended
+and the neighbors involved. This paper proposes a new approach that
+can adaptively utilize social network information based on the context
+characterized by products and users. This approach complements several
+existing social network based recommendation algorithms and thus can
+be integrated with existing solutions. Experimental results on Epinions
+data set demonstrate the added value of the proposed solution in two
+recommendation tasks: rating prediction and top-K recommendations.
+
+1
+
+Introduction
+
+Recommender Systems have achieved great success and are becoming increasingly
+popular in real world applications. For example, online stores, such as Amazon and
+Netﬂix, provide customized recommendations for products or services based on
+a user’s history. Many techniques have been proposed to make recommendations
+for the users, among which collaborative ﬁltering is one of the most popular ap-
+proaches. The task of collaborative ﬁltering is to predict the utility of items to a
+particular user based on the user’s history and other users’ ratings.
+
+With the increasing popularity of social network based applications such as
+Facebook, Myspace and LinkedIn, how to make recommendations with addi-
+tional information from a user’s social network has become an important re-
+search topic. In real life, we often turn to our friends for some recommendations.
+Besides, people with close relationship are likely to have similar tastes. There-
+fore, a user’s social network may have two eﬀects in the real world: help us in-
+fer users’ preferences and inﬂuence users’ behaviors. Hence, social network info
+might be an important element that recommender algorithms can take advantage
+of. Recently, several researchers have started to tackle this problem [11][10][9].For
+
+(cid:2) Corresponding author.
+
+J. Pei et al. (Eds.): PAKDD 2013, Part II, LNAI 7819, pp. 13–24, 2013.
+c(cid:2) Springer-Verlag Berlin Heidelberg 2013
+
+14
+
+M. Li et al.
+
+example, Jamali et al. proposed a a model-based approach utilizing matrix fac-
+torization techniques and incorporating trust propagation mechanisms [3]. Kon-
+stas et al. adopt a Random Walk framework and focus on investigating the role
+of additional relationships, such as friendships and social tags [6].
+
+However, most of prior research only focused on a single-domain recom-
+mendation and thus the solutions are less likely to work well in open domain
+recommenders systems. There are three diﬀerences between the two kinds of
+recommender systems: 1) Data is sparser in the open-domain systems. Open-
+domain systems have much more items but less user feedback. That means the
+user-item rating matrix is sparser in open-domain systems. Thus traditional col-
+laborative ﬁltering cannot achieve as good performance as in the single-domain
+systems. 2) Data distribution varies according to the diﬀerent domains. For
+example, in the Epinions data set, online stores get more reviews(average 10
+ratings/item), yet books tend to get less reviews(average 2 ratings/item).1 3)
+The social network structure is more complicated than the single-domain sys-
+tem. Social network has been used to measure users’ similarities and infer users’
+preferences in recommender systems. Most of prior research assumed that those
+people trusted by same user have the same inﬂuence for the user. However in the
+real world, people always selectively adopt others’ opinions. Some persons are
+good at software, some persons are good at sports. People will consult diﬀerent
+persons due to the products they want to purchase. Each person may involve in
+multiple social networks, we shouldn’t consider them equally.
+
+Recently, Hao et al.[8] introduced a framework combining social networks
+and collaborative ﬁltering techniques for recommendation in an open domain
+data set epinions.com. However, similar to existing research on social network
+based recommender systems, their solution also combines the information using a
+static weight, without considering how to balance the weights between user-item
+ratings and social network information based on the context.
+
+Motivated by early research on social network based recommender systems,
+this paper focuses on a problem that existing solutions have not addressed: how
+to diﬀerentiate the eﬀect of social network info based on recommendation con-
+text. Without loss of generality, we focus on three variables that characterize
+the context: item category, the number of observed ratings for the user and
+characteristics of the neighbors. Our experiments are based on these three char-
+acteristics. We propose a solution to modify some existing social network based
+recommendation algorithms so that the context could be considered.
+
+Based on experimental results, we found: 1) users’ social networks inﬂuence
+users’ behaviors and are useful for inferring users’ preference; 2) how to balance
+the weights between user-item ratings and social network information is de-
+pendent on the recommendation context and neighbors involved. Our proposed
+approaches using adaptive weights can capture the recommendation context and
+thus outperform the approaches using a static weight; 3) utilizing social network
+information can help overcome the negative eﬀect of rating variance, especially
+
+1 Based on the statistics of our crawled data.
+
+Product and User Dependent Social Network Models
+
+15
+
+in an open-domain recommender system; 4) weighted diﬀerentiation of each in-
+dividual in a social network can better model the inﬂuence of the social network.
+
+2 Social Recommendation Approaches
+
+Our approach is to start with state-of-the-art social network recommendation al-
+gorithms, modify them so that product and neighborhood characteristics will be
+considered when we trade oﬀ the predicted user preferences (without considering
+social information) and user’s neighbors’ preferences.
+
+Assume there are N items, M users in a recommender system. The rating
+of user i for item j is denoted by ri,j. All the ratings from users to items are
+denoted by a user-rating matrix R = {ri,j}. For some recommender systems,
+users are connected in a social network. For example, if user i selects user k as a
+trustable person or his/her friend, there is a directed connection from user i to
+user k. This network can be represented as a M × M matrix S = {si,k}, where
+si,k denotes how well user i trust user k. In the simplest case, si,k = 1 means
+user i trusts user k, otherwise 0. The task is to recommend a list of items to a
+user, and good items are those that user is likely to purchase, rate high, or click.
+
+2.1 Singular Value Decomposition
+
+Singular Value Decomposition(SVD) is a widely used collaborative ﬁltering algo-
+rithm. The central idea is factorizing the user-item rating matrix into low-rank
+approximation based on low-dimensional hidden representations of users and
+items, then utilizing them to predict the missing values in the rating matrix.
+Let U ∈ R
+D×N be latent user and item matrices, with column
+vectors ui and vj representing the latent/hidden vectors of user i and item j
+respectively. D is the dimension of latent vectors. There are various ways to ﬁnd
+the latent representations of users and items. We can view it as a statistical
+modeling problem, where the observed ratings are generated as follows [12]
+
+D×M and V ∈ R
+
+p(R|U, V, σ2) =
+
+N (ri,j|uT
+
+i vj , σ2)
+
+(1)
+
+(cid:2)
+
+ri,j∈R
+
+where N (x|μ, σ2) is a Gaussian distribution with mean μ and variance σ2.
+The dot product of latent user and item vectors uT
+i vj is the expected mean
+of rating ri,j . The latent vectors are assumed to be generated independently
+from Gaussian distributions of zero-mean: p(U|σ2
+uI) and
+p(V |σ2
+vI) where σu is the variance of the Gaussian distri-
+bution for users and σv is the variance of the Gaussian distribution for items. I
+is an identity matrix. Hence, the posterior distribution over the user and item
+latent vectors is given by
+
+N (vj|0, σ2
+
+N (ui|0, σ2
+
+(cid:3)N
+j=1
+
+(cid:3)M
+i=1
+
+u) =
+
+v) =
+
+p(U, V |R, σ2, σ2
+
+u, σ2
+
+v) ∝ (cid:2)
+ri,j∈R
+
+N (ri,j|uT
+
+i vj , σ2)× M(cid:2)
+
+N (ui|0, σ2
+
+uI)× N(cid:2)
+
+N (vj|0, σ2
+vI)
+
+i=1
+
+j=1
+
+We can ﬁnd ui and vj by maximizing the above posterior likelihood. The rating
+for user i and item j, if not available, can be predicted as ri,j = uT
+
+i vj.
+
+16
+
+M. Li et al.
+
+2.2 Factorization with Social Network
+
+In trust-aware recommender systems, users express trust for other users. When
+user u trusts user k, they may have similar preference to some extent, or user k
+may aﬀect user u’s decisions. Social Trust Ensemble is a probabilistic framework
+that naturally fused users’ tastes and their trusted friends’ favors [8]. In this
+framework, the conditional distribution over the observed ratings is modeled as:
+
+p(R, U, V |S, σ2, σ2
+
+U , σ2
+× (cid:2)
+ri,j∈R
+
+V ) ∝ M(cid:2)
+N (ui|0, σ2
+[N (ri,j|(αi,juT
+
+uI) × N(cid:2)
+i vj + (1 − αi,j)
+
+j=1
+
+i=1
+
+N (vj|0, σ2
+vI)
+(cid:4)
+
+k∈τ (i)
+
+(2)
+
+si,kuT
+
+k vj ), σ2)]
+
+The model assumes the ratings are generated from diﬀerent Gaussian distri-
+butions. The mean of the Gaussian distribution that generates a rating ri,j is
+determined by the latent vectors of user ui and item vj as well as the users in
+user i’s social network, which is denoted as τ (i). The contributions from the two
+parts are weighted by the parameter αi,j . In [8], αi,j is ﬁxed as the same value
+for diﬀerent user i and item j. It ignores the recommendation context associated
+with ratings. We will discuss this issue and propose a new solution later.
+
+2.3 Adaptive Weights Based on User and Product Characteristics
+
+In formula (2), αi,j and si,k balance the information from users’ own character-
+istics and their friends’ favors. αi,j controls how much the model should trust
+the user vs. the neighbors, and si,k controls how much one should trust user k.
+A straightforward way is to deﬁne a ﬁxed value for all the αi,j [8]. For instance,
+αi,j = 0.4 for all (cid:4)i, j(cid:5) pairs means whatever the situation is, a user’s own hidden
+representation contributes 40% and social network contributes 60%. However, in
+real life, how much to trust others depends on many factors. For example, if item
+k is a movie, user i may ask his/her friends or read reviews before watching it. If
+item k is a hard drive, the user i may have clear idea about his/her preferences
+(size, price range) and can judge the quality easily without consulting friends.
+
+To make αi,j context-sensitive, we propose to set the value of αi,j based on
+
+the features of user i and item j using the following sigmoid function:
+
+αi,j = sigmoid(wT fi,j)
+
+(3)
+
+where w ∈ R
+P and fi,j is a P -dimensional feature vector about user i and item j.
+Each dimension of fi,j corresponds to one feature, and each feature value could
+be binary or numeric. The features could include user characteristics (gender,
+location, etc.) and item characteristics(price, category, etc.). The features could
+also include interactions between users and items. For example, a binary value
+indicating whether user i is familiar with products in the same category/brand
+of item j, or the frequency of user i visiting the web pages mentioning product
+j. The sigmoid function is used to restrict the value of αi,j between 0 and 1.
+
+Product and User Dependent Social Network Models
+
+17
+
+According to the formula (3), the recommendation algorithm decides how
+much to adopt the social networks’ opinions based on the characteristics of users
+and items. The rating ri,j can be estimated as follows:
+
+ˆri,j = sigmoid(wT fi,j)uT
+
+i vj + (1 − sigmoid(wT fi,j))
+
+si,kuT
+
+k vj
+
+(4)
+
+(cid:4)
+
+k∈τ (i)
+
+We further assume w follows a Gaussian distribution N (0, σ2
+wI). Thus the max-
+imum likelihood estimation of the parameters can be learned by minimizing the
+following loss function (the negative log likelihood of the observation):
+
+lossR,S,U,V,W =
+
+(cid:4)
+
+ri,j∈R
+
+1
+2
+
+(ˆri,j−ri,j )2+
+
+M(cid:4)
+
+i=1
+
+λu
+2
+
+(cid:6) ui (cid:6)2
+
+2 +
+
+N(cid:4)
+
+j=1
+
+λv
+2
+
+(cid:6) vj (cid:6)2
+
+2 +
+
+λw
+2
+
+(cid:6) w (cid:6)2
+
+2
+
+where λu = σ2
+σ2
+u
+
+, λv = σ2
+σ2
+v
+
+, λw = σ2
+σ2
+w
+
+.
+
+The solution can be found using conjugate gradient algorithm. The gradient
+
+of ui, vj and w can be calculated as below:
+(cid:4)
+
+(cid:4)
+
+(cid:4)
+
+αi,j(ˆri,j − ri,j)vj +
+
+∂loss
+∂ui
+
+∂loss
+∂vj
+
+∂loss
+∂w
+
+=
+
+=
+
+=
+
+ri,j∈R
+(cid:4)
+
+ri,j∈R
+(cid:4)
+
+ri,j∈R
+
+rt,j∈R
+(ˆri,j − ri,j)(αi,j ui + (1 − αi,j)
+
+t∈ϕ(i)
+
+(ˆri,j − ri,j)(uT
+
+i vj − (cid:4)
+k∈τ (i)
+
+(1 − αi,j)(ˆrt,j − rt,j )st,ivj + λuui
+(cid:4)
+
+si,kuk) + λvvj
+
+k∈τ (i)
+
+si,kuT
+
+(cid:4)
+k vj )α
+i,jfi,j + λww
+
+(cid:4)
+i,j = exp(wT fi,j)/(1 + exp(wT fi,j))2 is the derivative of the sigmoid
+where α
+function. ϕ(i) is the set of all the users who trust user i.
+
+2.4 Adaptive Weights Based on Individual Neighbors
+
+si,k captures how a particular neighbor k aﬀects the prediction. According to
+the deﬁnition of si,k and τ (i), we have the following three approaches:
+
+Social Trust Model. A straightforward way is adopting a commonly used
+social network deﬁnition of recommender systems, which is so-called social trust
+network. In this scenario, τ (i) is the social network explicitly expressed by user i.
+For example, in Epinions.com, each user can express his/her Web of Trust by
+marking some other users as “trustable”. Then the set τ (i) contains all the
+users who are selected by user i. There are several possible reasons that user
+i add user k into his/her trust list. First, they might know each other in the
+real life. Second, user i has read the reviews and ratings provided by user k,
+and found them valuable or consistent with his/her own tastes. In both cases,
+social trust network has much potential to be utilized for better inference of
+users’ preferences. It is worth mentioning that the trust value is binary in most
+
+18
+
+M. Li et al.
+
+recommender systems. This means we do not know how much user i trusts each
+individual in the trust list. If we simply treat all trusted users on user i’s list
+
+equally, the deﬁnition of si,k is si,k = 1|τ (i)| where |τ (i)| is the number of trusted
+
+users by user i in the set τ (i).
+
+Social Inﬂuence Model. The social trust model mentioned above utilizes a
+user’s social network to infer the user’s preference. Now we further discuss how
+we model the social network inﬂuencing users’ behaviors. Consider a scenario in
+the real world, where user i knows nothing about the movie “Avatar” initially.
+He found more and more people around him have watched the movie, are talking
+about it and rate it highly. Then there is a high probability that user i will be
+inﬂuenced by people around and go to the theater for “Avatar”, even if he usually
+does not watch Action Sci-Fi movies or movies in general.
+
+To model the inﬂuence from one’s social network, we restrict si,k as follows:
+si,k = 1 if user k purchased or rated item j; otherwise si,k = 0. While predicting
+ri,j , the social inﬂuence network being considered contains all the users who are
+trusted by user i and also purchased/rated the target item j.
+
+Neighborhood Model with Implicit Social Network . The above models
+treat diﬀerent individual’s opinion in the social network equally. However, people
+adopt others’ opinions diﬀerently. For close friends that people know well, they
+trust them highly. In this case, we probably want to use a high value for si,k. For
+people they are not familiar with, one may cautiously take the advice. In this
+case, we may want a low value for si,k. Even for the same person, people will
+trust him/her in varying degrees in diﬀerent recommendation contexts. Besides,
+social network information is not always available for a recommender system.
+Based on above two considerations, we propose to utilize user’s neighborhoods,
+which can be found using standard collaborative ﬁltering algorithms, as implicit
+social network. In this model, τ (i) is the top-N nearest neighbors of user i. To
+calculate the similarity between users, several similarity measures have been
+proposed before. Without loss of generality, we use cosine similarity in the space
+of items. We use Ui and Uk to indicate the ith and kth row of the rating matrix.
+Then similarity between user i and user k is deﬁned as simi,k = UiUk
+(cid:5)Ui(cid:5)·(cid:5)Uk(cid:5) .
+According to the similarities between users, we select top N nearest neighbors
+for each user i as the implicit social network τ (i). si,k is deﬁned based on the
+similarity simi,k with a normalizing factor so that
+
+(cid:5)
+
+k∈τ (i) si,k = 1:
+
+si,k =
+
+(cid:5)
+
+simi,k
+t∈τ (i) simi,t
+
+(5)
+
+3 Experimental Methodology
+
+We collect evaluation data set from Epinions.com which is a consumers review
+website. Users can review items and provide integer ratings from 1 to 5. Epinions
+also provides the user proﬁles and item descriptions, such as item category. As a
+
+Product and User Dependent Social Network Models
+
+19
+
+trust-aware system, users can explicitly express the trust statements in Epinions.
+Each user maintains a “trust” list which includes some trustable users.
+
+Researchers have used Epinions data set for various research on recommender
+systems, however, none of the existing data sets contain all the information we
+need. The data set used in this paper is a new collection we collected by crawling
+Epinions.com on Oct 2009. We ﬁrst crawled the ratings and trust statements of
+the top reviewers and then move to the users who trust top reviewers or who
+are trusted by top reviewers. We crawled users’ ratings and trust statements
+following users’ social networks. As a result, we collected a data set that contains
+56,859 users, 271,365 items, and 1,154,812 ratings. There are totally 603,686 trust
+statements. Most of the items are assigned into one category by epinions.com.
+10,994(19.3%) users only rate one item. 26,712 users(47%) rated no more than 5
+items. We use two sets of binary features to represent recommendation context.
+The ﬁrst is item categories assigned by Epinions.com. The second is the group
+id that characterizes the number of items the user rated. We classify users into
+7 groups (1:“1”, 2:“2-5”, 3:“6-10”, 4:“11-20”, 5:“21-40”, 6:“41-80”, 7:“>80”).
+
+We carry out experiments on two recommendation tasks:
+
+Rating Prediction Given a user i and an item j, the task is to predict the
+rating of user i on item j. For this task, we randomly select 80% rating data
+for training, 10% for testing, and 10% for cross validation (hold out data set).
+The prediction accuracy is measured by Root Mean Square Error(RMSE).
+Top-K Recommendation In real life, a user wants the system to suggest a
+
+list of top K items that the user has not yet rated/purchased/seen before.
+
+We design the experiments to answer the following questions: 1) How does
+the setting of the factor αi,j aﬀect the performance? 2) How does the selection
+of a user’s social network τ (i) aﬀect the performance? 3) Does weighting each
+neighbor’ opinion diﬀerently improve the performance?
+
+To answer question 1), we compare two diﬀerent settings of αi,j . One is to
+deﬁne a ﬁxed value for all the αi,j [8]. The other is to assign adaptive weights
+based on characteristics of users and items (Section 2.3). To diﬀerentiate the two
+settings, we use “A” for the approaches with αi,j that is adaptive for diﬀerent
+users and items, and “F ” for the approaches with a ﬁxed value for all αi,k.
+To answer question 2), we compare the three models in Section 2.4 to utilize
+social network information. The models are denoted by “Trust”, “Inﬂuence” and
+“Neighborhood” respectively. To answer question 3), we compare two settings of
+si,k when using neighborhood as an implicit social network: using the similarities
+measure as formula (5) vs. assigning equal weights to all the neighbors.
+
+The algorithms compared in our experiments are summarized as follows:
+
+– SVD : Baseline approach as described in Section 2.1.
+– F-Trust : Social trust network with a ﬁxed α value (Section 2.4).
+– A-Trust : Social trust network with adaptive α values (Section 2.3).
+– F-Inﬂuence: Social inﬂuence network with a ﬁxed α value (Section 2.4).
+– A-Inﬂuence: Social inﬂuence network with adaptive α values.
+– F-Neighborhood : This approach uses neighborhood as implicit social network
+
+(Section 2.4) and a ﬁxed α value.
+
+20
+
+M. Li et al.
+
+and adaptive α values.
+
+– A-Neighborhood : This approach uses neighborhood as implicit social network
+– F-Neighborhood-E : A variation of F-Neighborhood that sets si,k = 1/|τ (i)|.
+– A-Neighborhood-E : A variation of A-Neighborhood that sets si,k = 1/|τ (i)|.
+
+All the approaches are based on the parameter setting λu = λv = λw = 0.2. For
+the Neighborhood based approaches, we use the top 10 nearest neighbors. Based
+on validation set, we found the ﬁxed α values (α = 0.3 for F-Trust, α = 1.0 for
+F-Inﬂuence, and α = 0.2 for F-Neighborhood.)
+
+4 Experimental Results
+
+4.1 Results on Rating Prediction
+
+Table 1. Performance comparison
+
+Table 2. Performance on the subsets
+
+Dimensionality
+
+Model
+
+SVD
+
+F-Trust
+A-Trust
+
+D=5 D=10 D=20
+1.0747 1.0683 1.0812
+1.0516 1.0434 1.0528
+1.0481 1.0387 1.0416
+1.0740 1.0673 1.0820
+1.0682 1.0618 1.0664
+F-Neighborhood 1.0262 1.0212 1.0270
+A-Neighborhood 1.0238 1.0142 1.0022
+
+F-Inﬂuence
+A-Inﬂuence
+
+α
+-
+
+SVD
+
+Model
+
+F-Trust
+A-Trust
+
+Inﬂuence Subset Trust Subset
+RMSE
+1.0467
+1.0009
+1.0002
+1.0447
+1.0373
+F-Neighborhood 1.0115
+A-Neighborhood 1.0023
+
+RMSE α
+1.0773
+-
+1.0382 0.3
+1.0347
+1.0779 1.0
+1.0747
+1.0323 0.2
+1.0251
+
+F-Inﬂuence
+A-Inﬂuence
+
+0.3
+
+-
+
+-
+
+-
+
+-
+
+-
+
+-
+
+0.3
+
+0.9
+
+Table 1 summarizes the results on the whole test data. We conduct experiments
+on three latent vector dimensions: 5, 10, and 20. There are several things worth
+mentioning. First, it shows social network information is valuable. Social network
+based approaches outperformed baseline SVD. Second, it shows A-Neighborhood
+performs better than other methods. The improvement of using neighbors over
+SVD is not surprising. Because factorization captures global structure of the rat-
+ing matrix, while neighborhood captures local regularization of the data space.
+Combining these complementary information has the same eﬀect as the Netﬂix
+competition winner’s solution, which combines nearest neighbors with factor-
+ization models [7]. However, it is interesting to see that neighborhood models
+perform better than social inﬂuence and social trust models, since neighborhood
+models do not use any user identiﬁed social network info. Third, it shows the
+performance of every approach improves when we vary α based on recommen-
+dation context (users and items). The improvements are diﬀerent when using
+diﬀerent social network information. One possible reason is the sparsity of so-
+cial networks. In Epinions data set, almost every user has neighborhood, while
+only 59.5% of ratings in the test data have social trust information and only
+18.2% have social inﬂuence information. Therefore, the overall performance may
+be dominated by the rating pairs without explicit social information. That also
+answers why F-Inﬂuence performs best with α = 1.0.
+Performance of Diﬀerent Social Networks. To focus on the eﬀect of diﬀer-
+ent social networks, we created two test data subsets. One subset (Trust Subset )
+consists of ratings with social trust info. Both Trust and Neighborhood based
+
+Product and User Dependent Social Network Models
+
+21
+
+approaches can be used to predict all the test cases, while Inﬂuence based ap-
+proaches can not be used on part of this subset. Thus the second subset (Inﬂu-
+ence Subset ) is much smaller and consists of the ratings with all three kinds of
+social info available. This data set contains 6618 users and 21,599 ratings. Table
+2 shows the results on the two smaller test data sets.2 We observe that Trust
+based approaches are comparable with Neighborhood based approaches, although
+Neighborhood based approaches are clearly better than the others on the whole
+test data (Table 1). On the inﬂuence subset, trust based approaches outperforms
+Neighborhood based approaches. The results suggest that a recommender system
+may want to use a hybrid neighborhood-trust network model.
+
+Table 3. Performance on two settings
+of si,k when using neighborhood as im-
+plicit social network
+
+identical si,k
+Model
+
+RMSE
+F-Neighborhood-E 1.0257
+A-Neighborhood-E 1.0200
+
+weighted si,k
+Model
+
+RMSE
+F-Neighborhood 1.0212
+A-Neighborhood 1.0163
+
+Fig. 1. Comparison on diﬀerent num-
+ber of observed ratings based on the
+whole test data
+
+Performance on Diﬀerent Users. We analyze how the size of training data
+per user aﬀects the performance of diﬀerent algorithms. We group all the users
+into 7 classes based on the number of observed ratings in the training data.
+Figure 1 shows the macro RMSE on diﬀerent user groups. The horizontal axis
+describes how many training ratings are available for a user in that class. It
+shows that A-Trust and A-Neighborhood almost consistently outperform SVD
+and A-Inﬂuence, especially when users have less than 6 ratings. It’s surprising
+that RMSE increases when the number of observed ratings is more than 10. To
+understand this, we look at the rating variance for each user group. We ﬁnd that
+variance and RMSE have the similar trend, both of them tend to increase after
+observing more than 10 ratings (Figure 1). When user has fewer ratings, those
+ratings usually are about one or two aspects and thus the variance is small; when
+the user provide more ratings, those ratings consist of user’s multiple interests.
+When we use all ratings to predict a rating in a speciﬁc aspect, products that
+are irrelevant to the target item may hurt the performance. Therefore, the initial
+decrease of RMSE is because the increase of observed ratings makes the model
+know more about users while the inﬂuence of rating variance confuses the model
+
+2 In the rest of this paper, all the experimental results are using 10-dimensional latent
+
+vector setting, where 10 is found by the validation data set.
+
+22
+
+M. Li et al.
+
+and hurts the performance. It suggests that user ratings on one category may
+hurt the prediction of user ratings in another category.
+Impact of Parameter si,k. In our approaches, the parameter si,k indicates
+how much user i would trust user k. Table 3 shows the results of two settings
+of si,k when using neighborhood as an implicit social network. It is clear that
+weighting others’ opinions based on the similarity (*-Neighborhood) can achieve
+better performance than treating all opinions equally (*-Neighborhood-E).
+
+4.2 Further Analysis about Social Inﬂuence
+
+We did some further analysis by looking at the weights learned (the component
+values of w)3 for diﬀerent contexts for social recommendation model, and the
+goal is to answer the following questions: 1) How does the number of observed
+ratings aﬀect the weight of social network? 2) How does the size of a user’s trust
+list aﬀect the weight of social network? 3) Is a user more likely to be inﬂuenced
+when his uncertainty about the product is high? (We assume a user may be more
+uncertain about the product quality if the product quality tends to be subjective,
+such as for books/movies, instead of objective, such as for PC/memory.)
+
+Figure 2(a) shows that, as the number of training ratings increases, the weights
+learned by A-Neighborhood become smaller, while the weights learned by A-Trust
+increase. The weight is a tradeoﬀ between uncertainty about neighbors’ ratings
+vs. uncertainty about the user’s own ratings. In A-Neighborhood, the neighbors
+found are unreliable when the user has fewer ratings, therefore, A-Neighborhood
+does not weight neighbors’ opinions high in these cases [1]. In A-Trust, the user’s
+own prediction is more reliable when the number of ratings is high, thus A-Trust
+does not weight neighbors’ opinions high.
+
+To answer question 2), we introduce a new feature, the size of social trust
+network, for A-Trust. Figure 2(b) shows the weights learned by A-Trust increases
+with the size of social trust network. That means the model considers larger
+social trust networks less reliable than smaller ones. One possible reason is that,
+a large social network is more likely be selected arbitrarily by a user, while a
+small social network tends to be selected more seriously and hence more reliable.
+Figure 2(c) shows the learned weights for diﬀerent categories. It seems that
+categories more related to personal experiences tend to have higher weights.
+Instead, the categories whose ratings are more subjective tend to have lower
+weights, probably because a user is more uncertain about these products and is
+likely to be inﬂuenced by people they trust.
+
+4.3 Results on Top-K Recommendations
+
+A more realistic task for a recommender system is to recommend K items that
+users may like. In this section, we simulate the real scenario and investigate the
+eﬀect of our approaches on the task of top-K recommendations.
+
+3 According to formula (4), a larger weight value means that less emphasis is placed
+
+on social network information.
+
+Product and User Dependent Social Network Models
+
+23
+
+(a)
+
+(b)
+
+(c)
+
+Fig. 2. Learned weights for diﬀerent features. In Figure(c), item categories form 1 to 14
+are: Books, Music, Kids & Family, Hotel & Travel, Software, Sports & Outdoors, Pets,
+Electronics, Games, Wellness & Beauty, Movies, Education, Online Stores & Services,
+Personal Finance.
+
+(a)
+
+(b)
+
+Fig. 3. Performance on Top-K Recommendation Task. The right plot concentrates on
+the top 2% ranking region.
+
+Previous works on this task tend to adopt classic IR measures such as P@N
+and Recall [4][2]. However, without complete relevance judgements for each indi-
+vidual user, standard IR evaluation is almost infeasible. Thus we use a variation
+of the evaluation method in [7]. We randomly sample 10% from the rating data
+set (cid:4)i, j, ri,j(cid:5). Then for each user in the sampled data set, we randomly choose
+one user-item pair with a 5-star rating. This gives 15,025 user-item testing pairs.
+To simulate the scenario that we only want to recommend the 5-star items to
+users, we treat 5-star pairs as relevant. The Epinions data is an open-domain
+data set with multiple categories. Intuitively, a book and a song are hard to com-
+pare. We assume that a user wants to purchase one speciﬁc kind of item, such as
+a book, and the system needs to rank items in this category. Therefore, for each
+testing pair (cid:4)i, j(cid:5), we randomly sample 1000 additional items which user i has
+not rated from the same category as item j. For example, if user i purchased a
+book, we randomly select 1000 additional books as candidates to be ranked.
+
+Figure 3 compares four methods: SVD, A-Trust, A-Inﬂuence, A-Neighborhood.
+In real systems, only top K items might be recommended. Therefore, we focus on
+the top 2% ranking area (top 20 ranked items out of 1000) (Figure 3(b)). First, it
+shows all the social network based approaches outperform SVD. That means we
+can beneﬁt from utilizing social network information in top-K recommendation
+
+24
+
+M. Li et al.
+
+task. Second, it shows A-Inﬂuence is not as good as A-Trust and A-Neighborhood
+due to the sparsity of social network.
+
+5 Conclusions and Future Work
+
+We investigated three ways to combine social network and matrix factoriza-
+tion for recommender systems. All three methods work better than the baseline
+method. This means social network is useful for recommendation. The three
+methods have diﬀerent properties. When social trust information is applicable,
+Social Trust Model always works better than SVD, especially when a user has few
+ratings. Social Inﬂuence Model is not always applicable. When it is applicable,
+making recommendations using the inﬂuence from people a user trust can also
+improve the performance for two tasks. When the social network information is
+not available, we can ﬁnd implicit N Nearest Neighbors and use the Neighbor-
+hood model to combine neighbors’ predictions with the SVD prediction. This is
+a ﬁrst step to adaptively weight the info from neighbors. Future work includes
+adapting the inﬂuence for other social network based recommendation methods.
+
+Acknowledgement. This work is supported by the National High-Tech Re-
+search and Development Plan of China (863) under Grant 2006AA01Z177, the
+National Natural Science Foundation of China (NSFC) under Grant No. 60873027,
+61021062, and the National 973 Program of China under Grant No. 2009CB320705.
+
+References
+
+1. Berkovsky, S., Kuﬂik, T., Ricci, F.: Distributed collaborative ﬁltering with domain
+
+specialization. In: RecSys, pp. 33–40 (2007)
+
+2. Gunawardana, A., Meek, C.: A uniﬁed approach to building hybrid recommender
+
+systems. In: RecSys, pp. 117–124 (2009)
+
+3. Jamali, M., Ester, M.: A transitivity aware matrix factorization model for recom-
+
+mendation in social networks. In: IJCAI, pp. 2644–2649 (2011)
+
+4. Karypis, G.: Evaluation of item-based top-n recommendation algorithms. In:
+
+CIKM, pp. 247–254 (2001)
+
+5. Kautz, H.A., Selman, B., Shah, M.A.: Referral web: Combining social networks
+
+and collaborative ﬁltering. Commun. ACM 40(3), 63–65 (1997)
+
+6. Konstas, I., Stathopoulos, V., Jose, J.M.: On social networks and collaborative
+
+recommendation. In: SIGIR, pp. 195–202 (2009)
+
+7. Koren, Y.: Factorization meets the neighborhood: a multifaceted collaborative ﬁl-
+
+tering model. In: KDD, pp. 426–434 (2008)
+
+8. Ma, H., King, I., Lyu, M.R.: Learning to recommend with social trust ensemble.
+
+In: SIGIR, pp. 203–210 (2009)
+
+9. Ma, H., Zhou, D., Liu, C., Lyu, M.R., King, I.: Recommender systems with social
+
+regularization. In: WSDM, pp. 287–296 (2011)
+
+10. Massa, P., Avesani, P.: Trust-aware recommender systems. In: RecSys, pp. 17–24
+
+(2007)
+
+11. McDonald, D.W.: Recommending collaboration with social networks: a compara-
+
+tive evaluation. In: CHI, pp. 593–600 (2003)
+
+12. Salakhutdinov, R., Mnih, A.: Probabilistic matrix factorization. In: NIPS (2007)
+
+
